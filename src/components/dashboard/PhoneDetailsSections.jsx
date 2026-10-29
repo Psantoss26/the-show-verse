@@ -348,8 +348,12 @@ export default function PhoneDetailsSections({
   const overrideType = type;
   const mobilePosterKey = `showverse:${overrideType}:${id}:mobilePoster`;
   const logoKey = `showverse:${overrideType}:${id}:logo`;
+  // Portada de las TARJETAS (pestaña «Tarjetas» de la vista lateral): la de
+  // escritorio (`poster`), no la del hero.
+  const cardPosterKey = `showverse:${overrideType}:${id}:poster`;
   const [selectedMobilePoster, setSelectedMobilePoster] = useState(null);
   const [selectedLogo, setSelectedLogo] = useState(null);
+  const [selectedCardPoster, setSelectedCardPoster] = useState(null);
 
   useEffect(() => {
     if (id == null) return;
@@ -358,10 +362,11 @@ export default function PhoneDetailsSections({
       snapshot ? snapshot[kind] || null : readArtworkPreference(key) || null;
     setSelectedMobilePoster(pick("mobilePoster", mobilePosterKey));
     setSelectedLogo(pick("logo", logoKey));
+    setSelectedCardPoster(pick("poster", cardPosterKey));
     setActiveImagesTab("posters");
     setImagesResFilter("all");
     setControlsOpen(false);
-  }, [id, overrideType, mobilePosterKey, logoKey]);
+  }, [id, overrideType, mobilePosterKey, logoKey, cardPosterKey]);
 
   const persistSelection = useCallback(
     (kind, key, filePath, setLocal, chosen) => {
@@ -406,9 +411,16 @@ export default function PhoneDetailsSections({
     [persistSelection, logoKey],
   );
 
+  const handleSelectCardPoster = useCallback(
+    (filePath, chosen) =>
+      persistSelection("poster", cardPosterKey, filePath, setSelectedCardPoster, chosen),
+    [persistSelection, cardPosterKey],
+  );
+
   const handleResetArtwork = useCallback(() => {
     setSelectedMobilePoster(null);
     setSelectedLogo(null);
+    setSelectedCardPoster(null);
     // Se restauran TODAS las capas, no solo las dos que se editan aquí: es lo
     // que hace el mismo botón en la ficha completa, y dejar a medias el resto
     // convertiría "restaurar" en algo distinto según desde dónde se pulse.
@@ -1186,6 +1198,7 @@ export default function PhoneDetailsSections({
     active: {
       mobilePoster: selectedMobilePoster || data?.heroPosterPath || null,
       logo: selectedLogo || data?.logoPath || null,
+      cardPoster: selectedCardPoster,
     },
   });
   const sectionSheetData = {
@@ -1204,6 +1217,7 @@ export default function PhoneDetailsSections({
         const source = kind === "logo" ? images?.logos : images?.posters;
         const chosen = source?.find((image) => image.file_path === filePath);
         if (kind === "logo") handleSelectLogo(filePath, chosen);
+        else if (kind === "poster") handleSelectCardPoster(filePath, chosen);
         else handleSelectMobilePoster(filePath, chosen);
       },
       onReset: handleResetArtwork,

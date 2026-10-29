@@ -50,7 +50,7 @@ test('tarjetas: usan la portada de escritorio, nunca la del hero móvil', () => 
   assert.equal(getOwnCardPoster('tv', 99), null)
 })
 
-test('tarjetas: la instantánea se parsea una vez hasta que AuthContext avisa', () => {
+test('tarjetas: la instantánea se parsea una vez hasta que AuthContext avisa', async () => {
   const storage = memoryStorage({
     [ARTWORK_PREFERENCES_CACHE_KEY]: snapshot({ 'movie:1': { poster: '/a.jpg' } })
   })
@@ -66,8 +66,13 @@ test('tarjetas: la instantánea se parsea una vez hasta que AuthContext avisa', 
   })
   storage.setItem(ARTWORK_PREFERENCES_CACHE_KEY, snapshot({ 'movie:1': { poster: '/b.jpg' } }))
   notifyPersistedArtworkOverridesChanged()
-  assert.equal(calls, 1)
+  notifyPersistedArtworkOverridesChanged()
+  // La lectura ya ve el cambio; el aviso llega después (fuera del render de
+  // quien escribió) y una sola vez por ráfaga.
   assert.equal(getOwnCardPoster('movie', 1), '/b.jpg')
+  assert.equal(calls, 0)
+  await Promise.resolve()
+  assert.equal(calls, 1)
   unsubscribe()
 })
 

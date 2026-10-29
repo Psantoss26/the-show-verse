@@ -173,9 +173,22 @@ function readCardPosterOverrides() {
     return cardPosterMemo.overrides
 }
 
+let cardPosterNotifyQueued = false
+
+// La memoria se invalida al momento, pero el aviso a las tarjetas va en una
+// microtarea (y agrupado): AuthContext reescribe la instantánea DENTRO del
+// actualizador de `setPreferences`, que React ejecuta mientras renderiza
+// AuthProvider. Avisar ahí actualizaba las tarjetas montadas en pleno render
+// de otro componente («Cannot update a component while rendering…», al elegir
+// portada en el panel lateral con una lista detrás).
 export function notifyPersistedArtworkOverridesChanged() {
     cardPosterMemo = null
-    for (const listener of cardPosterListeners) listener()
+    if (cardPosterNotifyQueued || cardPosterListeners.size === 0) return
+    cardPosterNotifyQueued = true
+    queueMicrotask(() => {
+        cardPosterNotifyQueued = false
+        for (const listener of cardPosterListeners) listener()
+    })
 }
 
 // `null` = sin portada propia para tarjetas: se usa el criterio automático.
