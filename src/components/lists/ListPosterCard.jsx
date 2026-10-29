@@ -8,7 +8,7 @@ import { Film, ImageOff, MonitorPlay } from "lucide-react";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
-import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 
 // Enlace a la ficha de un título: "/details/movie/123" o "/details/tv/456".
 const DETAILS_HREF_RE = /^\/details\/(movie|tv)\/(\d+)(?:[/?#]|$)/;
@@ -106,9 +106,15 @@ export default function ListPosterCard({
   // (drawer lateral) si hay un DetailModalProvider encima; si no, navega.
   const previewClick = usePreviewOpen();
   const detailsMatch = typeof href === "string" ? href.match(DETAILS_HREF_RE) : null;
-  // Portada elegida en la ficha: manda sobre la de la lista y no espera a la
-  // automática en inglés (`posterLoading`).
-  const ownPoster = useOwnCardPoster(detailsMatch?.[1], detailsMatch?.[2]);
+  // Portada elegida en la ficha o, sin ella, la más votada: manda sobre la de
+  // la lista y no espera a la automática en inglés (`posterLoading`). Mientras
+  // no se sabe si hay votada (`pending`, lote en camino) no se pinta la
+  // automática: se veía un instante y se cambiaba por la votada.
+  const { path: ownPoster, pending: ownPosterPending } = useCardArtworkState(
+    detailsMatch?.[1],
+    detailsMatch?.[2],
+    "poster",
+  );
   const shownPosterPath = ownPoster || posterPath;
   const handleClick =
     onClick ||
@@ -131,7 +137,7 @@ export default function ListPosterCard({
       <TmdbPoster
         posterPath={shownPosterPath}
         alt={title}
-        loading={posterLoading && !ownPoster}
+        loading={(posterLoading || ownPosterPending) && !ownPoster}
         onError={onPosterError}
       />
 

@@ -119,32 +119,26 @@ function pickTextlessMobileBackground(images) {
     )
 }
 
-function MovieCard({ movie, idx, imdbRating, disableHover = false, posterLoading = false }) {
+function MovieCard({ movie, imdbRating, disableHover = false, posterLoading = false }) {
     const href = `/details/movie/${movie.id}`
     const poster = movie.poster_path || movie.backdrop_path || null
     const title = movie.title || 'Película sin título'
     const year = movie.release_date ? String(new Date(movie.release_date).getFullYear()) : null
 
+    // La entrada la anima FilterableListItems (ListCardEntrance), como en las
+    // listas: solo las que caben en pantalla y nunca al volver atrás.
     return (
-        <div
-            className="animate-fade-in-up"
-            style={{
-                animationDelay: `${Math.min(idx * 50, 800)}ms`,
-                animationFillMode: 'both'
-            }}
-        >
-            <ListPosterCard
-                href={href}
-                title={title}
-                year={year}
-                mediaType="movie"
-                posterPath={poster}
-                voteAverage={movie.vote_average}
-                imdbRating={imdbRating}
-                posterLoading={posterLoading}
-                disableHover={disableHover}
-            />
-        </div>
+        <ListPosterCard
+            href={href}
+            title={title}
+            year={year}
+            mediaType="movie"
+            posterPath={poster}
+            voteAverage={movie.vote_average}
+            imdbRating={imdbRating}
+            posterLoading={posterLoading}
+            disableHover={disableHover}
+        />
     )
 }
 
@@ -459,7 +453,6 @@ export default function CollectionDetailsClient({ collectionId }) {
                         <MovieCard
                             key={`collection-${movie.id}`}
                             movie={movie}
-                            idx={0}
                             imdbRating={meta.imdbRating}
                             posterLoading={meta.posterLoading}
                             disableHover={viewMode === 'compact'}

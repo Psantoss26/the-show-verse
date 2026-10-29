@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Detalle de listas y colecciones: las tarjetas entran animadas al cargar, en cascada, como en Favoritos y Pendientes (solo las que caben en la pantalla y nunca al volver atrás); antes las de colecciones aparecían todas a la vez y se volvían a animar al volver. Las portadas ya no enseñan un instante la automática antes de la más votada: si aún no se sabe cuál es, la tarjeta espera un momento (como mucho un segundo). → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Listas y Colecciones (/lists): los pósters de los títulos en las vistas de cuadrícula, filas y lista usan la portada que hayas elegido en la ficha o, si no, la más votada, igual que el detalle de cada lista o colección, y cambian al momento cuando eliges otra. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Dashboards (inicio, Películas y Series): la vista previa al pasar el ratón y las tarjetas con fondo ya no enseñan un instante el fondo automático antes del más votado. Abren directamente con el elegido o el más votado y, si aún no se sabe cuál es, esperan un momento (como mucho un segundo) en vez de cambiar de imagen. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - «Portadas y fondos», filtros: el número de imágenes de cada idioma va en una insignia junto a su nombre («Inglés 134») en vez de entre paréntesis dentro del texto. → [fichas de detalle](docs/frontend/app-router-pages.md)

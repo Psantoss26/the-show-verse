@@ -26,6 +26,8 @@ import { TitleRow } from "@/components/details/sectionSheet/SectionSheetRows";
 import { getOwnCardPoster } from "@/lib/artworkApi";
 import { useOwnCardPostersVersion } from "@/lib/hooks/useOwnCardPoster";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import useCardEntrance from "@/hooks/useCardEntrance";
+import { estimateVisibleCards, pickResponsiveColumns } from "@/lib/ui/entranceFill";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import {
   saveUserDetailsSequence,
@@ -58,6 +60,42 @@ const HOVER_NEARBY_TITLES = 6;
 const INITIAL_RENDER_COUNT = 60;
 // Tarjetas en carga mientras llegan los títulos (dos filas en escritorio).
 const LOADING_PLACEHOLDER_CARDS = 12;
+
+// Columnas de cada vista (las de sus rejillas) para saber cuántas tarjetas
+// caben en pantalla y animar solo esas, como en las páginas de usuario.
+// Vistas de filas (lista y compacta): entran desde un poco más abajo.
+const ROW_LIKE_VIEWS = new Set(["list", "compact"]);
+// Alto/ancho de cada tarjeta (la fila de la vista lista es baja y ancha).
+const ENTRANCE_ASPECT = { grid: 1.5, compact: 1.5, list: 0.12 };
+const ENTRANCE_COLUMNS = {
+  grid: { base: 3, sm: 4, md: 5, xl: 6 },
+  compact: { base: 4, sm: 5, md: 6, lg: 7, xl: 8 },
+  list: { base: 1 },
+};
+
+// Entrada de una tarjeta del detalle de listas y colecciones: la misma que
+// Favoritos y Pendientes (`useCardEntrance`, fundido y leve escala con Web
+// Animations, en cascada y UNA sola vez al montar). Solo las que caben en la
+// primera pantalla y nunca al volver atrás: la página se ve tal como estaba.
+function ListCardEntrance({ as: Tag = "div", index, animateWithin, totalItems, viewMode, className, children }) {
+  const [{ shouldAnimate, delayS }] = useState(() => ({
+    shouldAnimate: index < Math.max(1, animateWithin),
+    delayS: totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03,
+  }));
+  const ref = useRef(null);
+  const rowLike = ROW_LIKE_VIEWS.has(viewMode);
+  useCardEntrance(ref, {
+    enabled: shouldAnimate,
+    delayS,
+    durationS: rowLike ? 0.25 : 0.2,
+    fromTransform: rowLike ? "translateY(10px) scale(0.95)" : "scale(0.95)",
+  });
+  return (
+    <Tag ref={ref} className={className}>
+      {children}
+    </Tag>
+  );
+}
 const RENDER_BATCH_SIZE = 60;
 
 // Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
@@ -701,7 +739,36 @@ export default function FilterableListItems({
     }
   };
 
-  const renderEntry = (entry) => {
+  // Cuántas tarjetas se animan al entrar: las que caben en pantalla (0 al
+  // volver atrás). El índice de cada una cuenta todas las de los grupos.
+  const entranceCount = isBackNav
+    ? 0
+    : estimateVisibleCards({
+        columns: pickResponsiveColumns(ENTRANCE_COLUMNS[viewMode] || ENTRANCE_COLUMNS.grid),
+        aspect: ENTRANCE_ASPECT[viewMode] || ENTRANCE_ASPECT.grid,
+      });
+  const entranceTotal = visibleGroupsWithEnglishPosters.reduce(
+    (sum, group) => sum + group.entries.length,
+    0,
+  );
+  let entranceIndex = 0;
+  const entranceProps = () => ({
+    index: entranceIndex++,
+    animateWithin: entranceCount,
+    totalItems: entranceTotal,
+    viewMode,
+  });
+
+  const renderEntry = (entry) => (
+    <ListCardEntrance
+      key={`${entry.meta.mediaType}-${entry.meta.id}-${entry.index}`}
+      {...entranceProps()}
+    >
+      {renderEntryCard(entry)}
+    </ListCardEntrance>
+  );
+
+  const renderEntryCard = (entry) => {
     if (renderCard) return renderCard(entry.item, entry.meta, viewMode, editMode);
     return (
       <ListPosterCard
@@ -860,8 +927,10 @@ export default function FilterableListItems({
                     ? renderAction(entry.item, entry.meta, editMode)
                     : null;
                   return (
-                    <li
+                    <ListCardEntrance
+                      as="li"
                       key={`${entry.meta.mediaType}-${entry.meta.id}-${entry.index}-list`}
+                      {...entranceProps()}
                     >
                       <TitleRow
                         item={entry.item}
@@ -893,7 +962,7 @@ export default function FilterableListItems({
                         imdbRating={entry.meta.imdbRating}
                         action={action}
                       />
-                    </li>
+                    </ListCardEntrance>
                   );
                 })}
               </ul>

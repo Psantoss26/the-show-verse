@@ -10,7 +10,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import Avatar from "@/components/ui/Avatar";
 import { getSoundtrackSourceBadge } from "@/lib/details/soundtrackSource";
 import { videoThumbUrl, videoTypeLabel } from "@/lib/details/videos";
-import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 
 const ROW_BASE = "flex items-center rounded-2xl bg-black/15 transition-colors";
 const ROW = `${ROW_BASE} gap-3.5 p-2.5`;
@@ -114,8 +114,9 @@ export function TitleRow({
 
   const targetHref = href || (item?.id ? `/details/${type}/${item.id}` : "#");
 
-  // Portada elegida en la ficha para este título (la de las tarjetas).
-  const ownPoster = useOwnCardPoster(type, item?.id);
+  // Portada elegida en la ficha o, sin ella, la más votada (la de las
+  // tarjetas). Mientras no se sabe si hay votada no se pinta la automática.
+  const { path: ownPoster, pending: ownPosterPending } = useCardArtworkState(type, item?.id, "poster");
   const resolvedPosterPath =
     ownPoster ||
     (posterPath !== null && posterPath !== undefined
@@ -156,7 +157,7 @@ export function TitleRow({
         src={posterSrc}
         alt=""
         className={LARGE_POSTER}
-        loading={posterLoading && !ownPoster}
+        loading={(posterLoading || ownPosterPending) && !ownPoster}
         onError={onPosterError}
       />
       <span className="min-w-0 flex-1">
