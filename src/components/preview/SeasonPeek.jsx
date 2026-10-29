@@ -6,7 +6,8 @@
 // los títulos (DetailPeekLayout) con lo de arriba de la ficha móvil de la
 // temporada (SeasonDetailsClient):
 //   - su portada (la elegida por el usuario o la de la escalera de idioma,
-//     la misma que la tarjeta) y «Temporada N»;
+//     la misma que la tarjeta), sin rótulo «Temporada N» (el póster ya lo
+//     lleva, como en la ficha móvil);
 //   - su fila de botones (tráiler, serie, vistos, puntuar), sin Anterior /
 //     Siguiente, con los mismos modales;
 //   - su marcador (TMDb, Trakt, IMDb y estadísticas), con las mismas consultas
@@ -335,51 +336,46 @@ export default function SeasonPeek({ item, origin, onClose, onOpenFull }) {
     [showId, seasonNumber, showName, posterPath, router, loginHref],
   );
 
-  // «Temporada N» encima de los botones, como en la ficha (el póster suele
-  // traer el título impreso al pie).
+  // Sin rótulo «Temporada N»: como en la ficha móvil, el póster ya lo lleva
+  // y la fila de botones va pegada a la portada.
   const actions = (
-    <>
-      <div className="mb-3 text-center text-[11px] font-bold uppercase leading-4 tracking-[0.14em] text-zinc-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
-        {seasonLabel}
-      </div>
-      <SubrouteDetailsActionRow
-        sequence={false}
-        seriesHref={`/details/tv/${showId}`}
-        trailer={{
-          available: Array.isArray(videos) && videos.length > 0,
-          loading: false,
-          onOpen: () => {
-            if (videos?.[0]) setActiveVideo(videos[0]);
-          },
-        }}
-        trakt={
-          seasonNumber > 0
-            ? {
-                connected: !!traktConnected,
-                watched: watchedCount > 0,
-                plays: null,
-                badge: progressBadge,
-                busy: watchedBusy,
-                loading:
-                  traktConnected == null ||
-                  (!!traktConnected && !episodesWatched.watchedBySeasonLoaded),
-                onOpen: () => setEpisodesOpen(true),
-              }
-            : null
-        }
-        rate={{
-          rating: userRating,
-          loading: ratingLoading,
-          connected: ratingConnected,
-          onConnect: () => router.push(loginHref),
-          onRate: handleRate,
-          onClear: () => handleRate(null),
-          min: 1,
-          max: 10,
-          step: 1,
-        }}
-      />
-    </>
+    <SubrouteDetailsActionRow
+      sequence={false}
+      seriesHref={`/details/tv/${showId}`}
+      trailer={{
+        available: Array.isArray(videos) && videos.length > 0,
+        loading: false,
+        onOpen: () => {
+          if (videos?.[0]) setActiveVideo(videos[0]);
+        },
+      }}
+      trakt={
+        seasonNumber > 0
+          ? {
+              connected: !!traktConnected,
+              watched: watchedCount > 0,
+              plays: null,
+              badge: progressBadge,
+              busy: watchedBusy,
+              loading:
+                traktConnected == null ||
+                (!!traktConnected && !episodesWatched.watchedBySeasonLoaded),
+              onOpen: () => setEpisodesOpen(true),
+            }
+          : null
+      }
+      rate={{
+        rating: userRating,
+        loading: ratingLoading,
+        connected: ratingConnected,
+        onConnect: () => router.push(loginHref),
+        onRate: handleRate,
+        onClear: () => handleRate(null),
+        min: 1,
+        max: 10,
+        step: 1,
+      }}
+    />
   );
 
   const scoreboard = (
@@ -425,6 +421,7 @@ export default function SeasonPeek({ item, origin, onClose, onOpenFull }) {
       origin={origin}
       posterLowSrc={tmdbImg(posterPath, "w342")}
       posterSrc={tmdbImg(posterPath, "w780")}
+      phoneCover
       actions={actions}
       scoreboard={scoreboard}
       onBackdropClick={onClose}

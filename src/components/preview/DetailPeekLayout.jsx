@@ -10,7 +10,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, usePresence, useReducedMotion } from "framer-motion";
 
 import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
-import { MOBILE_POSTER_OVERSCAN } from "@/components/details/MobileDetailsHero";
+import {
+  MOBILE_POSTER_OVERSCAN,
+  MobileHeroCover,
+} from "@/components/details/MobileDetailsHero";
 import { morphPeekCard, peekHrefKeepsParts } from "@/lib/navigation/peekHandoff";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 
@@ -128,6 +131,11 @@ export default function DetailPeekLayout({
   // EpisodeStillStack); `coverReady` dice cuándo está descargada.
   cover = null,
   coverReady = false,
+  // Portada como la de la ficha móvil (temporadas): MobileHeroCover de fondo
+  // de toda la tarjeta, con el póster entero, la prolongación difuminada de
+  // su borde y, detrás de botones y marcador, su reflejo difuminado y el
+  // oscurecido adaptativo, en vez del fundido a la tarjeta.
+  phoneCover = false,
   logo,
   actions,
   scoreboard,
@@ -300,9 +308,45 @@ export default function DetailPeekLayout({
             // (ver el efecto de arriba) parte de la tarjeta pulsada.
             transform: shown ? "none" : fromCss,
             opacity: shown ? 1 : 0,
+            ...(phoneCover
+              ? { "--mobile-cover-h": `${geometry.posterHeight}px` }
+              : null),
           }}
           onClick={(event) => event.stopPropagation()}
         >
+          {/* `phoneCover`: la portada de la ficha móvil (MobileHeroCover en
+              modo panel) de fondo de toda la tarjeta, recortada a ella. Va
+              detrás de la portada (que queda como zona táctil), los botones
+              y el marcador. */}
+          {phoneCover && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+            >
+              {!artReady && (
+                <div
+                  className="absolute inset-x-0 top-0 animate-pulse bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900"
+                  style={{
+                    height: geometry.posterHeight,
+                    WebkitMaskImage: "var(--sv-poster-fade)",
+                    maskImage: "var(--sv-poster-fade)",
+                  }}
+                />
+              )}
+              <MobileHeroCover
+                inPanel
+                lowSrc={posterLowSrc}
+                src={posterSrc}
+                onLoad={markLoaded(setLowReady, posterLowSrc)}
+                ready={!!artReady}
+                animate={false}
+                collage={null}
+                blurredUnderlay
+                adaptiveContrast
+              />
+            </div>
+          )}
+
           {/* Portada con su logo. Tocarla abre la ficha completa. */}
           <button
             ref={coverRef}
@@ -322,13 +366,13 @@ export default function DetailPeekLayout({
                 un envoltorio dentro de esta tarjeta Chrome no la pintaba y la
                 imagen llegaba nítida hasta el borde. */}
             <div className="absolute inset-0">
-              {!artReady && (
+              {!artReady && !phoneCover && (
                 <div className="sv-preview-fade absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900" />
               )}
               {/* La portada compuesta trae su propio fundido (ver `fade` en
                   EpisodeStillStack). */}
               {cover && <div className="absolute inset-0">{cover}</div>}
-              {!cover && posterLowSrc && (
+              {!cover && !phoneCover && posterLowSrc && (
                 <img
                   key={posterLowSrc}
                   src={posterLowSrc}
@@ -341,7 +385,7 @@ export default function DetailPeekLayout({
                   fetchPriority="high"
                 />
               )}
-              {!cover && posterSrc && (
+              {!cover && !phoneCover && posterSrc && (
                 <img
                   key={posterSrc}
                   src={posterSrc}
@@ -375,7 +419,7 @@ export default function DetailPeekLayout({
 
           {/* Fila y marcador como en la ficha móvil: mismo ancho y 20px
               entre los dos. */}
-          <div className="px-2.5 pb-2.5 pt-3">
+          <div className="relative px-2.5 pb-2.5 pt-3">
             <div ref={actionsRef} data-peek-part="actions">
               {actions}
             </div>
