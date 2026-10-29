@@ -35,3 +35,28 @@ export function estimateVisibleCards({ columns, aspect = 1.5, cap = 200 } = {}) 
   const rows = Math.ceil(window.innerHeight / Math.max(70, rowHeight)) + 2;
   return Math.min(cap, Math.max(columns * 2, rows * columns));
 }
+
+// Favoritos y Pendientes: columnas de cada vista (las mismas que sus rejillas).
+function userPageColumns(viewMode, imageMode) {
+  if (viewMode === "list") return { base: 1, xl: 2 };
+  if (viewMode === "compact") {
+    return imageMode === "backdrop"
+      ? { base: 2, sm: 3, md: 4, lg: 4, xl: 4 }
+      : { base: 4, sm: 5, md: 6, lg: 7, xl: 8 };
+  }
+  return imageMode === "backdrop"
+    ? { base: 2, sm: 2, md: 3, lg: 3, xl: 3 }
+    : { base: 3, sm: 4, md: 5, lg: 6, xl: 6 };
+}
+
+// Tarjetas que cubren la pantalla en Favoritos/Pendientes. Sirve para las dos
+// decisiones de la entrada: cuántas se ANIMAN y cuántas se MONTAN en la primera
+// tanda. Si se montaban menos de las que se ven (antes, 24 fijas: tres filas en
+// la vista compacta de escritorio), el resto llegaba tras la espera de la
+// siguiente tanda y aparecía de golpe, sin animar.
+export function estimateUserPageEntranceCount({ viewMode, imageMode } = {}) {
+  return estimateVisibleCards({
+    columns: pickResponsiveColumns(userPageColumns(viewMode, imageMode)),
+    aspect: viewMode === "list" || imageMode === "backdrop" ? 0.5625 : 1.5,
+  });
+}

@@ -52,8 +52,7 @@ import {
 } from "@/lib/hooks/useIsHistoryNavigation";
 import { useStableState } from "@/lib/hooks/useStableState";
 import {
-  pickResponsiveColumns,
-  estimateVisibleCards,
+  estimateUserPageEntranceCount,
 } from "@/lib/ui/entranceFill";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import { readCachedUserId } from "@/lib/auth/currentUser";
@@ -130,6 +129,12 @@ function readInitialWatchlistViewMode() {
   if (typeof window === "undefined") return "grid";
   const saved = window.localStorage.getItem("showverse:watchlist:viewMode");
   return WATCHLIST_VIEW_MODES.has(saved) ? saved : "grid";
+}
+
+function readInitialWatchlistImageMode() {
+  if (typeof window === "undefined") return "poster";
+  const saved = window.localStorage.getItem("showverse:watchlist:imageMode");
+  return saved === "backdrop" ? "backdrop" : "poster";
 }
 
 const WATCHLIST_INITIAL_RENDER_LIMIT = 24;
@@ -1838,8 +1843,21 @@ export default function WatchlistClient() {
   // mount, so the entrance feels consistent every visit.
   // Al VOLVER (atrás/adelante) se renderiza todo de golpe (sin trocear) para que
   // la altura sea correcta al instante y el scroll se restaure sin saltos.
-  const [renderLimit, setRenderLimit] = useState(
-    isBackNav ? Number.MAX_SAFE_INTEGER : WATCHLIST_INITIAL_RENDER_LIMIT,
+  //
+  // La primera tanda cubre TODA la pantalla (las mismas tarjetas que se animan,
+  // con su margen): con el tope fijo de 24, en pantallas grandes o en la vista
+  // compacta lo que pasaba de la tercera fila esperaba a la siguiente tanda y
+  // aparecía de golpe, sin animación.
+  const [renderLimit, setRenderLimit] = useState(() =>
+    isBackNav
+      ? Number.MAX_SAFE_INTEGER
+      : Math.max(
+          WATCHLIST_INITIAL_RENDER_LIMIT,
+          estimateUserPageEntranceCount({
+            viewMode: readInitialWatchlistViewMode(),
+            imageMode: readInitialWatchlistImageMode(),
+          }),
+        ),
   );
 
   // Filter states with localStorage persistence
@@ -1892,11 +1910,7 @@ export default function WatchlistClient() {
     return saved || "added-desc";
   });
 
-  const [imageMode, setImageModeState] = useState(() => {
-    if (typeof window === "undefined") return "poster";
-    const saved = window.localStorage.getItem("showverse:watchlist:imageMode");
-    return saved === "backdrop" ? "backdrop" : "poster";
-  });
+  const [imageMode, setImageModeState] = useState(readInitialWatchlistImageMode);
 
   const setImageMode = useCallback(
     (mode) => {
@@ -2695,20 +2709,7 @@ export default function WatchlistClient() {
 
   // Nº de tarjetas a animar a la entrada = las que caben en pantalla en la vista
   // actual (mismas columnas que la rejilla). Sustituye al tope fijo de 24.
-  const entranceVisibleCount = estimateVisibleCards({
-    columns: pickResponsiveColumns(
-      viewMode === "list"
-        ? { base: 1, xl: 2 }
-        : viewMode === "compact"
-          ? imageMode === "backdrop"
-            ? { base: 2, sm: 3, md: 4, lg: 4, xl: 4 }
-            : { base: 4, sm: 5, md: 6, lg: 7, xl: 8 }
-          : imageMode === "backdrop"
-            ? { base: 2, sm: 2, md: 3, lg: 3, xl: 3 }
-            : { base: 3, sm: 4, md: 5, lg: 6, xl: 6 },
-    ),
-    aspect: viewMode === "list" || imageMode === "backdrop" ? 0.5625 : 1.5,
-  });
+  const entranceVisibleCount = estimateUserPageEntranceCount({ viewMode, imageMode });
 
   if (!hydrated && !paintsBackNavigationSnapshot) {
     return <div className="min-h-screen bg-black" />;
