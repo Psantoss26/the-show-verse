@@ -8,6 +8,7 @@ import { Film, ImageOff, MonitorPlay } from "lucide-react";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 // Enlace a la ficha de un título: "/details/movie/123" o "/details/tv/456".
 const DETAILS_HREF_RE = /^\/details\/(movie|tv)\/(\d+)(?:[/?#]|$)/;
@@ -105,6 +106,10 @@ export default function ListPosterCard({
   // (drawer lateral) si hay un DetailModalProvider encima; si no, navega.
   const previewClick = usePreviewOpen();
   const detailsMatch = typeof href === "string" ? href.match(DETAILS_HREF_RE) : null;
+  // Portada elegida en la ficha: manda sobre la de la lista y no espera a la
+  // automática en inglés (`posterLoading`).
+  const ownPoster = useOwnCardPoster(detailsMatch?.[1], detailsMatch?.[2]);
+  const shownPosterPath = ownPoster || posterPath;
   const handleClick =
     onClick ||
     (detailsMatch
@@ -113,7 +118,7 @@ export default function ListPosterCard({
             id: Number(detailsMatch[2]),
             title,
             name: title,
-            poster_path: posterPath || null,
+            poster_path: shownPosterPath || null,
           },
           { mediaType: detailsMatch[1] },
         )
@@ -123,7 +128,12 @@ export default function ListPosterCard({
     <div
       className={`relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-lg backdrop-blur-[28px] ${className}`}
     >
-      <TmdbPoster posterPath={posterPath} alt={title} loading={posterLoading} onError={onPosterError} />
+      <TmdbPoster
+        posterPath={shownPosterPath}
+        alt={title}
+        loading={posterLoading && !ownPoster}
+        onError={onPosterError}
+      />
 
       {!disableHover ? (
         <>

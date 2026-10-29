@@ -9,6 +9,7 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { resolvePosterViewerState } from "./posterViewerState.mjs";
 import Stars from "./Stars";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 function tmdbPoster(path, size = "w342") {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
@@ -55,7 +56,14 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
   const [failed, setFailed] = useState(false);
   const previewClick = usePreviewOpen();
   const mediaType = mediaTypeOf(item);
-  const src = tmdbPoster(item?.posterPath || item?.poster_path);
+  // Portada elegida en la ficha del título (no en temporadas sueltas, que
+  // tienen la suya).
+  const rawType = item?.mediaType ?? item?.media_type ?? item?.type;
+  const ownPoster = useOwnCardPoster(
+    mediaType,
+    rawType === "season" ? null : item?.tmdbId || item?.id,
+  );
+  const src = tmdbPoster(ownPoster || item?.posterPath || item?.poster_path);
   const title = item?.title || item?.name || "";
 
   const { favorite, watchlist, watched, userRating } =

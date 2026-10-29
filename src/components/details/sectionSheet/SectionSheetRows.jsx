@@ -10,6 +10,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import Avatar from "@/components/ui/Avatar";
 import { getSoundtrackSourceBadge } from "@/lib/details/soundtrackSource";
 import { videoThumbUrl, videoTypeLabel } from "@/lib/details/videos";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 const ROW_BASE = "flex items-center rounded-2xl bg-black/15 transition-colors";
 const ROW = `${ROW_BASE} gap-3.5 p-2.5`;
@@ -113,10 +114,13 @@ export function TitleRow({
 
   const targetHref = href || (item?.id ? `/details/${type}/${item.id}` : "#");
 
+  // Portada elegida en la ficha para este título (la de las tarjetas).
+  const ownPoster = useOwnCardPoster(type, item?.id);
   const resolvedPosterPath =
-    posterPath !== null && posterPath !== undefined
+    ownPoster ||
+    (posterPath !== null && posterPath !== undefined
       ? posterPath
-      : item?.poster_path;
+      : item?.poster_path);
   const posterSrc = resolvedPosterPath
     ? resolvedPosterPath.startsWith("http")
       ? resolvedPosterPath
@@ -152,7 +156,7 @@ export function TitleRow({
         src={posterSrc}
         alt=""
         className={LARGE_POSTER}
-        loading={posterLoading}
+        loading={posterLoading && !ownPoster}
         onError={onPosterError}
       />
       <span className="min-w-0 flex-1">

@@ -23,6 +23,8 @@ import ListPosterCard, {
   listPosterGridClass,
 } from "@/components/lists/ListPosterCard";
 import { TitleRow } from "@/components/details/sectionSheet/SectionSheetRows";
+import { getOwnCardPoster } from "@/lib/artworkApi";
+import { useOwnCardPostersVersion } from "@/lib/hooks/useOwnCardPoster";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import {
@@ -550,6 +552,9 @@ export default function FilterableListItems({
       return next;
     });
   }, []);
+  // Con portada elegida en la ficha, la tarjeta se pinta aunque TMDb no tenga
+  // la automática en inglés (ver `hideMissingPosters`).
+  const ownCardPostersVersion = useOwnCardPostersVersion();
   const visibleGroupsWithEnglishPosters = useMemo(() => {
     let itemIndex = 0;
     return visibleGroups
@@ -563,6 +568,7 @@ export default function FilterableListItems({
           .filter(
             (entry) =>
               !hideMissingPosters ||
+              getOwnCardPoster(entry.meta.mediaType, entry.meta.id) ||
               !(
                 entry.item?._englishPosterMissing ||
                 brokenPosters.has(entry.meta.posterPath)
@@ -570,7 +576,8 @@ export default function FilterableListItems({
           ),
       }))
       .filter((group) => group.entries.length);
-  }, [visibleGroups, englishPosterItems, getMeta, hideMissingPosters, brokenPosters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- la versión invalida las portadas elegidas
+  }, [visibleGroups, englishPosterItems, getMeta, hideMissingPosters, brokenPosters, ownCardPostersVersion]);
   const posterErrorHandler = (entry) =>
     hideMissingPosters ? () => markPosterBroken(entry.meta.posterPath) : undefined;
 
