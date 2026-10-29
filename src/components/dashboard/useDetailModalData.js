@@ -221,6 +221,9 @@ const EMPTY_DATA = {
   autoHeroPosterPath: null,
   autoHeroHasBurnedTitle: false,
   autoLogoPath: null,
+  // Backdrop AUTOMÁTICO de la cabecera ancha (sin elección ni voto propios): al
+  // que vuelve el editor de imágenes de DetailModal al restaurar.
+  autoHeroBackdropPath: null,
   // Backdrop del hero: SOLO el definitivo (textless), fijado una única vez y ya
   // precargado. Hasta que existe se muestra el esqueleto, nunca una imagen
   // intermedia: así el usuario ve aparecer una sola imagen.
@@ -1378,18 +1381,22 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
         // resuelve como la portada y el logo: instantánea -> revalidación
         // remota -> copia local. Sin esperarla, un fondo elegido en otro
         // dispositivo no llegaba nunca al hero de la ficha rápida.
-        const [detailsForArt, bestBackdrop, artworkOverrides] =
+        const [detailsForArt, bestBackdrop, artworkOverrides, autoArtwork] =
           await Promise.all([
             detailsPromise,
             fetchBestBackdropNoLang(id, mediaType).catch(() => null),
             artworkOverridesPromise,
+            // Ya resuelta junto a `artworkOverridesPromise` (mismas fuentes).
+            autoArtworkPromise,
           ]);
-        const finalBackdrop =
-          overrideFrom(artworkOverrides, "backdrop") ||
+        const automaticBackdrop =
           bestBackdrop ||
           item?.backdrop_path ||
           detailsForArt?.backdrop_path ||
           null;
+        const finalBackdrop =
+          overrideFrom(artworkOverrides, "backdrop") || automaticBackdrop;
+        const autoHeroBackdropPath = autoArtwork?.backdrop || automaticBackdrop;
         if (cancelled || !finalBackdrop) return;
         // VISTA DE TELÉFONO: primero la portada, que es todo su primer
         // pantallazo. El backdrop va en tamaño `original` (la ficha ancha) y,
@@ -1400,7 +1407,11 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
         if (cancelled) return;
         await preloadImage(buildImg(finalBackdrop, HERO_BACKDROP_SIZE));
         if (cancelled) return;
-        setData((prev) => ({ ...prev, heroBackdropPath: finalBackdrop }));
+        setData((prev) => ({
+          ...prev,
+          heroBackdropPath: finalBackdrop,
+          autoHeroBackdropPath,
+        }));
       } catch {
         // sin backdrop: el hero mantiene el esqueleto
       }
@@ -1522,6 +1533,7 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
       if (kind === "reset") {
         return {
           ...prev,
+          heroBackdropPath: prev.autoHeroBackdropPath || prev.heroBackdropPath,
           heroPosterPath: prev.autoHeroPosterPath || prev.heroPosterPath,
           heroPosterHasBurnedTitle: prev.autoHeroPosterPath
             ? Boolean(prev.autoHeroHasBurnedTitle)
@@ -1530,8 +1542,17 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
           logoResolved: true,
         };
       }
+      // Sin ruta (restaurar esa capa): vuelve la automática.
       if (kind === "logo") {
-        return { ...prev, logoPath: filePath || null, logoResolved: true };
+        return { ...prev, logoPath: filePath || prev.autoLogoPath || null, logoResolved: true };
+      }
+      // «Vista previa» (editor de DetailModal): el backdrop de la cabecera ancha.
+      if (kind === "backdrop") {
+        return {
+          ...prev,
+          heroBackdropPath:
+            filePath || prev.autoHeroBackdropPath || prev.heroBackdropPath,
+        };
       }
       if (kind === "mobilePoster") {
         return {

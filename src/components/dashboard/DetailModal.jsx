@@ -41,6 +41,7 @@ import {
   BookmarkPlus,
   Pin,
   PanelRight,
+  Pencil,
   Smartphone,
   ArrowUpRight,
   Trophy,
@@ -156,6 +157,7 @@ import VideoModal from "@/components/details/VideoModal";
 import { loadTitleVideos } from "@/lib/details/titleVideos";
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
+import DetailModalArtworkEditor from "@/components/dashboard/DetailModalArtworkEditor";
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
 import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
@@ -691,6 +693,12 @@ export default function DetailModal({
   });
   const showFollowingActivity = hasFollowingActivity(followingActivity);
   const detailKey = `${mediaType}:${item?.id ?? ""}`;
+  // Backdrop de «Vista previa» y logo de la cabecera ancha (botón Editar).
+  const canEditHeaderArtwork =
+    !mobileDetails &&
+    !isEpisode &&
+    item?.id != null &&
+    (mediaType === "movie" || mediaType === "tv");
   const metadataLoading =
     !isEpisode &&
     (!data.detailsResolved || data.detailsKey !== detailKey);
@@ -2545,6 +2553,8 @@ export default function DetailModal({
 
   /* --------------------------- valoración de episodios (TV) --------------------------- */
   const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
+  // Editor de las imágenes de la cabecera ancha (Vista previa y Logo).
+  const [artworkEditorOpen, setArtworkEditorOpen] = useState(false);
 
   /* ------------------------------ ficha completa ------------------------------ */
   // Prefetch de la ficha completa al abrir el modal: así, al pulsar "Ver ficha
@@ -3613,6 +3623,17 @@ export default function DetailModal({
         />
       )}
 
+      {artworkEditorOpen && canEditHeaderArtwork && (
+        <DetailModalArtworkEditor
+          key={detailKey}
+          type={mediaType}
+          id={Number(item?.id)}
+          active={{ backdrop: data.heroBackdropPath, logo: data.logoPath }}
+          onApply={applyArtworkSelection}
+          onClose={() => setArtworkEditorOpen(false)}
+        />
+      )}
+
       {/* Valoración de episodios (solo series) — mismo modal que la ficha
           completa; se autoabastece (ratings + temporadas) al abrirse. */}
       {mediaType === "tv" && (
@@ -4030,6 +4051,33 @@ export default function DetailModal({
                 </div>
                 <span className={`max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 ${mobileDetails ? "hidden" : "group-hover:max-w-[104px] group-hover:opacity-100"} translate-y-[1px]`}>
                   Ver temporada
+                </span>
+              </button>
+            )}
+
+            {/* Editar las imágenes de esta cabecera: el backdrop de «Vista
+                previa» y el logo. Solo en la vista ancha, que es la que los
+                pinta (la ficha de teléfono edita las suyas en «Portadas y
+                fondos»). */}
+            {canEditHeaderArtwork && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  stopNestedModalOpeningEvent(event);
+                  setArtworkEditorOpen(true);
+                }}
+                disabled={navigatingToFullDetails}
+                aria-label="Editar imágenes"
+                title="Editar imágenes"
+                aria-haspopup="dialog"
+                aria-expanded={artworkEditorOpen}
+                className={`group flex h-10 w-10 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out hover:w-[148px] hover:gap-1.5 hover:px-3 ${DETAIL_MODAL_GLASS_CONTROL}`}
+              >
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center transition-transform duration-300 group-hover:-rotate-12">
+                  <Pencil className="h-[18px] w-[18px] shrink-0" />
+                </div>
+                <span className="max-w-0 translate-y-[1px] overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 group-hover:max-w-[104px] group-hover:opacity-100">
+                  Editar imágenes
                 </span>
               </button>
             )}

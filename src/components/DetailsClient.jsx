@@ -2981,8 +2981,11 @@ export default function DetailsClient({
   // «Con idioma» solo existe en móvil: en escritorio la portada es otra capa.
   useEffect(() => {
     if (
-      !isMobileViewport &&
-      (activeImagesTab === "localizedPosters" || activeImagesTab === "cardPosters")
+      // «Vista previa» ya no está en la ficha (se edita en DetailModal): una
+      // vuelta atrás que la restaure cae en la portada.
+      activeImagesTab === "backdrops" ||
+      (!isMobileViewport &&
+        (activeImagesTab === "localizedPosters" || activeImagesTab === "cardPosters"))
     ) {
       setActiveImagesTab("posters");
     }
@@ -8068,7 +8071,6 @@ export default function DetailsClient({
   // de la ficha (en móvil, Portada y Logo) con la imagen elegida marcada.
   const sheetPosterActive = (selectedPosterPath || communityPosterPath || basePosterPath || data?.profile_path) ?? null;
   const sheetMobilePosterActive = selectedMobilePosterPath || mobileNeutralPosterPath || null;
-  const sheetPreviewActive = selectedPreviewBackdropPath || communityPreviewBackdropPath || detailModalPreviewBackdropFallback || null;
   const sheetBackgroundActive = displayBackdropPath || data?.backdrop_path || null;
   const sheetArtworkTabs = useMemo(
     () =>
@@ -8081,7 +8083,6 @@ export default function DetailsClient({
           poster: sheetPosterActive,
           mobilePoster: sheetMobilePosterActive,
           cardPoster: selectedPosterPath || null,
-          preview: sheetPreviewActive,
           background: sheetBackgroundActive,
           logo: displayHeroLogoPath,
         },
@@ -8094,7 +8095,6 @@ export default function DetailsClient({
       sheetPosterActive,
       sheetMobilePosterActive,
       selectedPosterPath,
-      sheetPreviewActive,
       sheetBackgroundActive,
       displayHeroLogoPath,
     ],
@@ -11847,9 +11847,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <div className="self-start shrink-0 flex items-center gap-2 sm:gap-3 h-10 md:h-11">
                             {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                             <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
-                              {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo y Logo */}
+                              {/* Tabs de tipo de imagen: Portada, Fondo y Logo. «Vista
+                                  previa» (el backdrop de DetailModal) se edita desde el
+                                  botón Editar del propio DetailModal. */}
                               <div className="flex isolate transform-gpu items-center rounded-2xl p-1 w-fit h-10 md:h-11 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
-                                {["posters", "backdrops", "background", "logos"].map(
+                                {["posters", "background", "logos"].map(
                                   (tab) => (
                                     <button
                                       key={tab}
@@ -11867,11 +11869,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     >
                                       {tab === "posters"
                                         ? "Portada"
-                                        : tab === "backdrops"
-                                          ? "Vista previa"
-                                          : tab === "background"
-                                            ? "Fondo"
-                                            : "Logo"}
+                                        : tab === "background"
+                                          ? "Fondo"
+                                          : "Logo"}
                                     </button>
                                   ),
                                 )}

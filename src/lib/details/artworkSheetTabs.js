@@ -3,7 +3,9 @@
 // imágenes (sin el filtro de resolución de la galería; los logos, solo en
 // español e inglés como en ella).
 //
-//   - Escritorio: Portada, Vista previa, Fondo y Logo.
+//   - Escritorio: Portada, Fondo y Logo. «Vista previa» (el backdrop de
+//     DetailModal) se edita desde el propio DetailModal: ver
+//     `buildDetailModalArtworkTabs`.
 //   - Móvil: Portada, Con idioma, Tarjetas y Logo. La portada móvil va sin
 //     idioma con el logo encima; elegir una «Con idioma» la sustituye y el logo
 //     se oculta (ya trae el título impreso). Esas dos guardan la misma
@@ -43,19 +45,53 @@ function selectedFirst(list, activePath, source, injectActive = true) {
   return selected ? [selected, ...list] : list;
 }
 
-export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logos, active = {} }) {
-  const allPosters = withPath(posters);
+// Logos: como el filtro ES/EN de la galería, solo en español e inglés.
+const languageLogosOf = (allLogos) => orAll(allLogos.filter(isSpanishOrEnglishImage), allLogos);
+
+function finishTabs(tabs, sources) {
+  return tabs
+    .map((tab) => {
+      const { injectActive = true, ...rest } = tab;
+      const images = selectedFirst(tab.images, tab.activePath, sources[tab.kind], injectActive);
+      return { ...rest, images, count: images.length };
+    })
+    .filter((tab) => tab.count > 0);
+}
+
+// Editor de imágenes de DetailModal (botón Editar de sus controles): las dos
+// capas de su cabecera, el backdrop de «Vista previa» (sin idioma, con el logo
+// encima; kind `backdrop`) y el logo.
+export function buildDetailModalArtworkTabs({ backdrops, logos, active = {} }) {
   const allBackdrops = withPath(backdrops);
-  const neutralBackdrops = orAll(allBackdrops.filter(isLanguageNeutralImage), allBackdrops);
   const galleryBackdrops = orAll(
     allBackdrops.filter((img) => img.from !== "main"),
     allBackdrops,
   );
+  const allLogos = withPath(logos);
+  return finishTabs(
+    [
+      {
+        id: "backdrops",
+        label: "Vista previa",
+        kind: "backdrop",
+        aspect: "backdrop",
+        images: orAll(galleryBackdrops.filter(isLanguageNeutralImage), galleryBackdrops),
+        activePath: active.preview,
+      },
+      { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: languageLogosOf(allLogos), activePath: active.logo },
+    ],
+    { backdrop: allBackdrops, logo: allLogos },
+  );
+}
+
+export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logos, active = {} }) {
+  const allPosters = withPath(posters);
+  const allBackdrops = withPath(backdrops);
+  const neutralBackdrops = orAll(allBackdrops.filter(isLanguageNeutralImage), allBackdrops);
 
   const allLogos = withPath(logos);
-  // Como el filtro ES/EN de la galería: solo logos en español e inglés.
-  const languageLogos = orAll(allLogos.filter(isSpanishOrEnglishImage), allLogos);
-  const sources = { poster: allPosters, mobilePoster: allPosters, preview: allBackdrops, background: allBackdrops, logo: allLogos };
+  const languageLogos = languageLogosOf(allLogos);
+  const sources = { poster: allPosters, mobilePoster: allPosters, background: allBackdrops, logo: allLogos };
 
   const localizedPosters = spanishOrEnglishFirst(
     allPosters.filter((img) => !isLanguageNeutralImage(img)),
@@ -99,14 +135,6 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
     : [
         { id: "posters", label: "Portada", kind: "poster", aspect: "poster", images: allPosters, activePath: active.poster },
         {
-          id: "backdrops",
-          label: "Vista previa",
-          kind: "preview",
-          aspect: "backdrop",
-          images: orAll(galleryBackdrops.filter(isLanguageNeutralImage), galleryBackdrops),
-          activePath: active.preview,
-        },
-        {
           id: "background",
           label: "Fondo",
           kind: "background",
@@ -117,11 +145,5 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
         { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: languageLogos, activePath: active.logo },
       ];
 
-  return tabs
-    .map((tab) => {
-      const { injectActive = true, ...rest } = tab;
-      const images = selectedFirst(tab.images, tab.activePath, sources[tab.kind], injectActive);
-      return { ...rest, images, count: images.length };
-    })
-    .filter((tab) => tab.count > 0);
+  return finishTabs(tabs, sources);
 }

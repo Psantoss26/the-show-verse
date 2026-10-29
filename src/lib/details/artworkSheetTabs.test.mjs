@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildArtworkSheetTabs } from "./artworkSheetTabs.js";
+import { buildArtworkSheetTabs, buildDetailModalArtworkTabs } from "./artworkSheetTabs.js";
 
 const posters = [
   { file_path: "/es.jpg", iso_639_1: "es" },
@@ -35,14 +35,23 @@ test("móvil: las mismas pestañas que la ficha (Portada sin idioma, Con idioma,
   assert.equal(tabs[0].kind, "mobilePoster");
 });
 
-test("escritorio: Portada, Vista previa, Fondo y Logo", () => {
+test("escritorio: Portada, Fondo y Logo (Vista previa se edita en DetailModal)", () => {
   const tabs = buildArtworkSheetTabs({ posters, backdrops, logos, active: { background: "/limpio.jpg" } });
-  assert.deepEqual(tabs.map((tab) => tab.label), ["Portada", "Vista previa", "Fondo", "Logo"]);
+  assert.deepEqual(tabs.map((tab) => tab.label), ["Portada", "Fondo", "Logo"]);
   assert.equal(tabs[0].images.length, 3);
-  // Vista previa: arte de la galería (no el `main`) y sin texto.
-  assert.deepEqual(tabs[1].images.map((img) => img.file_path), ["/limpio.jpg"]);
   // Fondo: sin idioma, la elegida primero.
-  assert.deepEqual(tabs[2].images.map((img) => img.file_path), ["/limpio.jpg", "/main.jpg"]);
+  assert.deepEqual(tabs[1].images.map((img) => img.file_path), ["/limpio.jpg", "/main.jpg"]);
+});
+
+test("DetailModal: Vista previa (backdrop sin idioma de la galería) y Logo", () => {
+  const tabs = buildDetailModalArtworkTabs({ backdrops, logos, active: { logo: "/logo.png" } });
+  assert.deepEqual(tabs.map((tab) => [tab.id, tab.label, tab.kind]), [
+    ["backdrops", "Vista previa", "backdrop"],
+    ["logos", "Logo", "logo"],
+  ]);
+  // Arte de la galería (no el `main`) y sin texto.
+  assert.deepEqual(tabs[0].images.map((img) => img.file_path), ["/limpio.jpg"]);
+  assert.equal(tabs[1].activePath, "/logo.png");
 });
 
 test("móvil sin portadas neutras: sin «Portada»; pestañas vacías fuera", () => {
@@ -62,8 +71,7 @@ test("móvil: la portada elegida se marca solo en su pestaña", () => {
 });
 
 test("la elegida aparece aunque el filtro de su pestaña la deje fuera", () => {
-  const tabs = buildArtworkSheetTabs({ posters, backdrops, logos, active: { preview: "/texto.jpg" } });
-  const preview = tabs.find((tab) => tab.id === "backdrops");
+  const [preview] = buildDetailModalArtworkTabs({ backdrops, logos, active: { preview: "/texto.jpg" } });
   assert.deepEqual(preview.images.map((img) => img.file_path), ["/texto.jpg", "/limpio.jpg"]);
   assert.equal(preview.count, 2);
 });
