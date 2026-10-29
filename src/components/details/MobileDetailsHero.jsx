@@ -288,6 +288,15 @@ export function readBottomNavTop() {
  * título impreso al pie y nada puede ir encima): la imagen mide lo que el
  * hueco y, si ni así cabe, se recorta por arriba.
  *
+ * `fitCoverExactPoster` (temporadas): la imagen mide SIEMPRE
+ * `fitCoverPosterRatio` del ancho, así que el póster no se recorta ni por
+ * arriba ni por abajo. El hueco en flujo no pasa de ese alto: los botones van
+ * justo bajo el pie del póster y lo que sobre hasta el navbar se reparte a
+ * partes iguales a los dos lados del marcador. Si el marcador no cabe sin
+ * montarse en el póster, pasa a 'hidden' (sin el margen de
+ * MOBILE_FIT_POSTER_MAX_CROP); solo en móviles muy bajos, donde ni los
+ * botones caben bajo el póster, estos tapan su pie.
+ *
  * `fitCoverWhenShort` (listas y colecciones): la portada sigue en 150vw con el
  * marcador centrado debajo mientras quepa al menos el compacto a `fitGap` del
  * navbar inferior; si no (ventanas bajas), se ajusta como con `fitCover` y
@@ -304,7 +313,7 @@ const HERO_ROOT_START_STYLE = {
     '--mobile-scoreboard-shift': '0px',
 }
 
-export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, fitGap = 20, fitCoverMinRatio = 0.75, fitCoverPosterRatio = 0, fitCoverScoreboardOptional = false, fitCoverOverlap = true, fitCoverWhenShort = false } = {}) {
+export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, fitGap = 20, fitCoverMinRatio = 0.75, fitCoverPosterRatio = 0, fitCoverScoreboardOptional = false, fitCoverOverlap = true, fitCoverExactPoster = false, fitCoverWhenShort = false } = {}) {
     const rootRef = useRef(null)
     const coverSpacerRef = useRef(null)
     const actionRowRef = useRef(null)
@@ -452,21 +461,32 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                 // botones, a `fitGap` del navbar. `visibleCompact` se mide
                 // igual con el marcador oculto (sigue en flujo), así que la
                 // decisión no oscila.
-                const mode = fitCoverScoreboardOptional && withBoard < posterHeight * (1 - MOBILE_FIT_POSTER_MAX_CROP) ? 'hidden' : 'compact'
+                const maxCrop = fitCoverExactPoster ? 0 : MOBILE_FIT_POSTER_MAX_CROP
+                const mode = fitCoverScoreboardOptional && withBoard < posterHeight * (1 - maxCrop) ? 'hidden' : 'compact'
                 const available = mode === 'hidden'
                     ? navTopRef.current - fitGap - belowCover - coverDocTop
                     : withBoard
                 // Hacia abajo: con `round` el último hueco salía 1px corto.
-                const height = Math.floor(Math.max(window.innerWidth * fitCoverMinRatio, available))
+                const fitted = Math.floor(Math.max(window.innerWidth * fitCoverMinRatio, available))
+                // El pie visible del póster es el del sobrebarrido
+                // (MOBILE_POSTER_OVERSCAN, escalado desde arriba).
+                const height = fitCoverExactPoster
+                    ? Math.min(fitted, Math.floor(posterHeight * MOBILE_POSTER_OVERSCAN))
+                    : fitted
                 writeHeroVar('--mobile-cover-flow-h', `${height}px`)
                 writeHeroVar(
                     '--mobile-cover-h',
-                    fitCoverOverlap
-                        ? `${Math.max(height, Math.ceil(posterHeight))}px`
-                        : `${height}px`,
+                    fitCoverExactPoster
+                        ? `${posterHeight}px`
+                        : fitCoverOverlap
+                            ? `${Math.max(height, Math.ceil(posterHeight))}px`
+                            : `${height}px`,
                 )
                 setScoreboardMode((current) => (current === mode ? current : mode))
-                const fitShift = Math.round((fitGap - baseGap) * 2) / 2
+                // Con el póster exacto, lo que sobra bajo él se reparte entre
+                // botones → marcador y marcador → navbar.
+                const spare = mode === 'compact' ? Math.max(0, fitted - height) / 2 : 0
+                const fitShift = Math.round((fitGap + spare - baseGap) * 2) / 2
                 writeHeroVar('--mobile-scoreboard-shift', `${fitShift}px`)
                 return
             }
@@ -531,7 +551,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             fitMutations?.disconnect()
             if (raf) window.cancelAnimationFrame(raf)
         }
-    }, [enabled, isPhone, fitCover, fitGap, fitCoverMinRatio, fitCoverPosterRatio, fitCoverScoreboardOptional, fitCoverOverlap, fitCoverWhenShort, writeHeroVar])
+    }, [enabled, isPhone, fitCover, fitGap, fitCoverMinRatio, fitCoverPosterRatio, fitCoverScoreboardOptional, fitCoverOverlap, fitCoverExactPoster, fitCoverWhenShort, writeHeroVar])
 
     // Recorrido del relevo portada → fondo: 55vh, como en la ficha, salvo que
     // la página no dé para tanto (p. ej. colecciones de una sola fila de
@@ -968,6 +988,19 @@ const MOBILE_COVER_SHADE_SOFT = `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.46) ${MOBILE_COVER_SHADE_LEAD_PX + 220}px,
     rgba(10, 10, 10, 0.52) 100%)`
 
+// BORDE AJUSTADO (`tightEdge`, temporadas): el póster entero va encima de los
+// botones y nada debe taparlo. La capa difuminada entra solo en los últimos
+// MOBILE_COVER_TIGHT_BAND_PX, y el velo y el oscurecido adaptativo empiezan
+// en el borde y se completan a la altura de los botones.
+const MOBILE_COVER_TIGHT_BAND_PX = 16
+const MOBILE_COVER_TIGHT_LEAD_PX = 8
+const MOBILE_COVER_SHADE_TIGHT = `linear-gradient(to bottom,
+    rgba(10, 10, 10, 0) 0px,
+    rgba(10, 10, 10, 0.2) ${MOBILE_COVER_TIGHT_LEAD_PX + 24}px,
+    rgba(10, 10, 10, 0.36) ${MOBILE_COVER_TIGHT_LEAD_PX + 90}px,
+    rgba(10, 10, 10, 0.46) ${MOBILE_COVER_TIGHT_LEAD_PX + 220}px,
+    rgba(10, 10, 10, 0.52) 100%)`
+
 // CONTRASTE ADAPTATIVO (`adaptiveContrast`, la ficha): el logo y los botones
 // son blancos sobre cristal, y con pósters claros (cielo, nieve, fondos
 // blancos) se perdían. Oscurecer siempre apagaba los pósters oscuros, que no
@@ -1084,6 +1117,10 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.62) calc(var(--mobile-cover-h) * 0.74),
     rgba(10, 10, 10, 0.9) calc(var(--mobile-cover-h) * 0.86),
     rgb(10, 10, 10) calc(var(--mobile-cover-h) * 0.95))`
+const MOBILE_COVER_CONTRAST_SCRIM_TIGHT = `linear-gradient(to bottom,
+    rgba(10, 10, 10, 0) calc(var(--mobile-cover-h) - ${MOBILE_COVER_TIGHT_LEAD_PX}px),
+    rgba(10, 10, 10, 0.62) calc(var(--mobile-cover-h) + 24px),
+    rgb(10, 10, 10) calc(var(--mobile-cover-h) + 72px))`
 
 // `inPanel`: la portada de la ficha de teléfono del drawer (`usePanelHeroFit`).
 // Llena su contenedor (una capa fija del panel, detrás del contenido con
@@ -1093,7 +1130,10 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
 // póster (por defecto MOBILE_COVER_BLUR_BAND_PX). Las temporadas lo acortan:
 // sus pósters llevan el título impreso abajo y, con el póster difuminado
 // debajo (`blurredUnderlay`), basta con empezar más cerca del borde.
-export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX, ready, animate, inPanel = false, objectPosition = 'center bottom' }) {
+// `tightEdge`: ver MOBILE_COVER_TIGHT_BAND_PX (manda sobre `edgeBandPx`).
+export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, edgeBandPx: edgeBandProp = MOBILE_COVER_BLUR_BAND_PX, tightEdge = false, ready, animate, inPanel = false, objectPosition = 'center bottom' }) {
+    const edgeBandPx = tightEdge ? MOBILE_COVER_TIGHT_BAND_PX : edgeBandProp
+    const shadeLeadPx = tightEdge ? MOBILE_COVER_TIGHT_LEAD_PX : MOBILE_COVER_SHADE_LEAD_PX
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
@@ -1284,12 +1324,12 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                 <div
                     className="pointer-events-none absolute inset-x-0"
                     style={{
-                        top: `calc(var(--mobile-cover-h) - ${MOBILE_COVER_SHADE_LEAD_PX}px)`,
+                        top: `calc(var(--mobile-cover-h) - ${shadeLeadPx}px)`,
                         // Con el reflejo, hasta el pie de la pantalla.
                         height: blurredUnderlay
-                            ? `calc(100lvh + ${MOBILE_COVER_SHADE_LEAD_PX}px)`
-                            : MOBILE_COVER_EXTEND_PX + MOBILE_COVER_SHADE_LEAD_PX,
-                        backgroundImage: blurredUnderlay ? MOBILE_COVER_SHADE_SOFT : MOBILE_COVER_SHADE,
+                            ? `calc(100lvh + ${shadeLeadPx}px)`
+                            : MOBILE_COVER_EXTEND_PX + shadeLeadPx,
+                        backgroundImage: tightEdge ? MOBILE_COVER_SHADE_TIGHT : blurredUnderlay ? MOBILE_COVER_SHADE_SOFT : MOBILE_COVER_SHADE,
                     }}
                 />
             ) : null}
@@ -1298,7 +1338,7 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                     className="pointer-events-none absolute inset-x-0 top-0 transition-opacity duration-500 motion-reduce:transition-none"
                     style={{
                         height: 'calc(var(--mobile-cover-h) + 100lvh)',
-                        backgroundImage: MOBILE_COVER_CONTRAST_SCRIM,
+                        backgroundImage: tightEdge ? MOBILE_COVER_CONTRAST_SCRIM_TIGHT : MOBILE_COVER_CONTRAST_SCRIM,
                         opacity: contrastScrim ?? 0,
                     }}
                 />

@@ -650,6 +650,9 @@ export default function SeasonDetailsClient({
     fitCoverPosterRatio: 1.5,
     fitCoverScoreboardOptional: true,
     fitCoverOverlap: false,
+    // El póster entero, sin recortar arriba ni abajo: los botones van bajo
+    // su pie y el marcador en lo que sobre (o con el scroll).
+    fitCoverExactPoster: true,
   });
   // En teléfono empieza compacto; las estadísticas se revelan con el scroll.
   const mobileScoreboardMode = isPhone ? heroScoreboardMode : "full";
@@ -1605,8 +1608,9 @@ export default function SeasonDetailsClient({
           // parte central muy difuminada en vez de una franja lisa, así que no
           // se ve el corte donde termina la imagen.
           blurredUnderlay
-          // Comparte la transición inferior de 64px con DetailsClient,
-          // también cuando el encuadre centrado recorta el póster.
+          // Transición corta en el pie: el póster lleva el título impreso
+          // abajo y nada debe taparlo más allá del borde.
+          tightEdge
           // Rótulo y botones legibles sobre pósters claros: se oscurece su
           // zona según lo claro que sea (medido), nada en los oscuros. Igual
           // que en la ficha de la serie.
@@ -1747,17 +1751,18 @@ export default function SeasonDetailsClient({
               </h1>
             </div>
 
-            {/* MÓVIL: pegada a la portada (`-top-2`) y con la entrada de la
+            {/* MÓVIL: bajo el pie de la portada (sin montarse en él) y con la entrada de la
                 ficha (la fila sube y los botones caen en cascada) cuando la
                 portada está lista; hasta entonces, invisible en su sitio. */}
-            <div className="relative mb-6 px-1 max-sm:-top-2 max-sm:mb-4">
+            <div className="relative mb-6 px-1 max-sm:mb-4">
               <div
                 ref={heroActionRowRef}
                 className={
                   !animateMobileEntry ? "" : mobileCoverReady ? MOBILE_ACTIONS_ENTRY_ANIMATION : "max-sm:invisible"
                 }
               >
-              <h1 className="mb-3 text-center text-[11px] font-bold uppercase leading-4 tracking-[0.14em] text-zinc-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] sm:hidden">
+              {/* MÓVIL: sin rótulo visible (el póster ya lo lleva). */}
+              <h1 className="sr-only sm:hidden">
                 {Number(seasonNumber) === 0
                   ? "Especiales"
                   : `Temporada ${seasonNumber}`}
