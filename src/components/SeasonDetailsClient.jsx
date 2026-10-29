@@ -2257,6 +2257,7 @@ export default function SeasonDetailsClient({
           showId={showId}
           seasonNumber={seasonNumber}
           defaultPoster={defaultPosterPath}
+          criterionPoster={autoPosterPath}
           ownPoster={customPosterPath}
           onClose={() => setCoverEditing(false)}
         />

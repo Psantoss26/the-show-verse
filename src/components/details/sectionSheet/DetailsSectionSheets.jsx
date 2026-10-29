@@ -664,15 +664,18 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
               const badge = [gridIsPoster ? null : image.iso_639_1?.toUpperCase(), imageQualityLabel(image)].filter(Boolean).join(" · ");
               const votes = voteCounts?.[gridCurrent.voteKind || gridCurrent.kind]?.[image.file_path] || 0;
               const votesLabel = votes ? plural(votes, "selección", "selecciones") : null;
+              // La que da el criterio automático (sin elecciones ni votos),
+              // solo como información.
+              const isDefault = Boolean(gridCurrent.defaultPath) && image.file_path === gridCurrent.defaultPath;
               return (
-                <li key={image.file_path} className="group/card relative">
+                <li key={image.file_path} className="group/card @container relative">
                   <button
                     type="button"
                     onClick={() => {
                       if (!active) onSelect?.(gridCurrent.kind, image.file_path);
                     }}
                     aria-pressed={active}
-                    aria-label={`${active ? "Seleccionada" : "Seleccionar"}${resolution ? ` (${resolution})` : ""}${votesLabel ? `, ${votesLabel}` : ""}`}
+                    aria-label={`${active ? "Seleccionada" : "Seleccionar"}${resolution ? ` (${resolution})` : ""}${votesLabel ? `, ${votesLabel}` : ""}${isDefault ? ", imagen por defecto" : ""}`}
                     className={`group/img relative block w-full overflow-hidden rounded-xl bg-zinc-900 after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${
                       active
                         ? "shadow-[0_0_12px_rgba(16,185,129,0.35)] after:shadow-[inset_0_0_0_2px_rgba(52,211,153,1)]"
@@ -694,9 +697,22 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                         decoding="async"
                       />
                     </span>
-                    {active ? (
-                      <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] ring-1 ring-inset ring-white/25">
-                        <Check className="h-3 w-3" strokeWidth={3.5} aria-hidden="true" />
+                    {active || isDefault ? (
+                      <span aria-hidden="true" className="absolute left-2 top-2 flex max-w-[calc(100%-2.5rem)] items-center gap-1">
+                        {active ? (
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] ring-1 ring-inset ring-white/25">
+                            <Check className="h-3 w-3" strokeWidth={3.5} />
+                          </span>
+                        ) : null}
+                        {/* La imagen por defecto según el criterio automático
+                            (la que se ve sin elecciones ni votos). En tarjetas
+                            estrechas, solo el icono. */}
+                        {isDefault ? (
+                          <span className={`${IMAGE_CARD_CHIP} min-w-0 @max-[8.5rem]:w-5 @max-[8.5rem]:justify-center @max-[8.5rem]:px-0`} title="Imagen por defecto según el criterio automático">
+                            <Sparkles className="h-3 w-3 shrink-0 text-yellow-300" strokeWidth={2.5} />
+                            <span className="hidden translate-y-[0.5px] truncate @[8.5rem]:inline">Por defecto</span>
+                          </span>
+                        ) : null}
                       </span>
                     ) : null}
                     {/* Selecciones de todos los usuarios (cada elección es un

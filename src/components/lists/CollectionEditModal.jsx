@@ -83,9 +83,10 @@ export function prefetchCollectionEditImages(collectionId) {
  * elecciones propias y retira los votos.
  *
  * `defaults`: lo que se ve sin elección propia (la más votada o la automática),
+ * `criterionDefaults`: las automáticas sin votos (indicador «Por defecto»),
  * por campo; `own`: la elección propia guardada por campo (o `null`).
  */
-export default function CollectionEditModal({ collectionId, defaults, own, onClose }) {
+export default function CollectionEditModal({ collectionId, defaults, criterionDefaults, own, onClose }) {
   const { authenticated, cacheArtworkOverrides } = useAuth()
   const phone = usePhoneViewport()
   const [images, setImages] = useState(() => imagesCache.get(collectionId)?.images || null)
@@ -148,9 +149,9 @@ export default function CollectionEditModal({ collectionId, defaults, own, onClo
     ].filter(Boolean).map(({ field, candidates, ...section }) => {
       const active = draft[field] || defaults[field] || null
       const list = sectionImages(candidates, defaults[field], active)
-      return { ...section, kind: field, voteKind: COLLECTION_ARTWORK_KIND_BY_FIELD[field], images: list, activePath: active, count: list.length }
+      return { ...section, kind: field, voteKind: COLLECTION_ARTWORK_KIND_BY_FIELD[field], images: list, activePath: active, defaultPath: criterionDefaults?.[field] || null, count: list.length }
     })
-  }, [images, phone, defaults, draft])
+  }, [images, phone, defaults, criterionDefaults, draft])
 
   const changed = ARTWORK_FIELDS.some((field) => draft[field])
   const data = {

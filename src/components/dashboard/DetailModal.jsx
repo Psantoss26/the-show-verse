@@ -3635,6 +3635,7 @@ export default function DetailModal({
           type={mediaType}
           id={Number(item?.id)}
           active={{ backdrop: data.heroBackdropPath, logo: data.logoPath }}
+          defaults={{ backdrop: data.criterionHeroBackdropPath, logo: data.criterionLogoPath }}
           onApply={applyArtworkSelection}
           onClose={() => setArtworkEditorOpen(false)}
         />

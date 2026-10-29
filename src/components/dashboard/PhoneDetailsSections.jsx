@@ -85,7 +85,7 @@ import { getSeriesGraphSeasonAverages } from "@/lib/details/seriesGraphRatings";
 import { seasonStructuresAlign } from "@/lib/details/episodeRatingsStructure";
 import { getWatchedEpisodeCountForSeason } from "@/lib/hooks/useTraktEpisodesWatched";
 import { useOwnArtwork } from "@/lib/hooks/useOwnCardPoster";
-import { pickLadderBackdrop } from "@/lib/details/tmdbImages";
+import { pickLadderBackdrop, pickLadderPoster } from "@/lib/details/tmdbImages";
 import DetailsSectionMenu from "@/components/DetailsSectionMenu";
 import DetailsArrowCarousel, {
   SwiperSlide,
@@ -1196,6 +1196,16 @@ export default function PhoneDetailsSections({
         ]
       : []),
   ];
+  const autoCardBackdrop =
+    pickLadderBackdrop(images?.backdrops || [], {
+      originalLanguage: item?.original_language ?? data?.original_language,
+    })?.file_path || null;
+  const autoCardPoster =
+    pickLadderPoster(images?.posters || [], {
+      originalLanguage: item?.original_language ?? data?.original_language,
+    })?.file_path ||
+    item?.poster_path ||
+    null;
   const sheetArtworkTabs = buildArtworkSheetTabs({
     mobile: true,
     posters: images?.posters,
@@ -1205,14 +1215,16 @@ export default function PhoneDetailsSections({
       mobilePoster: selectedMobilePoster || data?.heroPosterPath || null,
       logo: selectedLogo || data?.logoPath || null,
       // La que usan las tarjetas: elegida, más votada o automática.
-      cardPoster: selectedCardPoster || cardPosterInUse || item?.poster_path || null,
-      cardBackdrop:
-        selectedCardBackdrop ||
-        cardBackdropInUse ||
-        pickLadderBackdrop(images?.backdrops || [], {
-          originalLanguage: item?.original_language ?? data?.original_language,
-        })?.file_path ||
-        null,
+      cardPoster: selectedCardPoster || cardPosterInUse || autoCardPoster || null,
+      cardBackdrop: selectedCardBackdrop || cardBackdropInUse || autoCardBackdrop || null,
+    },
+    // Las del criterio automático, sin elecciones ni votos (indicador «Por
+    // defecto»): las de la cabecera de este modal y las de las tarjetas.
+    defaults: {
+      mobilePoster: data?.criterionHeroPosterPath || null,
+      logo: data?.criterionLogoPath || null,
+      cardPoster: autoCardPoster,
+      cardBackdrop: autoCardBackdrop,
     },
   });
   const sectionSheetData = {

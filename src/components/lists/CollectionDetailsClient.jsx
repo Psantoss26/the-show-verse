@@ -494,6 +494,13 @@ export default function CollectionDetailsClient({ collectionId }) {
                     mobile_background_path: community.mobile_background_path || autoMobileBackground,
                     cover_backdrop_path: community.cover_backdrop_path || autoCoverBackdrop,
                 }}
+                // Las automáticas, sin votos: el indicador «Por defecto».
+                criterionDefaults={{
+                    poster_path: autoPoster || original?.poster_path || null,
+                    backdrop_path: autoBackdrop || original?.backdrop_path || null,
+                    mobile_background_path: autoMobileBackground || null,
+                    cover_backdrop_path: autoCoverBackdrop || null,
+                }}
                 own={collectionOwnArtwork(artworkOverride)}
                 onClose={() => setEditing(false)}
             />

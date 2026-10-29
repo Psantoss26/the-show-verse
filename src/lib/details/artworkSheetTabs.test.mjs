@@ -169,3 +169,26 @@ test("«Backdrop»: backdrops con idioma en español e inglés para la portada b
   const neutral = buildArtworkSheetTabs({ backdrops: [{ file_path: "/n.jpg", iso_639_1: null }] });
   assert.deepEqual(neutral.find((t) => t.id === "cardBackdrops").images.map((img) => img.file_path), ["/n.jpg"]);
 });
+
+test('cada pestaña lleva la imagen del criterio automático (defaultPath)', () => {
+  const posters = [{ file_path: '/p1.jpg', iso_639_1: 'en' }, { file_path: '/p2.jpg', iso_639_1: null }]
+  const backdrops = [{ file_path: '/b1.jpg', iso_639_1: 'en' }, { file_path: '/b2.jpg', iso_639_1: null }]
+  const logos = [{ file_path: '/l1.png', iso_639_1: 'en' }]
+  const desktop = buildArtworkSheetTabs({
+    posters,
+    backdrops,
+    logos,
+    defaults: { poster: '/p1.jpg', cardBackdrop: '/b1.jpg', background: '/b2.jpg', logo: '/l1.png' },
+  })
+  assert.deepEqual(
+    desktop.map((tab) => [tab.id, tab.defaultPath]),
+    [['posters', '/p1.jpg'], ['cardBackdrops', '/b1.jpg'], ['background', '/b2.jpg'], ['logos', '/l1.png']],
+  )
+  const mobile = buildArtworkSheetTabs({ mobile: true, posters, backdrops, logos, defaults: { mobilePoster: '/p2.jpg', cardPoster: '/p1.jpg' } })
+  assert.deepEqual(
+    mobile.map((tab) => [tab.id, tab.defaultPath]),
+    [['posters', '/p2.jpg'], ['cardPosters', '/p1.jpg'], ['cardBackdrops', null], ['logos', null]],
+  )
+  const modal = buildDetailModalArtworkTabs({ backdrops, logos, defaults: { preview: '/b2.jpg', logo: '/l1.png' } })
+  assert.deepEqual(modal.map((tab) => tab.defaultPath), ['/b2.jpg', '/l1.png'])
+})

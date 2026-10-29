@@ -1393,6 +1393,9 @@ export default function DetailsClient({
   // nacen con la selección guardada en este dispositivo (para pintarla sin
   // esperar), así que al restablecer hay que devolverlas a estos.
   const autoArtworkRef = useRef({ key: null, poster: null, backdrop: null });
+  // La misma portada automática, como estado: el indicador «Por defecto» de
+  // «Portadas y fondos».
+  const [autoPosterPath, setAutoPosterPath] = useState(() => restoredValue(backSnapshot, "autoPosterPath", null));
   const [artworkInitialized, setArtworkInitialized] = useState(() => restoredValue(backSnapshot, "artworkInitialized", false)); // Se pone a true tras la carga inicial
   // Un usuario autenticado puede tener poster/backdrop/preview/logo personalizados
   // guardados en el servidor (sección "Portadas y fondos"). En una sesión nueva
@@ -3775,6 +3778,7 @@ export default function DetailsClient({
           poster: asTmdbPath(poster) || null,
           backdrop: asTmdbPath(backdrop) || null,
         };
+        setAutoPosterPath(asTmdbPath(poster) || null);
         if (poster) {
           setBasePosterPath((prev) => {
             if (hasSavedPoster) return prev || asTmdbPath(poster);
@@ -8251,6 +8255,37 @@ export default function DetailsClient({
   const sheetPosterActive = (selectedPosterPath || communityPosterPath || basePosterPath || data?.profile_path) ?? null;
   const sheetMobilePosterActive = selectedMobilePosterPath || mobileNeutralPosterPath || null;
   const sheetBackgroundActive = displayBackdropPath || data?.backdrop_path || null;
+  // Las que da el criterio automático en cada pestaña, sin elecciones ni
+  // votos: los mismos selectores que la ficha (indicador «Por defecto»).
+  const sheetArtworkDefaults = useMemo(() => {
+    const posters = imagesState?.posters || [];
+    const backdrops = imagesState?.backdrops || [];
+    const poster =
+      autoPosterPath || asTmdbPath(data?.poster_path) || asTmdbPath(data?.profile_path) || null;
+    return {
+      poster,
+      cardPoster: poster,
+      mobilePoster:
+        pickMobileNeutralPoster(posters.filter((item) => item?.file_path && item.from !== "main"))?.file_path ||
+        poster,
+      cardBackdrop:
+        pickLadderBackdrop([...backdrops, ...(data?.images?.backdrops || [])], {
+          originalLanguage: data?.original_language,
+        })?.file_path || null,
+      background: pickHeroBackdropPath({ backdropPath: data?.backdrop_path, backdrops, preferredPaths: [] }) || null,
+      logo: heroLogoPath || null,
+    };
+  }, [
+    imagesState?.posters,
+    imagesState?.backdrops,
+    autoPosterPath,
+    data?.poster_path,
+    data?.profile_path,
+    data?.images?.backdrops,
+    data?.original_language,
+    data?.backdrop_path,
+    heroLogoPath,
+  ]);
   const sheetArtworkTabs = useMemo(
     () =>
       buildArtworkSheetTabs({
@@ -8268,6 +8303,7 @@ export default function DetailsClient({
           background: sheetBackgroundActive,
           logo: displayHeroLogoPath,
         },
+        defaults: sheetArtworkDefaults,
       }),
     [
       isMobileViewport,
@@ -8279,6 +8315,7 @@ export default function DetailsClient({
       posterBackdropFallback,
       sheetBackgroundActive,
       displayHeroLogoPath,
+      sheetArtworkDefaults,
     ],
   );
 
@@ -8726,6 +8763,7 @@ export default function DetailsClient({
     posterLayoutMode,
     posterModeHydrated,
     selectedBackgroundPath,
+    autoPosterPath,
     basePosterPath,
     baseBackdropPath,
     artworkInitialized,

@@ -66,9 +66,10 @@ const cachedSeasonPosters = (showId, seasonNumber) => postersCache.get(postersKe
  * retira el voto: se vuelve a ver la por defecto.
  *
  * `defaultPoster`: la que se ve sin elección propia (la más votada o la
- * automática); `ownPoster`: la elección propia guardada (o `null`).
+ * automática); `criterionPoster`: la automática, sin votos (indicador «Por
+ * defecto»); `ownPoster`: la elección propia guardada (o `null`).
  */
-export default function SeasonCoverEditModal({ seasonId, showId, seasonNumber, defaultPoster, ownPoster, onClose }) {
+export default function SeasonCoverEditModal({ seasonId, showId, seasonNumber, defaultPoster, criterionPoster, ownPoster, onClose }) {
   const { authenticated, cacheArtworkOverrides } = useAuth()
   const [posters, setPosters] = useState(() => cachedSeasonPosters(showId, seasonNumber))
   const [tab, setTab] = useState(null)
@@ -117,8 +118,8 @@ export default function SeasonCoverEditModal({ seasonId, showId, seasonNumber, d
     const list = posters.filter((img) => img?.file_path && isSpanishOrEnglish(img))
     const index = list.findIndex((img) => img.file_path === active)
     const images = index > 0 ? [list[index], ...list.slice(0, index), ...list.slice(index + 1)] : list
-    return [{ id: 'posters', label: 'Portada', kind: 'poster', aspect: 'poster', images, activePath: active, count: images.length }]
-  }, [posters, active])
+    return [{ id: 'posters', label: 'Portada', kind: 'poster', aspect: 'poster', images, activePath: active, defaultPath: criterionPoster || null, count: images.length }]
+  }, [posters, active, criterionPoster])
 
   const data = {
     images: {

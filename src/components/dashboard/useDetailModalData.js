@@ -225,6 +225,11 @@ const EMPTY_DATA = {
   // Backdrop AUTOMÁTICO de la cabecera ancha (sin elección ni voto propios): al
   // que vuelve el editor de imágenes de DetailModal al restaurar.
   autoHeroBackdropPath: null,
+  // Las del criterio automático, sin elecciones ni votos de nadie: el
+  // indicador «Por defecto» de «Portadas y fondos».
+  criterionHeroPosterPath: null,
+  criterionLogoPath: null,
+  criterionHeroBackdropPath: null,
   // Backdrop del hero: SOLO el definitivo (textless), fijado una única vez y ya
   // precargado. Hasta que existe se muestra el esqueleto, nunca una imagen
   // intermedia: así el usuario ve aparecer una sola imagen.
@@ -1244,6 +1249,7 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
             ...prev,
             logoPath: logoPath || prev.logoPath,
             autoLogoPath: autoArtwork?.logo || bestLogo || null,
+            criterionLogoPath: bestLogo || null,
             logoResolved: true,
           }));
         }
@@ -1338,6 +1344,11 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
             ...prev,
             autoHeroPosterPath,
             autoHeroHasBurnedTitle: burnedTitle(autoHeroPosterPath),
+            criterionHeroPosterPath:
+              pickModalHeroPosterPath({
+                mainPosterPath: item?.poster_path || null,
+                posters: images?.posters,
+              }) || finalPoster,
           }));
         });
 
@@ -1412,6 +1423,7 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
           ...prev,
           heroBackdropPath: finalBackdrop,
           autoHeroBackdropPath,
+          criterionHeroBackdropPath: automaticBackdrop,
         }));
       } catch {
         // sin backdrop: el hero mantiene el esqueleto

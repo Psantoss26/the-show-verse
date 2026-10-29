@@ -16,7 +16,9 @@
 //     portada de las tarjetas de páginas y dashboards: la misma preferencia
 //     que «Portada» en escritorio (`poster`).
 //
-// En cada pestaña la imagen elegida va primero y se marca (`activePath`).
+// En cada pestaña la imagen elegida va primero y se marca (`activePath`), y
+// se señala la que da el criterio automático sin elecciones ni votos
+// (`defaultPath`, de `defaults`), solo como información.
 
 import { isLanguageNeutralImage } from "./tmdbImages.js";
 
@@ -64,7 +66,7 @@ function finishTabs(tabs, sources) {
 // Editor de imágenes de DetailModal (botón Editar de sus controles): las dos
 // capas de su cabecera, el backdrop de «Vista previa» (sin idioma, con el logo
 // encima; kind `backdrop`) y el logo.
-export function buildDetailModalArtworkTabs({ backdrops, logos, active = {} }) {
+export function buildDetailModalArtworkTabs({ backdrops, logos, active = {}, defaults = {} }) {
   const allBackdrops = withPath(backdrops);
   const galleryBackdrops = orAll(
     allBackdrops.filter((img) => img.from !== "main"),
@@ -80,14 +82,23 @@ export function buildDetailModalArtworkTabs({ backdrops, logos, active = {} }) {
         aspect: "backdrop",
         images: orAll(galleryBackdrops.filter(isLanguageNeutralImage), galleryBackdrops),
         activePath: active.preview,
+        defaultPath: defaults.preview ?? null,
       },
-      { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: languageLogosOf(allLogos), activePath: active.logo },
+      {
+        id: "logos",
+        label: "Logo",
+        kind: "logo",
+        aspect: "logo",
+        images: languageLogosOf(allLogos),
+        activePath: active.logo,
+        defaultPath: defaults.logo ?? null,
+      },
     ],
     { backdrop: allBackdrops, logo: allLogos },
   );
 }
 
-export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logos, active = {} }) {
+export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logos, active = {}, defaults = {} }) {
   const allPosters = withPath(posters);
   const allBackdrops = withPath(backdrops);
   const neutralBackdrops = orAll(allBackdrops.filter(isLanguageNeutralImage), allBackdrops);
@@ -114,6 +125,7 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
       allBackdrops,
     ),
     activePath: active.cardBackdrop ?? null,
+    defaultPath: defaults.cardBackdrop ?? null,
   };
 
   const tabs = mobile
@@ -129,6 +141,7 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           images: [...neutralPosters, ...localizedPosters],
           defaultLanguage: neutralPosters.length ? "none" : null,
           activePath: active.mobilePoster,
+          defaultPath: defaults.mobilePoster ?? null,
           injectActive: false,
         },
         {
@@ -141,12 +154,29 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           // La que usan las tarjetas: la elegida, la más votada o la
           // automática.
           activePath: active.cardPoster ?? null,
+          defaultPath: defaults.cardPoster ?? null,
         },
         cardBackdropTab,
-        { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: languageLogos, activePath: active.logo },
+        {
+          id: "logos",
+          label: "Logo",
+          kind: "logo",
+          aspect: "logo",
+          images: languageLogos,
+          activePath: active.logo,
+          defaultPath: defaults.logo ?? null,
+        },
       ]
     : [
-        { id: "posters", label: "Portada", kind: "poster", aspect: "poster", images: allPosters, activePath: active.poster },
+        {
+          id: "posters",
+          label: "Portada",
+          kind: "poster",
+          aspect: "poster",
+          images: allPosters,
+          activePath: active.poster,
+          defaultPath: defaults.poster ?? null,
+        },
         cardBackdropTab,
         {
           id: "background",
@@ -155,8 +185,17 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           aspect: "backdrop",
           images: neutralBackdrops,
           activePath: active.background,
+          defaultPath: defaults.background ?? null,
         },
-        { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: languageLogos, activePath: active.logo },
+        {
+          id: "logos",
+          label: "Logo",
+          kind: "logo",
+          aspect: "logo",
+          images: languageLogos,
+          activePath: active.logo,
+          defaultPath: defaults.logo ?? null,
+        },
       ];
 
   return finishTabs(tabs, sources);

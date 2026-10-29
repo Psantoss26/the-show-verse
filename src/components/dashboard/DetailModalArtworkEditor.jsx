@@ -44,7 +44,7 @@ function readOwn(type, id) {
  *
  * `active`: lo que enseña ahora la cabecera ({ backdrop, logo }).
  */
-export default function DetailModalArtworkEditor({ type, id, active, onApply, onClose }) {
+export default function DetailModalArtworkEditor({ type, id, active, defaults, onApply, onClose }) {
   const { authenticated, cacheArtworkOverrides } = useAuth()
   const [images, setImages] = useState(null)
   const [tab, setTab] = useState(null)
@@ -69,8 +69,10 @@ export default function DetailModalArtworkEditor({ type, id, active, onApply, on
         preview: draft.backdrop || active?.backdrop || null,
         logo: draft.logo || active?.logo || null,
       },
+      // Las del criterio automático (indicador «Por defecto»).
+      defaults: { preview: defaults?.backdrop || null, logo: defaults?.logo || null },
     })
-  }, [images, draft, active?.backdrop, active?.logo])
+  }, [images, draft, active?.backdrop, active?.logo, defaults?.backdrop, defaults?.logo])
 
   function persist(changes) {
     for (const { kind, filePath } of changes) {
