@@ -2842,6 +2842,18 @@ export default function DetailsClient({
     // Filtrar imagenes por resolucion e idioma, siempre incluyendo la imagen activa
     // Las dos pestañas de portada móvil solo enseñan las suyas (también la
     // elegida: se marca en la que le corresponde, no en las dos).
+    // «Con idioma» y «Tarjetas»: solo portadas en español e inglés (los
+    // botones de idioma de la hoja); si el título no tiene ninguna, las de los
+    // idiomas que haya y, en «Tarjetas», sin ninguna con idioma, todas.
+    const localizedPool = (() => {
+      if (!isLocalizedPosterTab && !isCardPosterTab) return null;
+      const localized = withPath.filter((img) => !isLanguageNeutralImage(img));
+      const spanishOrEnglish = localized.filter(matchesLang);
+      const pool = spanishOrEnglish.length ? spanishOrEnglish : localized;
+      return new Set(
+        (isCardPosterTab && !pool.length ? withPath : pool).map((img) => img.file_path),
+      );
+    })();
     const inMobilePosterTab = (img) =>
       isLocalizedPosterTab ? !isLanguageNeutralImage(img) : isLanguageNeutralImage(img);
 
@@ -2849,6 +2861,7 @@ export default function DetailsClient({
       const fp = img?.file_path;
       if (isMobilePosterTab && !inMobilePosterTab(img)) return false;
       if (fp === activePath) return true; // Siempre incluir la imagen activa
+      if (localizedPool && !localizedPool.has(fp)) return false;
 
       if (imagesResFilter !== "all") {
         const b = imgResBucket(img);
@@ -2860,7 +2873,7 @@ export default function DetailsClient({
         return !img?.iso_639_1;
       }
 
-      if (isMobilePosterTab) return true;
+      if (isMobilePosterTab || localizedPool) return true;
 
       if (isLogoTab) return matchesLang(img);
 
@@ -2877,7 +2890,14 @@ export default function DetailsClient({
     // Fallback relajado: si los filtros son demasiado restrictivos, se relajan
     const relaxed = (() => {
       if (!withPath.length) return [];
-      // Portada móvil: se relaja la resolución, nunca el idioma.
+      // Portada móvil y «Tarjetas»: se relaja la resolución, nunca el idioma.
+      if (localizedPool) {
+        return withPath.filter(
+          (img) =>
+            (!isMobilePosterTab || inMobilePosterTab(img)) &&
+            (localizedPool.has(img.file_path) || img.file_path === activePath),
+        );
+      }
       if (isMobilePosterTab) return withPath.filter(inMobilePosterTab);
       if (isBackgroundTab) {
         const neutral = withPath.filter((img) => !img?.iso_639_1);
@@ -12050,10 +12070,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </SheetOption>
                             ))}
                           </SheetOptionGroup>
-                          {/* Los logos y las portadas de tarjetas sí tienen variantes
-                              localizadas; el póster móvil se mantiene neutro y no
-                              necesita este filtro. */}
-                          {(activeImagesTab === "logos" || activeImagesTab === "cardPosters") && (
+                          {/* Logos, «Con idioma» y «Tarjetas» tienen variantes
+                              localizadas (español e inglés; si no hay, las que
+                              haya); la portada sin idioma no necesita este filtro. */}
+                          {(activeImagesTab === "logos" ||
+                            activeImagesTab === "localizedPosters" ||
+                            activeImagesTab === "cardPosters") && (
                             <SheetOptionGroup
                               label={activeImagesTab === "logos" ? "Idioma de los logos" : "Idioma de las portadas"}
                               icon={Languages}

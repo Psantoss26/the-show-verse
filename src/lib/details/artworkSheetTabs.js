@@ -25,6 +25,12 @@ const SPANISH_OR_ENGLISH = new Set(["es", "es-es", "en", "en-us"]);
 const isSpanishOrEnglishImage = (img) =>
   SPANISH_OR_ENGLISH.has(String(img?.iso_639_1 || "").trim().toLowerCase());
 
+// Portadas CON IDIOMA de las pestañas «Con idioma» y «Tarjetas»: solo en
+// español e inglés; si el título no tiene ninguna en esos idiomas, las de los
+// idiomas que haya.
+export const spanishOrEnglishFirst = (images) =>
+  orAll(images.filter(isSpanishOrEnglishImage), images);
+
 // La elegida va primero. Como en la galería, aparece aunque el filtro de la
 // categoría la dejara fuera (p. ej. la vista previa por defecto con texto).
 function selectedFirst(list, activePath, source, injectActive = true) {
@@ -51,6 +57,10 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
   const languageLogos = orAll(allLogos.filter(isSpanishOrEnglishImage), allLogos);
   const sources = { poster: allPosters, mobilePoster: allPosters, preview: allBackdrops, background: allBackdrops, logo: allLogos };
 
+  const localizedPosters = spanishOrEnglishFirst(
+    allPosters.filter((img) => !isLanguageNeutralImage(img)),
+  );
+
   const tabs = mobile
     ? [
         {
@@ -69,7 +79,7 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           label: "Con idioma",
           kind: "mobilePoster",
           aspect: "poster",
-          images: allPosters.filter((img) => !isLanguageNeutralImage(img)),
+          images: localizedPosters,
           activePath: active.mobilePoster,
           injectActive: false,
         },
@@ -78,7 +88,8 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           label: "Tarjetas",
           kind: "poster",
           aspect: "poster",
-          images: allPosters,
+          // Las mismas que «Con idioma»; sin ninguna con idioma, todas.
+          images: orAll(localizedPosters, allPosters),
           // Solo la elegida a propósito: sin ella, cada página usa su portada
           // automática y no hay una que marcar.
           activePath: active.cardPoster ?? null,
