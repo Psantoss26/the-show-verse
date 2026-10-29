@@ -1474,12 +1474,12 @@ function AwardCard({ item }) {
           )}
         </div>
 
-        {/* Logo cuadrado al 58 % del ancho: el mismo margen a cada lado en
+        {/* Logo cuadrado al 75 % del ancho: el mismo margen a cada lado en
             cualquier tamaño de tarjeta. Desde `sm` deja libre la fila de
             resultado y año (`pt-8`); abajo, el hueco del texto. */}
         <div className="relative flex flex-1 flex-col items-center justify-center px-2 pb-14 sm:px-4 sm:pb-20 sm:pt-8 z-10">
           {imageSrc ? (
-            <div className="flex aspect-square w-[58%] items-center justify-center">
+            <div className="flex aspect-square w-[75%] items-center justify-center">
               <OptimizedImage
                 key={imageSrc}
                 src={imageSrc}
@@ -1498,7 +1498,7 @@ function AwardCard({ item }) {
               />
             </div>
           ) : (
-            <div className="flex aspect-square w-[58%] items-center justify-center">
+            <div className="flex aspect-square w-[75%] items-center justify-center">
               {result === "winner" ? (
                 <Trophy className="h-[85%] w-[85%] text-yellow-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
               ) : (
