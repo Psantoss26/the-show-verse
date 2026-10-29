@@ -1237,6 +1237,7 @@ export default function PhoneDetailsSections({
         else handleSelectMobilePoster(filePath, chosen);
       },
       onReset: handleResetArtwork,
+      voteTarget: { type, id },
     },
     videos,
     onPlayVideo: setActiveVideo,

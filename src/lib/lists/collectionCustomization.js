@@ -27,6 +27,11 @@ const ARTWORK_FIELDS = [
   ['background', 'cover_backdrop_path'],
 ];
 
+// Tipo de imagen (voto) de cada campo, para el contador de selecciones.
+export const COLLECTION_ARTWORK_KIND_BY_FIELD = Object.fromEntries(
+  ARTWORK_FIELDS.map(([kind, field]) => [field, kind]),
+);
+
 export const COLLECTION_ARTWORK_TYPE = 'collection';
 export const collectionArtworkKey = (id) => `${COLLECTION_ARTWORK_TYPE}:${Number(id)}`;
 

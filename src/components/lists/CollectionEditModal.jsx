@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { forgetCommunityArtwork, retractOwnArtworkVotes, saveArtworkOverrides } from '@/lib/artworkApi'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
 import {
+  COLLECTION_ARTWORK_KIND_BY_FIELD,
   COLLECTION_ARTWORK_TYPE,
   buildCollectionArtworkChanges,
   collectionArtworkVotes,
@@ -147,7 +148,7 @@ export default function CollectionEditModal({ collectionId, defaults, own, onClo
     ].filter(Boolean).map(({ field, candidates, ...section }) => {
       const active = draft[field] || defaults[field] || null
       const list = sectionImages(candidates, defaults[field], active)
-      return { ...section, kind: field, images: list, activePath: active, count: list.length }
+      return { ...section, kind: field, voteKind: COLLECTION_ARTWORK_KIND_BY_FIELD[field], images: list, activePath: active, count: list.length }
     })
   }, [images, phone, defaults, draft])
 
@@ -156,6 +157,7 @@ export default function CollectionEditModal({ collectionId, defaults, own, onClo
     images: {
       tabs,
       loading: !images,
+      voteTarget: { type: COLLECTION_ARTWORK_TYPE, id: Number(collectionId) },
       notice: authenticated ? null : 'Inicia sesión para guardar tu personalización.',
       onSelect: authenticated ? (field, path) => apply({ ...savedRef.current, [field]: path }) : undefined,
       // Restaurar: se borran todas las elecciones propias y vuelven las de por defecto.

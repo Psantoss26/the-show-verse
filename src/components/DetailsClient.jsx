@@ -10001,6 +10001,7 @@ export default function DetailsClient({
     awards: awardItems,
     images: {
       tabs: sheetArtworkTabs,
+      voteTarget: { type: endpointType, id },
       onSelect: (kind, filePath) => {
         if (kind === "logo") handleSelectLogo(filePath);
         else if (kind === "mobilePoster") handleSelectMobilePoster(filePath);

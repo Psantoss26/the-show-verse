@@ -124,6 +124,7 @@ export default function SeasonCoverEditModal({ seasonId, showId, seasonNumber, d
     images: {
       tabs,
       loading: !posters,
+      voteTarget: { type: SEASON_ARTWORK_TYPE, id: seasonId },
       notice: authenticated ? null : 'Inicia sesión para guardar tu personalización.',
       onSelect: authenticated ? (_, path) => apply(path) : undefined,
       onReset: authenticated && own ? () => apply(null) : undefined,

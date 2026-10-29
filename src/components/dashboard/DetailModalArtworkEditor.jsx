@@ -111,6 +111,7 @@ export default function DetailModalArtworkEditor({ type, id, active, onApply, on
     images: {
       tabs,
       loading: !images,
+      voteTarget: { type, id },
       notice: authenticated ? null : 'Inicia sesión para guardar tu personalización.',
       onSelect: authenticated ? select : undefined,
       onReset: authenticated && KINDS.some((kind) => own[kind]) ? reset : undefined,

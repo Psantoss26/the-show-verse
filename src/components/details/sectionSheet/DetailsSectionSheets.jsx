@@ -53,6 +53,7 @@ import { videoTypeOptions } from "@/lib/details/videos";
 import { DropdownItem, InlineDropdown } from "@/components/details/CreditFilterControls";
 import MobileOptionsSheet, { SheetAction, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
+import useArtworkVoteCounts from "@/lib/hooks/useArtworkVoteCounts";
 import { getScoreItemKey, readScoreCache } from "@/lib/userLists/listScoreCache";
 
 const SECTIONS = {
@@ -444,6 +445,9 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   const tabs = Array.isArray(data.images?.tabs) ? data.images.tabs : [];
   const onSelect = data.images?.onSelect;
   const onReset = data.images?.onReset;
+  // Cuántas veces está elegida cada imagen (`voteTarget`: { type, id } del
+  // título, temporada o colección): cada tarjeta enseña las suyas desde 1.
+  const voteCounts = useArtworkVoteCounts(data.images?.voteTarget);
   const current = tabs.find((item) => item.id === tab) || tabs[0] || null;
   const currentImages = current?.images;
   const tabImages = useMemo(() => currentImages || [], [currentImages]);
@@ -636,6 +640,8 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
               const card = sheetCardImage(image, { isPoster: gridIsPoster, isLogo: gridIsLogo });
               const resolution = image.width && image.height ? `${image.width}×${image.height}` : null;
               const badge = [gridIsPoster ? null : image.iso_639_1?.toUpperCase(), resolution].filter(Boolean).join(" · ");
+              const votes = voteCounts?.[gridCurrent.voteKind || gridCurrent.kind]?.[image.file_path] || 0;
+              const votesLabel = votes ? plural(votes, "selección", "selecciones") : null;
               return (
                 <li key={image.file_path} className="relative">
                   <button
@@ -644,7 +650,7 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                       if (!active) onSelect?.(gridCurrent.kind, image.file_path);
                     }}
                     aria-pressed={active}
-                    aria-label={`${active ? "Seleccionada" : "Seleccionar"}${resolution ? ` (${resolution})` : ""}`}
+                    aria-label={`${active ? "Seleccionada" : "Seleccionar"}${resolution ? ` (${resolution})` : ""}${votesLabel ? `, ${votesLabel}` : ""}`}
                     className={`group/img relative block w-full overflow-hidden rounded-xl bg-zinc-900 after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${
                       active
                         ? "shadow-[0_0_12px_rgba(16,185,129,0.35)] after:shadow-[inset_0_0_0_2px_rgba(52,211,153,1)]"
@@ -671,9 +677,22 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                         <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
                       </span>
                     ) : null}
-                    {badge ? (
-                      <span className="absolute bottom-1.5 left-1.5 right-1.5 truncate text-right text-[10px] font-bold text-zinc-200">
-                        <span className="rounded-md bg-black/65 px-1.5 py-0.5">{badge}</span>
+                    {badge || votes ? (
+                      <span className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between gap-1 text-[10px] font-bold text-zinc-200">
+                        {/* Selecciones de todos los usuarios (cada elección es un
+                            voto): solo con 1 o más. */}
+                        {votes ? (
+                          <span
+                            className="flex shrink-0 items-center gap-1 rounded-md bg-black/65 px-1.5 py-0.5 tabular-nums text-white"
+                            title={votesLabel}
+                          >
+                            <Users className="h-3 w-3" aria-hidden="true" />
+                            {votes}
+                          </span>
+                        ) : (
+                          <span aria-hidden="true" />
+                        )}
+                        {badge ? <span className="min-w-0 truncate rounded-md bg-black/65 px-1.5 py-0.5">{badge}</span> : null}
                       </span>
                     ) : null}
                   </button>

@@ -16,12 +16,13 @@ import {
 import { db } from '../db/client.js';
 import { invalidateLevelState } from '../level/store.js';
 import { getFollowingTitleActivity } from '../lib/followingTitleActivity.js';
-import { getCommunityArtwork, getCommunityArtworkForTitles, getCommunitySeasonPosters } from '../lib/artworkVotes.js';
+import { getArtworkVoteCounts, getCommunityArtwork, getCommunityArtworkForTitles, getCommunitySeasonPosters } from '../lib/artworkVotes.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const TYPES = new Set(['movie', 'tv']);
 const ARTWORK_TYPES = new Set(['movie', 'tv', 'collection']);
+const ARTWORK_VOTE_TYPES = new Set([...ARTWORK_TYPES, 'season']);
 function parseTarget(req, reply) {
   const type = String(req.params.type || '').toLowerCase();
   const tmdbId = Number(req.params.tmdbId);
@@ -247,6 +248,20 @@ export default async function communityRoutes(fastify) {
     const artwork = await getCommunityArtworkForTitles({ mediaType: type, tmdbIds, kinds });
     reply.header('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
     return { artwork };
+  });
+
+  // GET /:type/:tmdbId/artwork/votes — cuántas veces está elegida cada imagen
+  // del título, por tipo: { votes: { poster: { '/x.jpg': 3 } } }. Lo enseñan
+  // las tarjetas de «Portadas y fondos» (también temporadas: `season`).
+  fastify.get('/:type/:tmdbId/artwork/votes', async (req, reply) => {
+    const type = String(req.params.type || '').toLowerCase();
+    const tmdbId = Number(req.params.tmdbId);
+    if (!ARTWORK_VOTE_TYPES.has(type) || !Number.isInteger(tmdbId) || tmdbId <= 0) {
+      return reply.status(400).send({ error: 'Invalid type or tmdbId' });
+    }
+    const votes = await getArtworkVoteCounts({ mediaType: type, tmdbId });
+    reply.header('Cache-Control', 'no-store');
+    return { votes };
   });
 
   // GET /:type/:tmdbId/artwork — imagen más votada de cada tipo (poster,

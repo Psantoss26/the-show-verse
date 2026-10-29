@@ -302,3 +302,23 @@ test('subscribeCommunityArtwork: restablecer avisa a las páginas montadas del t
     forgetCommunityArtwork({ type: 'tv', id: 42 })
     assert.equal(events.length, 2)
 })
+
+test('adjustArtworkVoteCounts: elegir otra mueve el voto propio al momento', async () => {
+    const { adjustArtworkVoteCounts } = await import('./artworkApi.js')
+    const counts = { poster: { '/a.jpg': 2, '/b.jpg': 1 }, logo: { '/l.png': 1 } }
+    // Sin cambios: el mismo objeto.
+    assert.equal(adjustArtworkVoteCounts(counts, { poster: '/a.jpg' }, { poster: '/a.jpg' }), counts)
+    // De /a a /b: uno menos y uno más.
+    assert.deepEqual(adjustArtworkVoteCounts(counts, { poster: '/a.jpg' }, { poster: '/b.jpg' }), {
+        poster: { '/a.jpg': 1, '/b.jpg': 2 },
+        logo: { '/l.png': 1 },
+    })
+    // Restablecer quita el voto; una imagen sin votos desaparece.
+    assert.deepEqual(adjustArtworkVoteCounts(counts, { logo: '/l.png' }, {}), {
+        poster: { '/a.jpg': 2, '/b.jpg': 1 },
+        logo: {},
+    })
+    // Primera elección de un tipo sin votos.
+    assert.deepEqual(adjustArtworkVoteCounts({}, {}, { cardBackdrop: '/c.jpg' }), { cardBackdrop: { '/c.jpg': 1 } })
+    assert.equal(adjustArtworkVoteCounts(null, {}, { poster: '/a.jpg' }), null)
+})

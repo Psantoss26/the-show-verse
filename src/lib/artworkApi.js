@@ -497,6 +497,43 @@ export function fetchCommunityArtwork({ type, id }) {
     return promise
 }
 
+// Cuántas veces está elegida cada imagen de un título, por tipo de imagen:
+// { poster: { '/x.jpg': 3 } }. Para el contador de las tarjetas de «Portadas y
+// fondos» (también `season` y `collection`). `null` = no se pudo saber.
+export function fetchArtworkVoteCounts({ type, id }) {
+    const normalizedType = type === 'show' ? 'tv' : type || 'movie'
+    if (id == null || id === '') return Promise.resolve(null)
+    return fetch(`/api/community/${normalizedType}/${Number(id)}/artwork/votes`, { cache: 'no-store' })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((json) => (json?.votes && typeof json.votes === 'object' ? json.votes : null))
+        .catch(() => null)
+}
+
+// Recuento al día con la selección propia de AHORA: el servidor contó la que
+// había al leerlo (`ownAtFetch`), y elegir otra mueve ese voto al momento
+// (`ownNow`), sin esperar a volver a preguntar.
+export function adjustArtworkVoteCounts(counts, ownAtFetch, ownNow) {
+    if (!counts) return counts
+    const before = ownAtFetch || {}
+    const after = ownNow || {}
+    let next = counts
+    const bump = (kind, path, delta) => {
+        if (!path) return
+        if (next === counts) next = { ...counts }
+        const byPath = { ...(next[kind] || {}) }
+        const value = (byPath[path] || 0) + delta
+        if (value > 0) byPath[path] = value
+        else delete byPath[path]
+        next[kind] = byPath
+    }
+    for (const kind of new Set([...Object.keys(before), ...Object.keys(after)])) {
+        if ((before[kind] || null) === (after[kind] || null)) continue
+        bump(kind, before[kind], -1)
+        bump(kind, after[kind], 1)
+    }
+    return next
+}
+
 // Selección propia por encima de la más votada, tipo a tipo. Mismo contrato que
 // `fetchArtworkOverride`: `overrides` null = «no se sabe» y entonces vale la
 // copia local por título (`localPreference`). Sin votos devuelve `overrides`

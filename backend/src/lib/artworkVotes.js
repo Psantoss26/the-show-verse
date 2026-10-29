@@ -83,6 +83,33 @@ export async function getCommunityArtwork({ mediaType, tmdbId }, executor = db) 
   return pickTopVotedArtwork(rows);
 }
 
+// Cuántas veces está elegida cada imagen de un título, por tipo de imagen:
+// { poster: { '/x.jpg': 3 }, logo: { … } }. Solo imágenes con algún voto. Lo
+// enseñan las tarjetas de «Portadas y fondos». `mediaType` también `season`
+// (id de TMDb de la temporada).
+export async function getArtworkVoteCounts({ mediaType, tmdbId }, executor = db) {
+  const rows = await executor
+    .select({
+      kind: artworkVotes.kind,
+      filePath: artworkVotes.filePath,
+      votes: sql`COUNT(*)`.mapWith(Number),
+    })
+    .from(artworkVotes)
+    .where(and(eq(artworkVotes.mediaType, mediaType), eq(artworkVotes.tmdbId, Number(tmdbId))))
+    .groupBy(artworkVotes.kind, artworkVotes.filePath);
+  return voteCountsByKind(rows);
+}
+
+export function voteCountsByKind(rows) {
+  const counts = {};
+  for (const row of rows || []) {
+    const votes = Number(row?.votes) || 0;
+    if (!ARTWORK_VOTE_KINDS.includes(row?.kind) || !row.filePath || votes < 1) continue;
+    (counts[row.kind] ||= {})[row.filePath] = votes;
+  }
+  return counts;
+}
+
 // Lo mismo para VARIOS títulos de un tipo a la vez (filas con `tmdbId`):
 // { [tmdbId]: { poster: … } }. Los títulos sin votos no aparecen.
 export function pickTopVotedArtworkByTitle(rows) {
