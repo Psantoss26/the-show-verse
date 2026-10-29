@@ -42,7 +42,9 @@ import { loadUserExport } from '../lib/userExport.js';
 import { parseExportSections } from '../lib/userExportCore.js';
 import { applyArtworkVoteChanges } from '../lib/artworkVotes.js';
 
-const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
+// `cardBackdrop`: backdrop CON idioma de la portada backdrop de la ficha y de
+// las tarjetas backdrop de páginas y dashboards.
+const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo', 'cardBackdrop'];
 export const artworkChangeSchema = z.object({
   // `collection`: póster y fondo elegidos para una colección de TMDb.
   // `season`: portada elegida para una temporada (id = el de la temporada en

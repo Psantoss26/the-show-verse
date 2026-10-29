@@ -3,10 +3,10 @@
 // imágenes (sin el filtro de resolución de la galería; los logos, solo en
 // español e inglés como en ella).
 //
-//   - Escritorio: Portada, Fondo y Logo. «Vista previa» (el backdrop de
+//   - Escritorio: Portada, Backdrop, Fondo y Logo. «Vista previa» (el backdrop de
 //     DetailModal) se edita desde el propio DetailModal: ver
 //     `buildDetailModalArtworkTabs`.
-//   - Móvil: Portada, Con idioma, Tarjetas y Logo. La portada móvil va sin
+//   - Móvil: Portada, Con idioma, Tarjetas, Backdrop y Logo. La portada móvil va sin
 //     idioma con el logo encima; elegir una «Con idioma» la sustituye y el logo
 //     se oculta (ya trae el título impreso). Esas dos guardan la misma
 //     preferencia (`mobilePoster`), que es SOLO de la ficha móvil. «Tarjetas»
@@ -91,11 +91,26 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
 
   const allLogos = withPath(logos);
   const languageLogos = languageLogosOf(allLogos);
-  const sources = { poster: allPosters, mobilePoster: allPosters, background: allBackdrops, logo: allLogos };
+  const sources = { poster: allPosters, mobilePoster: allPosters, cardBackdrop: allBackdrops, background: allBackdrops, logo: allLogos };
 
   const localizedPosters = spanishOrEnglishFirst(
     allPosters.filter((img) => !isLanguageNeutralImage(img)),
   );
+  // «Backdrop»: la portada backdrop de la ficha y las tarjetas backdrop de
+  // páginas y dashboards (kind `cardBackdrop`). Con idioma, como «Con idioma»:
+  // español e inglés; si no hay, los idiomas que haya; sin ninguno con idioma,
+  // todos.
+  const cardBackdropTab = {
+    id: "cardBackdrops",
+    label: "Backdrop",
+    kind: "cardBackdrop",
+    aspect: "backdrop",
+    images: orAll(
+      spanishOrEnglishFirst(allBackdrops.filter((img) => !isLanguageNeutralImage(img))),
+      allBackdrops,
+    ),
+    activePath: active.cardBackdrop ?? null,
+  };
 
   const tabs = mobile
     ? [
@@ -130,10 +145,12 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           // automática y no hay una que marcar.
           activePath: active.cardPoster ?? null,
         },
+        cardBackdropTab,
         { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: languageLogos, activePath: active.logo },
       ]
     : [
         { id: "posters", label: "Portada", kind: "poster", aspect: "poster", images: allPosters, activePath: active.poster },
+        cardBackdropTab,
         {
           id: "background",
           label: "Fondo",

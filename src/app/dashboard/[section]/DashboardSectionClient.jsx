@@ -70,7 +70,7 @@ import {
   readScoreCache,
   writeScoreCache,
 } from "@/lib/userLists/listScoreCache";
-import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 const EMPTY_SCORES = new Map();
 
@@ -319,8 +319,11 @@ function PosterImage({
   const ownPoster = useOwnCardPoster(resolveType(item), item?.id);
   const poster = ownPoster || item?.poster_path;
   const wantsBackdrop = mode === "backdrop";
+  // Backdrop elegido en la ficha (pestaña «Backdrop»): manda sobre el del
+  // lote de arte y no lo espera.
+  const ownBackdrop = useOwnCardBackdrop(resolveType(item), item?.id);
   const backdrop = wantsBackdrop
-    ? previewBackdropPath
+    ? ownBackdrop || previewBackdropPath
     : previewBackdropPath || item?.backdrop_path;
   const preferredPath =
     wantsBackdrop

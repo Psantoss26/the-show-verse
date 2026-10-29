@@ -12,6 +12,18 @@ export default function useOwnCardPoster(type, id) {
   return useOwnArtwork(type, id, "poster");
 }
 
+// Backdrop elegido para las tarjetas backdrop (pestaña «Backdrop» de la ficha,
+// kind `cardBackdrop`): el backdrop CON idioma de la portada en modo backdrop.
+export function useOwnCardBackdrop(type, id) {
+  return useOwnArtwork(type, id, "cardBackdrop");
+}
+
+// La de la tarjeta según su modo de imagen: `backdrop` → `cardBackdrop`; el
+// resto → la portada.
+export function useOwnCardImage(type, id, mode) {
+  return useOwnArtwork(type, id, mode === "backdrop" ? "cardBackdrop" : "poster");
+}
+
 // Lo mismo para cualquier capa (p. ej. el logo del destacado del dashboard).
 export function useOwnArtwork(type, id, kind) {
   return useSyncExternalStore(

@@ -74,7 +74,7 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
-import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -1801,10 +1801,12 @@ function Backdrop({ entry, className = "" }) {
   });
   const type = getItemType(entry);
   const id = getTmdbId(entry);
+  // Backdrop elegido en la ficha (pestaña «Backdrop»): manda y no pide nada.
+  const ownBackdrop = useOwnCardBackdrop(type, id);
 
   useEffect(() => {
     let abort = false;
-    if (!hasBeenInView || !type || !id) return;
+    if (ownBackdrop || !hasBeenInView || !type || !id) return;
     setBackdropPath(null);
 
     const load = async () => {
@@ -1821,10 +1823,11 @@ function Backdrop({ entry, className = "" }) {
     return () => {
       abort = true;
     };
-  }, [entry, hasBeenInView, id, type]);
+  }, [entry, hasBeenInView, id, type, ownBackdrop]);
 
-  const src = backdropPath
-    ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
+  const shownBackdropPath = ownBackdrop || backdropPath;
+  const src = shownBackdropPath
+    ? `https://image.tmdb.org/t/p/w1280${shownBackdropPath}`
     : null;
 
   return (

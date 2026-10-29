@@ -1187,6 +1187,9 @@ export default function DetailsClient({
   const mobilePosterStorageKey = `showverse:${endpointType}:${id}:mobilePoster`;
   const logoStorageKey = `showverse:${endpointType}:${id}:logo`;
   const previewBackdropStorageKey = `showverse:${endpointType}:${id}:backdrop`;
+  // Backdrop CON idioma de la portada en modo backdrop y de las tarjetas
+  // backdrop de páginas y dashboards (pestaña «Backdrop»).
+  const cardBackdropStorageKey = `showverse:${endpointType}:${id}:cardBackdrop`;
   const backgroundStorageKey = `showverse:${endpointType}:${id}:background`;
   // Modo de vista global (poster o preview) - se comparte entre todos los contenidos
   const globalViewModeStorageKey = "showverse:global:posterViewMode";
@@ -1205,6 +1208,8 @@ export default function DetailsClient({
     useState(() => restoredValue(backSnapshot, "selectedMobilePosterPath", null));
   const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] =
     useState(() => restoredValue(backSnapshot, "selectedPreviewBackdropPath", null));
+  const [selectedCardBackdropPath, setSelectedCardBackdropPath] =
+    useState(() => restoredValue(backSnapshot, "selectedCardBackdropPath", null));
 
   // El primer render debe ser determinista para evitar hydration mismatch.
   // La preferencia real del usuario se restaura en cliente justo después.
@@ -1317,6 +1322,7 @@ export default function DetailsClient({
   const communityPosterPath = communityArtworkFor("poster");
   const communityMobilePosterPath = communityArtworkFor("mobilePoster");
   const communityPreviewBackdropPath = communityArtworkFor("backdrop");
+  const communityCardBackdropPath = communityArtworkFor("cardBackdrop");
   const communityBackgroundPath = communityArtworkFor("background");
   const communityLogoPath = communityArtworkFor("logo");
 
@@ -1594,6 +1600,7 @@ export default function DetailsClient({
       ["poster", selectedPosterPath],
       ["mobilePoster", selectedMobilePosterPath],
       ["backdrop", selectedPreviewBackdropPath],
+      ["cardBackdrop", selectedCardBackdropPath],
       ["background", selectedBackgroundPath],
       ["logo", selectedLogoPath],
     ]) {
@@ -1605,6 +1612,7 @@ export default function DetailsClient({
     selectedPosterPath,
     selectedMobilePosterPath,
     selectedPreviewBackdropPath,
+    selectedCardBackdropPath,
     selectedBackgroundPath,
     selectedLogoPath,
   ]);
@@ -2685,6 +2693,11 @@ export default function DetailsClient({
     // usuario y luego sería sustituido -- el parpadeo que se quiere evitar.
     if (!artworkInitialized || !remoteArtworkChecked) return null;
 
+    // El backdrop elegido en la pestaña «Backdrop» (propio y, sin él, el más
+    // votado) manda sobre el de la escalera de idiomas.
+    if (selectedCardBackdropPath) return selectedCardBackdropPath;
+    if (communityCardBackdropPath) return communityCardBackdropPath;
+
     const allBackdrops = [
       ...(imagesState?.backdrops || []),
       ...(data?.images?.backdrops ? data.images.backdrops : []),
@@ -2702,6 +2715,8 @@ export default function DetailsClient({
     data?.original_language,
     artworkInitialized,
     remoteArtworkChecked,
+    selectedCardBackdropPath,
+    communityCardBackdropPath,
   ]);
 
   // Póster del hero móvil. Se prioriza el arte sin idioma para no duplicar el
@@ -2767,6 +2782,9 @@ export default function DetailsClient({
     // dashboards, que es la de escritorio (kind `poster`); la del hero móvil
     // no sale de la ficha.
     const isCardPosterTab = activeImagesTab === "cardPosters";
+    // «Backdrop»: backdrop CON idioma de la portada en modo backdrop y de las
+    // tarjetas backdrop (kind `cardBackdrop`).
+    const isCardBackdropTab = activeImagesTab === "cardBackdrops";
     const isPoster =
       activeImagesTab === "posters" || isLocalizedPosterTab || isCardPosterTab;
     const rawList = isLogoTab
@@ -2807,6 +2825,9 @@ export default function DetailsClient({
         ? // Solo la elegida a propósito: sin ella cada tarjeta usa su
           // portada automática, que no tiene por qué ser la de la ficha.
           selectedPosterPath || null
+      : isCardBackdropTab
+        ? // La que enseña la portada en modo backdrop.
+          posterBackdropFallback || null
       : isPoster
         ? currentPosterActive
       : isBackdropTab
@@ -2836,13 +2857,13 @@ export default function DetailsClient({
     // botones de idioma de la hoja); si el título no tiene ninguna, las de los
     // idiomas que haya y, en «Tarjetas», sin ninguna con idioma, todas.
     const localizedPool = (() => {
-      if (!isLocalizedPosterTab && !isCardPosterTab) return null;
+      if (!isLocalizedPosterTab && !isCardPosterTab && !isCardBackdropTab) return null;
       const localized = withPath.filter((img) => !isLanguageNeutralImage(img));
       const spanishOrEnglish = localized.filter(matchesLang);
       const pool = spanishOrEnglish.length ? spanishOrEnglish : localized;
-      return new Set(
-        (isCardPosterTab && !pool.length ? withPath : pool).map((img) => img.file_path),
-      );
+      // «Tarjetas» y «Backdrop» no se quedan vacías sin imágenes con idioma.
+      const orAll = (isCardPosterTab || isCardBackdropTab) && !pool.length;
+      return new Set((orAll ? withPath : pool).map((img) => img.file_path));
     })();
     const inMobilePosterTab = (img) =>
       isLocalizedPosterTab ? !isLanguageNeutralImage(img) : isLanguageNeutralImage(img);
@@ -2938,6 +2959,7 @@ export default function DetailsClient({
       isMobilePosterTab,
       isLocalizedPosterTab,
       isCardPosterTab,
+      isCardBackdropTab,
       isLogoTab,
       isBackdropTab,
       isBackgroundTab,
@@ -2966,6 +2988,7 @@ export default function DetailsClient({
     selectedPreviewBackdropPath,
     displayBackdropPath,
     data?.backdrop_path,
+    posterBackdropFallback,
   ]);
 
   // «Con idioma» solo existe en móvil: en escritorio la portada es otra capa.
@@ -3206,6 +3229,7 @@ export default function DetailsClient({
     const initialPreviewBackdrop = readArtworkPreference(
       previewBackdropStorageKey,
     );
+    const initialCardBackdrop = readArtworkPreference(cardBackdropStorageKey);
     const initialBackdrop = readArtworkPreference(backgroundStorageKey);
 
     // ¿Toca renunciar a los overrides en esta visita? `isMobileViewport` es
@@ -3258,6 +3282,9 @@ export default function DetailsClient({
     );
     setSelectedPreviewBackdropPath(
       initialFor("backdrop", previewBackdropStorageKey, initialPreviewBackdrop),
+    );
+    setSelectedCardBackdropPath(
+      initialFor("cardBackdrop", cardBackdropStorageKey, initialCardBackdrop),
     );
     setSelectedBackgroundPath(
       initialFor("background", backgroundStorageKey, initialBackdrop),
@@ -3319,6 +3346,7 @@ export default function DetailsClient({
     logoStorageKey,
     backgroundStorageKey,
     previewBackdropStorageKey,
+    cardBackdropStorageKey,
   ]);
 
   // La caché global de preferencias guarda una instantánea COMPLETA de los
@@ -3364,6 +3392,7 @@ export default function DetailsClient({
       previewBackdropStorageKey,
       setSelectedPreviewBackdropPath,
     );
+    restore("cardBackdrop", cardBackdropStorageKey, setSelectedCardBackdropPath);
     restore("background", backgroundStorageKey, setSelectedBackgroundPath);
     setRemoteArtworkChecked(true);
   }, [
@@ -3372,6 +3401,7 @@ export default function DetailsClient({
     mobilePosterStorageKey,
     logoStorageKey,
     previewBackdropStorageKey,
+    cardBackdropStorageKey,
     backgroundStorageKey,
   ]);
 
@@ -3423,6 +3453,7 @@ export default function DetailsClient({
           previewBackdropStorageKey,
           setSelectedPreviewBackdropPath,
         );
+        restore("cardBackdrop", cardBackdropStorageKey, setSelectedCardBackdropPath);
         restore("background", backgroundStorageKey, setSelectedBackgroundPath);
         cacheArtworkOverrides?.({
           type: endpointType,
@@ -3435,6 +3466,7 @@ export default function DetailsClient({
             },
             { kind: "logo", filePath: overrides?.logo || null },
             { kind: "backdrop", filePath: overrides?.backdrop || null },
+            { kind: "cardBackdrop", filePath: overrides?.cardBackdrop || null },
             { kind: "background", filePath: overrides?.background || null },
           ],
         });
@@ -3456,6 +3488,7 @@ export default function DetailsClient({
     mobilePosterStorageKey,
     logoStorageKey,
     previewBackdropStorageKey,
+    cardBackdropStorageKey,
     backgroundStorageKey,
     account?.id,
     cacheArtworkOverrides,
@@ -7169,6 +7202,19 @@ export default function DetailsClient({
     saveArtworkOverride({ type: endpointType, id, kind: "backdrop", filePath });
   };
 
+  // Backdrop CON idioma (pestaña «Backdrop»): la portada en modo backdrop y
+  // las tarjetas backdrop de páginas y dashboards (`useOwnArtwork`).
+  const handleSelectCardBackdrop = (filePath) => {
+    setSelectedCardBackdropPath(filePath);
+    persistArtworkPreference(cardBackdropStorageKey, filePath);
+    cacheArtworkOverrides?.({
+      type: endpointType,
+      id,
+      changes: [{ kind: "cardBackdrop", filePath }],
+    });
+    saveArtworkOverride({ type: endpointType, id, kind: "cardBackdrop", filePath });
+  };
+
   // Selecciona una imagen de fondo con transicion crossfade suave
   const handleSelectBackground = (filePath) => {
     // Guardar la imagen anterior para el fade
@@ -7201,6 +7247,7 @@ export default function DetailsClient({
     setSelectedPosterPath(null);
     setSelectedMobilePosterPath(null);
     setSelectedPreviewBackdropPath(null);
+    setSelectedCardBackdropPath(null);
     setSelectedBackgroundPath(null);
     setSelectedLogoPath(null);
     setPosterViewMode("poster");
@@ -7208,11 +7255,13 @@ export default function DetailsClient({
     persistArtworkPreference(posterStorageKey, null);
     persistArtworkPreference(mobilePosterStorageKey, null);
     persistArtworkPreference(previewBackdropStorageKey, null);
+    persistArtworkPreference(cardBackdropStorageKey, null);
     persistArtworkPreference(backgroundStorageKey, null);
     persistArtworkPreference(logoStorageKey, null);
     const resetChanges = [
       { kind: "poster", filePath: null },
       { kind: "backdrop", filePath: null },
+      { kind: "cardBackdrop", filePath: null },
       { kind: "background", filePath: null },
       { kind: "mobilePoster", filePath: null },
       { kind: "logo", filePath: null },
@@ -8076,6 +8125,11 @@ export default function DetailsClient({
           poster: sheetPosterActive,
           mobilePoster: sheetMobilePosterActive,
           cardPoster: selectedPosterPath || null,
+          // En la ficha de escritorio se marca la que enseña la portada en
+          // modo backdrop; en el móvil (sin esa portada), solo la elegida.
+          cardBackdrop: isMobileViewport
+            ? selectedCardBackdropPath || null
+            : posterBackdropFallback || null,
           background: sheetBackgroundActive,
           logo: displayHeroLogoPath,
         },
@@ -8088,6 +8142,8 @@ export default function DetailsClient({
       sheetPosterActive,
       sheetMobilePosterActive,
       selectedPosterPath,
+      selectedCardBackdropPath,
+      posterBackdropFallback,
       sheetBackgroundActive,
       displayHeroLogoPath,
     ],
@@ -8532,6 +8588,7 @@ export default function DetailsClient({
     selectedPosterPath,
     selectedMobilePosterPath,
     selectedPreviewBackdropPath,
+    selectedCardBackdropPath,
     posterViewMode,
     posterLayoutMode,
     posterModeHydrated,
@@ -9815,6 +9872,7 @@ export default function DetailsClient({
         if (kind === "logo") handleSelectLogo(filePath);
         else if (kind === "mobilePoster") handleSelectMobilePoster(filePath);
         else if (kind === "poster") handleSelectPoster(filePath);
+        else if (kind === "cardBackdrop") handleSelectCardBackdrop(filePath);
         else if (kind === "preview") handleSelectPreviewBackdrop(filePath);
         else handleSelectBackground(filePath);
       },
@@ -11840,11 +11898,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <div className="self-start shrink-0 flex items-center gap-2 sm:gap-3 h-10 md:h-11">
                             {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                             <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
-                              {/* Tabs de tipo de imagen: Portada, Fondo y Logo. «Vista
-                                  previa» (el backdrop de DetailModal) se edita desde el
-                                  botón Editar del propio DetailModal. */}
+                              {/* Tabs de tipo de imagen: Portada, Backdrop (con idioma:
+                                  portada en modo backdrop y tarjetas backdrop), Fondo y
+                                  Logo. «Vista previa» (el backdrop de DetailModal) se
+                                  edita desde el botón Editar del propio DetailModal. */}
                               <div className="flex isolate transform-gpu items-center rounded-2xl p-1 w-fit h-10 md:h-11 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
-                                {["posters", "background", "logos"].map(
+                                {["posters", "cardBackdrops", "background", "logos"].map(
                                   (tab) => (
                                     <button
                                       key={tab}
@@ -11862,9 +11921,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     >
                                       {tab === "posters"
                                         ? "Portada"
-                                        : tab === "background"
-                                          ? "Fondo"
-                                          : "Logo"}
+                                        : tab === "cardBackdrops"
+                                          ? "Backdrop"
+                                          : tab === "background"
+                                            ? "Fondo"
+                                            : "Logo"}
                                     </button>
                                   ),
                                 )}
@@ -12168,6 +12229,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                               handleSelectMobilePoster(filePath);
                                             } else if (activeImagesTab === "posters" || activeImagesTab === "cardPosters")
                                               handleSelectPoster(filePath);
+                                            else if (activeImagesTab === "cardBackdrops")
+                                              handleSelectCardBackdrop(filePath);
                                             else if (
                                               activeImagesTab === "backdrops"
                                             )
@@ -12190,6 +12253,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 handleSelectMobilePoster(filePath);
                                               } else if (activeImagesTab === "posters" || activeImagesTab === "cardPosters")
                                                 handleSelectPoster(filePath);
+                                              else if (activeImagesTab === "cardBackdrops")
+                                                handleSelectCardBackdrop(filePath);
                                               else if (
                                                 activeImagesTab === "backdrops"
                                               )

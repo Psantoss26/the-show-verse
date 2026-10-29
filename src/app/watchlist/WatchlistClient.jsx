@@ -94,7 +94,7 @@ import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import MobileOptionsSheet, { SheetOption, SheetOptionBreak, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
 import useUserDetailsSequenceSource from "@/lib/navigation/useUserDetailsSequenceSource";
-import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import { useOwnCardImage } from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -936,10 +936,12 @@ function SmartPoster({ item, title, mode = "poster" }) {
           : item.poster_path || item.backdrop_path || null,
     };
   }
-  // Portada elegida en la ficha: manda sobre la automática y no pide nada.
-  const ownPoster = useOwnCardPoster(type, id);
-  const ownPosterUrl =
-    mode === "poster" && ownPoster ? buildImg(ownPoster, POSTER_CARD_SIZE) : null;
+  // Portada (o, en modo backdrop, backdrop) elegida en la ficha: manda sobre
+  // la automática y no pide nada.
+  const ownImage = useOwnCardImage(type, id, mode);
+  const ownPosterUrl = ownImage
+    ? buildImg(ownImage, mode === "backdrop" ? "w1280" : POSTER_CARD_SIZE)
+    : null;
   const initialSrc = ownPosterUrl || getCachedSmartPosterUrl(item, mode);
 
   const [src, setSrc] = useState(initialSrc);

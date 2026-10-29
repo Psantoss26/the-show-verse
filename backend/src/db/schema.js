@@ -287,7 +287,7 @@ export const artworkVotes = pgTable('artwork_votes', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   mediaType: text('media_type').notNull(),                 // 'movie' | 'tv' | 'collection' | 'season'
   tmdbId: integer('tmdb_id').notNull(),
-  kind: text('kind').notNull(),                            // 'poster' | 'mobilePoster' | 'backdrop' | 'background' | 'logo'
+  kind: text('kind').notNull(),                            // 'poster' | 'mobilePoster' | 'backdrop' | 'background' | 'logo' | 'cardBackdrop'
   filePath: text('file_path').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({

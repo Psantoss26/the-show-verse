@@ -337,9 +337,12 @@ export default function PhoneDetailsSections({
   // Portada de las TARJETAS (pestaña «Tarjetas» de la vista lateral): la de
   // escritorio (`poster`), no la del hero.
   const cardPosterKey = `showverse:${overrideType}:${id}:poster`;
+  // Backdrop CON idioma de las tarjetas backdrop (pestaña «Backdrop»).
+  const cardBackdropKey = `showverse:${overrideType}:${id}:cardBackdrop`;
   const [selectedMobilePoster, setSelectedMobilePoster] = useState(null);
   const [selectedLogo, setSelectedLogo] = useState(null);
   const [selectedCardPoster, setSelectedCardPoster] = useState(null);
+  const [selectedCardBackdrop, setSelectedCardBackdrop] = useState(null);
 
   useEffect(() => {
     if (id == null) return;
@@ -349,9 +352,10 @@ export default function PhoneDetailsSections({
     setSelectedMobilePoster(pick("mobilePoster", mobilePosterKey));
     setSelectedLogo(pick("logo", logoKey));
     setSelectedCardPoster(pick("poster", cardPosterKey));
+    setSelectedCardBackdrop(pick("cardBackdrop", cardBackdropKey));
     setActiveImagesTab("posters");
     setImagesResFilter("all");
-  }, [id, overrideType, mobilePosterKey, logoKey, cardPosterKey]);
+  }, [id, overrideType, mobilePosterKey, logoKey, cardPosterKey, cardBackdropKey]);
 
   const persistSelection = useCallback(
     (kind, key, filePath, setLocal, chosen) => {
@@ -402,10 +406,17 @@ export default function PhoneDetailsSections({
     [persistSelection, cardPosterKey],
   );
 
+  const handleSelectCardBackdrop = useCallback(
+    (filePath, chosen) =>
+      persistSelection("cardBackdrop", cardBackdropKey, filePath, setSelectedCardBackdrop, chosen),
+    [persistSelection, cardBackdropKey],
+  );
+
   const handleResetArtwork = useCallback(() => {
     setSelectedMobilePoster(null);
     setSelectedLogo(null);
     setSelectedCardPoster(null);
+    setSelectedCardBackdrop(null);
     // Se restauran TODAS las capas, no solo las dos que se editan aquí: es lo
     // que hace el mismo botón en la ficha completa, y dejar a medias el resto
     // convertiría "restaurar" en algo distinto según desde dónde se pulse.
@@ -415,6 +426,7 @@ export default function PhoneDetailsSections({
     const changes = [
       { kind: "poster", filePath: null },
       { kind: "backdrop", filePath: null },
+      { kind: "cardBackdrop", filePath: null },
       { kind: "background", filePath: null },
       { kind: "mobilePoster", filePath: null },
       { kind: "logo", filePath: null },
@@ -1180,11 +1192,13 @@ export default function PhoneDetailsSections({
   const sheetArtworkTabs = buildArtworkSheetTabs({
     mobile: true,
     posters: images?.posters,
+    backdrops: images?.backdrops,
     logos: images?.logos,
     active: {
       mobilePoster: selectedMobilePoster || data?.heroPosterPath || null,
       logo: selectedLogo || data?.logoPath || null,
       cardPoster: selectedCardPoster,
+      cardBackdrop: selectedCardBackdrop,
     },
   });
   const sectionSheetData = {
@@ -1200,10 +1214,12 @@ export default function PhoneDetailsSections({
     images: {
       tabs: sheetArtworkTabs,
       onSelect: (kind, filePath) => {
-        const source = kind === "logo" ? images?.logos : images?.posters;
+        const source =
+          kind === "logo" ? images?.logos : kind === "cardBackdrop" ? images?.backdrops : images?.posters;
         const chosen = source?.find((image) => image.file_path === filePath);
         if (kind === "logo") handleSelectLogo(filePath, chosen);
         else if (kind === "poster") handleSelectCardPoster(filePath, chosen);
+        else if (kind === "cardBackdrop") handleSelectCardBackdrop(filePath, chosen);
         else handleSelectMobilePoster(filePath, chosen);
       },
       onReset: handleResetArtwork,

@@ -75,3 +75,12 @@ test('seasons accept a cover by their TMDb season id, apart from the show', () =
   });
 });
 
+
+test('cardBackdrop (backdrop con idioma de portada y tarjetas) es un tipo de imagen válido', () => {
+  const change = { type: 'movie', id: 550, kind: 'cardBackdrop', filePath: '/card-backdrop.jpg' };
+  assert.equal(artworkChangeSchema.safeParse(change).success, true);
+  const settings = applyArtworkChanges({}, [change]);
+  assert.deepEqual(getArtworkOverrides(settings, { type: 'movie', ids: [550] }), {
+    '550': { cardBackdrop: '/card-backdrop.jpg' },
+  });
+});

@@ -11,6 +11,7 @@ import { pickCollectionCoverBackdrop } from "@/lib/lists/coverBackdrop";
 import { buildPosterCollageTargets } from "@/lib/lists/posterCollage";
 import { peekListArtwork, requestListArtwork } from "@/lib/tmdb/artworkBatch";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
+import { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaños de TMDb para la miniatura 16:9 de la vista «Lista con backdrop»
 // (≈136-224 px de ancho según la pantalla, a 2-3× de densidad).
@@ -110,6 +111,9 @@ function TitleBackdrop({ item, alt, sizes }) {
     };
   }, [mediaType, tmdbId]);
 
+  // Backdrop elegido en la ficha (pestaña «Backdrop»): manda y no espera al lote.
+  const ownBackdrop = useOwnCardBackdrop(mediaType, tmdbId);
+  if (ownBackdrop) return <BackdropImage path={ownBackdrop} alt={alt} sizes={sizes} />;
   if (backdropPath === undefined) return <Pending />;
   if (backdropPath) return <BackdropImage path={backdropPath} alt={alt} sizes={sizes} />;
   return <PosterFallback item={item} alt={alt} />;

@@ -73,7 +73,7 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
-import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import { useOwnCardImage } from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -282,8 +282,9 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
   const originalLanguage = item.original_language;
   const [src, setSrc] = useState(null);
   const [ready, setReady] = useState(false);
-  // Portada elegida en la ficha, suscrita (se actualiza con la página viva).
-  const ownPoster = useOwnCardPoster(type, id);
+  // Portada (o backdrop, pestaña «Backdrop») elegida en la ficha, suscrita
+  // (se actualiza con la página viva).
+  const ownImage = useOwnCardImage(type, id, kind);
 
   useEffect(() => {
     let abort = false;
@@ -293,7 +294,7 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
       const key = `${type}:${id}`;
       const cache = kind === "poster" ? posterChoiceCache : backdropChoiceCache;
       const preferredPath =
-        kind === "poster" ? ownPoster : getArtworkPreference(id, type).backdrop;
+        ownImage || (kind === "poster" ? null : getArtworkPreference(id, type).backdrop);
       const fallbackPath =
         kind === "poster"
           ? itemPosterPath || itemBackdropPath || null
@@ -313,7 +314,7 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
     return () => {
       abort = true;
     };
-  }, [type, id, kind, itemPosterPath, itemBackdropPath, originalLanguage, ownPoster]);
+  }, [type, id, kind, itemPosterPath, itemBackdropPath, originalLanguage, ownImage]);
 
   const Fallback = kind === "poster" ? Film : Tv;
   return (

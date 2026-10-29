@@ -101,6 +101,7 @@ import {
   movieExtrasCache,
   preloadImage,
 } from "@/lib/dashboard/media";
+import { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 /* =================== CONSTANTES / VARIANTES =================== */
 const EMPTY_ARRAY = [];
@@ -184,8 +185,11 @@ function getInitialItemBackdrop(item, backdropOverride) {
 // los backdrops de TODAS sus tarjetas al montar el dashboard.
 function useItemBackdrop(item, backdropOverride, { preload = true } = {}) {
   const mediaType = getMediaTypeForItem(item);
+  // Backdrop elegido en la ficha (pestaña «Backdrop»): manda sobre todo y no
+  // se guarda en `movieBackdropCache`, para que al quitarlo vuelva el automático.
+  const ownBackdrop = useOwnCardBackdrop(mediaType, item?.id);
   const [backdropPath, setBackdropPath] = useState(() =>
-    getInitialItemBackdrop(item, backdropOverride),
+    ownBackdrop || getInitialItemBackdrop(item, backdropOverride),
   );
   // Valor ya pintado, para no llamar a `setState` si no cambia. Un updater que
   // devuelve el mismo valor NO es gratis: React programa igualmente el render y
@@ -222,6 +226,12 @@ function useItemBackdrop(item, backdropOverride, { preload = true } = {}) {
       setBackdropPath(path);
     };
 
+    if (ownBackdrop) {
+      reveal(ownBackdrop);
+      return () => {
+        abort = true;
+      };
+    }
     if (backdropOverride) {
       movieBackdropCache.set(key, backdropOverride);
       reveal(backdropOverride);
@@ -256,7 +266,7 @@ function useItemBackdrop(item, backdropOverride, { preload = true } = {}) {
     return () => {
       abort = true;
     };
-  }, [itemKey, backdropOverride, preload]);
+  }, [itemKey, backdropOverride, preload, ownBackdrop]);
 
   return { backdropPath, mediaType };
 }

@@ -58,7 +58,7 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
-import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -448,6 +448,8 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
   const type = "tv";
   const id = item.tmdbId;
   const originalLanguage = item.original_language;
+  // Backdrop elegido en la ficha (pestaña «Backdrop»).
+  const pref = useOwnCardBackdrop(type, id);
 
   const [src, setSrc] = useState(null);
   const [ready, setReady] = useState(false);
@@ -463,8 +465,10 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
 
       // Resolvemos SIEMPRE el backdrop final antes de mostrar nada, con fallback
       // al backdrop/póster del propio item para que nunca quede vacía.
-      let finalPath;
-      if (backdropChoiceCache.has(key)) {
+      let finalPath = pref || null;
+      if (finalPath) {
+        // Elegido en la ficha: no hace falta el selector automático.
+      } else if (backdropChoiceCache.has(key)) {
         finalPath = backdropChoiceCache.get(key) || item.backdrop_path || item.poster_path || null;
       } else {
         const best = await getBestBackdropCached(type, id, originalLanguage);
@@ -484,7 +488,7 @@ function SmartBackdrop({ item, title, imgClassName = "" }) {
     return () => {
       abort = true;
     };
-  }, [type, id, originalLanguage]);
+  }, [type, id, originalLanguage, pref]);
 
   return (
     <div className="relative w-full h-full">

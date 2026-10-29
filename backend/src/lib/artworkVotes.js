@@ -10,7 +10,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { artworkVotes } from '../db/schema.js';
 
-export const ARTWORK_VOTE_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
+export const ARTWORK_VOTE_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo', 'cardBackdrop'];
 
 // Refleja en `artwork_votes` los mismos cambios que se acaban de aplicar a
 // `artworkOverrides`. Va dentro de la transacción del guardado (`executor`),

@@ -83,7 +83,7 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
-import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
@@ -484,8 +484,12 @@ function Top10MobileBackdropCardTV({
   frameClassName = "rounded-3xl aspect-[16/9]",
   imageClassName = "object-contain",
 }) {
-  const [backdropPath, setBackdropPath] = useState(null);
-  const [ready, setReady] = useState(false);
+  const [autoBackdropPath, setBackdropPath] = useState(null);
+  const [autoReady, setReady] = useState(false);
+  // Backdrop elegido en la ficha (pestaña «Backdrop»): manda sobre el automático.
+  const ownBackdrop = useOwnCardBackdrop("tv", show?.id);
+  const backdropPath = ownBackdrop || autoBackdropPath;
+  const ready = !!ownBackdrop || autoReady;
 
   useEffect(() => {
     let abort = false;
