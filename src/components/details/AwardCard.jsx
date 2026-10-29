@@ -446,15 +446,9 @@ export default function AwardCard({ item, enableHover = false }) {
         </div>
 
         <div className="relative flex flex-1 flex-col items-center justify-center px-2 pb-14 sm:px-4 sm:pb-20 z-10">
-          <div
-            className={`max-w-[95%] rounded-md border border-white/10 bg-black/20 px-1.5 py-1 text-[9px] font-black uppercase leading-none tracking-[0.16em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] truncate backdrop-blur-sm sm:max-w-[82%] sm:px-2 sm:text-[11px] ${visual.accent}`}
-          >
-            {visual.label}
-          </div>
-
           {item?.groupImageUrl && (
             <div
-              className={`mt-3 flex h-20 w-20 items-center justify-center transform-gpu transition-transform duration-500 ease-out sm:mt-4 sm:h-24 sm:w-24 motion-reduce:transition-none ${
+              className={`flex h-28 w-28 items-center justify-center transform-gpu transition-transform duration-500 ease-out sm:h-36 sm:w-36 motion-reduce:transition-none ${
                 enableHover ? "group-hover:scale-110" : ""
               }`}
             >

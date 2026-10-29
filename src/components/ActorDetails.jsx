@@ -1475,14 +1475,8 @@ function AwardCard({ item }) {
         </div>
 
         <div className="relative flex flex-1 flex-col items-center justify-center px-2 pb-14 sm:px-4 sm:pb-20 z-10">
-          <div
-            className={`max-w-[95%] rounded-md border border-white/10 bg-black/20 px-1.5 py-1 text-[9px] font-black uppercase leading-none tracking-[0.16em] drop-shadow-[0_4px_18px_rgba(0,0,0,0.8)] truncate backdrop-blur-sm sm:max-w-[82%] sm:px-2 sm:text-[11px] ${visual.accent}`}
-          >
-            {visual.label}
-          </div>
-
           {imageSrc ? (
-            <div className="mt-3 flex h-20 w-20 items-center justify-center sm:mt-4 sm:h-24 sm:w-24">
+            <div className="flex h-28 w-28 items-center justify-center sm:h-36 sm:w-36">
               <OptimizedImage
                 key={imageSrc}
                 src={imageSrc}
@@ -1501,11 +1495,11 @@ function AwardCard({ item }) {
               />
             </div>
           ) : (
-            <div className="mt-3 flex h-20 w-20 items-center justify-center sm:mt-4 sm:h-24 sm:w-24">
+            <div className="flex h-28 w-28 items-center justify-center sm:h-36 sm:w-36">
               {result === "winner" ? (
-                <Trophy className="h-16 w-16 sm:h-20 sm:w-20 text-yellow-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
+                <Trophy className="h-24 w-24 sm:h-32 sm:w-32 text-yellow-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
               ) : (
-                <Award className="h-16 w-16 sm:h-20 sm:w-20 text-zinc-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
+                <Award className="h-24 w-24 sm:h-32 sm:w-32 text-zinc-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
               )}
             </div>
           )}
