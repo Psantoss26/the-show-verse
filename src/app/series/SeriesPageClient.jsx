@@ -606,6 +606,13 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
   const [backdropReady, setBackdropReady] = useState(false);
   // `undefined` mientras se resuelve: ni logo ni título (ver useSpotlightLogo).
   const logoPath = useSpotlightLogo(show?.id, "tv", isSpotlight);
+  // Destacada (con el logo encima): el backdrop SIN idioma de «Vista previa»
+  // elegido o más votado, como la cabecera de DetailModal.
+  const { path: previewBackdrop, pending: previewBackdropPending } = useCardArtworkState(
+    "tv",
+    isSpotlight ? show?.id : null,
+    "backdrop",
+  );
 
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -669,7 +676,12 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
 
       if (isSpotlight) {
         const cachedBackdrop = tvSpotlightBackdropCache.get(show.id);
-        if (cachedBackdrop !== undefined) {
+        if (previewBackdrop) {
+          revealBackdrop(previewBackdrop);
+        } else if (previewBackdropPending) {
+          // Se espera a saber si hay votado (el efecto vuelve a correr).
+          revealBackdrop(null);
+        } else if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
           try {
@@ -814,7 +826,7 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
     return () => {
       abort = true;
     };
-  }, [isSpotlight, show, cardBackdrop, cardBackdropPending]);
+  }, [isSpotlight, show, cardBackdrop, cardBackdropPending, previewBackdrop, previewBackdropPending]);
 
   const href = `/details/tv/${show.id}`;
 

@@ -584,8 +584,17 @@ function InlinePreviewCard({
     movie?.id,
     "cardBackdrop",
   );
+  // Destacada (spotlight, con el logo encima): el backdrop SIN idioma de
+  // «Vista previa» elegido o más votado, como la cabecera de DetailModal.
+  const { path: previewBackdrop, pending: previewBackdropPending } = useCardArtworkState(
+    mediaType,
+    isSpotlight ? movie?.id : null,
+    "backdrop",
+  );
   const [backdropPath, setBackdropPath] = useState(() =>
-    !isSpotlight && (cardBackdrop || cardBackdropPending)
+    isSpotlight && (previewBackdrop || previewBackdropPending)
+      ? previewBackdrop
+      : !isSpotlight && (cardBackdrop || cardBackdropPending)
       ? cardBackdrop
       : getInitialDashboardPreviewBackdrop(
           movie,
@@ -743,7 +752,12 @@ function InlinePreviewCard({
       const backdropCacheKey = getBackdropCacheKey(movie, mediaType);
       if (isSpotlight) {
         const cachedBackdrop = spotlightBackdropCache.get(backdropCacheKey);
-        if (cachedBackdrop !== undefined) {
+        if (previewBackdrop) {
+          revealBackdrop(previewBackdrop);
+        } else if (previewBackdropPending) {
+          // Se espera a saber si hay votado (el efecto vuelve a correr).
+          revealBackdrop(null);
+        } else if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
           try {
@@ -890,7 +904,16 @@ function InlinePreviewCard({
     return () => {
       abort = true;
     };
-  }, [isSpotlight, mediaType, movie, stableBackdropOverride, cardBackdrop, cardBackdropPending]);
+  }, [
+    isSpotlight,
+    mediaType,
+    movie,
+    stableBackdropOverride,
+    cardBackdrop,
+    cardBackdropPending,
+    previewBackdrop,
+    previewBackdropPending,
+  ]);
 
   // Carga perezosa (en hover == al montar) de los datos que alimentan la fila
   // meta compartida. También se usa en spotlight para el mismo diseño de estado

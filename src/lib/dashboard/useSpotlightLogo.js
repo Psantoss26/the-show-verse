@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchBestLogo, peekBestLogo } from "@/lib/dashboard/media";
+import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 
 const LOGO_LANGS = ["en", "es", null];
 
@@ -18,9 +19,18 @@ const LOGO_LANGS = ["en", "es", null];
  * logo": en el primer hover se veía el título mientras llegaba la petición, y
  * después lo sustituía el logo. Con la caché ya llena (siguientes hovers) se
  * arranca directamente en el estado final.
+ *
+ * El logo elegido en la ficha o, sin él, el más votado manda sobre el
+ * automático; mientras no se sabe si hay votado, `undefined` (no se pinta el
+ * automático para cambiarlo después).
  */
 export default function useSpotlightLogo(itemId, mediaType, enabled = true) {
   const type = mediaType === "tv" ? "tv" : "movie";
+  const { path: chosenLogo, pending: chosenLogoPending } = useCardArtworkState(
+    type,
+    enabled ? itemId : null,
+    "logo",
+  );
   const [state, setState] = useState(() =>
     enabled && itemId ? peekBestLogo(itemId, type, LOGO_LANGS) : null,
   );
@@ -46,5 +56,7 @@ export default function useSpotlightLogo(itemId, mediaType, enabled = true) {
     };
   }, [enabled, itemId, type]);
 
+  if (enabled && chosenLogo) return chosenLogo;
+  if (enabled && chosenLogoPending) return undefined;
   return state;
 }
