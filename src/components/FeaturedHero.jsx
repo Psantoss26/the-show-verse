@@ -2449,11 +2449,7 @@ export default function FeaturedHero({
       unsubscribe();
     };
   }, [activeId, activeMediaType]);
-  // Restablecido en la ficha (marca `auto`): el automático aunque haya otro
-  // más votado.
-  const ownAutoArtwork = useOwnArtwork(activeMediaType, activeMovie?.id, "auto");
-  const activeLogoPath =
-    ownLogo || (ownAutoArtwork ? null : activeAssets.communityLogo) || activeAssets.logo || null;
+  const activeLogoPath = ownLogo || activeAssets.communityLogo || activeAssets.logo || null;
   const activeBackdropOptions = useMemo(() => {
     if (!activeMovie) return [];
 
