@@ -11638,7 +11638,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
              ================================================================= */}
           {/* Todas las secciones se muestran en orden sin ocultarse */}
           {/* Cada sección se registra para el sistema de detección de scroll */}
-          <div className="mt-14 space-y-14">
+          <div className="sv-trim-end mt-14 space-y-14">
             {/* =================================================================
             SECCIÓN: TEMPORADAS (solo para series)
            ================================================================= */}

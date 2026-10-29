@@ -36,6 +36,8 @@ tags: [area/frontend, type/referencia]
 | `/embed/details/[...segments]` | `page.jsx` | Ficha móvil incrustada para la «vista teléfono» del panel lateral de escritorio (`noindex`). |
 | `/s/movie/[id]`, `/s/tv/[id]`, `/s/person/[id]` | `route.js` (runtime `nodejs`) | Versión ligera server-only en HTML plano con metadatos OG/Twitter, pensada para bots de redes sociales (destino del rewrite del middleware), no para usuarios humanos. |
 
+Final de la ficha, la temporada y el episodio: el contenedor de las secciones lleva `sv-trim-end` (`globals.css`), que anula el margen inferior de la última sección (su envoltorio, `AnimatedSection` y la sección). Al llegar abajo del todo solo queda el `pb-8` (`lg:pb-12`) del contenedor, más el hueco del navbar inferior en el móvil; las demás secciones conservan su separación.
+
 ## Listas, favoritos y estados de usuario
 
 | Ruta | Fichero(s) | Propósito |

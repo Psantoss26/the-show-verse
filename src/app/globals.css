@@ -3767,3 +3767,15 @@ html[data-details-sequence-transition] .sv-topbar {
     transition: none;
   }
 }
+
+/* Final de la ficha, la temporada y el episodio: el margen inferior de la
+   última sección (`mb-12`/`mb-16`, pensado para separarla de la siguiente) se
+   sumaba al `pb-8` del contenedor y dejaba un hueco de sobra al llegar abajo
+   del todo. Se anula en la cadena de últimos hijos (envoltorio de la sección,
+   AnimatedSection y la sección), que es por donde ese margen sale del
+   contenedor; el espacio final queda en el padding del contenedor. */
+.sv-trim-end > :last-child,
+.sv-trim-end > :last-child > :last-child,
+.sv-trim-end > :last-child > :last-child > :last-child {
+  margin-bottom: 0;
+}

@@ -1609,7 +1609,7 @@ export default function SeasonDetailsClient({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
+      <div className="sv-trim-end relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
         {/* Hero */}
         <motion.div
           // El hero contiene el marcador y el menú de secciones liquid glass.
