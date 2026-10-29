@@ -96,7 +96,7 @@ export default function EpisodeCard({
 
         {/* `pr-6`: sitio para el icono de la esquina si el texto llega arriba. */}
         <span className={`relative flex min-w-0 flex-1 flex-col justify-center ${watched != null ? "pr-6" : ""}`}>
-          <span className="block text-[11px] font-bold uppercase tracking-widest text-zinc-500">
+          <span className="block text-xs font-bold text-zinc-400">
             Episodio {episodeNumber}
           </span>
           {/* Una línea en el móvil: con dos la tarjeta crecería más que la
