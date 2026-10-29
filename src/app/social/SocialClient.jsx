@@ -60,6 +60,7 @@ import Avatar from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import EntranceItem, { estimateVisibleRows } from "@/components/ui/EntranceItem";
 import { useSearchParams } from "next/navigation";
 import { defaultSocialLanding, todayHref } from "@/lib/today/params";
 import { dayTabLabel } from "@/components/today/todayUi";
@@ -456,18 +457,28 @@ const POSTER_RESENA = "h-32 w-[5.4rem] rounded-lg xl:h-40 xl:w-[6.75rem] 2xl:h-4
 // Un bloque de eventos con la vista elegida, como `ActivityFeed` del perfil.
 // Lo usan los dos caminos de pintado (con grupos y sin ellos) para que no
 // puedan divergir. `yo` es el actor de los eventos propios (pestaña "Yo").
-function ListaEventos({ eventos, vista, mostrarAutor, yo }) {
+// Cada fila entra con la cascada de las páginas de usuario; `inicio` es el
+// índice global de la primera (con grupos, la cascada sigue de uno a otro).
+function ListaEventos({ eventos, vista, mostrarAutor, yo, inicio = 0, total = eventos.length }) {
   const conPoster = vista === "poster-list";
   const conBackdrop = vista === "backdrop-list";
+  const animarHasta = estimateVisibleRows(conBackdrop ? 110 : conPoster ? 90 : 72);
   return (
     <ol role="list" className="space-y-3">
-      {eventos.map((evento) => {
+      {eventos.map((evento, indice) => {
         const actor = mostrarAutor && evento.author ? evento.author : yo;
         const props = { evento, actor, mostrarAutor, conPoster, conBackdrop };
         return (
-          <li key={evento.id} className="min-w-0">
+          <EntranceItem
+            as="li"
+            key={evento.id}
+            className="min-w-0"
+            index={inicio + indice}
+            total={total}
+            animateWithin={animarHasta}
+          >
             {evento.type === "review" ? <EventoResena {...props} /> : <EventoFila {...props} />}
-          </li>
+          </EntranceItem>
         );
       })}
     </ol>
@@ -768,6 +779,16 @@ export default function SocialClient({ initialView = "today", initialToday = {},
     () => groupSocialFeed(visibles, agrupar, { orden }),
     [visibles, agrupar, orden],
   );
+  // Índice global de la primera fila de cada grupo, para la cascada continua.
+  const inicioDeGrupo = useMemo(() => {
+    const inicios = [];
+    let acumulado = 0;
+    for (const grupo of grupos || []) {
+      inicios.push(acumulado);
+      acumulado += grupo.items.length;
+    }
+    return inicios;
+  }, [grupos]);
 
   // Sin sesión lo resuelve SocialHub.
   if (!hydrated || !session || !account?.id) return null;
@@ -1048,7 +1069,9 @@ export default function SocialClient({ initialView = "today", initialToday = {},
           <>
             {/* Con agrupado, una cabecera por grupo y su propia rejilla debajo,
                 igual que en las páginas de usuario. Sin agrupado, una sola. */}
-            <div ref={listaRef}>
+            {/* La `key` remonta la lista al cambiar de sección o de vista para
+                que vuelva a entrar en cascada, como en las páginas de usuario. */}
+            <div ref={listaRef} key={`${scope}:${vista}:${agrupar}`}>
               {grupos ? (
                 <div className="space-y-8">
                   {grupos.map((grupo, indice) => (
@@ -1065,6 +1088,8 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                         vista={vista}
                         mostrarAutor={scope === "following"}
                         yo={account}
+                        inicio={inicioDeGrupo[indice]}
+                        total={visibles.length}
                       />
                     </div>
                   ))}

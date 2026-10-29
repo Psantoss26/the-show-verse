@@ -22,6 +22,8 @@ Hoy es una opción más de la barra sticky de Social (`SocialClient`), junto a S
 
 El buscador filtra lo de Hoy por título o persona. En móvil, como el resto de menús, van en la hoja de filtros (`MobileOptionsSheet`). `TodayClient` es controlado: recibe esos valores como props y devuelve los recuentos de los días (`onDaysChange`). `SocialHub` (`src/app/social/SocialHub.jsx`) pone el fondo y la cabecera «Social.» con las cifras (Siguiendo, Seguidores, Activos). Cambiar de opción solo reescribe la URL, sin volver a pedir el RSC.
 
+**Entrada animada.** Como en las páginas de usuario, al cambiar de opción (Actividad / Siguiendo / Yo), de vista o de agrupado, el contenido entra en cascada: cada cartel o fila sube, aparece y escala (0,32 s, escalonado por índice y solo lo que cabe en pantalla). Al volver atrás no se anima. Lo hace `EntranceItem` (`src/components/ui/EntranceItem.jsx`), en `TodayFeed` y en las filas de Siguiendo / Yo; la lista de Siguiendo / Yo cambia de `key` con la opción, la vista y el agrupado para repetir la entrada.
+
 Parámetros de URL (`src/lib/today/params.js`):
 - `scope=following|community`
 - `day=today|yesterday|week|YYYY-MM-DD`

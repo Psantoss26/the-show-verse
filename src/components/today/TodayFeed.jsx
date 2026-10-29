@@ -7,6 +7,7 @@
 // La agrupación (título, persona o franja horaria) y la vista (rejilla o lista,
 // ListRow) se eligen en la barra de Social.
 
+import EntranceItem, { estimateVisibleRows } from "@/components/ui/EntranceItem";
 import { mediaKey, summarizeActions } from "@/lib/today/stories";
 import { AvatarStack, Poster, RatingBadge, UserAvatar } from "./TodayParts";
 import { CARD_SURFACE, dayHeading, displayName, milestoneLabel, whenLabel } from "./todayUi";
@@ -15,6 +16,19 @@ const GRID = "grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-x-3 gap-y
 // Vista lista: una fila por título, con el cartel pequeño a la izquierda; cabe
 // mucho más a lo alto que la rejilla.
 const LIST = `divide-y divide-white/[0.06] overflow-hidden rounded-2xl ${CARD_SURFACE}`;
+
+// Cuántas tarjetas caben en pantalla, para animar solo esas al entrar (se
+// sobreestima, como en las páginas de usuario). La rejilla va en la columna
+// central, que desde `lg` comparte el ancho con la destacada y los más activos.
+function estimateEntrance(layout) {
+  if (layout === "list") return estimateVisibleRows(64);
+  if (typeof window === "undefined") return 30;
+  const width = window.innerWidth >= 1024 ? window.innerWidth * 0.5 : window.innerWidth - 32;
+  const columns = Math.max(2, Math.floor(width / 120));
+  const tileWidth = width / columns;
+  const rows = Math.ceil(window.innerHeight / (tileWidth * 1.5 + 60)) + 2;
+  return Math.min(120, rows * columns);
+}
 
 function averageOf(actions) {
   const values = actions
@@ -29,10 +43,10 @@ function averageOf(actions) {
  * la nota, el hito y el tipo se quedan para la lista y la historia, para no
  * llenar la portada de indicadores. `actions` resume la línea de debajo.
  */
-function PosterTile({ media, users, actions, latestAt, tz, onOpen }) {
+function PosterTile({ media, users, actions, latestAt, tz, onOpen, entrance }) {
   const line = summarizeActions(actions, { people: users.length });
   return (
-    <li className="min-w-0">
+    <EntranceItem as="li" className="min-w-0" {...entrance}>
       <button
         type="button"
         onClick={onOpen}
@@ -52,7 +66,7 @@ function PosterTile({ media, users, actions, latestAt, tz, onOpen }) {
           <span className="tabular-nums">{whenLabel(latestAt, tz)}</span>
         </span>
       </button>
-    </li>
+    </EntranceItem>
   );
 }
 
@@ -61,10 +75,10 @@ function PosterTile({ media, users, actions, latestAt, tz, onOpen }) {
  * En pantallas grandes (xl, y más en 2xl: monitores 2K) crece el cartel, el
  * texto y las caras, para que la fila no se quede pequeña en tanto ancho.
  */
-function ListRow({ media, users, actions, rating, milestone, latestAt, tz, onOpen }) {
+function ListRow({ media, users, actions, rating, milestone, latestAt, tz, onOpen, entrance }) {
   const line = summarizeActions(actions, { people: users.length });
   return (
-    <li>
+    <EntranceItem as="li" {...entrance}>
       <button
         type="button"
         onClick={onOpen}
@@ -92,17 +106,19 @@ function ListRow({ media, users, actions, rating, milestone, latestAt, tz, onOpe
           <AvatarStack users={users} max={3} size="h-7 w-7 2xl:h-9 2xl:w-9" />
         </span>
       </button>
-    </li>
+    </EntranceItem>
   );
 }
 
 function TitleGrid({ stories, tz, onOpenStory, layout }) {
   const Item = layout === "list" ? ListRow : PosterTile;
+  const animateWithin = estimateEntrance(layout);
   return (
     <ol className={layout === "list" ? LIST : GRID}>
-      {stories.map((story) => (
+      {stories.map((story, index) => (
         <Item
           key={story.key}
+          entrance={{ index, total: stories.length, animateWithin }}
           media={story.media}
           users={story.users}
           actions={story.actions}
@@ -120,6 +136,10 @@ function TitleGrid({ stories, tz, onOpenStory, layout }) {
 // Por persona: cabecera con la cara y, debajo, sus títulos en la misma rejilla.
 function PersonSections({ people, tz, onOpenStory, onOpenPerson, layout }) {
   const Item = layout === "list" ? ListRow : PosterTile;
+  const animateWithin = estimateEntrance(layout);
+  const total = people.reduce((sum, group) => sum + new Set(group.actions.map((a) => mediaKey(a.media))).size, 0);
+  // Índice global para que la cascada siga de una sección a la siguiente.
+  let next = 0;
   return (
     <div className="space-y-8">
       {people.map((group) => {
@@ -146,6 +166,7 @@ function PersonSections({ people, tz, onOpenStory, onOpenPerson, layout }) {
               {[...byTitle.entries()].map(([key, actions]) => (
                 <Item
                   key={key}
+                  entrance={{ index: next++, total, animateWithin }}
                   media={actions[0].media}
                   users={[group.user]}
                   actions={actions}
@@ -167,6 +188,10 @@ function PersonSections({ people, tz, onOpenStory, onOpenPerson, layout }) {
 // Por hora: una sección por franja (y por día si la ventana abarca varios).
 function TimeSections({ sections, tz, onOpenStory, layout }) {
   const Item = layout === "list" ? ListRow : PosterTile;
+  const animateWithin = estimateEntrance(layout);
+  const total = sections.reduce((sum, section) => sum + section.actions.length, 0);
+  // Índice global para que la cascada siga de una franja a la siguiente.
+  let next = 0;
   return (
     <div className="space-y-8">
       {sections.map((section) => (
@@ -179,6 +204,7 @@ function TimeSections({ sections, tz, onOpenStory, layout }) {
             {section.actions.map((action) => (
               <Item
                 key={action.key}
+                entrance={{ index: next++, total, animateWithin }}
                 media={action.media}
                 users={[action.user]}
                 actions={[action]}
