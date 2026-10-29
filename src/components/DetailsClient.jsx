@@ -63,6 +63,7 @@ import {
   forgetCommunityArtwork,
   readArtworkPreference,
   readPersistedArtworkOverride,
+  rememberCommunityCardArtwork,
   resolveCachedArtworkOverride,
   retractOwnArtworkVotes,
   saveArtworkOverride,
@@ -1434,6 +1435,9 @@ export default function DetailsClient({
   useEffect(() => {
     if (initialCommunityArtwork) {
       setCommunityArtwork(initialCommunityArtwork);
+      // La del SSR es la más reciente: las tarjetas del título (Favoritos,
+      // Pendientes…) la usan ya en vez de su copia por lotes.
+      rememberCommunityCardArtwork({ type: endpointType, id }, initialCommunityArtwork);
       return;
     }
     let cancelled = false;

@@ -492,6 +492,7 @@ export function fetchCommunityArtwork({ type, id }) {
     communityArtworkRequests.set(key, { at: Date.now(), promise })
     promise.then((artwork) => {
         if (!artwork) communityArtworkRequests.delete(key)
+        else rememberCommunityCardArtwork({ type: normalizedType, id }, artwork)
     })
     return promise
 }
@@ -519,7 +520,9 @@ export function withCommunityArtwork(overrides, community, localPreference = nul
 // vuelve a preguntar. Las tarjetas lo leen con `getCardArtwork` y se enteran
 // de lo que llega por la misma suscripción que la elección propia.
 const COMMUNITY_CARD_STORAGE_KEY = 'showverse:community-card-artwork:v1'
-const COMMUNITY_CARD_FRESH_MS = 10 * 60 * 1000
+// Un minuto, como la consulta de un título y la caché del backend: los votos
+// de otros usuarios llegan a las tarjetas casi a la vez que a la ficha.
+const COMMUNITY_CARD_FRESH_MS = 60 * 1000
 const COMMUNITY_CARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const COMMUNITY_CARD_RETRY_MS = 60 * 1000
 const COMMUNITY_CARD_BATCH_MS = 16
@@ -654,6 +657,28 @@ export function getCardArtworkState(type, id, kind) {
     if (community) return community
     if (loadCommunityCardEntries().has(key) || communityCardFailedAt.has(key)) return false
     return null
+}
+
+// La ficha, DetailModal o el destacado acaban de leer la más votada de UN
+// título: pasa también a las tarjetas. Sin esto, una tarjeta con la copia por
+// lotes de antes del voto de otro usuario («sin votos», todavía fresca)
+// seguía con la automática aunque la ficha ya enseñara la votada.
+export function rememberCommunityCardArtwork({ type, id }, artwork) {
+    if (typeof window === 'undefined' || !artwork || typeof artwork !== 'object') return
+    const key = communityCardKey(type, id)
+    if (!key) return
+    const entries = loadCommunityCardEntries()
+    const previous = entries.get(key)?.artwork
+    entries.set(key, { artwork, at: Date.now() })
+    communityCardFailedAt.delete(key)
+    persistCommunityCardEntries()
+    if (!sameArtwork(previous, artwork)) queueCardArtworkNotify()
+}
+
+function sameArtwork(a, b) {
+    if (!a || !b) return a === b
+    const keys = Object.keys(a)
+    return keys.length === Object.keys(b).length && keys.every((kind) => a[kind] === b[kind])
 }
 
 // Votos propios retirados o nuevos (ver `retractOwnArtworkVotes` y

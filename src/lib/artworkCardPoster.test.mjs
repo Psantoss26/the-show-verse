@@ -157,3 +157,31 @@ test('tarjetas: sin elección propia, la más votada, pedida por lotes', async (
   delete globalThis.fetch
 })
 
+
+test('tarjetas: la votada que lee la ficha pasa a la copia por lotes', async () => {
+  const { rememberCommunityCardArtwork } = await import('./artworkApi.js')
+  installWindow(memoryStorage({ [ARTWORK_PREFERENCES_CACHE_KEY]: snapshot({}) }))
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ artwork: {} }) })
+  let calls = 0
+  const unsubscribe = subscribeOwnCardPosters(() => {
+    calls += 1
+  })
+  // Favoritos ya preguntó antes del voto de otro usuario: «sin votos».
+  assert.equal(getCardArtwork('movie', 801, 'poster'), null)
+  await new Promise((resolve) => setTimeout(resolve, 40))
+  calls = 0
+  assert.equal(getCardArtwork('movie', 801, 'poster'), null)
+
+  // La ficha la trae (SSR o consulta del título): las tarjetas la usan ya.
+  rememberCommunityCardArtwork({ type: 'movie', id: 801 }, { poster: '/de-otro.jpg' })
+  assert.equal(getCardArtwork('movie', 801, 'poster'), '/de-otro.jpg')
+  await Promise.resolve()
+  assert.equal(calls, 1)
+
+  // La misma otra vez no vuelve a renderizar las tarjetas.
+  rememberCommunityCardArtwork({ type: 'movie', id: 801 }, { poster: '/de-otro.jpg' })
+  await Promise.resolve()
+  assert.equal(calls, 1)
+  unsubscribe()
+  delete globalThis.fetch
+})
