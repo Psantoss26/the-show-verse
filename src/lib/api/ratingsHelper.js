@@ -172,6 +172,7 @@ export async function getEpisodeImdbRating(
 
   return {
     id: imdbId,
+    episodeImdbId: target?.imdbID || null,
     rating: parseOmdbRating(target?.imdbRating),
     votes: parseOmdbVotes(target?.imdbVotes),
   };

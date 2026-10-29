@@ -57,7 +57,7 @@ import { buildShareCardPayload } from "@/lib/details/shareCard";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import {
   buildTraktHref,
-  buildImdbHref,
+  buildImdbEpisodeHref,
 } from "@/lib/details/ratingLinks";
 import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
 import {
@@ -1956,7 +1956,16 @@ export default function EpisodeDetailsClient({
                 sub: imdbData?.votes
                   ? formatCountShort(imdbData.votes)
                   : undefined,
-                href: buildImdbHref({ href: imdbUrl, title: showName }),
+                href: buildImdbEpisodeHref({
+                  episodeImdbIds: [
+                    episode?.external_ids?.imdb_id,
+                    imdbData?.id,
+                    imdbData?.episodeImdbId,
+                  ],
+                  showImdbId: imdbId,
+                  fallbackHref: imdbUrl,
+                  title: showName,
+                }),
               }}
               stats={tScoreboard?.stats}
               // Reserva la fila de estadísticas mientras Trakt responde: el

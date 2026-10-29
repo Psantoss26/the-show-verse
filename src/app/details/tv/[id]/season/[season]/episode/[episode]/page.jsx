@@ -63,7 +63,7 @@ export default async function EpisodePage({ params }) {
 
   const showPromise = tmdbFetch(`/tv/${showId}?append_to_response=external_ids`);
   const episodePromise = tmdbFetch(
-    `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
+    `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}?append_to_response=external_ids`,
   );
   const seasonPromise = tmdbFetch(`/tv/${showId}/season/${seasonNumber}`);
   // Portada móvil: varias imágenes del episodio apiladas (ver

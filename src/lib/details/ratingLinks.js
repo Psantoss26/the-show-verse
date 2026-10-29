@@ -37,3 +37,23 @@ export function buildImdbHref({ href, imdbId, title } = {}) {
   if (q) return `https://www.imdb.com/find/?q=${encodeURIComponent(q)}&s=tt`;
   return undefined;
 }
+
+const IMDB_TITLE_ID = /^tt\d+$/;
+
+// IMDb, ficha exacta de un episodio. El primer id válido que no sea el de la serie
+// gana, en orden de fiabilidad: el del propio episodio en TMDb (no depende de cómo
+// agrupe cada fuente las temporadas), el `tconst` que SeriesGraph ya ha emparejado
+// con la ruta de TMDb y el de OMDb. Sin ninguno, cae a `fallbackHref` (la lista de
+// episodios de la serie).
+export function buildImdbEpisodeHref({
+  episodeImdbIds = [],
+  showImdbId,
+  fallbackHref,
+  title,
+} = {}) {
+  const episodeImdbId = episodeImdbIds.find(
+    (id) => typeof id === "string" && IMDB_TITLE_ID.test(id) && id !== showImdbId,
+  );
+  if (episodeImdbId) return `https://www.imdb.com/es-es/title/${episodeImdbId}/`;
+  return buildImdbHref({ href: fallbackHref, imdbId: showImdbId, title });
+}
