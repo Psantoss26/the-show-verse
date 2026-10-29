@@ -707,14 +707,15 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                         ) : null}
                         {/* La imagen por defecto según el criterio automático
                             (la que se ve sin elecciones ni votos): solo el
-                            icono, en un círculo como la marca verde; el texto,
+                            icono, en un círculo amarillo relleno igual que la
+                            marca verde; el texto,
                             en el `title` y la etiqueta accesible. */}
                         {isDefault ? (
                           <span
-                            className={`${IMAGE_CARD_CHIP} w-5 shrink-0 justify-center !px-0`}
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-zinc-950 shadow-[0_2px_8px_rgba(0,0,0,0.4)] ring-1 ring-inset ring-white/25"
                             title="Imagen por defecto según el criterio automático"
                           >
-                            <Bookmark className="h-3 w-3 text-yellow-300" strokeWidth={2.5} />
+                            <Bookmark className="h-3 w-3 fill-current" strokeWidth={2.5} />
                           </span>
                         ) : null}
                       </span>
