@@ -1228,7 +1228,7 @@ export default function ContinueWatchingClient() {
     { label: "Progreso Medio", shortLabel: "Progreso", value: `${stats.avg}%`, loading: statsLoading, icon: TrendingUp, iconKey: "trending-up", colorClass: "text-purple-400" },
     { label: "Películas", value: stats.movies, loading: statsLoading, icon: Film, iconKey: "film", colorClass: "text-sky-400" },
     { label: "Series", value: stats.series, loading: statsLoading, icon: Tv, iconKey: "tv", colorClass: "text-emerald-400" },
-  ]);
+  ].map((card) => ({ ...card, swapGroup: "continue-watching" })));
 
   const sortLabels = {
     recent: "Recientes",
@@ -2303,7 +2303,7 @@ function Header({ cards, staticEntry = false, onRefresh, refreshing }) {
         </div>
         <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end shrink-0" initial={staticEntry ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
           {cards.map((card, index) => (
-            <StatCard key={index} {...card} />
+            <StatCard key={index} {...card} swapIndex={index} />
           ))}
         </motion.div>
       </div>

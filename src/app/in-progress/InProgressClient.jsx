@@ -1707,6 +1707,8 @@ export default function InProgressClient({
     ...card,
     value: statsHandoff ? statsHandoff[index].value : card.value,
     loading: statsHandoff ? statsHandoff[index].loading : !currentDataLoaded,
+    // Al pasar del relevo a la pestaña propia se relevan todas las piezas.
+    swapGroup: statsHandoff ? "handoff" : activeTab,
   }));
   const statCardsSignature = statCards.map((card) => `${card.loading ? "" : card.value}`).join("|");
   useEffect(() => {
@@ -2155,7 +2157,7 @@ export default function InProgressClient({
                   animate={{ opacity: 1, scale: 1 }}
                   transition={staticHeader ? { duration: 0 } : { duration: 0.4, delay: 0.5 + index * 0.1 }}
                 >
-                  <StatCard {...card} />
+                  <StatCard {...card} swapIndex={index} />
                 </motion.div>
               ))}
             </motion.div>

@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Tarjetas de información de la cabecera (Historial, Continuar viendo, Listas, En progreso y Completadas): al cambiar de sección cambian enteras, con todos sus iconos, cifras y títulos, también los que coinciden en las dos secciones (como «Películas»). El cambio va en ola de izquierda a derecha y es más suave: lo anterior se encoge y se apaga en su sitio y lo nuevo sube y se enfoca. → [páginas](docs/frontend/app-router-pages.md)
 - Tarjetas de información de la cabecera (Historial, Continuar viendo, Listas, En progreso y Completadas): al cambiar de sección, la cifra anterior ya no se desplaza hacia la nueva ni choca con los bordes de la tarjeta. Se apaga en su sitio y, justo después, entra la nueva; lo mismo con el icono y el título. → [páginas](docs/frontend/app-router-pages.md)
 - Historial en el ordenador: al llegar desde Continuar viendo, el calendario de la derecha aparece a la vez que la barra y el contenido, en lugar de entrar casi un segundo después. → [páginas](docs/frontend/app-router-pages.md)
 - Social: al cambiar entre Actividad, Siguiendo y Yo, o de vista (cuadrícula o lista en Actividad; lista, con póster o con backdrop en Siguiendo y Yo), el contenido entra en cascada como en el resto de páginas de usuario: cada cartel o fila sube y aparece, uno tras otro. Al volver atrás no se anima. → [Hoy](docs/features/hoy.md)

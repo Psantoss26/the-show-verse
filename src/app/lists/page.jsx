@@ -2904,6 +2904,8 @@ export default function ListsPage() {
                     loading={headerStatsLoading || (contentSource === "collections" && stat.key === "likes" && !collectionLikesReady)}
                     animateChanges
                     iconKey={stat.icon}
+                    swapGroup={contentSource}
+                    swapIndex={index}
                   />
                 </motion.div>
               ))}

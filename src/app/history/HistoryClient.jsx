@@ -3738,7 +3738,7 @@ export default function HistoryClient() {
     { label: "Títulos", value: stats.unique, loading: !historyLoaded, icon: LayoutList, iconKey: "layout-list", colorClass: "text-purple-400" },
     { label: "Películas", value: stats.movies, loading: !historyLoaded, icon: Film, iconKey: "film", colorClass: "text-sky-400" },
     { label: "Episodios", value: stats.shows, loading: !historyLoaded, icon: Tv, iconKey: "tv", colorClass: "text-pink-400" },
-  ]);
+  ].map((card) => ({ ...card, swapGroup: "history" })));
 
   const countsByDay = useMemo(() => {
     const m = {};
@@ -4006,7 +4006,7 @@ export default function HistoryClient() {
                     transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.5 + index * 0.1 }}
                     className="w-full min-w-0"
                   >
-                    <StatCard {...card} />
+                    <StatCard {...card} swapIndex={index} />
                   </motion.div>
                 ))}
               </motion.div>

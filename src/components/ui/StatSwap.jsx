@@ -2,24 +2,30 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 
-const EASE = [0.4, 0, 0.2, 1];
+const EASE_OUT = [0.22, 1, 0.36, 1];
+const EASE_IN = [0.4, 0, 1, 1];
+// Lo nuevo empieza cuando lo anterior ya casi no se ve: nunca se cruzan.
+const ENTER_AFTER_EXIT = 0.14;
 
-// Lo que sale se apaga EN SU SITIO (sin desplazarse) y lo nuevo entra desde
-// abajo justo cuando lo anterior ya casi no se ve: nunca se cruzan dos cifras.
-const SWAP_MOTION = {
-  initial: { opacity: 0, y: 8, filter: "blur(6px)" },
+// Lo que sale se encoge un poco y se apaga EN SU SITIO (sin desplazarse); lo
+// nuevo sube unos píxeles, crece y se enfoca. `delay` escalona el relevo entre
+// piezas y tarjetas.
+const swapMotion = (delay) => ({
+  initial: { opacity: 0, y: 6, scale: 0.94, filter: "blur(4px)" },
   animate: {
     opacity: 1,
     y: 0,
+    scale: 1,
     filter: "blur(0px)",
-    transition: { duration: 0.4, delay: 0.18, ease: EASE },
+    transition: { duration: 0.42, delay: delay + ENTER_AFTER_EXIT, ease: EASE_OUT },
   },
   exit: {
     opacity: 0,
-    filter: "blur(6px)",
-    transition: { duration: 0.2, ease: EASE },
+    scale: 0.9,
+    filter: "blur(4px)",
+    transition: { duration: 0.18, delay, ease: EASE_IN },
   },
-};
+});
 
 // Relevo animado de una pieza de `PageStatCard` (icono, cifra o etiqueta):
 // cuando cambia `swapKey`, lo anterior se desvanece y lo nuevo entra, sin
@@ -32,11 +38,11 @@ const SWAP_MOTION = {
 // la cifra vieja se desplazaba hacia la nueva y chocaba con los bordes, y la
 // etiqueta quedaba limitada al ancho de la nueva y `truncate` la cortaba con
 // «…». Centradas en la celda, el ajuste de ancho al terminar no se ve.
-export default function StatSwap({ swapKey, className = "", children }) {
+export default function StatSwap({ swapKey, className = "", delay = 0, children }) {
   return (
     <span className="grid max-w-full grid-cols-[minmax(0,auto)] justify-center justify-items-center">
       <AnimatePresence initial={false}>
-        <motion.span key={swapKey} className={`[grid-area:1/1] ${className}`} {...SWAP_MOTION}>
+        <motion.span key={swapKey} className={`[grid-area:1/1] ${className}`} {...swapMotion(delay)}>
           {children}
         </motion.span>
       </AnimatePresence>

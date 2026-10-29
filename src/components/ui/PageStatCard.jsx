@@ -1,6 +1,9 @@
 import Link from "next/link";
 import StatSwap from "@/components/ui/StatSwap";
 
+const SWAP_CARD_STAGGER = 0.05;
+const SWAP_PIECE_STAGGER = 0.035;
+
 // Tarjeta de información de la cabecera de las páginas de usuario. Es la ÚNICA
 // versión: Favoritos, Pendientes, Biblioteca, Dashboard, Listas, Historial,
 // En progreso, Continuar viendo, Perfil y Social la usan tal cual, para que no
@@ -25,6 +28,12 @@ import StatSwap from "@/components/ui/StatSwap";
 // que muestra (p. ej. las pestañas de Listas) y solo se relevan, animados, el
 // icono, la cifra y la etiqueta que cambian (`StatSwap`). `iconKey` identifica
 // el icono (y su color) para saber cuándo ha cambiado.
+//
+// `swapGroup` identifica la sección que se muestra (la pestaña de Listas, la
+// página de Historial o Continuar viendo…): al cambiar, se relevan TODAS las
+// piezas de todas las tarjetas, también las que coinciden («Películas»), para
+// que el cambio de sección se lea entero. `swapIndex` (posición de la tarjeta
+// en la fila) escalona el relevo de izquierda a derecha.
 export default function PageStatCard({
   label,
   // Etiqueta de la mini tarjeta (móvil), que va SIEMPRE en una línea: para
@@ -43,10 +52,17 @@ export default function PageStatCard({
   className = "",
   animateChanges = false,
   iconKey,
+  swapGroup = "",
+  swapIndex = 0,
 }) {
-  const swap = (key, content, swapClassName) =>
+  // Escalonado: por tarjeta y, dentro de ella, icono → cifra → etiqueta.
+  const swap = (key, content, swapClassName, piece) =>
     animateChanges ? (
-      <StatSwap swapKey={key} className={swapClassName}>
+      <StatSwap
+        swapKey={`${swapGroup}|${key}`}
+        className={swapClassName}
+        delay={swapIndex * SWAP_CARD_STAGGER + piece * SWAP_PIECE_STAGGER}
+      >
         {content}
       </StatSwap>
     ) : (
@@ -71,6 +87,7 @@ export default function PageStatCard({
               aria-hidden="true"
             />,
             "inline-flex",
+            0,
           )}
         </span>
         <span className="block text-base max-md:leading-none md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
@@ -82,6 +99,7 @@ export default function PageStatCard({
               value
             ),
             "block",
+            1,
           )}
         </span>
       </div>
@@ -97,6 +115,7 @@ export default function PageStatCard({
             label
           ),
           "block max-w-full max-md:truncate",
+          2,
         )}
       </span>
     </>
