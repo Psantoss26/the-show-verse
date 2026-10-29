@@ -1474,9 +1474,12 @@ function AwardCard({ item }) {
           )}
         </div>
 
-        <div className="relative flex flex-1 flex-col items-center justify-center px-2 pb-14 sm:px-4 sm:pb-20 z-10">
+        {/* Logo cuadrado al 58 % del ancho: el mismo margen a cada lado en
+            cualquier tamaño de tarjeta. Desde `sm` deja libre la fila de
+            resultado y año (`pt-8`); abajo, el hueco del texto. */}
+        <div className="relative flex flex-1 flex-col items-center justify-center px-2 pb-14 sm:px-4 sm:pb-20 sm:pt-8 z-10">
           {imageSrc ? (
-            <div className="flex h-28 w-28 items-center justify-center sm:h-36 sm:w-36">
+            <div className="flex aspect-square w-[58%] items-center justify-center">
               <OptimizedImage
                 key={imageSrc}
                 src={imageSrc}
@@ -1495,11 +1498,11 @@ function AwardCard({ item }) {
               />
             </div>
           ) : (
-            <div className="flex h-28 w-28 items-center justify-center sm:h-36 sm:w-36">
+            <div className="flex aspect-square w-[58%] items-center justify-center">
               {result === "winner" ? (
-                <Trophy className="h-24 w-24 sm:h-32 sm:w-32 text-yellow-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
+                <Trophy className="h-[85%] w-[85%] text-yellow-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
               ) : (
-                <Award className="h-24 w-24 sm:h-32 sm:w-32 text-zinc-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
+                <Award className="h-[85%] w-[85%] text-zinc-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
               )}
             </div>
           )}

@@ -445,10 +445,13 @@ export default function AwardCard({ item, enableHover = false }) {
           )}
         </div>
 
-        <div className="relative flex flex-1 flex-col items-center justify-center px-2 pb-14 sm:px-4 sm:pb-20 z-10">
+        {/* Logo cuadrado al 58 % del ancho: el mismo margen a cada lado en
+            cualquier tamaño de tarjeta. Desde `sm` deja libre la fila de
+            resultado y año (`pt-8`); abajo, el hueco del texto. */}
+        <div className="relative flex flex-1 flex-col items-center justify-center px-2 pb-14 sm:px-4 sm:pb-20 sm:pt-8 z-10">
           {item?.groupImageUrl && (
             <div
-              className={`flex h-28 w-28 items-center justify-center transform-gpu transition-transform duration-500 ease-out sm:h-36 sm:w-36 motion-reduce:transition-none ${
+              className={`flex aspect-square w-[58%] items-center justify-center transform-gpu transition-transform duration-500 ease-out motion-reduce:transition-none ${
                 enableHover ? "group-hover:scale-110" : ""
               }`}
             >
