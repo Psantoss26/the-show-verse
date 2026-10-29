@@ -10,7 +10,8 @@
 //     lleva, como en la ficha móvil);
 //   - su fila de botones (tráiler, serie, vistos, puntuar), sin Anterior /
 //     Siguiente, con los mismos modales;
-//   - su marcador (TMDb, Trakt, IMDb y estadísticas), con las mismas consultas
+//   - su marcador compacto (TMDb, Trakt e IMDb, sin la fila de estadísticas,
+//     para que la portada quepa entera), con las mismas consultas
 //     y cachés (lib/details/seasonScores).
 // Tocar la portada lleva a la ficha de la temporada.
 
@@ -379,10 +380,12 @@ export default function SeasonPeek({ item, origin, onClose, onOpenFull }) {
   );
 
   const scoreboard = (
+    // Compacto, como el de la ficha móvil al entrar: solo las puntuaciones,
+    // sin la fila de estadísticas, para que la portada quepa entera (ver
+    // `compactScoreboard` en DetailPeekLayout).
     <DetailsScoreboardPanel
       mobileScoresOnly
       phoneLayout
-      statsPending={!traktScore.resolved}
       tmdb={{
         value: tmdbVote?.toFixed(1),
         sub: tmdbVotes ? formatCountShort(tmdbVotes) : undefined,
@@ -410,7 +413,6 @@ export default function SeasonPeek({ item, origin, onClose, onOpenFull }) {
           title: showName,
         }),
       }}
-      stats={trakt?.stats}
       showFavoritedStat={false}
     />
   );
@@ -422,6 +424,7 @@ export default function SeasonPeek({ item, origin, onClose, onOpenFull }) {
       posterLowSrc={tmdbImg(posterPath, "w342")}
       posterSrc={tmdbImg(posterPath, "w780")}
       phoneCover
+      compactScoreboard
       actions={actions}
       scoreboard={scoreboard}
       onBackdropClick={onClose}

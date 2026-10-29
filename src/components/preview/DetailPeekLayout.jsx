@@ -30,6 +30,12 @@ const PEEK_SIDE_GUTTER = 6;
 // Alto que se reserva para la fila de botones, el marcador y el aire de arriba
 // y abajo.
 const PEEK_CHROME_HEIGHT = 300;
+// Con el marcador compacto (solo puntuaciones, sin la fila de estadísticas;
+// ver `compactScoreboard`): botones (~70px con su aire), marcador compacto
+// (~75px), separaciones y el margen de la tarjeta a la pantalla. Con 300 la
+// portada de una temporada se quedaba por debajo de 2:3 en un 390×844 y
+// perdía el borde superior.
+const PEEK_COMPACT_CHROME_HEIGHT = 220;
 // La tarjeta no crece hasta tener la portada cargada (ver DetailPeekLayout);
 // si tarda más que esto, se abre igualmente con el esqueleto. La portada se
 // pide ya al apoyar el dedo (`prewarmModalHeroPoster`), así que casi siempre
@@ -37,13 +43,26 @@ const PEEK_CHROME_HEIGHT = 300;
 // como que la pulsación no ha funcionado.
 const PEEK_ART_MAX_WAIT_MS = 450;
 
-function peekGeometry() {
+// Ancho mínimo de la tarjeta al estrecharla para que quepa la portada entera
+// (`fitPoster`): por debajo, los botones y las tres puntuaciones no caben.
+const PEEK_FIT_MIN_WIDTH = 280;
+
+function peekGeometry(chromeHeight = PEEK_CHROME_HEIGHT, fitPoster = false) {
   const vw = window.innerWidth;
   const vh = window.visualViewport?.height || window.innerHeight;
-  const width = Math.min(PEEK_MAX_WIDTH, vw - PEEK_SIDE_GUTTER * 2);
+  let width = Math.min(PEEK_MAX_WIDTH, vw - PEEK_SIDE_GUTTER * 2);
+  // `fitPoster` (temporadas, con el título impreso arriba y abajo): en
+  // pantallas bajas la tarjeta se estrecha para que la portada siga en 2:3
+  // en vez de recortarse.
+  if (fitPoster) {
+    width = Math.min(
+      width,
+      Math.max(PEEK_FIT_MIN_WIDTH, Math.floor((vh - chromeHeight) / 1.5)),
+    );
+  }
   const posterHeight = Math.max(
     180,
-    Math.min(Math.round(width * 1.5), vh - PEEK_CHROME_HEIGHT),
+    Math.min(Math.round(width * 1.5), vh - chromeHeight),
   );
   return { vw, vh, width, posterHeight };
 }
@@ -136,6 +155,10 @@ export default function DetailPeekLayout({
   // su borde y, detrás de botones y marcador, su reflejo difuminado y el
   // oscurecido adaptativo, en vez del fundido a la tarjeta.
   phoneCover = false,
+  // El marcador que se pasa es el compacto (sin fila de estadísticas): se
+  // reserva menos alto y la portada queda siempre en 2:3, sin recortes (en
+  // pantallas bajas, estrechando la tarjeta; ver `peekGeometry`).
+  compactScoreboard = false,
   logo,
   actions,
   scoreboard,
@@ -151,7 +174,12 @@ export default function DetailPeekLayout({
 }) {
   const reduceMotion = useReducedMotion();
   const router = useRouter();
-  const [geometry] = useState(peekGeometry);
+  const [geometry] = useState(() =>
+    peekGeometry(
+      compactScoreboard ? PEEK_COMPACT_CHROME_HEIGHT : PEEK_CHROME_HEIGHT,
+      compactScoreboard,
+    ),
+  );
   useEffect(() => {
     if (prefetchHref) router.prefetch(prefetchHref);
   }, [router, prefetchHref]);
