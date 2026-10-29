@@ -16,7 +16,7 @@ const SPANISH_OR_ENGLISH = new Set(['es', 'en'])
 const isSpanishOrEnglish = (img) => SPANISH_OR_ENGLISH.has(String(img?.iso_639_1 || '').toLowerCase())
 
 // Pósters de la temporada (TMDb devuelve todos los idiomas).
-async function fetchSeasonPosters(showId, seasonNumber) {
+async function requestSeasonPosters(showId, seasonNumber) {
   const key = process.env.NEXT_PUBLIC_TMDB_API_KEY
   if (!key) return null
   try {
@@ -28,6 +28,30 @@ async function fetchSeasonPosters(showId, seasonNumber) {
     return null
   }
 }
+
+// Pósters ya pedidos en esta sesión, por temporada. La página los pide antes
+// de abrir la vista (`prefetchSeasonPosters`), así que abre ya con ellos, como
+// «Portadas y fondos» en la ficha.
+const postersCache = new Map()
+const postersKey = (showId, seasonNumber) => `${showId}:${seasonNumber}`
+function fetchSeasonPosters(showId, seasonNumber) {
+  const key = postersKey(showId, seasonNumber)
+  const entry = postersCache.get(key)
+  if (entry) return entry.promise
+  const next = { promise: null, posters: null }
+  next.promise = requestSeasonPosters(showId, seasonNumber).then((result) => {
+    // Un fallo no se guarda: la próxima vez se vuelve a pedir.
+    if (result) next.posters = result
+    else postersCache.delete(key)
+    return result
+  })
+  postersCache.set(key, next)
+  return next.promise
+}
+export function prefetchSeasonPosters(showId, seasonNumber) {
+  if (showId != null && seasonNumber != null) fetchSeasonPosters(showId, seasonNumber)
+}
+const cachedSeasonPosters = (showId, seasonNumber) => postersCache.get(postersKey(showId, seasonNumber))?.posters || null
 
 /**
  * «Editar portada» de una temporada: elegir su póster entre los de TMDb. Es
@@ -46,7 +70,7 @@ async function fetchSeasonPosters(showId, seasonNumber) {
  */
 export default function SeasonCoverEditModal({ seasonId, showId, seasonNumber, defaultPoster, ownPoster, onClose }) {
   const { authenticated, cacheArtworkOverrides } = useAuth()
-  const [posters, setPosters] = useState(null)
+  const [posters, setPosters] = useState(() => cachedSeasonPosters(showId, seasonNumber))
   const [tab, setTab] = useState(null)
   // La elección propia guardada: cada cambio se calcula contra ella (no contra
   // `ownPoster`, que ya refleja la instantánea local antes de guardar).

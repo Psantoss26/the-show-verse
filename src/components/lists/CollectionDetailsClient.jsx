@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useState, useMemo } from 'react'
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { Banknote, Clock3, ExternalLink, Film, Heart } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
-import CollectionEditModal from '@/components/lists/CollectionEditModal'
+import CollectionEditModal, { prefetchCollectionEditImages } from '@/components/lists/CollectionEditModal'
 import CollectionCastModal from '@/components/lists/CollectionCastModal'
 import { formatCollectionRevenue } from '@/lib/lists/collectionStats'
 import {
@@ -149,6 +149,17 @@ export default function CollectionDetailsClient({ collectionId }) {
     const { preferences, authenticated = false } = useAuth()
     const like = useCollectionLike(collectionId)
     const [editing, setEditing] = useState(false)
+    // Las imágenes de «Editar colección» se piden ya, en un hueco libre: la
+    // vista abre con ellas, como «Portadas y fondos» en la ficha.
+    useEffect(() => {
+        const run = () => prefetchCollectionEditImages(collectionId)
+        if (typeof window.requestIdleCallback !== 'function') {
+            const timer = window.setTimeout(run, 300)
+            return () => window.clearTimeout(timer)
+        }
+        const handle = window.requestIdleCallback(run, { timeout: 2000 })
+        return () => window.cancelIdleCallback(handle)
+    }, [collectionId])
     const [castOpen, setCastOpen] = useState(false)
     const isBackNav = useIsHistoryNavigation()
     const gallery = useCollectionGallery(collectionId)

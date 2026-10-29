@@ -45,7 +45,7 @@ import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { pickBestNeutralPosterByResVotes } from "@/lib/details/tmdbImages";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
-import SeasonCoverEditModal from "@/components/details/SeasonCoverEditModal";
+import SeasonCoverEditModal, { prefetchSeasonPosters } from "@/components/details/SeasonCoverEditModal";
 import { useAuth } from "@/context/AuthContext";
 import { readSeasonCustomPoster } from "@/lib/details/seasonArtwork";
 import { useCommunitySeasonPoster } from "@/lib/details/communitySeasonPosters";
@@ -288,6 +288,18 @@ export default function SeasonDetailsClient({
   // del primer pintado; la portada además espera a que cargue su imagen).
   const { preferences } = useAuth();
   const [coverEditing, setCoverEditing] = useState(false);
+  // Los pósters de «Editar portada» se piden ya, en un hueco libre: la vista
+  // abre con ellos, como «Portadas y fondos» en la ficha.
+  useEffect(() => {
+    if (!season?.id) return undefined;
+    const run = () => prefetchSeasonPosters(showId, seasonNumber);
+    if (typeof window.requestIdleCallback !== "function") {
+      const timer = window.setTimeout(run, 300);
+      return () => window.clearTimeout(timer);
+    }
+    const handle = window.requestIdleCallback(run, { timeout: 2000 });
+    return () => window.cancelIdleCallback(handle);
+  }, [season?.id, showId, seasonNumber]);
 
   // VÍDEOS DE LA TEMPORADA (TMDb /season/{n}/videos), para «Ver tráiler» y
   // recorrerlos en el modal con Anterior / Siguiente. Sin vídeos, el botón va

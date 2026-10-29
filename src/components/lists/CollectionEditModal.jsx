@@ -48,6 +48,27 @@ function sectionImages(candidates, fallback, active) {
   return [...new Set([...first, ...byPath.keys()])].map((path) => byPath.get(path) || { file_path: path })
 }
 
+// Imágenes ya pedidas en esta sesión, por colección. La página las pide antes
+// de abrir la vista (`prefetchCollectionEditImages`), así que abre ya con
+// ellas, como «Portadas y fondos» en la ficha.
+const imagesCache = new Map()
+function fetchEditImages(collectionId) {
+  const entry = imagesCache.get(collectionId)
+  if (entry) return entry.promise
+  const next = { promise: null, images: null }
+  next.promise = fetchTmdbImages(COLLECTION_ARTWORK_TYPE, collectionId, { allLanguages: true, priority: 'high' }).then((result) => {
+    // Un fallo no se guarda: la próxima vez se vuelve a pedir.
+    if (result) next.images = result
+    else imagesCache.delete(collectionId)
+    return result
+  })
+  imagesCache.set(collectionId, next)
+  return next.promise
+}
+export function prefetchCollectionEditImages(collectionId) {
+  if (collectionId != null) fetchEditImages(collectionId)
+}
+
 /**
  * Edición por usuario de las IMÁGENES de una colección (el nombre y la
  * descripción son siempre los de TMDb). Es la MISMA vista lateral que
@@ -66,7 +87,7 @@ function sectionImages(candidates, fallback, active) {
 export default function CollectionEditModal({ collectionId, defaults, own, onClose }) {
   const { authenticated, cacheArtworkOverrides } = useAuth()
   const phone = usePhoneViewport()
-  const [images, setImages] = useState(null)
+  const [images, setImages] = useState(() => imagesCache.get(collectionId)?.images || null)
   const [tab, setTab] = useState(null)
   // Lo guardado de verdad: cada elección se calcula contra esto (no contra
   // `own`, que ya refleja la instantánea local antes de guardar).
@@ -76,7 +97,7 @@ export default function CollectionEditModal({ collectionId, defaults, own, onClo
 
   useEffect(() => {
     let cancelled = false
-    fetchTmdbImages(COLLECTION_ARTWORK_TYPE, collectionId, { allLanguages: true, priority: 'high' }).then((result) => {
+    fetchEditImages(collectionId).then((result) => {
       if (!cancelled) setImages(result || {})
     })
     return () => { cancelled = true }

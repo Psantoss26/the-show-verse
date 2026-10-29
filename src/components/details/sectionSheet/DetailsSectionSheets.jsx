@@ -489,7 +489,13 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   const gridKey = `${current?.id ?? ""}|${language}`;
   const gridRef = useRef(null);
   const [shownGrid, setShownGrid] = useState(() => ({ key: gridKey, images, current }));
-  const gridStale = shownGrid.key !== gridKey;
+  // Sin cuadrícula anterior que mantener (una vista que abre antes de tener
+  // las imágenes: editar portada de temporada o colección), la nueva entra
+  // directamente, como al abrir «Portadas y fondos» en la ficha.
+  if (shownGrid.key !== gridKey && !shownGrid.images.length) {
+    setShownGrid({ key: gridKey, images, current });
+  }
+  const gridStale = shownGrid.key !== gridKey && shownGrid.images.length > 0;
   const gridEntranceRef = useRef(null);
   const latestGridRef = useRef(null);
   // Va ANTES del efecto de abajo (los efectos corren en orden): ese lee la
@@ -618,11 +624,8 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
         {data.images?.notice ? (
           <p className="mb-3 rounded-xl bg-yellow-500/10 p-3 text-xs font-medium text-yellow-200">{data.images.notice}</p>
         ) : null}
-        {data.images?.loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-zinc-500" aria-label="Cargando imágenes" />
-          </div>
-        ) : gridImages.length ? (
+        {/* Mientras llegan las imágenes, nada: sin indicador ni «no hay». */}
+        {data.images?.loading ? null : gridImages.length ? (
           <ul
             ref={gridRef}
             aria-busy={gridStale || undefined}
