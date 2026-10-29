@@ -17,11 +17,13 @@ import {
   ImageOff,
   Clock as ClockIcon,
   LayoutGrid,
+  LayoutList,
   AlignJustify,
 } from "lucide-react";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
+import EpisodeCard from "@/components/details/EpisodeCard";
 import {
   AnimatedSection,
   StaggerContainer,
@@ -243,7 +245,7 @@ export default function SeasonDetailsClient({
   const router = useRouter();
   const traktRequestIdRef = useRef(0);
 
-  const [episodesView, setEpisodesView] = useState("list"); // 'list' | 'grid'
+  const [episodesView, setEpisodesView] = useState("list"); // 'list' | 'grid' | 'cards'
 
   // En el TELÉFONO la vista por defecto es la de rejilla: con una columna, cada
   // episodio es una sola tarjeta con la imagen y sus datos encima (~220px)
@@ -794,6 +796,17 @@ export default function SeasonDetailsClient({
     );
     return uniqueEpisodes.size;
   }, [watchedBySeason, seasonNumber]);
+
+  // Episodios vistos de esta temporada, para el indicador de la vista
+  // «Recuadros». `null` mientras no se sabe (sin Trakt o sin cargar).
+  const seasonWatchedSet = useMemo(() => {
+    if (!trakt.connected || !watchedBySeasonLoaded) return null;
+    return new Set(
+      getSeasonWatchedEpisodes(watchedBySeason, seasonNumber)
+        .map((episodeNumber) => Number(episodeNumber))
+        .filter((episodeNumber) => Number.isFinite(episodeNumber)),
+    );
+  }, [trakt.connected, watchedBySeasonLoaded, watchedBySeason, seasonNumber]);
 
   const seasonProgressPct = useMemo(() => {
     if (!totalEp || seasonWatchedEpisodes <= 0) return null;
@@ -2007,6 +2020,21 @@ export default function SeasonDetailsClient({
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
+
+              <button
+                type="button"
+                onClick={() => setEpisodesView("cards")}
+                className={[
+                  "relative z-10 grid h-9 w-9 place-items-center rounded-full transition-[color,background-color,box-shadow,transform] duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300",
+                  episodesView === "cards"
+                    ? "bg-white/[0.16] text-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.9)]"
+                    : "text-white/65 hover:bg-white/[0.08] hover:text-white",
+                ].join(" ")}
+                title="Vista recuadros"
+                aria-pressed={episodesView === "cards"}
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
@@ -2185,6 +2213,43 @@ export default function SeasonDetailsClient({
                           </div>
                         </div>
                       </Link>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ======================= */}
+              {/* VISTA RECUADROS (como las temporadas de la ficha de la serie) */}
+              {/* ======================= */}
+              {episodesView === "cards" && (
+                <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {episodes.map((ep) => {
+                    const epNum = Number(ep?.episode_number);
+                    return (
+                      <EpisodeCard
+                        key={`cards-${seasonNumber}-${epNum}`}
+                        href={`/details/tv/${showId}/season/${seasonNumber}/episode/${epNum}`}
+                        episodeNumber={epNum}
+                        name={ep?.name}
+                        stillPath={ep?.still_path || null}
+                        airDate={ep?.air_date ? formatDateEs(ep.air_date) : null}
+                        runtime={ep?.runtime}
+                        tmdbRating={ep?.vote_average}
+                        imdbRating={
+                          seriesGraphRatings
+                            ? getSeriesGraphEpisodeRating({
+                                ratings: seriesGraphRatings,
+                                seasonNumber: Number(seasonNumber),
+                                episodeNumber: epNum,
+                                tmdbSeasons: show?.seasons,
+                                showId,
+                                title: showName,
+                              })?.rating ?? null
+                            : null
+                        }
+                        watched={seasonWatchedSet ? seasonWatchedSet.has(epNum) : null}
+                        onPrefetch={() => prefetchEpisodeDetails(epNum)}
+                      />
                     );
                   })}
                 </div>
