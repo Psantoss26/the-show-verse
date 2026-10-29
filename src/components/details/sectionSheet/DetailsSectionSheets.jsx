@@ -439,6 +439,28 @@ function sheetCardImage(image, { isPoster, isLogo }) {
 // de un teléfono alto (5 filas de 3 pósters u 8 de 2 apaisadas) y la que asoma.
 const SHEET_PRELOAD_COUNT = 18;
 
+// Insignias de las tarjetas de «Portadas y fondos»: píldoras pequeñas, casi
+// opacas y sin borde. Sin `backdrop-blur`: una capa
+// con desenfoque por tarjeta hacía parpadear las portadas en el móvil al mover
+// la galería.
+const IMAGE_CARD_CHIP =
+  "pointer-events-auto inline-flex h-5 items-center gap-1 rounded-full bg-zinc-950/80 px-1.5 text-[11px] font-bold leading-none tabular-nums text-white shadow-[0_2px_8px_rgba(0,0,0,0.35)] transition";
+// Calidad en corto (la escala del filtro de resolución de la ficha): cabe en
+// las tarjetas de tres columnas del móvil junto a las selecciones. La medida
+// exacta va en el `title` y en la etiqueta accesible.
+function imageQualityLabel(image) {
+  const long = Math.max(Number(image?.width) || 0, Number(image?.height) || 0);
+  if (!long) return null;
+  if (long >= 3840) return "4K";
+  if (long >= 2560) return "2K";
+  if (long >= 1920) return "1080p";
+  if (long >= 1280) return "720p";
+  return "SD";
+}
+// En el ordenador, solo al pasar por la tarjeta o al llegar con el teclado.
+const IMAGE_CARD_HOVER_ONLY =
+  "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/card:opacity-100 [@media(hover:hover)]:group-focus-within/card:opacity-100";
+
 export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   // Pestañas ya calculadas por la ficha (lib/details/artworkSheetTabs): las
   // mismas que su galería, con la imagen elegida primero.
@@ -639,11 +661,11 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
               const active = image.file_path === gridCurrent.activePath;
               const card = sheetCardImage(image, { isPoster: gridIsPoster, isLogo: gridIsLogo });
               const resolution = image.width && image.height ? `${image.width}×${image.height}` : null;
-              const badge = [gridIsPoster ? null : image.iso_639_1?.toUpperCase(), resolution].filter(Boolean).join(" · ");
+              const badge = [gridIsPoster ? null : image.iso_639_1?.toUpperCase(), imageQualityLabel(image)].filter(Boolean).join(" · ");
               const votes = voteCounts?.[gridCurrent.voteKind || gridCurrent.kind]?.[image.file_path] || 0;
               const votesLabel = votes ? plural(votes, "selección", "selecciones") : null;
               return (
-                <li key={image.file_path} className="relative">
+                <li key={image.file_path} className="group/card relative">
                   <button
                     type="button"
                     onClick={() => {
@@ -673,43 +695,44 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                       />
                     </span>
                     {active ? (
-                      <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
-                        <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
+                      <span className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_2px_8px_rgba(0,0,0,0.4)] ring-1 ring-inset ring-white/25">
+                        <Check className="h-3 w-3" strokeWidth={3.5} aria-hidden="true" />
                       </span>
                     ) : null}
-                    {badge || votes ? (
-                      <span className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between gap-1 text-[10px] font-bold text-zinc-200">
-                        {/* Selecciones de todos los usuarios (cada elección es un
-                            voto): solo con 1 o más. */}
-                        {votes ? (
-                          <span
-                            className="flex shrink-0 items-center gap-1 rounded-md bg-black/65 px-1.5 py-0.5 tabular-nums text-white"
-                            title={votesLabel}
-                          >
-                            <Users className="h-3 w-3" aria-hidden="true" />
-                            {votes}
-                          </span>
-                        ) : (
-                          <span aria-hidden="true" />
-                        )}
-                        {badge ? <span className="min-w-0 truncate rounded-md bg-black/65 px-1.5 py-0.5">{badge}</span> : null}
+                    {/* Selecciones de todos los usuarios (cada elección es un
+                        voto): solo con 1 o más, siempre a la vista. */}
+                    {votes ? (
+                      <span aria-hidden="true" className={`${IMAGE_CARD_CHIP} absolute bottom-2 left-2`} title={votesLabel}>
+                        <Users className="h-3 w-3 text-emerald-300" strokeWidth={2.5} />
+                        {/* PT Sans queda medio píxel alta en la caja: medio
+                            píxel abajo la centra con el icono (medido; `pt-px`
+                            la bajaba uno entero). */}
+                        <span className="translate-y-[0.5px]">{votes}</span>
+                      </span>
+                    ) : null}
+                    {/* Idioma y resolución: en el ordenador, al pasar por la
+                        tarjeta (con la imagen limpia en reposo); en táctil,
+                        siempre. */}
+                    {badge ? (
+                      <span
+                        aria-hidden="true"
+                        className={`${IMAGE_CARD_CHIP} ${IMAGE_CARD_HOVER_ONLY} absolute bottom-2 right-2 text-white/85 ${
+                          votes ? "max-w-[calc(100%-4rem)]" : "max-w-[calc(100%-1rem)]"
+                        }`}
+                      >
+                        <span className="translate-y-[0.5px] truncate" title={resolution || undefined}>{badge}</span>
                       </span>
                     ) : null}
                   </button>
-                  {/* Sin `backdrop-blur`: eran una capa con desenfoque por
-                      tarjeta (44 portadas con idioma) y, al desplegar la fila de
-                      filtros, la galería se movía y sus tarjetas se convertían en
-                      capas y dejaban de serlo en cada fotograma: parpadeaban las
-                      portadas en el móvil. A este tamaño basta el fondo opaco. */}
                   <a
                     href={`https://image.tmdb.org/t/p/original${image.file_path}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white/85 transition-colors hover:bg-black/75 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400"
+                    className={`${IMAGE_CARD_CHIP} ${IMAGE_CARD_HOVER_ONLY} absolute right-2 top-2 w-5 justify-center !px-0 text-white/85 hover:bg-zinc-800/90 hover:text-white focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400`}
                     aria-label={`Abrir imagen original${resolution ? ` (${resolution})` : ""}`}
                     title="Abrir original"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                    <ExternalLink className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
                   </a>
                 </li>
               );
