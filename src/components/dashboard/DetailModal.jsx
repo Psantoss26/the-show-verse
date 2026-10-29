@@ -217,6 +217,7 @@ import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 import { statusRetryDelay } from "@/lib/trakt/statusRetry";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
+import { PEEK_OVER_PAGE_Z } from "@/lib/ui/pageModal";
 
 function normalizeUrl(url) {
   if (!url) return null;
@@ -3669,7 +3670,13 @@ export default function DetailModal({
           // Sobre un modal de la página el panel sube a z-[10001] y estos
           // modales (z-[10000]) quedarían debajo de él: el envoltorio sube con
           // ellos. Sin desplazamiento ni tamaño, sus hijos `fixed` no cambian.
-          style={overModal ? { position: "relative", zIndex: 10001 } : undefined}
+          // La vista previa del móvil sobre un modal sube por encima de todo
+          // (PEEK_OVER_PAGE_Z) y estos modales con ella.
+          style={
+            overModal
+              ? { position: "relative", zIndex: peek ? PEEK_OVER_PAGE_Z : 10001 }
+              : undefined
+          }
           onPointerDown={stopNestedModalEvent}
           onMouseDown={stopNestedModalEvent}
           onClick={stopNestedModalEvent}

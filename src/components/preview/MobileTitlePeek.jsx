@@ -54,7 +54,7 @@ import {
 } from "@/lib/navigation/peekHandoff";
 
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
-import { isInsidePageModal } from "@/lib/ui/pageModal";
+import { PEEK_OVER_PAGE_Z, isInsidePageOverlay } from "@/lib/ui/pageModal";
 import useModalGuard from "@/hooks/useModalGuard";
 import {
   TITLE_PEEK_ATTR,
@@ -346,8 +346,9 @@ export default function MobileTitlePeek() {
           width: rect.width,
           height: rect.height,
         },
-        // Pulsada dentro de un modal (episodios agrupados…): encima de él.
-        overModal: isInsidePageModal(gesture.target),
+        // Pulsada dentro de un modal o un desplegable (episodios agrupados,
+        // vista lateral de Temporadas, alertas del navbar…): encima de todo.
+        overModal: isInsidePageOverlay(gesture.target),
       });
     };
 
@@ -476,11 +477,17 @@ export default function MobileTitlePeek() {
   // convierte en contexto de apilamiento y, sin él, caería al nivel 0 de la
   // página. El navbar y la barra superior, por encima, aparecían de golpe
   // sobre la vista previa en vez de verse a través de ella.
+  // `data-detail-modal-layer`: con la vista lateral abierta (SectionSheet,
+  // `data-sv-sheet-open`) globals.css quita el desenfoque a todo lo que cuelga
+  // de <body> salvo las capas de modal; sin la marca, el fondo difuminado y el
+  // cristal de la tarjeta se quedaban transparentes.
   return createPortal(
     <div
       data-sv-no-peek=""
+      data-detail-modal-layer=""
       ref={layerRef}
-      className={`relative ${peek?.overModal ? "z-[10001]" : "z-[9999]"}`}
+      className="relative"
+      style={{ zIndex: peek?.overModal ? PEEK_OVER_PAGE_Z : 9999 }}
     >
       {/* Detrás de la vista previa mientras se va a la ficha: tapa la página
           que se deja y la pantalla de carga con el fondo de la ficha. */}
