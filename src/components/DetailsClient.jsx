@@ -8261,12 +8261,10 @@ export default function DetailsClient({
         active: {
           poster: sheetPosterActive,
           mobilePoster: sheetMobilePosterActive,
-          cardPoster: selectedPosterPath || null,
-          // En la ficha de escritorio se marca la que enseña la portada en
-          // modo backdrop; en el móvil (sin esa portada), solo la elegida.
-          cardBackdrop: isMobileViewport
-            ? selectedCardBackdropPath || null
-            : posterBackdropFallback || null,
+          // «Tarjetas» y «Backdrop» (móvil) marcan la que usan las tarjetas:
+          // la elegida, la más votada o la automática, como en escritorio.
+          cardPoster: sheetPosterActive,
+          cardBackdrop: posterBackdropFallback || null,
           background: sheetBackgroundActive,
           logo: displayHeroLogoPath,
         },
@@ -8278,8 +8276,6 @@ export default function DetailsClient({
       titleLogos,
       sheetPosterActive,
       sheetMobilePosterActive,
-      selectedPosterPath,
-      selectedCardBackdropPath,
       posterBackdropFallback,
       sheetBackgroundActive,
       displayHeroLogoPath,

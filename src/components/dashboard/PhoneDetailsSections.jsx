@@ -84,6 +84,8 @@ import { stripHtml, formatDateTimeEs } from "@/lib/details/formatters";
 import { getSeriesGraphSeasonAverages } from "@/lib/details/seriesGraphRatings";
 import { seasonStructuresAlign } from "@/lib/details/episodeRatingsStructure";
 import { getWatchedEpisodeCountForSeason } from "@/lib/hooks/useTraktEpisodesWatched";
+import { useOwnArtwork } from "@/lib/hooks/useOwnCardPoster";
+import { pickLadderBackdrop } from "@/lib/details/tmdbImages";
 import DetailsSectionMenu from "@/components/DetailsSectionMenu";
 import DetailsArrowCarousel, {
   SwiperSlide,
@@ -344,6 +346,10 @@ export default function PhoneDetailsSections({
   const [selectedLogo, setSelectedLogo] = useState(null);
   const [selectedCardPoster, setSelectedCardPoster] = useState(null);
   const [selectedCardBackdrop, setSelectedCardBackdrop] = useState(null);
+  // Sin elección en esta vista: la de las tarjetas (propia o más votada), para
+  // marcar en «Tarjetas» y «Backdrop» la que se está usando.
+  const cardPosterInUse = useOwnArtwork(type, id, "poster");
+  const cardBackdropInUse = useOwnArtwork(type, id, "cardBackdrop");
 
   useEffect(() => {
     if (id == null) return;
@@ -1198,8 +1204,15 @@ export default function PhoneDetailsSections({
     active: {
       mobilePoster: selectedMobilePoster || data?.heroPosterPath || null,
       logo: selectedLogo || data?.logoPath || null,
-      cardPoster: selectedCardPoster,
-      cardBackdrop: selectedCardBackdrop,
+      // La que usan las tarjetas: elegida, más votada o automática.
+      cardPoster: selectedCardPoster || cardPosterInUse || item?.poster_path || null,
+      cardBackdrop:
+        selectedCardBackdrop ||
+        cardBackdropInUse ||
+        pickLadderBackdrop(images?.backdrops || [], {
+          originalLanguage: item?.original_language ?? data?.original_language,
+        })?.file_path ||
+        null,
     },
   });
   const sectionSheetData = {

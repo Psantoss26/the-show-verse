@@ -138,8 +138,8 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           aspect: "poster",
           // Las con idioma de «Portada»; sin ninguna con idioma, todas.
           images: orAll(localizedPosters, allPosters),
-          // Solo la elegida a propósito: sin ella, cada página usa su portada
-          // automática y no hay una que marcar.
+          // La que usan las tarjetas: la elegida, la más votada o la
+          // automática.
           activePath: active.cardPoster ?? null,
         },
         cardBackdropTab,
