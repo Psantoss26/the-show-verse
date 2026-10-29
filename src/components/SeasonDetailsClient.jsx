@@ -1,9 +1,7 @@
 "use client";
 
 
-import OptimizedImage from "@/components/OptimizedImage";
 import { useMemo, useEffect, useLayoutEffect, useState, useCallback, useRef } from "react";
-import Link from "next/link";
 import { sendEmbeddedDetailsAction } from "@/lib/navigation/embeddedDetails";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion } from "framer-motion";
@@ -14,11 +12,6 @@ import {
   Calendar as CalendarIcon,
   Film as FilmIcon,
   MonitorPlay,
-  ImageOff,
-  Clock as ClockIcon,
-  LayoutGrid,
-  LayoutList,
-  AlignJustify,
 } from "lucide-react";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
@@ -51,8 +44,6 @@ import SeasonCoverEditModal, { prefetchSeasonPosters } from "@/components/detail
 import { useAuth } from "@/context/AuthContext";
 import { readSeasonCustomPoster } from "@/lib/details/seasonArtwork";
 import { useCommunitySeasonPoster } from "@/lib/details/communitySeasonPosters";
-import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_BAR, LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import {
   buildTraktHref,
   buildImdbHref,
@@ -244,20 +235,6 @@ export default function SeasonDetailsClient({
 }) {
   const router = useRouter();
   const traktRequestIdRef = useRef(0);
-
-  const [episodesView, setEpisodesView] = useState("list"); // 'list' | 'grid' | 'cards'
-
-  // En el TELÉFONO la vista por defecto es la de rejilla: con una columna, cada
-  // episodio es una sola tarjeta con la imagen y sus datos encima (~220px)
-  // frente a la imagen + título + sinopsis de la lista (~375px). Se decide
-  // antes del primer pintado tras hidratar; el servidor no conoce el ancho, y
-  // la lista queda muy por debajo de la cabecera, así que el cambio no se ve.
-  // Después manda lo que elija el usuario con los botones.
-  useLayoutEffect(() => {
-    if (window.matchMedia("(max-width: 639px)").matches) {
-      setEpisodesView("grid");
-    }
-  }, []);
 
   const showName = show?.name || show?.title || "Serie";
   const seasonName =
@@ -797,8 +774,8 @@ export default function SeasonDetailsClient({
     return uniqueEpisodes.size;
   }, [watchedBySeason, seasonNumber]);
 
-  // Episodios vistos de esta temporada, para el indicador de la vista
-  // «Recuadros». `null` mientras no se sabe (sin Trakt o sin cargar).
+  // Episodios vistos de esta temporada, para el indicador de cada tarjeta de
+  // episodio. `null` mientras no se sabe (sin Trakt o sin cargar).
   const seasonWatchedSet = useMemo(() => {
     if (!trakt.connected || !watchedBySeasonLoaded) return null;
     return new Set(
@@ -1966,7 +1943,7 @@ export default function SeasonDetailsClient({
           delay={0.04}
           renderImmediately
         >
-          {/* Header con toggle (mismo estilo SectionTitle) */}
+          {/* Header (mismo estilo SectionTitle) */}
           <div className="flex items-center justify-between gap-4 mb-8 w-full">
             <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 pr-4 sm:pr-6">
               <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-[14px] bg-yellow-500/5 backdrop-blur-2xl shadow-[0_4px_24px_rgba(234,179,8,0.12)] shrink-0 overflow-hidden group-hover/section:bg-yellow-500/10 group-hover/section:shadow-[0_8px_32px_rgba(234,179,8,0.2)] transition-all duration-500">
@@ -1982,60 +1959,6 @@ export default function SeasonDetailsClient({
                 <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-yellow-500 to-transparent opacity-0 group-hover/section:opacity-100 transition-opacity duration-500" />
               </div>
             </div>
-
-            <div
-              role="group"
-              aria-label="Modo de vista de episodios"
-              className={`relative isolate flex shrink-0 items-center gap-1 overflow-hidden rounded-full p-1 ${LIQUID_GLASS_BAR}`}
-            >
-              {/* Misma refracción y reflejos sutiles que el selector de
-                  secciones de DetailsClient, sin dibujar un borde. */}
-              <LiquidGlassOpticalLayers />
-              <button
-                type="button"
-                onClick={() => setEpisodesView("list")}
-                className={[
-                  "relative z-10 grid h-9 w-9 place-items-center rounded-full transition-[color,background-color,box-shadow,transform] duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300",
-                  episodesView === "list"
-                    ? "bg-white/[0.16] text-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.9)]"
-                    : "text-white/65 hover:bg-white/[0.08] hover:text-white",
-                ].join(" ")}
-                title="Vista lista"
-                aria-pressed={episodesView === "list"}
-              >
-                <AlignJustify className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setEpisodesView("grid")}
-                className={[
-                  "relative z-10 grid h-9 w-9 place-items-center rounded-full transition-[color,background-color,box-shadow,transform] duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300",
-                  episodesView === "grid"
-                    ? "bg-white/[0.16] text-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.9)]"
-                    : "text-white/65 hover:bg-white/[0.08] hover:text-white",
-                ].join(" ")}
-                title="Vista grid"
-                aria-pressed={episodesView === "grid"}
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setEpisodesView("cards")}
-                className={[
-                  "relative z-10 grid h-9 w-9 place-items-center rounded-full transition-[color,background-color,box-shadow,transform] duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300",
-                  episodesView === "cards"
-                    ? "bg-white/[0.16] text-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.9)]"
-                    : "text-white/65 hover:bg-white/[0.08] hover:text-white",
-                ].join(" ")}
-                title="Vista recuadros"
-                aria-pressed={episodesView === "cards"}
-              >
-                <LayoutList className="w-4 h-4" />
-              </button>
-            </div>
           </div>
 
           {episodes.length === 0 ? (
@@ -2043,218 +1966,40 @@ export default function SeasonDetailsClient({
               No hay episodios disponibles para esta temporada.
             </div>
           ) : (
-            <>
-              {/* ======================= */}
-              {/* VISTA LISTA (sin TMDb badge) */}
-              {/* ======================= */}
-              {episodesView === "list" && (
-                <div className="mt-2 space-y-4">
-                  {episodes.map((ep) => {
-                    const epNum = Number(ep?.episode_number);
-                    const epTitle = ep?.name || `Episodio ${epNum}`;
-                    const epAir = ep?.air_date
-                      ? formatDateEs(ep.air_date)
-                      : null;
-                    const epRuntime = Number(ep?.runtime || 0) || null;
-                    const still = ep?.still_path || null;
-                    const href = `/details/tv/${showId}/season/${seasonNumber}/episode/${epNum}`;
-
-                    return (
-                      <Link
-                        key={`${seasonNumber}-${epNum}`}
-                        href={href}
-                        onMouseEnter={() => prefetchEpisodeDetails(epNum)}
-                        onFocus={() => prefetchEpisodeDetails(epNum)}
-                        onTouchStart={() => prefetchEpisodeDetails(epNum)}
-                        // MISMO CRISTAL QUE LOS PANELES DE LA FICHA. Antes era
-                        // una copia a mano del acabado —`bg-zinc-900/20` con
-                        // `backdrop-blur-2xl` (64px), sin saturar ni realzar, y
-                        // dos capas propias de degradado y reflejo—, que es la
-                        // deriva que las constantes existen para impedir. Con
-                        // 64px de desenfoque y ese velo no pasaba color del
-                        // fondo: se leía como una placa gris, no como vidrio.
-                        //
-                        // Se usa `LIQUID_GLASS_CARD` y NO el `LIQUID_GLASS_BAR`
-                        // del ScoreboardPanel a propósito: es la variante SIN
-                        // SOMBRA, pensada justo para tarjetas en grupo. Los
-                        // episodios van apilados y, con la sombra de la barra,
-                        // las de cada tarjeta se solapan y forman una banda
-                        // oscura detrás de toda la lista (ver liquidGlass.js).
-                        className={`group relative isolate block rounded-2xl ${LIQUID_GLASS_CARD} transition-all duration-500 overflow-hidden hover:bg-white/[0.06]`}
-                      >
-                        {/* Refracción del canto, especular y luz superior: las
-                            mismas que pinta el ScoreboardPanel. */}
-                        <LiquidGlassOpticalLayers />
-
-                        <div className="relative z-10 flex flex-col sm:flex-row gap-4 p-4">
-                          {/* Still */}
-                          <div className="relative w-full sm:w-[280px] aspect-video sm:aspect-[16/9] rounded-xl overflow-hidden bg-black/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),inset_0_-1px_2px_rgba(0,0,0,0.3)] shrink-0">
-                            {still ? (
-                              <OptimizedImage
-                                src={`https://image.tmdb.org/t/p/w780${still}`}
-                                alt={epTitle}
-                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                                loading="lazy"
-                                decoding="async"
-                              />
-                            ) : (
-                              <div className="absolute inset-0 flex items-center justify-center opacity-60">
-                                <ImageOff className="w-7 h-7 text-zinc-500" />
-                              </div>
-                            )}
-
-                            {/* ❌ eliminado: badge "TMDb X.X" */}
-                          </div>
-
-                          {/* Info */}
-                          <div className="min-w-0 flex-1">
-                            <div className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-                              Episodio {epNum}
-                            </div>
-
-                            <div className="mt-1 flex items-start justify-between gap-3">
-                              <h3 className="text-lg font-extrabold text-white leading-tight line-clamp-1">
-                                {epTitle}
-                              </h3>
-                            </div>
-
-                            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
-                              {epAir ? (
-                                <span className="inline-flex items-center gap-2">
-                                  <CalendarIcon className="w-4 h-4" /> {epAir}
-                                </span>
-                              ) : null}
-
-                              {epRuntime ? (
-                                <span className="inline-flex items-center gap-2">
-                                  <ClockIcon className="w-4 h-4" /> {epRuntime}{" "}
-                                  min
-                                </span>
-                              ) : null}
-                            </div>
-
-                            <p className="mt-3 text-sm leading-relaxed text-zinc-300 line-clamp-2">
-                              {ep?.overview?.trim() || "Sin descripción."}
-                            </p>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* ======================= */}
-              {/* VISTA GRID (hover overlay) */}
-              {/* ======================= */}
-              {episodesView === "grid" && (
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {episodes.map((ep) => {
-                    const epNum = Number(ep?.episode_number);
-                    const epTitle = ep?.name || `Episodio ${epNum}`;
-                    const epAir = ep?.air_date
-                      ? formatDateEs(ep.air_date)
-                      : null;
-                    const epRuntime = Number(ep?.runtime || 0) || null;
-                    const still = ep?.still_path || null;
-                    const href = `/details/tv/${showId}/season/${seasonNumber}/episode/${epNum}`;
-
-                    return (
-                      <Link
-                        key={`grid-${seasonNumber}-${epNum}`}
-                        href={href}
-                        onMouseEnter={() => prefetchEpisodeDetails(epNum)}
-                        onFocus={() => prefetchEpisodeDetails(epNum)}
-                        onTouchStart={() => prefetchEpisodeDetails(epNum)}
-                        className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"
-                        title={epTitle}
-                      >
-                        <div className="relative aspect-video overflow-hidden">
-                          {still ? (
-                            <OptimizedImage
-                              src={`https://image.tmdb.org/t/p/w780${still}`}
-                              alt={epTitle}
-                              className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
-                              <ImageOff className="w-7 h-7 text-zinc-500" />
-                            </div>
-                          )}
-
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
-
-                          <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
-                            <div className="text-[10px] sm:text-xs font-semibold leading-tight text-zinc-300 group-hover:text-yellow-400 transition-colors duration-300 drop-shadow-sm">
-                              Episodio {epNum}
-                            </div>
-
-                            <p className="mt-0.5 text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
-                              {epTitle}
-                            </p>
-
-                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-300 drop-shadow-sm">
-                              {epAir ? (
-                                <span className="inline-flex items-center gap-1">
-                                  <CalendarIcon className="w-3.5 h-3.5" />{" "}
-                                  {epAir}
-                                </span>
-                              ) : null}
-
-                              {epRuntime ? (
-                                <span className="inline-flex items-center gap-1">
-                                  <ClockIcon className="w-3.5 h-3.5" />{" "}
-                                  {epRuntime} min
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* ======================= */}
-              {/* VISTA RECUADROS (como las temporadas de la ficha de la serie) */}
-              {/* ======================= */}
-              {episodesView === "cards" && (
-                <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {episodes.map((ep) => {
-                    const epNum = Number(ep?.episode_number);
-                    return (
-                      <EpisodeCard
-                        key={`cards-${seasonNumber}-${epNum}`}
-                        href={`/details/tv/${showId}/season/${seasonNumber}/episode/${epNum}`}
-                        episodeNumber={epNum}
-                        name={ep?.name}
-                        stillPath={ep?.still_path || null}
-                        airDate={ep?.air_date ? formatDateEs(ep.air_date) : null}
-                        runtime={ep?.runtime}
-                        tmdbRating={ep?.vote_average}
-                        imdbRating={
-                          seriesGraphRatings
-                            ? getSeriesGraphEpisodeRating({
-                                ratings: seriesGraphRatings,
-                                seasonNumber: Number(seasonNumber),
-                                episodeNumber: epNum,
-                                tmdbSeasons: show?.seasons,
-                                showId,
-                                title: showName,
-                              })?.rating ?? null
-                            : null
-                        }
-                        watched={seasonWatchedSet ? seasonWatchedSet.has(epNum) : null}
-                        onPrefetch={() => prefetchEpisodeDetails(epNum)}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </>
+            // Una sola vista: un episodio por fila, con la tarjeta de las
+            // temporadas de la ficha de la serie (EpisodeCard) y la sinopsis.
+            <div className="mt-2 space-y-4">
+              {episodes.map((ep) => {
+                const epNum = Number(ep?.episode_number);
+                return (
+                  <EpisodeCard
+                    key={`${seasonNumber}-${epNum}`}
+                    href={`/details/tv/${showId}/season/${seasonNumber}/episode/${epNum}`}
+                    episodeNumber={epNum}
+                    name={ep?.name}
+                    overview={ep?.overview}
+                    stillPath={ep?.still_path || null}
+                    airDate={ep?.air_date ? formatDateEs(ep.air_date) : null}
+                    runtime={ep?.runtime}
+                    tmdbRating={ep?.vote_average}
+                    imdbRating={
+                      seriesGraphRatings
+                        ? getSeriesGraphEpisodeRating({
+                            ratings: seriesGraphRatings,
+                            seasonNumber: Number(seasonNumber),
+                            episodeNumber: epNum,
+                            tmdbSeasons: show?.seasons,
+                            showId,
+                            title: showName,
+                          })?.rating ?? null
+                        : null
+                    }
+                    watched={seasonWatchedSet ? seasonWatchedSet.has(epNum) : null}
+                    onPrefetch={() => prefetchEpisodeDetails(epNum)}
+                  />
+                );
+              })}
+            </div>
           )}
         </AnimatedSection>
       </div>

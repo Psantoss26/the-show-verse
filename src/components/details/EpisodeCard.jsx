@@ -1,10 +1,14 @@
 "use client";
 
-// Tarjeta de un episodio en la vista «Recuadros» de la sección «Episodios» de
-// la ficha de la temporada (SeasonDetailsClient). Es la misma tarjeta que la
-// de las temporadas en la ficha de la serie (SeasonCard) con dos cambios: la
-// imagen es el fotograma del episodio (horizontal, como un backdrop) y, en vez
-// de la barra de progreso, un icono dice si el episodio está visto o no.
+// Tarjeta de un episodio en la sección «Episodios» de la ficha de la temporada
+// (SeasonDetailsClient), uno por fila. Es la misma tarjeta que la de las
+// temporadas en la ficha de la serie (SeasonCard) con dos cambios: la imagen
+// es el fotograma del episodio (horizontal, como un backdrop) y, en vez de la
+// barra de progreso, un icono dice si el episodio está visto o no. Sin el
+// número grande de fondo y con fecha y duración en una fila; debajo de las
+// notas, la sinopsis. La tarjeta mide lo que la imagen (o los datos, si son
+// más altos) más el mismo margen por los cuatro lados. En el teléfono no hay
+// sinopsis: junto a una imagen de 160px no cabe y la tarjeta queda compacta.
 
 import Link from "next/link";
 import { CalendarDays, CheckCircle2, Circle, Clock, ImageOff } from "lucide-react";
@@ -17,6 +21,8 @@ export default function EpisodeCard({
   href,
   episodeNumber,
   name = null,
+  // Sinopsis del episodio (TMDb), solo desde `sm`. Sin ella no se pinta nada.
+  overview = null,
   stillPath = null,
   // Fecha de emisión ya formateada («12 de marzo de 2024»).
   airDate = null,
@@ -34,6 +40,7 @@ export default function EpisodeCard({
   const minutes = Number(runtime) > 0 ? Number(runtime) : null;
   const tmdbScore = Number(tmdbRating) > 0 ? Number(tmdbRating) : null;
   const imdbScore = Number(imdbRating) > 0 ? Number(imdbRating) : null;
+  const synopsis = typeof overview === "string" ? overview.trim() : "";
 
   return (
     <Link
@@ -41,64 +48,82 @@ export default function EpisodeCard({
       onMouseEnter={onPrefetch}
       onFocus={onPrefetch}
       onTouchStart={onPrefetch}
-      // Cristal de TARJETA compartido, sin sombra: van en rejilla (ver SeasonCard).
-      className={`group relative isolate flex w-full transform-gpu gap-4 overflow-hidden rounded-2xl p-3 text-left ${LIQUID_GLASS_CARD} transition-all lg:hover:-translate-y-1 lg:hover:brightness-110`}
+      // Cristal de TARJETA compartido, sin sombra: van apiladas (ver SeasonCard).
+      className={`group relative isolate block w-full transform-gpu overflow-hidden rounded-2xl p-3 text-left ${LIQUID_GLASS_CARD} transition-all lg:hover:-translate-y-1 lg:hover:brightness-110`}
       aria-label={`Ver episodio ${episodeNumber}: ${title}`}
     >
       <LiquidGlassOpticalLayers />
-      {/* Número del episodio en grande al fondo, como el de la temporada. */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-4 top-1/2 z-0 -translate-y-1/2 select-none text-[110px] font-black leading-none text-white/5 transition-colors group-hover:text-white/10"
-      >
-        {episodeNumber}
-      </span>
 
-      <span
-        // `self-center`: la imagen es horizontal y la columna de datos suele
-        // ser más alta; centrada no deja un hueco solo por debajo.
-        className="relative z-10 aspect-video w-40 shrink-0 self-center overflow-hidden rounded-xl bg-zinc-900 shadow-lg shadow-black/40 sm:w-44 lg:w-48"
-      >
-        {stillPath ? (
-          <OptimizedImage
-            src={`https://image.tmdb.org/t/p/w780${stillPath}`}
-            srcSet={tmdbSrcSet(stillPath, "backdrop")}
-            // Imagen de 160–192px: se pide ~1,5× para que se vea nítida.
-            sizes="(min-width: 1024px) 288px, (min-width: 640px) 264px, 240px"
-            alt=""
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <span className="flex h-full w-full items-center justify-center">
-            <ImageOff className="h-6 w-6 text-zinc-600" aria-hidden="true" />
-          </span>
-        )}
-      </span>
-
-      <span className="relative z-10 flex min-w-0 flex-1 flex-col py-1 pr-1">
-        <span className="block text-[11px] font-bold uppercase tracking-widest text-zinc-500">
-          Episodio {episodeNumber}
+      {/* Visto / sin ver en la esquina superior derecha, con el mismo margen
+          que la imagen (`p-3`): los datos van centrados en alto y, dentro de
+          su columna, el icono quedaba flotando a media tarjeta. */}
+      {watched != null ? (
+        <span className="absolute right-3 top-3 z-20 flex">
+          {watched ? (
+            <CheckCircle2 className="h-5 w-5 text-emerald-400" aria-label="Visto" role="img" />
+          ) : (
+            <Circle className="h-5 w-5 text-zinc-500" aria-label="Sin ver" role="img" />
+          )}
         </span>
-        <span className="mt-0.5 line-clamp-2 text-base font-bold leading-tight text-white">{title}</span>
+      ) : null}
 
-        {/* Una fila por dato: fecha, duración y notas. */}
-        <span className="mt-2 flex flex-col gap-1.5 text-xs font-bold text-zinc-400">
-          {airDate ? (
-            <span className="flex items-center gap-1.5">
-              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden="true" />
-              {airDate}
+      <span className="relative z-10 flex gap-4">
+        <span
+          // `self-stretch` con `aspect-video` como mínimo: la imagen mide 16:9 y,
+          // si los datos son más altos (en el móvil, fecha y duración no caben en
+          // una fila), se estira hasta ellos. Así el margen del recuadro es el
+          // mismo (`p-3`) por los cuatro lados.
+          className="relative aspect-video w-40 shrink-0 sm:w-[46%] sm:max-w-80 self-stretch overflow-hidden rounded-xl bg-zinc-900 shadow-lg shadow-black/40"
+        >
+          {stillPath ? (
+            <OptimizedImage
+              src={`https://image.tmdb.org/t/p/w780${stillPath}`}
+              srcSet={tmdbSrcSet(stillPath, "backdrop")}
+              // 160px en el móvil; desde sm, el 46% de la tarjeta (hasta 320px).
+              // Se pide ~1,5× para que se vea nítida.
+              sizes="(min-width: 640px) 480px, 240px"
+              alt=""
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center">
+              <ImageOff className="h-6 w-6 text-zinc-600" aria-hidden="true" />
             </span>
-          ) : null}
-          {minutes ? (
-            <span className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden="true" />
-              {minutes} min
+          )}
+        </span>
+
+        {/* `pr-6`: sitio para el icono de la esquina si el texto llega arriba. */}
+        <span className={`relative flex min-w-0 flex-1 flex-col justify-center ${watched != null ? "pr-6" : ""}`}>
+          <span className="block text-[11px] font-bold uppercase tracking-widest text-zinc-500">
+            Episodio {episodeNumber}
+          </span>
+          {/* Una línea en el móvil: con dos la tarjeta crecería más que la
+              imagen. En el ordenador la imagen es lo bastante alta para dos. */}
+          <span className="mt-0.5 line-clamp-1 lg:line-clamp-2 text-base font-bold leading-tight text-white" title={title}>
+            {title}
+          </span>
+
+          {/* Fecha y duración en una fila; debajo, las notas. */}
+          {airDate || minutes ? (
+            <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-zinc-400">
+              {airDate ? (
+                <span className="flex items-center gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden="true" />
+                  {airDate}
+                </span>
+              ) : null}
+              {minutes ? (
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden="true" />
+                  {minutes} min
+                </span>
+              ) : null}
             </span>
           ) : null}
           {tmdbScore != null || imdbScore != null ? (
-            <span className="flex items-center gap-3 pt-0.5 text-sm text-white">
+            <span className="mt-2 flex items-center gap-3 text-sm font-bold text-white">
               {tmdbScore != null ? (
                 <span className="flex items-center gap-1.5" title="Nota en TMDb">
                   <OptimizedImage src="/logo-TMDb.png" alt="TMDb" className="h-3.5 w-auto" />
@@ -113,24 +138,12 @@ export default function EpisodeCard({
               ) : null}
             </span>
           ) : null}
+          {synopsis ? (
+            <span className="mt-3 hidden text-sm leading-relaxed text-zinc-300 sm:line-clamp-2 lg:line-clamp-3">
+              {synopsis}
+            </span>
+          ) : null}
         </span>
-
-        {/* Visto / sin ver, abajo del todo (donde la temporada lleva la barra
-            de progreso) para que todas las tarjetas lo alineen. */}
-        {watched != null ? (
-          <span
-            className={`mt-auto flex items-center gap-1.5 pt-3 text-xs font-bold ${
-              watched ? "text-emerald-400" : "text-zinc-500"
-            }`}
-          >
-            {watched ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-            ) : (
-              <Circle className="h-4 w-4 shrink-0" aria-hidden="true" />
-            )}
-            {watched ? "Visto" : "Sin ver"}
-          </span>
-        ) : null}
       </span>
     </Link>
   );
