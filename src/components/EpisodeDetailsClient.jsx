@@ -24,7 +24,6 @@ import {
   Star as StarIcon,
   Users as UsersIcon,
   MonitorPlay,
-  ImageOff,
   Link2,
   Play as PlayIcon,
 } from "lucide-react";
@@ -54,6 +53,7 @@ import DetailsScoreboardPanel, {
 } from "@/components/details/DetailsScoreboardPanel";
 import { ActionShareButton } from "@/components/details/DetailHeaderBits";
 import { buildShareCardPayload } from "@/lib/details/shareCard";
+import EpisodeCard from "@/components/details/EpisodeCard";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import {
   buildTraktHref,
@@ -1603,6 +1603,49 @@ export default function EpisodeDetailsClient({
     episodeProduction,
   ]);
 
+  // Fila «Episodios»: la misma tarjeta que la temporada (EpisodeCard), con la
+  // nota de IMDb de cada episodio (SeriesGraph, misma petición en caché que la
+  // nota del episodio) y el indicador de visto si hay Trakt.
+  const [seriesGraphRatings, setSeriesGraphRatings] = useState(null);
+  useEffect(() => {
+    if (nextEpisodes.length === 0) return undefined;
+    let alive = true;
+    const controller = new AbortController();
+    const cancelSchedule = scheduleAfterFirstPaint(async () => {
+      try {
+        const ratings = await fetchSeriesGraphRatingsCached({
+          showId,
+          title: showName,
+          signal: controller.signal,
+        });
+        if (alive) setSeriesGraphRatings(ratings || null);
+      } catch {
+        // Sin notas: la tarjeta sale solo con la de TMDb.
+      }
+    }, 600);
+    return () => {
+      alive = false;
+      controller.abort();
+      cancelSchedule();
+    };
+  }, [showId, showName, nextEpisodes.length]);
+
+  const seasonWatchedSet = useMemo(() => {
+    if (!trakt?.connected || !watchedBySeasonLoaded) return null;
+    return new Set(
+      getWatchedSeasonEpisodes(watchedBySeason, seasonNumber)
+        .map((number) => Number(number))
+        .filter((number) => Number.isFinite(number)),
+    );
+  }, [trakt?.connected, watchedBySeasonLoaded, watchedBySeason, seasonNumber]);
+
+  const prefetchEpisodeDetails = useCallback(
+    (epNum) => {
+      router.prefetch(`/details/tv/${showId}/season/${seasonNumber}/episode/${epNum}`);
+    },
+    [router, showId, seasonNumber],
+  );
+
   return (
     <div
       ref={heroRootRef}
@@ -2069,9 +2112,6 @@ export default function EpisodeDetailsClient({
             @media (min-width: 768px) { .ssr-swiper-fix .swiper-slide { width: calc(25% - 12px) !important; margin-right: 16px !important; } }
             @media (min-width: 1024px) { .ssr-swiper-fix .swiper-slide { width: calc(20% - 14.4px) !important; margin-right: 18px !important; } }
             @media (min-width: 1280px) { .ssr-swiper-fix .swiper-slide { width: calc(16.666% - 16.67px) !important; margin-right: 20px !important; } }
-            .ssr-swiper-fix-episodes .swiper-slide { width: 100% !important; margin-right: 16px !important; display: block; }
-            @media (min-width: 640px) { .ssr-swiper-fix-episodes .swiper-slide { width: calc(50% - 8px) !important; } }
-            @media (min-width: 1024px) { .ssr-swiper-fix-episodes .swiper-slide { width: calc(33.333% - 10.67px) !important; } }
           `,
             }}
           />
@@ -2079,73 +2119,42 @@ export default function EpisodeDetailsClient({
 
         {nextEpisodes.length > 0 && (
           <AnimatedSection className="sv-phone-scaled-section" delay={0.04}>
-            <section className="mb-8 group/section">
+            <section className="mb-16 group/section">
               <SectionTitle title="Episodios" icon={MonitorPlay} />
-              {/* Carrusel Swiper, como el reparto: el arrastre lo gestiona el
-                  propio carrusel y en teléfono no cambia de episodio
-                  (MobileUserPageSwipeNavigation). */}
-              <div data-mobile-page-swipe-ignore="">
-                <DetailsArrowCarousel
-                  spaceBetween={16}
-                  slidesPerView={1}
-                  // Al soltar, la fila se ajusta a la tarjeta más cercana.
-                  freeMode={{ enabled: true, sticky: true, momentum: true, momentumRatio: 0.55 }}
-                  breakpoints={{
-                    640: { slidesPerView: 2, spaceBetween: 16 },
-                    1024: { slidesPerView: 3, spaceBetween: 16 },
-                  }}
-                  className={`pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix-episodes" : ""}`}
-                >
-                  {nextEpisodes.map((nextEpisode) => {
-                    const nextNumber = Number(nextEpisode?.episode_number);
-                    const nextTitle =
-                      nextEpisode?.name || `Episodio ${nextNumber}`;
-                    const nextAirDate = nextEpisode?.air_date
-                      ? formatDateEs(nextEpisode.air_date)
-                      : null;
-                    const still = nextEpisode?.still_path || null;
-
-                    return (
-                      <SwiperSlide key={`${seasonNumber}-${nextNumber}`}>
-                        <Link
-                          href={`/details/tv/${showId}/season/${seasonNumber}/episode/${nextNumber}`}
-                          className="group/episode relative block w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-lg shadow-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
-                          title={nextTitle}
-                        >
-                          <div className="relative aspect-video overflow-hidden">
-                            {still ? (
-                              <OptimizedImage
-                                src={`https://image.tmdb.org/t/p/w780${still}`}
-                                alt={nextTitle}
-                                className="h-full w-full object-cover transition-transform duration-500 group-hover/episode:scale-105"
-                                loading="lazy"
-                                decoding="async"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-500">
-                                <ImageOff className="h-7 w-7" aria-hidden="true" />
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" />
-                            <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4">
-                              <p className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                                Episodio {nextNumber}
-                              </p>
-                              <h3 className="mt-1 line-clamp-2 text-sm font-extrabold leading-tight text-white sm:text-base">
-                                {nextTitle}
-                              </h3>
-                              {nextAirDate ? (
-                                <p className="mt-1 text-xs font-semibold text-zinc-300">
-                                  {nextAirDate}
-                                </p>
-                              ) : null}
-                            </div>
-                          </div>
-                        </Link>
-                      </SwiperSlide>
-                    );
-                  })}
-                </DetailsArrowCarousel>
+              {/* Los siguientes episodios con la vista de la temporada: uno por
+                  fila con EpisodeCard (fotograma, fecha, duración, notas,
+                  sinopsis desde `sm` y visto / sin ver). */}
+              <div className="space-y-4">
+                {nextEpisodes.map((nextEpisode) => {
+                  const nextNumber = Number(nextEpisode?.episode_number);
+                  return (
+                    <EpisodeCard
+                      key={`${seasonNumber}-${nextNumber}`}
+                      href={`/details/tv/${showId}/season/${seasonNumber}/episode/${nextNumber}`}
+                      episodeNumber={nextNumber}
+                      name={nextEpisode?.name}
+                      overview={nextEpisode?.overview}
+                      stillPath={nextEpisode?.still_path || null}
+                      airDate={nextEpisode?.air_date ? formatDateEs(nextEpisode.air_date) : null}
+                      runtime={nextEpisode?.runtime}
+                      tmdbRating={nextEpisode?.vote_average}
+                      imdbRating={
+                        seriesGraphRatings
+                          ? getSeriesGraphEpisodeRating({
+                              ratings: seriesGraphRatings,
+                              seasonNumber: Number(seasonNumber),
+                              episodeNumber: nextNumber,
+                              tmdbSeasons: show?.seasons,
+                              showId,
+                              title: showName,
+                            })?.rating ?? null
+                          : null
+                      }
+                      watched={seasonWatchedSet ? seasonWatchedSet.has(nextNumber) : null}
+                      onPrefetch={() => prefetchEpisodeDetails(nextNumber)}
+                    />
+                  );
+                })}
               </div>
             </section>
           </AnimatedSection>

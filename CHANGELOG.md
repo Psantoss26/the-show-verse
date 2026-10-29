@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha de episodio, sección «Episodios»: los siguientes episodios se ven como en la temporada, uno por fila con la misma tarjeta (fotograma, fecha, duración, notas de TMDb e IMDb, sinopsis en el ordenador e icono de visto / sin ver si tienes Trakt), en lugar del carrusel de fotogramas. → [fichas de detalle](docs/frontend/app-router-pages.md), [componentes](docs/frontend/components.md)
 - Temporada, sección «Episodios»: el rótulo «Episodio N» de cada fila tiene la misma letra que la fecha y la duración (sin mayúsculas y más clara), así que se lee también sobre fondos claros. → [componentes](docs/frontend/components.md)
 - Tarjetas de premios (ficha de película o serie y ficha de persona): el logo del premio tiene un tamaño proporcional a la tarjeta, con el mismo margen a cada lado, y queda centrado entre los indicadores de arriba y el texto de abajo. Sin la línea horizontal que acompañaba al rótulo. En el ordenador ya no queda pegado a «Ganador»/«Nominado» y al año; en el móvil ya no llena la tarjeta. → [componentes](docs/frontend/components.md)
 - Ficha de la serie, sección «Temporadas»: el cambio entre la vista de tarjetas y la de pósters es animado. La vista actual se desvanece, la sección cambia de altura con suavidad (sin empujar de golpe lo de debajo) y las temporadas de la nueva vista entran en cascada. Con movimiento reducido el cambio sigue siendo directo. → [componentes](docs/frontend/components.md)
