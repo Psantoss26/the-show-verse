@@ -1947,7 +1947,7 @@ export default function BibliotecaClient() {
   // ===== ERROR STATE =====
   if (error) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center text-zinc-100 font-sans selection:bg-amber-500/30">
+      <div className="min-h-screen bg-black flex items-center justify-center text-zinc-100 font-sans selection:bg-amber-500/30">
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
           <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-amber-600/15 blur-[120px] sm:blur-[150px]" />
           <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-amber-700/20 blur-[120px] sm:blur-[150px]" />
@@ -1979,7 +1979,7 @@ export default function BibliotecaClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-amber-500/30">
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-amber-500/30">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-amber-600/15 blur-[120px] sm:blur-[150px]" />
         <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-amber-700/20 blur-[120px] sm:blur-[150px]" />
