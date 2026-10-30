@@ -5,6 +5,7 @@ import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGl
 import { useEffect, useState, useRef } from "react";
 import { X, Loader2, Calendar, Pencil, Trash2, AlertTriangle } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
+import ListToggleConfirmModal from "@/components/details/ListToggleConfirmModal";
 
 export default function TraktCommentModal({
   open,
@@ -103,15 +104,18 @@ export default function TraktCommentModal({
     setError("");
   };
 
-  const handleConfirmDelete = async (commentId) => {
+  // La papelera abre la MISMA confirmación que quitar un título de favoritos
+  // (ListToggleConfirmModal); al confirmar se cierra y la papelera muestra el
+  // spinner mientras se borra.
+  const handleConfirmDelete = async () => {
+    const commentId = confirmDeleteId;
+    setConfirmDeleteId(null);
+    if (!commentId) return;
     setDeletingCommentId(commentId);
     setError("");
     try {
       if (onDelete) {
         await onDelete({ commentId });
-      }
-      if (confirmDeleteId === commentId) {
-        setConfirmDeleteId(null);
       }
     } catch (err) {
       setError(err?.message || "Error al eliminar el comentario");
@@ -266,62 +270,42 @@ export default function TraktCommentModal({
 
                         {/* Actions */}
                         <div className="flex items-center gap-2">
-                          {confirmDeleteId === comment.id ? (
-                            <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-right-1 duration-200 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-xl">
-                              <span className="text-[11px] font-bold text-rose-300 mr-1">¿Eliminar?</span>
-                              <button data-online-only="true"
-                                type="button"
-                                onClick={() => handleConfirmDelete(comment.id)}
-                                disabled={deletingCommentId === comment.id}
-                                className="px-2.5 py-1 rounded-lg bg-rose-500 hover:bg-rose-600 disabled:bg-zinc-800 text-[10px] font-black text-white transition-all cursor-pointer flex items-center gap-1 shadow-sm"
-                              >
-                                {deletingCommentId === comment.id ? (
-                                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                                ) : null}
-                                <span>Sí</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(null)}
-                                disabled={deletingCommentId === comment.id}
-                                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] font-bold text-zinc-300 transition-all cursor-pointer"
-                              >
-                                No
-                              </button>
-                            </div>
-                          ) : (
-                            // MISMOS BOTONES QUE EL HISTORIAL DE VISIONADO: solo
-                            // icono, redondos y en gris tenue, con el color
-                            // apareciendo al pasar por encima. Antes eran
-                            // píldoras con rótulo ("Editar" / "Eliminar"), que
-                            // pesaban mucho más en una fila que ya lleva fecha
-                            // y etiqueta de spoiler.
-                            //
-                            // El rótulo desaparece, así que el nombre accesible
-                            // pasa a `aria-label`: `title` solo produce el
-                            // globo del ratón y no siempre lo anuncian los
-                            // lectores de pantalla.
-                            <div className="flex items-center gap-1">
-                              <button data-online-only="true"
-                                type="button"
-                                onClick={() => handleStartEdit(comment)}
-                                className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
-                                aria-label="Editar"
-                                title="Editar reseña"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(comment.id)}
-                                className="rounded-full p-2 text-white/45 transition hover:bg-red-500/15 hover:text-red-300"
-                                aria-label="Eliminar"
-                                title="Eliminar reseña"
-                              >
+                          {/* MISMOS BOTONES QUE EL HISTORIAL DE VISIONADO: solo
+                             icono, redondos y en gris tenue, con el color
+                             apareciendo al pasar por encima. Antes eran
+                             píldoras con rótulo ("Editar" / "Eliminar"), que
+                             pesaban mucho más en una fila que ya lleva fecha
+                             y etiqueta de spoiler.
+                          
+                             El rótulo desaparece, así que el nombre accesible
+                             pasa a `aria-label`: `title` solo produce el
+                             globo del ratón y no siempre lo anuncian los
+                             lectores de pantalla. */}
+                          <div className="flex items-center gap-1">
+                            <button data-online-only="true"
+                              type="button"
+                              onClick={() => handleStartEdit(comment)}
+                              className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
+                              aria-label="Editar"
+                              title="Editar reseña"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(comment.id)}
+                              disabled={deletingCommentId === comment.id}
+                              className="rounded-full p-2 text-white/45 transition hover:bg-red-500/15 hover:text-red-300 disabled:pointer-events-none"
+                              aria-label="Eliminar"
+                              title="Eliminar reseña"
+                            >
+                              {deletingCommentId === comment.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
                                 <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )}
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
 
@@ -376,6 +360,16 @@ export default function TraktCommentModal({
           </div>
         </div>
       </div>
+
+      <ListToggleConfirmModal
+        open={Boolean(confirmDeleteId)}
+        kind="comment"
+        active
+        itemTitle={title}
+        subject="este comentario"
+        onConfirm={handleConfirmDelete}
+        onClose={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

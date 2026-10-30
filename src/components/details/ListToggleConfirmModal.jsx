@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { BookmarkMinus, BookmarkPlus, Heart, HeartOff, X } from "lucide-react";
+import { BookmarkMinus, BookmarkPlus, Heart, HeartOff, Trash2, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 // Textos y colores por tipo. El color es el del botón de la fila de acciones:
 // rojo para favoritos y azul para pendientes (`activeColor` de LiquidButton).
+// `comment` es el borrado de un comentario propio (TraktCommentModal): solo
+// existe la variante `active` y el botón dice «Eliminar».
 const KINDS = {
   favorite: {
     addTitle: "Añadir a favoritos",
@@ -31,6 +33,15 @@ const KINDS = {
     confirmClass:
       "bg-blue-500/85 bg-gradient-to-b from-blue-400/90 to-blue-600/90 shadow-[0_0_18px_rgba(59,130,246,0.35),inset_0_1px_1px_rgba(255,255,255,0.25)] hover:from-blue-400 hover:to-blue-500 focus-visible:outline-blue-300",
   },
+  comment: {
+    removeTitle: "Eliminar comentario",
+    removeText: (subject) => `¿Quieres eliminar ${subject}? No se puede deshacer.`,
+    removeLabel: "Eliminar",
+    RemoveIcon: Trash2,
+    iconClass: "bg-red-500/15 text-red-300",
+    confirmClass:
+      "bg-red-500/85 bg-gradient-to-b from-red-400/90 to-red-600/90 shadow-[0_0_18px_rgba(239,68,68,0.35),inset_0_1px_1px_rgba(255,255,255,0.25)] hover:from-red-400 hover:to-red-500 focus-visible:outline-red-300",
+  },
 };
 
 /**
@@ -40,7 +51,9 @@ const KINDS = {
  * (ExternalLinksModal, AddToListModal…): velo oscurecido y desenfocado, panel de
  * cristal líquido `rounded-[2rem]` y cabecera de cristal.
  *
- * `kind`: "favorite" | "watchlist". `active`: el título YA está en la lista, así
+ * También confirma el borrado de un comentario propio (`kind="comment"`).
+ *
+ * `kind`: "favorite" | "watchlist" | "comment". `active`: el título YA está en la lista, así
  * que confirmar lo quita. `itemTitle` (opcional) va bajo el encabezado y
  * `subject` nombra lo que se marca en el texto («este título», «esta lista»…).
  */
@@ -140,7 +153,7 @@ export default function ListToggleConfirmModal({
               autoFocus
               className={`flex flex-1 items-center justify-center gap-2 rounded-2xl py-3 text-xs font-bold uppercase tracking-wide text-white transition active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${config.confirmClass}`}
             >
-              {active ? "Quitar" : "Añadir"}
+              {active ? config.removeLabel || "Quitar" : config.addLabel || "Añadir"}
             </button>
           </div>
         </div>
