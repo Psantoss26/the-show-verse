@@ -113,7 +113,7 @@ import {
   cleanupFullDetailsTransitionLayers,
   startFullDetailsTransition,
   backdropVariants,
-  panelVariants,
+  createPanelVariants,
   createPanelVariantsRight,
 } from "@/components/dashboard/detailPanelMotion";
 import {
@@ -603,6 +603,10 @@ export default function DetailModal({
   const isPresent = useIsPresent();
   const panelVariantsRight = useMemo(
     () => createPanelVariantsRight(prefersReducedMotion),
+    [prefersReducedMotion],
+  );
+  const panelVariantsCenter = useMemo(
+    () => createPanelVariants(prefersReducedMotion),
     [prefersReducedMotion],
   );
   const { session, account, preferences } = useAuth();
@@ -3839,7 +3843,7 @@ export default function DetailModal({
         // Con `switching` true → fundido cruzado (opacity); false → deslizar.
         // El panel SALIENTE recibe su `custom` del AnimatePresence del provider.
         custom={switching}
-        variants={isRightPlacement ? panelVariantsRight : panelVariants}
+        variants={isRightPlacement ? panelVariantsRight : panelVariantsCenter}
         initial={restoredFromHistory ? false : "hidden"}
         animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"

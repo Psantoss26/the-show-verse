@@ -6,9 +6,11 @@
 /* =============================== ANIMACIÓN =============================== */
 export const backdropVariants = {
   hidden: { opacity: 0 },
+  // El desenfoque acompaña al panel: entra y sale en el mismo tiempo que su
+  // recorrido, para que no se asiente antes ni se quede colgado al cerrar.
   visible: {
     opacity: 1,
-    transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.36, ease: [0.22, 1, 0.36, 1] },
   },
   navigate: {
     // El dim real se oculta durante la navegación; la capa temporal usa un
@@ -18,42 +20,67 @@ export const backdropVariants = {
   },
   exit: {
     opacity: 0,
-    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
+    transition: { duration: 0.32, ease: [0.25, 0.8, 0.25, 1] },
   },
 };
 
-// Panel anclado abajo: entra como una hoja de preview y sale hacia la ficha.
-// NO se anima `filter: blur` ni la opacidad de entrada: ambas propiedades
-// atenuaban el liquid glass durante la carga. La hoja conserva su movimiento
-// mediante y + scale, que se componen en GPU.
-export const panelVariants = {
-  hidden: { opacity: 1, y: 86, scale: 0.965 },
-  visible: {
+// Panel anclado abajo (modal centrado de los dashboards): es una hoja pegada al
+// borde inferior, así que entra subiendo desde FUERA de la pantalla y sale
+// bajando hasta salir de ella. Así el recorrido es continuo de principio a fin.
+//
+// Antes: muelle con `y` + `scale` (de 86 px y 0.965 a la identidad) y salida
+// con fundido. Medido fotograma a fotograma en el dashboard:
+// - Motion anima `y`/`scale` en el HILO PRINCIPAL, y el montaje de la ficha lo
+//   bloquea: el primer fotograma llegaba a los ~117 ms con el panel ya al 70 %
+//   del recorrido (salto de 86 a 24 px) y había otro parón de ~167 ms.
+// - El muelle dejaba una cola de ~250 ms moviéndose por debajo de 2 px, con
+//   rebote final: se leía como que el panel no acababa de asentarse.
+// - Aparecer ya a 86 px de su sitio y con opacidad 1 hacía que el canto
+//   superior "brotara" de la nada en vez de entrar.
+// - La salida fundía `opacity`, que convierte el panel en Backdrop Root: el
+//   cristal de las tarjetas se apagaba desde el primer fotograma del cierre.
+//
+// Ahora se anima el `transform` completo (WAAPI nativo, en el compositor, como
+// el drawer) con curvas sin rebote, y ni la entrada ni la salida tocan la
+// opacidad. `switching` (bajar/subir en la pila de previews con el modal ya
+// abierto) mantiene el fundido cruzado en el sitio: deslizar ahí dejaría ver
+// el fondo entre ficha y ficha.
+const SHEET_EASE_IN = [0.16, 1, 0.3, 1];
+// Salida: sale rápido y frena, por lo mismo que el drawer (ver
+// DRAWER_EASE_OUT): con un ease-in el panel parecía quieto y luego se esfumaba.
+const SHEET_EASE_OUT = [0.25, 0.8, 0.25, 1];
+const SHEET_EXIT_DURATION = 0.32;
+const sheetTransform = "translate3d(0, 0, 0)";
+const sheetHiddenTransform = "translate3d(0, 100%, 0)";
+export const createPanelVariants = (reduceMotion) => ({
+  hidden: (switching) => ({
+    opacity: switching && !reduceMotion ? 0 : 1,
+    transform: switching || reduceMotion ? sheetTransform : sheetHiddenTransform,
+  }),
+  visible: (switching) => ({
     opacity: 1,
-    y: 0,
-    scale: 1,
+    transform: sheetTransform,
     transition: {
-      type: "spring",
-      stiffness: 170,
-      damping: 22,
-      mass: 0.9,
+      duration: reduceMotion ? 0 : switching ? 0.2 : 0.44,
+      ease: switching ? [0.22, 1, 0.36, 1] : SHEET_EASE_IN,
     },
-  },
+  }),
   navigate: {
     // El panel real se oculta: el movimiento visible lo hace un clon inerte
     // montado en body, independiente del ciclo de render de App Router.
     opacity: 0,
-    y: 0,
-    scale: 1,
+    transform: sheetTransform,
     transition: { duration: 0 },
   },
-  exit: {
-    opacity: 0,
-    y: 52,
-    scale: 0.985,
-    transition: { duration: 0.18, ease: [0.4, 0, 1, 1] },
-  },
-};
+  exit: (switching) => ({
+    opacity: switching && !reduceMotion ? 0 : 1,
+    transform: switching || reduceMotion ? sheetTransform : sheetHiddenTransform,
+    transition: {
+      duration: reduceMotion ? 0 : switching ? 0.16 : SHEET_EXIT_DURATION,
+      ease: switching ? [0.4, 0, 1, 1] : SHEET_EASE_OUT,
+    },
+  }),
+});
 
 // Placement "right" (páginas de usuario): drawer anclado al borde derecho que
 // entra deslizándose desde la derecha hacia el centro, con el mismo ancho. Se

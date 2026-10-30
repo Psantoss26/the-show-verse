@@ -20,7 +20,7 @@ import {
   createPanelVariantsRight,
   DETAILS_ROUTE_REVEAL_MIN_MS,
   nextAnimationFrame,
-  panelVariants,
+  createPanelVariants,
   startFullDetailsTransition,
   wait,
   waitForDetailsRoot,
@@ -122,6 +122,7 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
       ? `Temporada ${item.seasonNumber}`
       : `Episodio ${item.seasonNumber}×${item.episodeNumber}`;
   const panelVariantsRight = useMemo(() => createPanelVariantsRight(reducedMotion), [reducedMotion]);
+  const panelVariantsCenter = useMemo(() => createPanelVariants(reducedMotion), [reducedMotion]);
   const [panelSettled, setPanelSettled] = useState(restoredFromHistory);
   const [loading, setLoading] = useState(true);
   const [navigating, setNavigating] = useState(false);
@@ -452,7 +453,7 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
         ref={panelRef}
         data-drawer-moving={right && (!panelSettled || !isPresent) ? "" : undefined}
         custom={switching}
-        variants={right ? panelVariantsRight : panelVariants}
+        variants={right ? panelVariantsRight : panelVariantsCenter}
         initial={restoredFromHistory ? false : "hidden"}
         animate={navigating ? "navigate" : "visible"}
         exit="exit"
