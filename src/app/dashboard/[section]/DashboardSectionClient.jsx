@@ -915,7 +915,8 @@ export default function DashboardSectionClient({
   const [sortBy, setSortBy] = useState("rank");
   const [groupBy, setGroupBy] = useState("none");
   // Por defecto, la rejilla de Favoritos.
-  const [viewMode, setViewMode] = useState(initialViewMode || "grid");
+  // Sin vista guardada: la cuadrícula compacta, la que más títulos pone por fila.
+  const [viewMode, setViewMode] = useState(initialViewMode || "compact");
   const [imageMode, setImageMode] = useState(initialImageMode || "poster");
   // Entrada (framer) de los bloques de grupo, que solo se montan al agrupar,
   // después de abrir la página: nunca sobre lo que entrega el servidor, que
@@ -957,15 +958,26 @@ export default function DashboardSectionClient({
     }
   }, [initialImageMode, initialViewMode]);
 
-  useEffect(() => {
+  // Se guarda solo al ELEGIR una vista. Antes se escribía en cada visita, así
+  // que la vista por defecto quedaba guardada como si el usuario la hubiera
+  // elegido y un cambio de valor por defecto ya no le llegaba.
+  const saveViewPrefs = (nextView, nextImage) => {
     try {
-      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
-      window.localStorage.setItem(IMAGE_MODE_STORAGE_KEY, imageMode);
+      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, nextView);
+      window.localStorage.setItem(IMAGE_MODE_STORAGE_KEY, nextImage);
     } catch {
       // Sin almacenamiento: queda la cookie.
     }
-    writeSectionViewPrefsCookie(viewMode, imageMode);
-  }, [imageMode, viewMode]);
+    writeSectionViewPrefsCookie(nextView, nextImage);
+  };
+  const chooseViewMode = (mode) => {
+    setViewMode(mode);
+    saveViewPrefs(mode, imageMode);
+  };
+  const chooseImageMode = (mode) => {
+    setImageMode(mode);
+    saveViewPrefs(viewMode, mode);
+  };
 
   useEffect(() => {
     if (serverData) return undefined;
@@ -1353,12 +1365,12 @@ export default function DashboardSectionClient({
             </Dropdown>
             <SheetOptionGroup label="Vista" icon={LayoutGrid}>
               {VIEW_MODE_BUTTONS.map(([mode, Icon, label]) => (
-                <SheetOption key={mode} icon={Icon} active={viewMode === mode} onClick={() => setViewMode(mode)}>
+                <SheetOption key={mode} icon={Icon} active={viewMode === mode} onClick={() => chooseViewMode(mode)}>
                   {label.replace(/^Vista /, "").replace(/^./, (c) => c.toUpperCase())}
                 </SheetOption>
               ))}
             </SheetOptionGroup>
-            <ImageModeSheetGroup value={imageMode} onChange={setImageMode} />
+            <ImageModeSheetGroup value={imageMode} onChange={chooseImageMode} />
           </MobileOptionsSheet>
 
           <div
@@ -1402,7 +1414,7 @@ export default function DashboardSectionClient({
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => setViewMode(mode)}
+                  onClick={() => chooseViewMode(mode)}
                   aria-label={label}
                   aria-pressed={viewMode === mode}
                   className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
@@ -1419,7 +1431,7 @@ export default function DashboardSectionClient({
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => setImageMode(mode)}
+                  onClick={() => chooseImageMode(mode)}
                   aria-label={label}
                   aria-pressed={imageMode === mode}
                   className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${

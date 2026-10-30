@@ -272,7 +272,7 @@ CREATE INDEX idx_tmdb_cache_expires ON tmdb_cache(expires_at);
 ```sql
 CREATE TABLE user_preferences (
   user_id        UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  default_view   TEXT DEFAULT 'grid',          -- 'grid' | 'list' | 'compact'
+  default_view   TEXT DEFAULT 'compact',       -- 'grid' | 'list' | 'compact'
   language       TEXT DEFAULT 'es-ES',
   adult_content  BOOLEAN DEFAULT false,
   notification_settings JSONB DEFAULT '{}',

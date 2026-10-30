@@ -136,7 +136,7 @@ function profileFavoritesByType(items) {
 
 function normalizePreferences(row) {
   return {
-    defaultView: row?.defaultView || 'grid',
+    defaultView: row?.defaultView || 'compact',
     language: row?.language || 'es-ES',
     adultContent: Boolean(row?.adultContent),
     notificationSettings: row?.notificationSettings || {},
@@ -162,7 +162,7 @@ async function ensurePreferences(userId) {
 
   return created || {
     userId,
-    defaultView: 'grid',
+    defaultView: 'compact',
     language: 'es-ES',
     adultContent: false,
     notificationSettings: {},
@@ -282,7 +282,7 @@ export default async function usersRoutes(fastify) {
     const current = await ensurePreferences(req.user.id);
     const values = {
       userId: req.user.id,
-      defaultView: next.defaultView ?? current.defaultView ?? 'grid',
+      defaultView: next.defaultView ?? current.defaultView ?? 'compact',
       language: next.language ?? current.language ?? 'es-ES',
       adultContent: next.adultContent ?? Boolean(current.adultContent),
       notificationSettings: next.notificationSettings ?? current.notificationSettings ?? {},

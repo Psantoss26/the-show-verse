@@ -26,7 +26,9 @@ const LEGACY_STORAGE_KEYS = ["tmdb_session", "tmdb_session_id", "tmdb_account"];
 const COMPAT_SESSION_VALUE = "showverse";
 
 const DEFAULT_PREFERENCES = {
-  defaultView: "grid",
+  // Vista de las páginas de usuario sin una propia guardada: la cuadrícula
+  // compacta (la que más títulos pone por fila).
+  defaultView: "compact",
   adultContent: false,
   notificationSettings: {
     weeklySummary: false,

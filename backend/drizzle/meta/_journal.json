@@ -204,6 +204,13 @@
       "when": 1793138269776,
       "tag": "0028_artwork_votes",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793363284098,
+      "tag": "0029_default_view_compact",
+      "breakpoints": true
     }
   ]
 }

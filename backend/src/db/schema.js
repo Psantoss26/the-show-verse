@@ -266,7 +266,8 @@ export const tmdbCache = pgTable('tmdb_cache', {
 // ─────────────────────────────────────────────
 export const userPreferences = pgTable('user_preferences', {
   userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
-  defaultView: text('default_view').default('grid'),      // 'grid' | 'list' | 'compact'
+  // Sin elección: la cuadrícula compacta (la que más títulos pone por fila).
+  defaultView: text('default_view').default('compact'),   // 'grid' | 'list' | 'compact'
   language: text('language').default('es-ES'),
   adultContent: boolean('adult_content').default(false),
   notificationSettings: jsonb('notification_settings').default({}),

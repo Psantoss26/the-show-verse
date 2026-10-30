@@ -125,10 +125,11 @@ const cardVariants = {
 };
 const WATCHLIST_VIEW_MODES = new Set(["list", "grid", "compact"]);
 
+// Sin vista guardada: la cuadrícula compacta, la que más títulos pone por fila.
 function readInitialWatchlistViewMode() {
-  if (typeof window === "undefined") return "grid";
+  if (typeof window === "undefined") return "compact";
   const saved = window.localStorage.getItem("showverse:watchlist:viewMode");
-  return WATCHLIST_VIEW_MODES.has(saved) ? saved : "grid";
+  return WATCHLIST_VIEW_MODES.has(saved) ? saved : "compact";
 }
 
 function readInitialWatchlistImageMode() {

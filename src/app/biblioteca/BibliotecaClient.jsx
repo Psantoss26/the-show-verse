@@ -949,7 +949,8 @@ export default function BibliotecaClient() {
   // cliente) para no romper la hidratación —los toggles y las columnas de la
   // rejilla dependen de estos valores—. El valor guardado se aplica en un layout
   // effect ANTES del primer pintado, así no hay ni parpadeo ni mismatch.
-  const [viewMode, setViewModeState] = useState("grid");
+  // Sin vista guardada: la cuadrícula compacta, la que más títulos pone por fila.
+  const [viewMode, setViewModeState] = useState("compact");
   const [imageMode, setImageMode] = useState("poster");
   // Marca si el usuario ya fijó una vista propia: en ese caso la preferencia
   // global NO debe sobrescribirla de forma asíncrona.

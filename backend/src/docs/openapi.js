@@ -241,7 +241,7 @@ export const openApiDocument = {
       UserPreferences: {
         type: 'object',
         properties: {
-          defaultView: { type: 'string', enum: ['grid', 'list', 'compact'], default: 'grid' },
+          defaultView: { type: 'string', enum: ['grid', 'list', 'compact'], default: 'compact' },
           language: { type: 'string', example: 'es-ES' },
           adultContent: { type: 'boolean', default: false },
           notificationSettings: { type: 'object', additionalProperties: true },

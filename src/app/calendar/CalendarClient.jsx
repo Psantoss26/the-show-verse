@@ -1051,7 +1051,8 @@ export default function CalendarClient({
   const [cardView, setCardView, seedCardView] = useStoredSetting(
     "showverse:calendar:cardView",
     CARD_VIEWS,
-    "grid",
+    // Sin vista guardada: la compacta, la que más tarjetas pone por fila.
+    "compact",
     "cardView",
     initialSettings?.cardView,
   );

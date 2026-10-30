@@ -466,7 +466,9 @@ function saveProfileView(profileKey, view) {
 function getSectionPreference(cacheKey, section, profileKey) {
   const usesDiaryDefaults = section === "watched";
   const current = profileSectionPreferences.get(cacheKey);
-  const fallbackView = section === "activity" || usesDiaryDefaults ? "list" : "grid";
+  // Secciones de pósters sin vista guardada: la cuadrícula compacta, la que más
+  // títulos pone por fila. Actividad y Vistos, en lista.
+  const fallbackView = section === "activity" || usesDiaryDefaults ? "list" : "compact";
   const sharedView = profileViewPreferences.get(profileKey);
   const view = supportsProfileView(section, sharedView)
     ? sharedView

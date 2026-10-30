@@ -137,10 +137,11 @@ const FAVORITES_INITIAL_RENDER_LIMIT = 24;
 const FAVORITES_RENDER_CHUNK_SIZE = 36;
 const FAVORITES_VIEW_MODES = new Set(["list", "grid", "compact"]);
 
+// Sin vista guardada: la cuadrícula compacta, la que más títulos pone por fila.
 function readInitialFavoritesViewMode() {
-  if (typeof window === "undefined") return "grid";
+  if (typeof window === "undefined") return "compact";
   const saved = window.localStorage.getItem("showverse:favorites:viewMode");
-  return FAVORITES_VIEW_MODES.has(saved) ? saved : "grid";
+  return FAVORITES_VIEW_MODES.has(saved) ? saved : "compact";
 }
 
 function readInitialFavoritesImageMode() {

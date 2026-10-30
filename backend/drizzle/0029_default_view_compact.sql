@@ -1,0 +1,1 @@
+ALTER TABLE "user_preferences" ALTER COLUMN "default_view" SET DEFAULT 'compact';
