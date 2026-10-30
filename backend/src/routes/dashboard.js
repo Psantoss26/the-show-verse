@@ -2,7 +2,7 @@
 // GET /v1/dashboard/:surface — assembles dashboard rows for home, movies, series surfaces.
 
 import { SURFACES, personalizedRowDefs } from '../dashboard/surfaces.js';
-import { getPool, dedupeCards } from '../dashboard/pools.js';
+import { getPool, dedupeCards, TOP_RATED_RANKING_SIZE } from '../dashboard/pools.js';
 import { getUserRecommendations } from '../dashboard/recommendations.js';
 import { loadLibrary, libraryBasisHash, dislikedIds } from '../dashboard/library.js';
 import { rankRowItems, MIXED_GENRES, cardKey, stableHash } from '../dashboard/ranking.js';
@@ -71,6 +71,24 @@ const SECTION_ROW_ITEMS = 60;
 
 const isValidCard = (card) =>
   !!card && ['movie', 'tv'].includes(card.mediaType) && Number(card.tmdbId) > 0;
+
+/**
+ * "Mejor valoradas" de Inicio: los TOP_RATED_RANKING_SIZE títulos con mejor
+ * nota de TMDB (más de 8000 votos, ver el pool `top_rated_ranking`), películas
+ * y series en una sola lista por nota. Es un ranking: se enseña entero y en su
+ * orden, sin el reparto entre filas ni la deduplicación con las demás (que le
+ * quitaban los que ya salían en Tendencias o Populares). Solo se saltan los que
+ * el usuario ha valorado mal (`excluded`), como en el resto del dashboard; el
+ * siguiente del ranking ocupa su hueco.
+ */
+async function buildTopRatedRanking(pool, excluded = new Set()) {
+  const [movie, tv] = await Promise.all(['movie', 'tv'].map((mt) =>
+    pool('top_rated_ranking', mt).catch(() => [])));
+  return dedupeCards([...movie, ...tv].filter((card) => isValidCard(card) && !excluded.has(cardKey(card))))
+    .sort((a, b) => (b.voteAverage || 0) - (a.voteAverage || 0)
+      || (b.voteCount || 0) - (a.voteCount || 0))
+    .slice(0, TOP_RATED_RANKING_SIZE);
+}
 
 /**
  * Lista completa de una sección: la usan su página dedicada
@@ -277,7 +295,8 @@ export default async function dashboardRoutes(fastify, options = {}) {
     // fila es el principio de la MISMA lista (`buildSectionList`), en el mismo
     // orden y con SECTION_ROW_ITEMS títulos. No entran en el reparto equitativo
     // (que recortaría y saltaría títulos); las demás filas se deduplican
-    // contra ellas para no repetir lo que ya enseñan.
+    // contra ellas para no repetir lo que ya enseñan. «Mejor valoradas» va
+    // igual, con su ranking completo (`buildTopRatedRanking`).
     const sectionRows = new Map();
     if (surfaceKey === 'home') {
       const lists = await Promise.all(specs.filter((spec) => SECTION_KEYS.has(spec.key)).map(async (spec) => {
@@ -290,6 +309,10 @@ export default async function dashboardRoutes(fastify, options = {}) {
       }));
       for (const entry of lists) {
         if (entry && entry[1].length >= DASHBOARD_MIN_ITEMS_PER_ROW) sectionRows.set(entry[0], entry[1]);
+      }
+      if (specs.some((spec) => spec.key === 'top_rated')) {
+        const ranking = await buildTopRatedRanking(pool, dislikedIds(lib));
+        if (ranking.length) sectionRows.set('top_rated', ranking);
       }
     }
     const sectionIds = new Set([...sectionRows.values()].flat().map(cardKey));

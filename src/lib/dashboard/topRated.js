@@ -1,3 +1,9 @@
+// «Mejor valoradas» de Inicio: los 20 títulos (películas y series juntas) con
+// mejor nota de TMDb entre los que tienen MÁS de 8000 votos. Mismo criterio que
+// el pool `top_rated_ranking` del motor (backend/src/dashboard/pools.js).
+export const TOP_RATED_MIN_VOTES = 8001;
+export const TOP_RATED_SIZE = 20;
+
 function normalizeTopRatedItem(item, mediaType) {
   if (!item?.id) return null;
   return {

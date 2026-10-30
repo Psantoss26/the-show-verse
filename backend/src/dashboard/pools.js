@@ -53,6 +53,10 @@ const ACCLAIMED_VOTES = { movie: 3000, tv: 400 };
 // Con menos, la nota media de TMDB es demasiado volátil y la sección se
 // llenaba de títulos de nicho con notas infladas por pocas muestras.
 export const TOP_RATED_MIN_VOTES = 5001;
+// "Mejor valoradas" de Inicio: los 20 títulos (películas y series juntas) con
+// mejor nota de TMDB entre los que tienen MÁS de 8000 votos.
+export const TOP_RATED_RANKING_MIN_VOTES = 8001;
+export const TOP_RATED_RANKING_SIZE = 20;
 const BLOCKBUSTER_VOTES = { movie: 5000, tv: 800 };
 const GEM_VOTES = {
   movie: { gte: 800, lte: 6000 },
@@ -199,6 +203,21 @@ for (const mediaType of ['movie', 'tv']) {
       'vote_count.gte': TOP_RATED_MIN_VOTES,
     }), 6), mediaType, TOP_RATED_MIN_VOTES),
     { version: 'votes5000' },
+  );
+}
+
+// top_rated_ranking (7d) — la fila "Mejor valoradas" de Inicio: el ranking de
+// TMDB tal cual (nota media, más de 8000 votos), SIN las reglas de contenido de
+// `refine`, que relegaban o quitaban animación y anime (Rick y Morty, El viaje
+// de Chihiro…). Con una página por tipo basta: la ruta mezcla ambos y se queda
+// con los TOP_RATED_RANKING_SIZE primeros.
+for (const mediaType of ['movie', 'tv']) {
+  addPool('top_rated_ranking', mediaType, TTL_7D, async () =>
+    dedupeCards(await discoverPages(mediaType, {
+      sort_by: 'vote_average.desc',
+      'vote_count.gte': TOP_RATED_RANKING_MIN_VOTES,
+    }, 2)).filter((card) => (card.voteCount || 0) >= TOP_RATED_RANKING_MIN_VOTES),
+    { version: 'votes8000' },
   );
 }
 

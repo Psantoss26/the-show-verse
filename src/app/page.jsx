@@ -19,7 +19,11 @@ import {
   FEATURED_HERO_SIZE,
 } from "@/lib/dashboard/featured";
 import { fetchFeaturedSources } from "@/lib/dashboard/featuredSources";
-import { combineTopRatedItems } from "@/lib/dashboard/topRated";
+import {
+  combineTopRatedItems,
+  TOP_RATED_MIN_VOTES,
+  TOP_RATED_SIZE,
+} from "@/lib/dashboard/topRated";
 
 export const dynamic = "force-static";
 export const revalidate = 3600; // 1 hora — reduce cold starts en Vercel
@@ -90,8 +94,8 @@ async function getDashboardData() {
       popularTV,
       featuredSources,
     ] = await Promise.all([
-      fetchTopRatedMovies(5001),
-      fetchTopRatedTV(5001),
+      fetchTopRatedMovies(TOP_RATED_MIN_VOTES),
+      fetchTopRatedTV(TOP_RATED_MIN_VOTES),
       discoverMovies({
         "vote_average.gte": 7.5,
         "vote_count.gte": 2000,
@@ -113,25 +117,14 @@ async function getDashboardData() {
       fetchFeaturedSources(),
     ]);
 
-    // Top 20 películas y Top 20 series — se usan los backdrop_path del endpoint de lista.
-    // La mejora a backdrop EN se hace client-side en TopRatedHero (ya implementado).
-    const topRatedMoviesSSR = topRatedMovies
-      .map((m) => ({ ...m, media_type: "movie" }))
-      .sort((a, b) => (
-        (b.vote_average || 0) - (a.vote_average || 0)
-      ));
-    const balancedTopRatedMoviesSSR = balanceSoftLimitedDashboardContent(topRatedMoviesSSR, "movie")
-      .slice(0, 28);
-
-    const topRatedTVSSR = topRatedTV
-      .map((s) => ({ ...s, media_type: "tv" }))
-      .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
-    const balancedTopRatedTVSSR = balanceSoftLimitedDashboardContent(topRatedTVSSR, "tv")
-      .slice(0, 28);
+    // Respaldo de «Mejor valoradas» si el motor no responde: el mismo ranking
+    // que su fila (los 20 de mejor nota con más de 8000 votos, películas y
+    // series juntas), sin reglas de contenido que lo recorten.
+    // La mejora a backdrop EN se hace client-side en TopRatedHero.
     const topRatedSSR = combineTopRatedItems(
-      balancedTopRatedMoviesSSR,
-      balancedTopRatedTVSSR,
-    );
+      topRatedMovies.filter((m) => (m?.vote_count || 0) >= TOP_RATED_MIN_VOTES),
+      topRatedTV.filter((s) => (s?.vote_count || 0) >= TOP_RATED_MIN_VOTES),
+    ).slice(0, TOP_RATED_SIZE);
 
     const awardedSSR = curateList(awarded, {
       minVotes: 1200,

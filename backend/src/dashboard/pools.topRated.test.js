@@ -56,3 +56,48 @@ test('"Mejor valoradas" solo admite títulos con más de 5000 votos', async (t) 
     assert.ok(items.every((card) => card.voteCount > 5000));
   }
 });
+
+test('"Mejor valoradas" de Inicio: ranking de TMDB con más de 8000 votos, sin reglas de contenido', async (t) => {
+  const originalKey = process.env.TMDB_API_KEY;
+  process.env.TMDB_API_KEY = 'test-key';
+  t.after(() => {
+    if (originalKey === undefined) delete process.env.TMDB_API_KEY;
+    else process.env.TMDB_API_KEY = originalKey;
+  });
+  const { POOL_DEFS, TOP_RATED_RANKING_MIN_VOTES, poolStorageKey } = await import(
+    './pools.js?top-rated-ranking-test'
+  );
+
+  assert.equal(TOP_RATED_RANKING_MIN_VOTES, 8001);
+
+  const requests = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    requests.push(url);
+    const results =
+      Number(url.searchParams.get('page')) === 1
+        ? [
+            { id: 1, name: 'Animación japonesa', poster_path: '/a.jpg', vote_average: 8.5, vote_count: 19000, genre_ids: [16, 14], original_language: 'ja' },
+            { id: 2, name: 'Justo 8001', poster_path: '/b.jpg', vote_average: 8.4, vote_count: 8001, genre_ids: [18], original_language: 'en' },
+            { id: 3, name: 'Justo 8000', poster_path: '/c.jpg', vote_average: 9.0, vote_count: 8000, genre_ids: [18], original_language: 'en' },
+          ]
+        : [];
+    return { ok: true, json: async () => ({ results }) };
+  });
+
+  for (const mediaType of ['movie', 'tv']) {
+    const def = POOL_DEFS.get(`top_rated_ranking:${mediaType}`);
+    assert.equal(poolStorageKey(def), 'top_rated_ranking:v2.votes8000');
+
+    requests.length = 0;
+    const items = await def.build();
+
+    assert.ok(requests.length > 0);
+    for (const url of requests) {
+      assert.match(url.pathname, new RegExp(`/discover/${mediaType}$`));
+      assert.equal(url.searchParams.get('vote_count.gte'), '8001');
+      assert.equal(url.searchParams.get('sort_by'), 'vote_average.desc');
+      assert.equal(url.searchParams.get('without_genres'), null);
+    }
+    assert.deepEqual(items.map((card) => card.tmdbId), [1, 2]);
+  }
+});

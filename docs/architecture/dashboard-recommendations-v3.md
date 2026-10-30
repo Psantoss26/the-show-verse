@@ -42,8 +42,10 @@ y al 10 % en «Porque te gustó», calculado sobre la longitud real.
 Los encabezados describen los datos disponibles: «Populares en streaming en
 España» indica disponibilidad regional y popularidad TMDb, no audiencia medida
  en España; «Películas con grandes valoraciones» no presupone premios; nostalgia
-explicita 1995–2012 y estrenos incluye próximos lanzamientos. Inicio utiliza la
-misma fila del motor en su bloque de mejor valoradas para respetar la deduplicación.
+explicita 1995–2012 y estrenos incluye próximos lanzamientos. El bloque de mejor
+valoradas de Inicio es un ranking fijo: los 20 títulos de mejor nota de TMDb con
+más de 8000 votos (pool `top_rated_ranking`), sin reparto ni deduplicación con las
+demás filas.
 
 ## Caché y fallos
 

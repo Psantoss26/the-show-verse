@@ -159,7 +159,7 @@ user_recommendations (
 | ----------------------------- | ------ | ------------------------------------------------ |
 | `trending`                    | 12 h   | cambia a menudo                                  |
 | `popular`, `new_releases`, `region_top` | 24 h | actualidad diaria                       |
-| `top_rated`, `acclaimed`, `blockbusters`, `hidden_gems`, `genre:*` | 7 días | estable |
+| `top_rated`, `top_rated_ranking`, `acclaimed`, `blockbusters`, `hidden_gems`, `genre:*` | 7 días | estable |
 | `decade:*`                    | 30 días | catálogo histórico, casi inmutable              |
 | `user_recommendations`        | 24 h **y** `basis_hash` coincide | recalcular si cambia la biblioteca |
 
@@ -264,7 +264,8 @@ ASIAN_MIN_KEEP  = 3     // se conservan al menos los 3 más conocidos
 | -------------- | ---------------------------------------- | ------- | --------------------------------------- |
 | `trending`     | `/trending/{type}/week`                  | **5**   | `MIN_VOTES` (pool profundo, ver nota)   |
 | `popular`      | `/{type}/popular`                        | **7**   | `MIN_VOTES` (pool profundo, ver nota)   |
-| `top_rated`    | `/{type}/top_rated`                      | 3       | `MIN_VOTES`                             |
+| `top_rated`    | discover `vote_average.desc`             | 6       | `TOP_RATED_MIN_VOTES` (más de 5000)     |
+| `top_rated_ranking` | discover `vote_average.desc`        | 2       | más de 8000 votos (`TOP_RATED_RANKING_MIN_VOTES`), **sin** reglas de contenido ni cap asiático |
 | `acclaimed`    | discover `vote_average.desc`, `>=7.5`    | 3       | `ACCLAIMED_VOTES`                       |
 | `blockbusters` | discover `popularity.desc`               | 3       | `BLOCKBUSTER_VOTES`                     |
 | `hidden_gems`  | discover `vote_average.desc`, `>=7.5`    | 3       | `GEM_VOTES` (banda `gte`..`lte`)        |
@@ -273,8 +274,11 @@ ASIAN_MIN_KEEP  = 3     // se conservan al menos los 3 más conocidos
 | `genre:{id}`   | discover `with_genres`, `popularity.desc`| **4**   | `GENRE_VOTES`                           |
 | `decade:{año}` | discover por rango de fechas de la década| **5**   | `DECADE_VOTES`                          |
 
-> Todos los pools pasan por las reglas de contenido (§4.1) y el cap asiático
-> (§4.3). Las peticiones `discover` de **TV** llevan además `without_genres` con
+> Todos los pools salvo `top_rated_ranking` pasan por las reglas de contenido (§4.1) y el cap asiático
+> (§4.3). `top_rated_ranking` alimenta solo «Mejor valoradas» de Inicio: la ruta
+> mezcla películas y series, ordena por nota (y votos) y enseña los 20 primeros
+> tal cual, fuera del reparto entre filas y sin deduplicar contra las demás;
+> solo se saltan los que el usuario ha valorado mal (`buildTopRatedRanking`). Las peticiones `discover` de **TV** llevan además `without_genres` con
 > los géneros excluidos.
 >
 > **Nota — pools profundos:** `trending` (5), `popular` (7), `genre:*` (4) y

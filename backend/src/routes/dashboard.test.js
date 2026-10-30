@@ -28,13 +28,15 @@ async function appFor({ lib = emptyLibrary, fail = false } = {}) {
 }
 // En Inicio, las filas con página dedicada (Recomendaciones, Más esperadas y
 // Tendencias) llevan los 60 primeros de su lista; el resto, hasta 32.
+// «Mejor valoradas» es un ranking fijo de 20 que tampoco entra en el reparto.
 const SECTION_ROWS = new Set(['for_you', 'anticipated', 'trending']);
+const FIXED_ROWS = new Set([...SECTION_ROWS, 'top_rated']);
 function verifyRows(body, surface) {
   assert.ok(body.rows.length >= 12, `${surface}: ${body.rows.length} rows`);
   const used = new Map();
   body.rows.forEach((row, index) => {
-    const isSectionRow = surface === 'home' && SECTION_ROWS.has(row.key);
-    const max = isSectionRow ? 60 : 32;
+    const isSectionRow = surface === 'home' && FIXED_ROWS.has(row.key);
+    const max = surface === 'home' && SECTION_ROWS.has(row.key) ? 60 : 32;
     assert.ok(row.items.length >= 12 && row.items.length <= max, `${row.key}: ${row.items.length}`);
     // Las filas de sección son su lista verbatim (ver el test de abajo, que
     // además exige que las demás no repitan sus títulos): no cuentan aquí.
@@ -192,9 +194,34 @@ for (const authenticated of [false, true]) {
       keysOf(row.items).forEach(k => pinned.add(k));
     }
     assert.equal(home.rows.some(r => r.key === 'for_you'), authenticated);
-    for (const row of home.rows.filter(r => !expected.includes(r.key))) {
+    for (const row of home.rows.filter(r => !expected.includes(r.key) && r.key !== 'top_rated')) {
       assert.ok(row.items.every(c => !pinned.has(`${c.mediaType}:${c.tmdbId}`)), `${row.key} repeats a section title`);
       assert.ok(row.items.length <= 32);
     }
   });
 }
+
+test('home «Mejor valoradas»: the 20 best rated titles, movies and series together, verbatim', async t => {
+  const ranked = { movie: [card(11, 'movie', { voteAverage: 8.7 }), card(12, 'movie', { voteAverage: 8.6 }),
+    ...Array.from({ length: 20 }, (_, i) => card(100 + i, 'movie', { voteAverage: 8 - i / 100 }))],
+  tv: [card(21, 'tv', { voteAverage: 8.9 }), card(22, 'tv', { voteAverage: 8.7, voteCount: 9000 }), card(23, 'tv', { voteAverage: 8.5 })] };
+  const lib = { ...emptyLibrary, ratings: [{ tmdbId: 12, mediaType: 'movie', rating: 3 }] };
+  const app = Fastify();
+  app.decorateRequest('user', null);
+  app.addHook('preHandler', async req => { if (req.headers['x-test-user']) req.user = { id: req.headers['x-test-user'] }; });
+  await app.register(dashboardRoutes, { prefix: '/dashboard', sources: {
+    loadLibrary: async () => lib,
+    getUserRecommendations: async () => [],
+    getPool: async (key, mt) => key === 'top_rated_ranking' ? ranked[mt]
+      : Array.from({ length: 145 }, (_, i) => card(i + 1, mt)),
+  } });
+  t.after(() => app.close());
+  for (const headers of [{}, { 'x-test-user': 'profile-a' }]) {
+    const row = (await app.inject({ url: '/dashboard/home', headers })).json().rows.find(r => r.key === 'top_rated');
+    const keys = row.items.map(c => `${c.mediaType}:${c.tmdbId}`);
+    assert.equal(keys.length, 20);
+    // Por nota y, a igual nota, por votos; lo valorado mal por el usuario se salta.
+    const head = headers['x-test-user'] ? ['tv:21', 'tv:22', 'movie:11', 'tv:23'] : ['tv:21', 'tv:22', 'movie:11', 'movie:12', 'tv:23'];
+    assert.deepEqual(keys.slice(0, head.length), head);
+  }
+});
