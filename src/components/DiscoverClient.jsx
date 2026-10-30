@@ -690,6 +690,8 @@ const TMDB_MAX_PAGES = 500;
 const FILL_AHEAD_PX = 800;
 // Tope de páginas de TMDb por tanda (filtros muy estrictos, p. ej. IMDb).
 const MAX_PAGES_PER_BATCH = 8;
+// Retraso de la entrada de la barra de filtros desde que monta la página.
+const TOOLBAR_ENTRANCE_DELAY_MS = 500;
 // Tope mientras la tanda no ha encontrado ningún título.
 const MAX_PAGES_EMPTY_BATCH = 40;
 
@@ -1073,6 +1075,9 @@ export default function DiscoverClient() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [genresAll, setGenresAll] = useState([]);
+  // Catálogo de TMDb (géneros, plataformas, certificaciones) ya recibido una
+  // vez: con él las píldoras enseñan los nombres y no «1 plataformas».
+  const [metaReady, setMetaReady] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [certsAll, setCertsAll] = useState([]);
   const [selectedCerts, setSelectedCerts] = useState([]);
@@ -1299,6 +1304,8 @@ export default function DiscoverClient() {
         }
       } catch (e) {
         if (!isAbortError(e) && !ac.signal.aborted) console.error(e);
+      } finally {
+        if (!cancelled) setMetaReady(true);
       }
     }
     loadMeta();
@@ -1813,6 +1820,35 @@ export default function DiscoverClient() {
   const entranceVisibleCount = estimateUserPageEntranceCount({ viewMode, imageMode });
 
   const statsLoading = !filtersReady || (loading && totalResults == null);
+
+  // La barra y las píldoras de filtros entran JUNTAS y ya en su estado final:
+  // con los filtros guardados restaurados y, si hay plataformas o géneros,
+  // con sus nombres. Antes las píldoras salían de golpe antes que la barra
+  // (que entra con fundido) y con etiquetas provisionales que luego cambiaban.
+  // Entran a los 0,5 s de montar; si el catálogo tarda más, en cuanto llega.
+  // Las tarjetas tampoco se montan antes (su entrada va con la barra).
+  const toolbarReady =
+    filtersReady &&
+    (metaReady || (selectedProviders.length === 0 && selectedGenres.length === 0));
+  const mountedAtRef = useRef(0);
+  useEffect(() => {
+    mountedAtRef.current = performance.now();
+  }, []);
+  const [toolbarShown, setToolbarShown] = useState(false);
+  useEffect(() => {
+    if (!toolbarReady || toolbarShown) return undefined;
+    const elapsedMs = performance.now() - mountedAtRef.current;
+    const timer = setTimeout(
+      () => setToolbarShown(true),
+      Math.max(0, TOOLBAR_ENTRANCE_DELAY_MS - elapsedMs),
+    );
+    return () => clearTimeout(timer);
+  }, [toolbarReady, toolbarShown]);
+  const toolbarMotion = {
+    initial: { opacity: 0 },
+    animate: { opacity: toolbarShown ? 1 : 0 },
+    transition: { duration: 0.4 },
+  };
   const sortLabel = SORT_OPTIONS.find((o) => o.id === sortPreset)?.label || SORT_OPTIONS[0].label;
   const contentLabel = CONTENT_OPTIONS.find((o) => o.id === content)?.label || "Películas";
 
@@ -1981,9 +2017,7 @@ export default function DiscoverClient() {
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
           className="sv-toolbar-rise sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] mb-6 space-y-1 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, delay: 0.5 }}
+          {...toolbarMotion}
         >
           {/* Mobile: search + toggle */}
           <div className="relative z-10 flex gap-2 lg:hidden">
@@ -2032,7 +2066,9 @@ export default function DiscoverClient() {
           </div>
         </motion.div>
 
-        {/* Filtros avanzados activos */}
+        {/* Filtros avanzados activos: entran con la barra (siempre montado,
+            así quitar o añadir filtros después no repite la entrada). */}
+        <motion.div {...toolbarMotion}>
         {activeFilters.length > 0 || ignoredBySearch ? (
           <div className="-mt-2 mb-5 flex flex-wrap items-center gap-2">
             {activeFilters.map((chip) => (
@@ -2064,6 +2100,7 @@ export default function DiscoverClient() {
             ) : null}
           </div>
         ) : null}
+        </motion.div>
 
         <main className="relative min-h-[50vh]">
           {error && items.length === 0 && (
@@ -2074,7 +2111,7 @@ export default function DiscoverClient() {
             </div>
           )}
 
-          {!loading && !error && items.length === 0 && (
+          {toolbarShown && !loading && !error && items.length === 0 && (
             <div className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
               <Compass className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
               <p className="text-zinc-500 font-medium">No se encontraron resultados.</p>
@@ -2091,7 +2128,7 @@ export default function DiscoverClient() {
             </div>
           )}
 
-          {items.length > 0 && (
+          {toolbarShown && items.length > 0 && (
             <div>
               <FlipReorder
                 key={`grid-${viewMode}-${imageMode}`}
