@@ -796,6 +796,24 @@ function itemDate(item) {
   return item?.release_date || item?.first_air_date || "";
 }
 
+// Texto comparable para buscar por título: sin mayúsculas ni tildes.
+function normalizeTitleText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+// ¿El título (en español o el original) contiene lo buscado?
+function matchesTitleQuery(item, query) {
+  const needle = normalizeTitleText(query);
+  if (!needle) return true;
+  return [item?.title, item?.name, item?.original_title, item?.original_name].some(
+    (text) => normalizeTitleText(text).includes(needle),
+  );
+}
+
 function DiscoverHoverIndicator({ type, tmdbScore, imdbScore, compact = false }) {
   const normalizedTmdbScore = Number(tmdbScore);
   const normalizedImdbScore = Number(imdbScore);
@@ -1433,6 +1451,19 @@ export default function DiscoverClient() {
   //
   // Una página de TMDb, con los filtros que se aplican en el cliente (vistas,
   // IMDb y, en la búsqueda por título, los que /search no admite).
+  // Filtros que /search no sabe aplicar. Con alguno puesto, buscar por título
+  // es buscar DENTRO de los resultados filtrados: se recorre /discover con
+  // todos los filtros y se quedan los títulos que contienen lo escrito. Antes
+  // se pasaba a /search y esos filtros se ignoraban (con un aviso).
+  const searchInFiltered =
+    !!debouncedQ &&
+    (selectedProviders.length > 0 ||
+      monetization.length > 0 ||
+      selectedCerts.length > 0 ||
+      debouncedRuntimeRange[0] > 0 ||
+      debouncedRuntimeRange[1] < 360 ||
+      selectedKeywords.length > 0);
+
   const fetchPage = async (pageNum, signal) => {
     async function fetchDiscoverForType(type) {
       const params = { ...discoverParams, page: pageNum, sort_by: sortByFor(type) };
@@ -1508,7 +1539,7 @@ export default function DiscoverClient() {
     }
 
     let result;
-    if (debouncedQ) {
+    if (debouncedQ && !searchInFiltered) {
       result = await fetchSearch();
     } else if (content === "movie" || content === "tv") {
       result = await fetchDiscoverForType(content);
@@ -1523,6 +1554,15 @@ export default function DiscoverClient() {
         list: [...m.list, ...t.list].sort(
           (a, b) => (b.popularity || 0) - (a.popularity || 0),
         ),
+      };
+    }
+    if (searchInFiltered) {
+      // El total de TMDb es el de los filtros, no el de la búsqueda: se cuenta
+      // al terminar (ver `resultsValue`).
+      result = {
+        ...result,
+        total: null,
+        list: result.list.filter((it) => matchesTitleQuery(it, debouncedQ)),
       };
     }
     return { ...result, list: await applyImdbFilter(applySeenFilter(result.list)) };
@@ -1545,7 +1585,7 @@ export default function DiscoverClient() {
     let p = startPage;
     for (;;) {
       const r = await fetchPageRef.current(p, signal);
-      total = r.total;
+      total = r.total ?? null;
       pages = Math.min(r.pages, TMDB_MAX_PAGES);
       for (const it of r.list) {
         const key = `${it.media_type}-${it.id}`;
@@ -1759,16 +1799,6 @@ export default function DiscoverClient() {
     keywordNames,
   ]);
 
-  // Filtros que /search no admite: se avisa si hay alguno puesto.
-  const ignoredBySearch =
-    !!debouncedQ &&
-    (selectedProviders.length > 0 ||
-      monetization.length > 0 ||
-      selectedCerts.length > 0 ||
-      runtimeRange[0] > 0 ||
-      runtimeRange[1] < 360 ||
-      selectedKeywords.length > 0);
-
   const averageScore = useMemo(() => {
     const scores = items
       .map((it) => Number(it.vote_average))
@@ -1791,7 +1821,9 @@ export default function DiscoverClient() {
   }, [viewMode, imageMode]);
 
   const visibleItems = useMemo(() => {
-    if (!hasMore || columns <= 1) return items;
+    // Con menos de una fila (búsqueda dentro de los filtros que aún sigue
+    // recorriendo páginas) se enseña lo encontrado en vez de nada.
+    if (!hasMore || columns <= 1 || items.length < columns) return items;
     return items.slice(0, Math.floor(items.length / columns) * columns);
   }, [items, hasMore, columns]);
 
@@ -1841,6 +1873,14 @@ export default function DiscoverClient() {
   const entranceVisibleCount = estimateUserPageEntranceCount({ viewMode, imageMode });
 
   const statsLoading = !filtersReady || (loading && totalResults == null);
+  // Buscando dentro de los filtros no hay total de TMDb: se cuenta lo
+  // encontrado cuando ya no quedan páginas.
+  const resultsValue =
+    totalResults != null
+      ? totalResults.toLocaleString("es-ES")
+      : searchInFiltered && !hasMore && !loading
+        ? items.length.toLocaleString("es-ES")
+        : "—";
 
   // La barra y las píldoras de filtros entran JUNTAS y ya en su estado final:
   // con los filtros guardados restaurados y, si hay plataformas o géneros,
@@ -1999,7 +2039,7 @@ export default function DiscoverClient() {
               {[
                 {
                   label: "Resultados",
-                  value: totalResults == null ? "—" : totalResults.toLocaleString("es-ES"),
+                  value: resultsValue,
                   icon: Compass,
                   colorClass: "text-orange-400",
                 },
@@ -2090,7 +2130,7 @@ export default function DiscoverClient() {
         {/* Filtros avanzados activos: entran con la barra (siempre montado,
             así quitar o añadir filtros después no repite la entrada). */}
         <motion.div {...toolbarMotion}>
-        {activeFilters.length > 0 || ignoredBySearch ? (
+        {activeFilters.length > 0 ? (
           <div className="-mt-2 mb-5 flex flex-wrap items-center gap-2">
             {activeFilters.map((chip) => (
               <button
@@ -2113,12 +2153,6 @@ export default function DiscoverClient() {
                 Quitar todos
               </button>
             ) : null}
-            {ignoredBySearch ? (
-              <p className="w-full text-xs text-zinc-500">
-                La búsqueda por título no admite plataformas, certificación,
-                duración ni keywords: esos filtros no se aplican mientras buscas.
-              </p>
-            ) : null}
           </div>
         ) : null}
         </motion.div>
@@ -2132,7 +2166,7 @@ export default function DiscoverClient() {
             </div>
           )}
 
-          {toolbarShown && !loading && !error && items.length === 0 && (
+          {toolbarShown && !loading && !hasMore && !error && items.length === 0 && (
             <div className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
               <Compass className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
               <p className="text-zinc-500 font-medium">No se encontraron resultados.</p>
@@ -2170,11 +2204,16 @@ export default function DiscoverClient() {
                 ))}
               </FlipReorder>
 
-              {/* Marca del final: al acercarse a la pantalla, otra página. */}
-              <div ref={sentinelRef} aria-hidden="true" className="h-px" />
               <div className="h-20" />
             </div>
           )}
+
+          {/* Marca del final: al acercarse a la pantalla, otra tanda. Va
+              fuera de la rejilla para seguir buscando aunque una tanda no
+              haya encontrado nada (búsqueda por título dentro de los filtros,
+              «Vistas», IMDb): antes salía «No se encontraron resultados» y no
+              se pedía más. */}
+          {hasMore ? <div ref={sentinelRef} aria-hidden="true" className="h-px" /> : null}
         </main>
       </div>
 
