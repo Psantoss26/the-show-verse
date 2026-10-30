@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Temporada y episodio: el modal de enlaces externos ya no lista IMDb, TMDb ni Trakt, como en la ficha de la serie; se abren desde sus notas del marcador. Quedan la web oficial, Instagram, JustWatch, SeriesGraph, FilmAffinity y Wikipedia. → [componentes](docs/frontend/components.md)
 - Ficha de película o serie, temporada y episodio: al llegar abajo del todo ya no sobra hueco bajo la última sección (eran 48–64 px de más). Las secciones mantienen su separación entre ellas. → [fichas de detalle](docs/frontend/app-router-pages.md)
 - Ficha de episodio, sección «Episodios»: los siguientes episodios se ven como en la temporada, uno por fila con la misma tarjeta (fotograma, fecha, duración, notas de TMDb e IMDb, sinopsis en el ordenador e icono de visto / sin ver si tienes Trakt), en lugar del carrusel de fotogramas. → [fichas de detalle](docs/frontend/app-router-pages.md), [componentes](docs/frontend/components.md)
 - Temporada, sección «Episodios»: el rótulo «Episodio N» de cada fila tiene la misma letra que la fecha y la duración (sin mayúsculas y más clara), así que se lee también sobre fondos claros. → [componentes](docs/frontend/components.md)

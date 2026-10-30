@@ -14,9 +14,12 @@ function normalizeUrl(value) {
  * Enlaces de referencia de una serie compartidos por sus fichas de temporada
  * y episodio. Son los equivalentes que puede mostrar DetailsClient sin pedir
  * más datos al montar una subficha: con `externalIds` (los de la serie en
- * TMDb) suma Instagram, IMDb, TMDb y Trakt; Wikipedia la añade el modal de
- * enlaces (ver `tvWikipediaQuery`).
+ * TMDb) suma Instagram; Wikipedia la añade el modal de enlaces (ver
+ * `tvWikipediaQuery`). IMDb, TMDb y Trakt NO van: en temporada y episodio ya
+ * están en las notas del marcador, cada una con su enlace propio.
  */
+const SUBROUTE_HIDDEN_LINKS = new Set(["imdb", "tmdb", "trakt"]);
+
 export function buildTvExternalLinks({
   showId,
   title,
@@ -71,7 +74,7 @@ export function buildTvExternalLinks({
     type: "tv",
     tmdbId: showId,
     imdbId: ids.imdbId,
-  });
+  }).filter((item) => !SUBROUTE_HIDDEN_LINKS.has(item?.id ?? item?.key));
 }
 
 /** Consulta de Wikipedia de la serie para el modal de enlaces de una subficha. */
