@@ -1018,7 +1018,8 @@ export default function ContinueWatchingClient() {
   const [q, setQ] = useState("");
   const [sortBy, setSortBy] = useState("recent");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [viewMode, setViewMode] = useState("cards");
+  // Sin vista guardada: Portadas.
+  const [viewMode, setViewModeState] = useState("poster");
   const [posterImageMode, setPosterImageMode] = useState("poster");
   const [imageModeHydrated, setImageModeHydrated] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -1035,7 +1036,7 @@ export default function ContinueWatchingClient() {
 
   useEffect(() => {
     const v = typeof window !== "undefined" && window.localStorage.getItem("showverse:cw:viewMode");
-    if (v && VIEW_MODES.has(v)) setViewMode(v);
+    if (v && VIEW_MODES.has(v)) setViewModeState(v);
     const imageMode = typeof window !== "undefined" && window.localStorage.getItem("showverse:cw:posterImageMode");
     if (imageMode === "poster" || imageMode === "backdrop") setPosterImageMode(imageMode);
     setImageModeHydrated(true);
@@ -1049,9 +1050,16 @@ export default function ContinueWatchingClient() {
     }
   }, []);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") window.localStorage.setItem("showverse:cw:viewMode", viewMode);
-  }, [viewMode]);
+  // La vista se guarda solo al ELEGIRLA. Antes se escribía en cada visita, así
+  // que la vista por defecto quedaba guardada como si se hubiera elegido.
+  const setViewMode = (mode) => {
+    setViewModeState(mode);
+    try {
+      window.localStorage.setItem("showverse:cw:viewMode", mode);
+    } catch {
+      // Sin almacenamiento: la vista vale para esta visita.
+    }
+  };
   useEffect(() => {
     if (!imageModeHydrated || typeof window === "undefined") return;
     window.localStorage.setItem("showverse:cw:posterImageMode", posterImageMode);

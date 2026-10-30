@@ -1288,13 +1288,24 @@ export default function InProgressClient({
   // guarda la suya. Completadas, sin vista propia aún, parte de la de En
   // progreso (la clave compartida de antes) para no perder la elección.
   const viewPrefsPrefix = activeTab === "completed" ? "showverse:completed" : "showverse:inprogress";
-  const [viewMode, setViewMode] = useState(() =>
+  // Sin vista guardada: Portadas.
+  const [viewMode, setViewModeState] = useState(() =>
     readStoredInProgressValue(
       `${viewPrefsPrefix}:viewMode`,
-      readStoredInProgressValue("showverse:inprogress:viewMode", "cards", IN_PROGRESS_VIEW_MODES),
+      readStoredInProgressValue("showverse:inprogress:viewMode", "poster", IN_PROGRESS_VIEW_MODES),
       IN_PROGRESS_VIEW_MODES,
     ),
   );
+  // La vista se guarda solo al ELEGIRLA. Antes se escribía en cada visita, así
+  // que la vista por defecto quedaba guardada como si se hubiera elegido.
+  const setViewMode = (mode) => {
+    setViewModeState(mode);
+    try {
+      window.localStorage.setItem(`${viewPrefsPrefix}:viewMode`, mode);
+    } catch {
+      // Sin almacenamiento: la vista vale para esta visita.
+    }
+  };
   const [posterImageMode, setPosterImageMode] = useState(() =>
     readStoredInProgressValue(
       `${viewPrefsPrefix}:posterImageMode`,
@@ -1366,10 +1377,6 @@ export default function InProgressClient({
   }, [fromSibling]);
 
   // Persist
-  useEffect(() => {
-    if (!uiReady) return;
-    window.localStorage.setItem(`${viewPrefsPrefix}:viewMode`, viewMode);
-  }, [uiReady, viewMode, viewPrefsPrefix]);
   useEffect(() => {
     if (!uiReady) return;
     window.localStorage.setItem(

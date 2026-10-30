@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Continuar viendo, En progreso y Completadas: si no tienes vista guardada, se abren en «Portadas». La vista solo se recuerda cuando la eliges. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Inicio, «Mejor valoradas»: muestra siempre los 20 títulos con mejor nota de TMDb entre los que tienen más de 8000 votos, películas y series juntas y ordenadas por nota. Antes faltaban algunos (los que ya salían en Tendencias o Populares, y la animación y el anime, como Rick y Morty o El viaje de Chihiro) y el orden se alteraba. → [dashboards](docs/architecture/dashboards-implementation.md)
 - Páginas de usuario: la primera vez que abres Favoritos, Pendientes, Biblioteca, Historial, Calendario, una sección del dashboard o una sección de pósters del Perfil, y no tienes vista guardada, se muestra la cuadrícula compacta, la que más títulos pone por fila. También es la «Vista por defecto» de las cuentas nuevas. Si ya habías elegido otra, se mantiene. → [páginas de usuario](docs/features/paginas-de-usuario.md), [plan del backend](docs/backend/backend_implementation_plan.md)
 - Ficha de serie, «Temporadas»: las tarjetas ya no aparecen en negro antes de tener el póster. Mientras se carga, el hueco es un velo tenue sobre el cristal y el póster entra con un fundido corto y un leve ajuste de escala; al volver a la ficha, si ya estaba cargado, sale directamente. → [componentes](docs/frontend/components.md)
