@@ -31,7 +31,9 @@ async function getJson(url, signal) {
   return response.json().catch(() => null);
 }
 
-async function loadWatchCounts(signal) {
+// Visionados por título ("movie:603" → n) de todo el historial de Trakt.
+// Sin Trakt conectado o sin respuesta, vacío.
+export async function loadWatchCounts(signal) {
   const data = await getJson("/api/trakt/history?type=all&limit=all&enrich=0", signal);
   if (!data?.connected || !Array.isArray(data.items)) return EMPTY_MAP;
   const counts = new Map();

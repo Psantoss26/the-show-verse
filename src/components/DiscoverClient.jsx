@@ -30,10 +30,12 @@ import {
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import useCardEntrance from "@/hooks/useCardEntrance";
+import FlipReorder from "@/components/ui/FlipReorder";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
 import { peekListArtwork, requestListArtwork } from "@/lib/tmdb/artworkBatch";
+import { loadWatchCounts, userTitleKey } from "@/lib/hooks/useUserTitleStates";
 import {
   estimateUserPageColumns,
   estimateUserPageEntranceCount,
@@ -688,6 +690,8 @@ const TMDB_MAX_PAGES = 500;
 const FILL_AHEAD_PX = 800;
 // Tope de páginas de TMDb por tanda (filtros muy estrictos, p. ej. IMDb).
 const MAX_PAGES_PER_BATCH = 8;
+// Tope mientras la tanda no ha encontrado ningún título.
+const MAX_PAGES_EMPTY_BATCH = 40;
 
 // Campo de cristal de la hoja (buscadores y fechas).
 const SHEET_INPUT =
@@ -847,6 +851,9 @@ function DiscoverCard({
   );
   const shellClassName =
     "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
+  // La recolocación al cambiar de tipo u orden la anima <FlipReorder> por
+  // esta clave, como en Favoritos.
+  const flipKey = `${type}-${item.id}`;
 
   // Entrada como en Favoritos: las que caben en pantalla, escalonadas, UNA vez
   // al montar. La rejilla va con `key` de vista e imagen, así que al cambiar
@@ -870,7 +877,7 @@ function DiscoverCard({
   if (viewMode === "list") {
     const tmdb = Number(item.vote_average);
     return (
-      <div ref={shellRef} className={shellClassName}>
+      <div ref={shellRef} className={shellClassName} data-flip-key={flipKey} data-discover-card="">
         <Link
           href={href}
           prefetch={false}
@@ -913,7 +920,7 @@ function DiscoverCard({
 
   if (viewMode === "compact") {
     return (
-      <div ref={shellRef} className={shellClassName}>
+      <div ref={shellRef} className={shellClassName} data-flip-key={flipKey} data-discover-card="">
         <Link href={href} prefetch={false} onClick={onPreviewClick} {...intentProps} className="block">
           <HoverExpandCard
             cellClassName={aspectRatio}
@@ -933,7 +940,7 @@ function DiscoverCard({
   }
 
   return (
-    <div ref={shellRef} className={shellClassName}>
+    <div ref={shellRef} className={shellClassName} data-flip-key={flipKey} data-discover-card="">
       <Link href={href} prefetch={false} onClick={onPreviewClick} {...intentProps} className="block">
         <div
           className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-orange-900/20 transition-shadow duration-300`}
@@ -1060,8 +1067,9 @@ export default function DiscoverClient() {
   const [providerQuery, setProviderQuery] = useState("");
   const [monetization, setMonetization] = useState([]);
   const [seenMode, setSeenMode] = useState("all");
-  const [ratedMovieIds, setRatedMovieIds] = useState(null);
-  const [ratedTvIds, setRatedTvIds] = useState(null);
+  // Títulos vistos ("movie:603", "tv:1399") para «Por ver» / «Vistas»: null
+  // hasta que llega el historial.
+  const [watchedKeys, setWatchedKeys] = useState(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [genresAll, setGenresAll] = useState([]);
@@ -1089,6 +1097,10 @@ export default function DiscoverClient() {
   const [items, setItems] = useState([]);
   const [totalResults, setTotalResults] = useState(null);
   const [hasMore, setHasMore] = useState(false);
+  // Sube con cada primera tanda (lista nueva por filtros, tipo u orden): es la
+  // señal de <FlipReorder> para recolocar las tarjetas que siguen. Las tandas
+  // que se añaden al final no la cambian, así no se mide toda la rejilla.
+  const [listVersion, setListVersion] = useState(0);
   // Siguiente página de TMDb a pedir, tanda «más» en curso y copia de los
   // títulos para leerlos desde la tanda sin depender del render.
   const nextPageRef = useRef(1);
@@ -1117,11 +1129,7 @@ export default function DiscoverClient() {
     sameRange(runtimeRange, debouncedRuntimeRange) &&
     minVotes === debouncedMinVotes;
   const seenReady =
-    seenMode === "all" ||
-    (hydrated &&
-      (!hasSession ||
-        ((content === "tv" || ratedMovieIds !== null) &&
-          (content === "movie" || ratedTvIds !== null))));
+    seenMode === "all" || (hydrated && (!hasSession || watchedKeys !== null));
 
   useEffect(() => {
     const savedFilters = loadFiltersFromStorage();
@@ -1321,64 +1329,28 @@ export default function DiscoverClient() {
     };
   }, [keywordQuery]);
 
-  // --- Rated IDs ---
+  // --- Títulos vistos ---
+  // Los mismos visionados que Favoritos, Pendientes y el Historial: todo el
+  // historial de Trakt (`loadWatchCounts`). Antes salían de las valoraciones
+  // de TMDb (`/account/rated`, como mucho 10 páginas), que en las cuentas
+  // Showverse vienen vacías: «Por ver» lo enseñaba todo y «Vistas», nada.
   useEffect(() => {
-    let cancelled = false;
+    if (seenMode === "all" || !hasSession || watchedKeys !== null) return undefined;
     const ac = new AbortController();
-    async function loadRatedIds(type) {
-      if (!hasSession) return new Set();
-      const base = `/account/${account.id}/rated/${type}`;
-      const ids = new Set();
-      let p = 1;
-      const MAX_PAGES = 10;
-      while (!cancelled && p <= MAX_PAGES) {
-        const data = await tmdbFetch(
-          base,
-          { session_id: session, page: p, sort_by: "created_at.desc" },
-          ac.signal,
-        );
-        if (!data?.results?.length) break;
-        for (const it of data.results) if (it?.id) ids.add(it.id);
-        if (p >= (data.total_pages || 1)) break;
-        p++;
-      }
-      return ids;
-    }
-    async function runIfNeeded() {
-      if (seenMode === "all") return;
-      try {
-        if (
-          (content === "movie" || content === "all") &&
-          ratedMovieIds === null
-        ) {
-          const ids = await loadRatedIds("movies");
-          if (!cancelled) setRatedMovieIds(ids);
-        }
-        if ((content === "tv" || content === "all") && ratedTvIds === null) {
-          const ids = await loadRatedIds("tv");
-          if (!cancelled) setRatedTvIds(ids);
-        }
-      } catch (e) {
-        if (!isAbortError(e) && !cancelled) {
-          if (ratedMovieIds === null) setRatedMovieIds(new Set());
-          if (ratedTvIds === null) setRatedTvIds(new Set());
-        }
-      }
-    }
-    runIfNeeded();
-    return () => {
-      cancelled = true;
-      ac.abort();
-    };
-  }, [
-    seenMode,
-    content,
-    hasSession,
-    account,
-    session,
-    ratedMovieIds,
-    ratedTvIds,
-  ]);
+    loadWatchCounts(ac.signal)
+      .then((counts) => {
+        if (!ac.signal.aborted) setWatchedKeys(new Set(counts.keys()));
+      })
+      .catch((e) => {
+        if (!isAbortError(e) && !ac.signal.aborted) setWatchedKeys(new Set());
+      });
+    return () => ac.abort();
+  }, [seenMode, hasSession, watchedKeys]);
+
+  // Otra cuenta: su historial es otro.
+  useEffect(() => {
+    setWatchedKeys(null);
+  }, [account?.id]);
 
   // --- Params comunes de /discover (con valores debounced) ---
   const discoverParams = useMemo(() => {
@@ -1488,10 +1460,9 @@ export default function DiscoverClient() {
     }
     function applySeenFilter(list) {
       if (seenMode === "all" || !hasSession) return list;
+      if (!(watchedKeys instanceof Set)) return list;
       return list.filter((it) => {
-        const set = it.media_type === "movie" ? ratedMovieIds : ratedTvIds;
-        if (!(set instanceof Set)) return true;
-        const has = set.has(it.id);
+        const has = watchedKeys.has(userTitleKey(it.media_type, it.id));
         return seenMode === "seen" ? has : !has;
       });
     }
@@ -1554,7 +1525,12 @@ export default function DiscoverClient() {
         keys.add(key);
         added.push(it);
       }
-      if (added.length >= target || p >= pages || p - startPage + 1 >= MAX_PAGES_PER_BATCH) break;
+      // Con filtros que se aplican aquí («Vistas», IMDb) una tanda puede no
+      // encontrar nada en sus páginas: sin tarjetas tampoco hay marca del
+      // final que pida más, y salía «No se encontraron resultados» aunque
+      // hubiera más adelante. Mientras no haya ninguna, se sigue más lejos.
+      const pageCap = added.length ? MAX_PAGES_PER_BATCH : MAX_PAGES_EMPTY_BATCH;
+      if (added.length >= target || p >= pages || p - startPage + 1 >= pageCap) break;
       p += 1;
     }
     return { added, total, nextPage: p + 1, hasMore: p < pages };
@@ -1589,6 +1565,7 @@ export default function DiscoverClient() {
         if (ac.signal.aborted) return;
         nextPageRef.current = batch.nextPage;
         setItems(batch.added);
+        setListVersion((v) => v + 1);
         setTotalResults(batch.total);
         setHasMore(batch.hasMore);
       } catch (e) {
@@ -1611,8 +1588,7 @@ export default function DiscoverClient() {
     sortPreset,
     seenMode,
     hasSession,
-    ratedMovieIds,
-    ratedTvIds,
+    watchedKeys,
     dateFrom,
     dateTo,
     debouncedQ,
@@ -2117,9 +2093,11 @@ export default function DiscoverClient() {
 
           {items.length > 0 && (
             <div>
-              <div
+              <FlipReorder
                 key={`grid-${viewMode}-${imageMode}`}
                 className={gridClassName}
+                orderKey={listVersion}
+                itemSelector="[data-discover-card]"
               >
                 {visibleItems.map((item, idx) => (
                   <DiscoverCard
@@ -2132,7 +2110,7 @@ export default function DiscoverClient() {
                     imageMode={imageMode}
                   />
                 ))}
-              </div>
+              </FlipReorder>
 
               {/* Marca del final: al acercarse a la pantalla, otra página. */}
               <div ref={sentinelRef} aria-hidden="true" className="h-px" />
