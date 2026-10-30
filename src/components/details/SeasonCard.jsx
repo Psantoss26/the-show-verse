@@ -23,6 +23,8 @@ import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import { DETAILS_POSTER_ROW_SIZES, tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
 import { titlePeekSeasonAttrs } from "@/lib/navigation/titlePeek.mjs";
 
+const LAZY_IMAGE = { loading: "lazy" };
+
 /**
  * Póster de la temporada: el elegido en «Editar portada», el más votado por
  * todos, el de la escalera de idioma (inglés → español → original → sin
@@ -90,6 +92,9 @@ export default function SeasonCard({
   // Sin efectos al pasar el ratón (vista de teléfono del modal lateral): el
   // diseño que se replica es el táctil, como el resto de secciones.
   enableHover = true,
+  // Carga del póster: la sección pide en el acto las primeras tarjetas
+  // (`detailsRowImageLoading`), como Reparto y Recomendaciones.
+  imageLoading = LAZY_IMAGE,
 }) {
   const { poster, pending: posterPending } = useSeasonPoster({
     showId,
@@ -154,7 +159,7 @@ export default function SeasonCard({
             sizes={compact ? "(min-width: 640px) 170px, 192px" : "(min-width: 1024px) 240px, (min-width: 640px) 216px, 192px"}
             alt=""
             className={`h-full w-full object-cover transition-transform duration-500 ${enableHover ? "group-hover:scale-[1.04]" : ""}`}
-            loading="lazy"
+            {...imageLoading}
           />
         ) : posterPending ? null : (
           <span className="flex h-full w-full items-center justify-center text-4xl font-black text-white/15">
@@ -264,6 +269,7 @@ export function SeasonPosterCard({
   onPrefetch,
   // Ver SeasonCard: sin efectos al pasar el ratón en la vista de teléfono.
   enableHover = true,
+  imageLoading = LAZY_IMAGE,
 }) {
   const { poster, pending: posterPending } = useSeasonPoster({
     showId,
@@ -301,7 +307,7 @@ export function SeasonPosterCard({
             sizes={DETAILS_POSTER_ROW_SIZES}
             alt=""
             className={`h-full w-full object-cover transition-transform duration-500 ease-out ${enableHover ? "group-hover:scale-110" : ""}`}
-            loading="lazy"
+            {...imageLoading}
           />
         ) : posterPending ? null : (
           <span className="flex h-full w-full items-center justify-center bg-neutral-800 text-5xl font-black text-white/15">

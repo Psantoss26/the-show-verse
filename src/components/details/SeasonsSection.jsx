@@ -24,6 +24,7 @@ import SectionTitle from "@/components/details/SectionTitle";
 import SeasonCard, { SeasonPosterCard } from "@/components/details/SeasonCard";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_BAR } from "@/lib/ui/liquidGlass";
+import { detailsRowImageLoading } from "@/lib/tmdb/imageSrcSet";
 
 const VIEW_KEY = "showverse:details:seasonsView";
 const VIEWS = [
@@ -315,12 +316,16 @@ export default function SeasonsSection({
           }}
           className={phoneLayout ? "pb-2" : "pb-8 !overflow-visible"}
         >
-          {items.map(({ key, ...season }) => (
+          {items.map(({ key, ...season }, index) => (
             <SwiperSlide key={key}>
               {/* Vista de teléfono del modal lateral: sin hover, como el
                   resto de secciones (el diseño que se replica es el táctil). */}
               <div data-season-item>
-                <SeasonPosterCard {...season} enableHover={!phoneLayout} />
+                <SeasonPosterCard
+                  {...season}
+                  enableHover={!phoneLayout}
+                  imageLoading={detailsRowImageLoading(index)}
+                />
               </div>
             </SwiperSlide>
           ))}
@@ -328,9 +333,13 @@ export default function SeasonsSection({
       ) : (
         <>
           <div className={`grid grid-cols-1 gap-4 ${phoneLayout ? "" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
-            {visibleCards.map(({ key, ...season }) => (
+            {visibleCards.map(({ key, ...season }, index) => (
               <div key={key} data-season-item>
-                <SeasonCard {...season} enableHover={!phoneLayout} />
+                <SeasonCard
+                  {...season}
+                  enableHover={!phoneLayout}
+                  imageLoading={detailsRowImageLoading(index)}
+                />
               </div>
             ))}
           </div>
