@@ -1404,7 +1404,7 @@ export default function ContinueWatchingClient() {
                   Portadas
                 </SheetOption>
                 <SheetOption icon={LayoutList} active={viewMode === "compact"} onClick={() => setViewMode("compact")}>
-                  Compacta
+                  Lista
                 </SheetOption>
               </SheetOptionGroup>
               {viewMode === "poster" && (

@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Continuar viendo en el móvil: en «Filtros y vista», la vista «Compacta» pasa a llamarse «Lista». → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Tarjetas de episodio (temporada y «Episodios» de la ficha de episodio): «EPISODIO N» en mayúsculas. → [componentes](docs/frontend/components.md)
 - Comentarios de una ficha abiertos desde la vista previa (modal o panel lateral): «Mis comentarios anteriores» ya no incluye reseñas tuyas importadas de Trakt, que no se pueden editar ni borrar desde la app (al eliminarlas salía «Comment not found»). Solo aparecen las publicadas en The Show Verse, igual que en la ficha. → [comunidad](docs/features/comunidad.md)
 - Temporada y episodio: el modal de enlaces externos ya no lista IMDb, TMDb ni Trakt, como en la ficha de la serie; se abren desde sus notas del marcador. Quedan la web oficial, Instagram, JustWatch, SeriesGraph, FilmAffinity y Wikipedia. → [componentes](docs/frontend/components.md)
