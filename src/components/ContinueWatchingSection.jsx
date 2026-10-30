@@ -537,7 +537,7 @@ function ContinueWatchingBaseCard({ show, mode = "continue" }) {
           src={bgSrc}
           alt={show?.title || ""}
           fill
-          sizes="(min-width:1280px) 338px, (min-width:768px) 300px, 224px"
+          sizes="(min-width:1280px) 340px, (min-width:768px) 300px, 224px"
           quality={CONTINUE_WATCHING_IMAGE_QUALITY}
           className={`object-cover transition-opacity duration-200 ${
             imgReady ? "opacity-100" : "opacity-0"
@@ -2041,7 +2041,18 @@ function ContinueWatchingSection({
     setCanNext(hasOverflow && !swiper.isEnd);
     setActiveIndex(swiper.activeIndex);
     const spv = swiper?.params?.slidesPerView;
-    if (typeof spv === "number" && Number.isFinite(spv)) setPerView(spv);
+    if (typeof spv === "number" && Number.isFinite(spv)) {
+      setPerView(spv);
+    } else if (spv === "auto") {
+      // Ancho fijo: las visibles enteras salen del ancho de la fila.
+      const slideWidth = swiper.slidesSizesGrid?.[0];
+      const gap = Number(swiper.params.spaceBetween) || 0;
+      if (slideWidth > 0 && swiper.width > 0) {
+        setPerView(
+          Math.max(1, Math.floor((swiper.width + gap) / (slideWidth + gap))),
+        );
+      }
+    }
   };
 
   const handleSwiper = (swiper) => {
@@ -2126,18 +2137,20 @@ function ContinueWatchingSection({
   // `loading`), así que esto solo afecta a "Continuar viendo".
   if (loading) return null;
 
-  // En escritorio el nº de tarjetas por fila escala con el ancho disponible
-  // hasta un máximo de 6. En móvil, pósters con la densidad de las demás filas.
+  // En escritorio la tarjeta tiene ancho fijo, como las filas de pósters y
+  // las backdrop del dashboard: tan ancha como alto es el póster (300/340 px).
+  // Repartir la fila en N columnas la dejaba casi del ancho de un póster justo
+  // tras cada breakpoint. En móvil, pósters con la densidad de las demás filas.
   const breakpoints = isMobile
     ? {
         0: { slidesPerView: mobileCardsPerRow, spaceBetween: 12 },
       }
     : {
-        768: { slidesPerView: 3, spaceBetween: 14 },
-        1024: { slidesPerView: 4, spaceBetween: 16 },
-        1280: { slidesPerView: 5, spaceBetween: 18 },
-        1536: { slidesPerView: 6, spaceBetween: 20 },
+        768: { slidesPerView: "auto", spaceBetween: 14 },
+        1024: { slidesPerView: "auto", spaceBetween: 18 },
+        1280: { slidesPerView: "auto", spaceBetween: 20 },
       };
+  const desktopSlideWidthClass = "!w-[300px] xl:!w-[340px]";
 
   const swiperKey = `${mode}-landscape-${hydrated ? "h" : "s"}-${isMobile ? `m${mobileCardsPerRow}` : "d"}`;
 
@@ -2179,8 +2192,8 @@ function ContinueWatchingSection({
         <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
           <Swiper
             key={swiperKey}
-            slidesPerView={isMobile ? mobileCardsPerRow : 3}
-            spaceBetween={isMobile ? 12 : 16}
+            slidesPerView={isMobile ? mobileCardsPerRow : "auto"}
+            spaceBetween={isMobile ? 12 : 14}
             onSwiper={handleSwiper}
             onSlideChange={updateNav}
             onResize={updateNav}
@@ -2244,7 +2257,7 @@ function ContinueWatchingSection({
               return (
                 <SwiperSlide
                   key={itemKey}
-                  className={`${isMobile ? "select-none" : "select-none pointer-events-auto"} ${
+                  className={`${isMobile ? "select-none" : `select-none pointer-events-auto ${desktopSlideWidthClass}`} ${
                     isActive ? "!relative !z-[100] !overflow-visible" : isAnimatingOut ? "!relative !z-[50] !overflow-visible" : "!relative !z-10"
                   }`}
                 >
