@@ -11,7 +11,7 @@ Comentarios y reseñas en las fichas, resumen de sentimiento, listas de la comun
 - **Sembrado:** la primera vez que se abre la sección de un título, `seed.js` toma un bloqueo y descarga sus comentarios públicos de Trakt (`trakt.js`, solo con client-id). Se **renuevan cada semana** en segundo plano al abrir la sección, para que lleguen los nuevos y se actualicen «me gusta» y respuestas.
 - **Idioma:** Trakt no lo da. `commentLanguage.js` combina alfabeto, palabras funcionales y trigramas para quedarse solo con inglés y español (un detector de trigramas solo fallaba con comentarios cortos).
 - **Pestañas** (`tabs.js`): *Populares* (me gusta + respuestas) y *Recientes*. «Ordenar por likes» reordena; en Recientes se limita a los últimos 30 días.
-- **Comentarios nativos:** los miembros publican, editan y borran sus reseñas (con aviso de spoiler). Las reseñas importadas de Letterboxd entran aquí a nombre del usuario.
+- **Comentarios nativos:** los miembros publican, editan y borran sus reseñas (con aviso de spoiler). Las reseñas importadas de Letterboxd entran aquí a nombre del usuario. En la ficha, «Mis comentarios» solo cuenta como propias las nativas (`isOwnedComment` en `src/lib/community/commentOwnership.js`): una reseña sembrada desde Trakt nunca lo es, aunque su autor coincida con el usuario de Trakt conectado, porque no se puede editar ni borrar desde la app.
 - **Autores:** `/v1/users/public/resolve-usernames` decide qué autores son miembros reales para enlazar su perfil y no generar enlaces rotos a autores de Trakt.
 
 ## Sentimiento

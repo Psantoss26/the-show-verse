@@ -32,3 +32,13 @@ test("does not include reviews authored by another user", () => {
     false,
   );
 });
+
+test("never treats a review imported from Trakt as owned, even by the user's Trakt handle", () => {
+  assert.equal(
+    isOwnedComment(
+      { id: "trakt-review", source: "trakt", user: { username: "pablo-trakt" } },
+      { appUsername: "psantos26", traktUsername: "pablo-trakt" },
+    ),
+    false,
+  );
+});
