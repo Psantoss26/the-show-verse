@@ -22,8 +22,21 @@ import { useSeasonLadderPoster } from "@/lib/tmdb/useSeasonLadderPoster";
 import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import { DETAILS_POSTER_ROW_SIZES, tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
 import { titlePeekSeasonAttrs } from "@/lib/navigation/titlePeek.mjs";
+import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
 
 const LAZY_IMAGE = { loading: "lazy" };
+
+// Entrada del póster: no se enseña hasta que la imagen está cargada y
+// decodificada (useImageLoadReady) y entonces aparece con un fundido corto y
+// un leve ajuste de escala; mientras, el hueco es un velo apenas visible sobre
+// el cristal, no un bloque negro. Si viene de caché (volver a la ficha) sale
+// de golpe, sin fundido. `hoverScale`: el zoom del hover, que comparte
+// `transform` con la entrada.
+function posterRevealClass({ ready, instant }, hoverScale) {
+  const motion = instant ? "transition-transform duration-500" : "transition-[opacity,transform] duration-500";
+  const state = ready ? `opacity-100 scale-100 ${hoverScale}` : "opacity-0 scale-[1.03]";
+  return `${motion} ease-out ${state}`;
+}
 
 /**
  * Póster de la temporada: el elegido en «Editar portada», el más votado por
@@ -103,6 +116,10 @@ export default function SeasonCard({
     posterPath,
     fallbackPosterPath,
   });
+  const posterSrc = poster ? `https://image.tmdb.org/t/p/w342${poster}` : null;
+  const posterLoad = useImageLoadReady(posterSrc);
+  const { imgRef: posterRef, onLoad: onPosterLoad } = posterLoad;
+  const posterClass = posterRevealClass(posterLoad, enableHover ? "group-hover:scale-[1.04]" : "");
   const isSpecials = Number(seasonNumber) === 0;
   const title = isSpecials ? "Especiales" : `Temporada ${seasonNumber}`;
   const subtitle = seasonSubtitle(name, title);
@@ -146,19 +163,21 @@ export default function SeasonCard({
       <span
         // `self-start`: si la columna de datos es más alta, el flex estiraría
         // el póster y rompería su 2:3.
-        className={`relative z-10 aspect-[2/3] shrink-0 self-start overflow-hidden rounded-xl bg-zinc-900 shadow-lg shadow-black/40 ${
+        className={`relative z-10 aspect-[2/3] shrink-0 self-start overflow-hidden rounded-xl bg-white/[0.04] shadow-lg shadow-black/40 ${
           compact ? "w-32 sm:w-28" : "w-32 sm:w-36 lg:w-40"
         }`}
       >
         {poster ? (
           <OptimizedImage
-            src={`https://image.tmdb.org/t/p/w342${poster}`}
+            ref={posterRef}
+            onLoad={onPosterLoad}
+            src={posterSrc}
             srcSet={tmdbSrcSet(poster)}
             // Póster de 128–160px (128px y 112px desde `sm` en compacto): se
             // pide ~1,5× para que se vea nítido.
             sizes={compact ? "(min-width: 640px) 170px, 192px" : "(min-width: 1024px) 240px, (min-width: 640px) 216px, 192px"}
             alt=""
-            className={`h-full w-full object-cover transition-transform duration-500 ${enableHover ? "group-hover:scale-[1.04]" : ""}`}
+            className={`h-full w-full object-cover ${posterClass}`}
             {...imageLoading}
           />
         ) : posterPending ? null : (
@@ -284,6 +303,10 @@ export function SeasonPosterCard({
   const total = Number(totalEpisodes) || null;
   const watched = Math.max(0, Math.min(Number(watchedEpisodes) || 0, total || 0));
   const percentage = total ? Math.round((watched / total) * 100) : 0;
+  const posterSrc = poster ? `https://image.tmdb.org/t/p/w342${poster}` : null;
+  const posterLoad = useImageLoadReady(posterSrc);
+  const { imgRef: posterRef, onLoad: onPosterLoad } = posterLoad;
+  const posterClass = posterRevealClass(posterLoad, enableHover ? "group-hover:scale-110" : "");
 
   // Solo el póster; el progreso va DEBAJO, fuera de la imagen, como en
   // «Continuar viendo» del dashboard.
@@ -298,15 +321,17 @@ export function SeasonPosterCard({
         {...titlePeekSeasonAttrs(showId, seasonNumber)}
         aria-label={`Ver ${title}${subtitle ? `: ${subtitle}` : ""}`}
         title={title}
-        className={`group relative block aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${enableHover ? "lg:hover:shadow-yellow-900/20" : ""}`}
+        className={`group relative block aspect-[2/3] w-full overflow-hidden rounded-xl bg-white/[0.04] shadow-md transition-shadow duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${enableHover ? "lg:hover:shadow-yellow-900/20" : ""}`}
       >
         {poster ? (
           <OptimizedImage
-            src={`https://image.tmdb.org/t/p/w342${poster}`}
+            ref={posterRef}
+            onLoad={onPosterLoad}
+            src={posterSrc}
             srcSet={tmdbSrcSet(poster)}
             sizes={DETAILS_POSTER_ROW_SIZES}
             alt=""
-            className={`h-full w-full object-cover transition-transform duration-500 ease-out ${enableHover ? "group-hover:scale-110" : ""}`}
+            className={`h-full w-full object-cover ${posterClass}`}
             {...imageLoading}
           />
         ) : posterPending ? null : (
