@@ -187,7 +187,6 @@ function CastSheet({ meta, data, onClose, tab, setTab, query, setQuery }) {
                   person={person}
                   role={person.character}
                   episodes={data.type === "tv" ? person.total_episode_count || null : null}
-                  onNavigate={onClose}
                 />
               </li>
             ))}
@@ -210,7 +209,6 @@ function CastSheet({ meta, data, onClose, tab, setTab, query, setQuery }) {
                     person={person}
                     role={person.jobs.map((job) => crewRoleLabel(job.job)).join(", ")}
                     episodes={data.type === "tv" ? person.episodes || null : null}
-                    onNavigate={onClose}
                   />
                 </li>
               ))}
@@ -264,7 +262,6 @@ function RecommendationsSheet({ meta, data, onClose, query, setQuery }) {
               <TitleRow
                 item={item}
                 mediaType={item.media_type}
-                onNavigate={onClose}
                 onOpenTitle={data.onOpenTitle}
                 showImdb
                 imdbRating={imdbScores.get(getScoreItemKey(item))}
@@ -314,7 +311,6 @@ function CollectionSheet({ meta, data, onClose }) {
           // círculo, fondo y estados; el nombre va de tooltip.
           <Link
             href={`/lists/collection/${collection.id}`}
-            onClick={onClose}
             aria-label="Abrir colección completa"
             title="Abrir colección"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
@@ -331,7 +327,6 @@ function CollectionSheet({ meta, data, onClose }) {
               <TitleRow
                 item={item}
                 mediaType="movie"
-                onNavigate={onClose}
                 onOpenTitle={data.onOpenTitle}
                 showImdb
                 imdbRating={imdbScores.get(getScoreItemKey(item))}
@@ -991,10 +986,7 @@ function SeasonsSheet({ meta, data, onClose }) {
               <SeasonCard
                 {...season}
                 compact
-                onClick={() => {
-                  onClose();
-                  onClick?.();
-                }}
+                onClick={onClick}
               />
             </li>
           ))}
@@ -1208,7 +1200,7 @@ function ListsSheet({ meta, data, onClose, query, setQuery }) {
             const list = row?.list || row || {};
             return (
               <li key={String(list.id || `${list.name}-${index}`)}>
-                <ListRow row={row} onNavigate={onClose} />
+                <ListRow row={row} />
               </li>
             );
           })}

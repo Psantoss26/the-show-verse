@@ -226,7 +226,6 @@ export default function FilmographySheet({ meta, data, onClose, tab, setTab, que
                           item={item}
                           department={current.key}
                           watched={watchedKeys.has(item.key)}
-                          onNavigate={onClose}
                         />
                       </li>
                     ))}

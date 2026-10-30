@@ -179,7 +179,6 @@ function TitleList({
             <TitleRow
               item={item}
               mediaType={item.media_type}
-              onNavigate={onClose}
               detail={creditRole(item)}
               showImdb
               imdbRating={imdbScores.get(scoreKey)}
