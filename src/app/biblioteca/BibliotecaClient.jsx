@@ -903,7 +903,7 @@ function LibraryMediaCard({
 // ================== MAIN COMPONENT ==================
 
 export default function BibliotecaClient() {
-  const { preferences, updatePreference, authenticated, hydrated } = useAuth();
+  const { updatePreference, authenticated, hydrated } = useAuth();
   const { t } = useTranslation();
 
   // Estado inicial IDÉNTICO en servidor y cliente (loading=true) para no romper
@@ -952,16 +952,12 @@ export default function BibliotecaClient() {
   // Sin vista guardada: la cuadrícula compacta, la que más títulos pone por fila.
   const [viewMode, setViewModeState] = useState("compact");
   const [imageMode, setImageMode] = useState("poster");
-  // Marca si el usuario ya fijó una vista propia: en ese caso la preferencia
-  // global NO debe sobrescribirla de forma asíncrona.
-  const viewModeUserSetRef = useRef(false);
 
   useIsoLayoutEffect(() => {
     const savedView = window.localStorage.getItem(
       "showverse:biblioteca:viewMode",
     );
     if (savedView === "list" || savedView === "grid" || savedView === "compact") {
-      viewModeUserSetRef.current = true;
       setViewModeState(savedView);
     }
     const savedImage = window.localStorage.getItem(
@@ -971,21 +967,11 @@ export default function BibliotecaClient() {
       setImageMode(savedImage);
     }
   }, []);
-
-  useEffect(() => {
-    // La preferencia global solo aplica cuando el usuario aún no tiene una vista
-    // propia para Biblioteca (evita el parpadeo al recargar).
-    if (viewModeUserSetRef.current) return;
-    if (
-      preferences?.defaultView &&
-      ["list", "grid", "compact"].includes(preferences.defaultView)
-    ) {
-      setViewModeState(preferences.defaultView);
-    }
-  }, [preferences?.defaultView]);
+  // Sin vista propia de Biblioteca se queda en la compacta: ya no se toma la
+  // «Vista por defecto» de la cuenta (que guardan las demás páginas al cambiar
+  // de vista), igual que Favoritos, que tampoco la lee.
 
   const setViewMode = useCallback((mode) => {
-    viewModeUserSetRef.current = true;
     setViewModeState(mode);
     if (typeof window !== "undefined") {
       window.localStorage.setItem("showverse:biblioteca:viewMode", mode);

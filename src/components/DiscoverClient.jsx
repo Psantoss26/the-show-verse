@@ -358,39 +358,47 @@ function discoverScoreKey(item) {
   return item?.id == null ? "" : `${type}:${item.id}`;
 }
 
+// Lee la respuesta de /api/imdb/ratings: nota de cada título pedido, `null`
+// si se CONFIRMA que no tiene, y nada (se queda sin caché) si no se pudo
+// averiguar: respuesta fallida, error del servidor o título en `unresolved`.
+// Antes cualquier fallo se guardaba como «sin nota» para toda la visita y el
+// filtro de IMDb ocultaba esos títulos aunque se cambiaran los filtros o se
+// hiciera scroll (como en Favoritos, solo se guardan negativos confirmados).
+function rememberDiscoverImdbScores(keys, response, payload) {
+  const failed = !response?.ok || !payload || payload.error || payload.meta?.loaded === false;
+  const unresolved = new Set(Array.isArray(payload?.unresolved) ? payload.unresolved : []);
+  for (const key of keys) {
+    const rating = Number(payload?.items?.[key]?.rating);
+    if (Number.isFinite(rating) && rating > 0) discoverImdbScores.set(key, rating);
+    else if (!failed && !unresolved.has(key)) discoverImdbScores.set(key, null);
+  }
+}
+
+async function postDiscoverImdbRatings(items, { signal, priority } = {}) {
+  const response = await fetch("/api/imdb/ratings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+    cache: "no-store",
+    signal,
+    priority,
+  });
+  const payload = response.ok ? await response.json().catch(() => null) : null;
+  rememberDiscoverImdbScores(items.map((item) => item.key), response, payload);
+}
+
 async function fetchDiscoverImdbScore(item) {
   const key = discoverScoreKey(item);
   if (!key) return null;
   if (discoverImdbScores.has(key)) return discoverImdbScores.get(key);
   if (discoverImdbRequests.has(key)) return discoverImdbRequests.get(key);
 
-  const request = fetch("/api/imdb/ratings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      items: [
-        {
-          key,
-          id: item.id,
-          mediaType: item.media_type,
-          imdbId: item.imdb_id || null,
-        },
-      ],
-    }),
-    cache: "no-store",
-    priority: "low",
-  })
-    .then(async (response) => {
-      if (!response.ok) return null;
-      const payload = await response.json().catch(() => null);
-      const rating = Number(payload?.items?.[key]?.rating);
-      return Number.isFinite(rating) && rating > 0 ? rating : null;
-    })
-    .catch(() => null)
-    .then((rating) => {
-      discoverImdbScores.set(key, rating);
-      return rating;
-    })
+  const request = postDiscoverImdbRatings(
+    [{ key, id: item.id, mediaType: item.media_type, imdbId: item.imdb_id || null }],
+    { priority: "low" },
+  )
+    .catch(() => {})
+    .then(() => discoverImdbScores.get(key) ?? null)
     .finally(() => {
       discoverImdbRequests.delete(key);
     });
@@ -399,37 +407,46 @@ async function fetchDiscoverImdbScore(item) {
   return request;
 }
 
-// Notas de IMDb de una página entera (filtro de IMDb): una sola petición para
-// los que aún no están en la caché.
-async function fetchDiscoverImdbScores(list, signal) {
-  const missing = list.filter((item) => {
-    const key = discoverScoreKey(item);
-    return key && !discoverImdbScores.has(key);
+// Pausa antes de repetir los títulos cuya nota no se pudo averiguar.
+const IMDB_RETRY_DELAY_MS = 700;
+
+function waitFor(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true },
+    );
   });
-  if (missing.length) {
+}
+
+// Notas de IMDb de una página entera (filtro de IMDb): una sola petición para
+// los que aún no están en la caché y, para los que no se pudieron averiguar,
+// un reintento. Los que sigan sin saberse no entran esta vez, pero tampoco se
+// guardan: la próxima tanda o el próximo cambio de filtros los vuelve a pedir.
+async function fetchDiscoverImdbScores(list, signal) {
+  const pending = () =>
+    list.filter((item) => {
+      const key = discoverScoreKey(item);
+      return key && !discoverImdbScores.has(key);
+    });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const missing = pending();
+    if (!missing.length) break;
+    if (attempt > 0) await waitFor(IMDB_RETRY_DELAY_MS, signal);
     try {
-      const response = await fetch("/api/imdb/ratings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: missing.map((item) => ({
-            key: discoverScoreKey(item),
-            id: item.id,
-            mediaType: item.media_type,
-          })),
-        }),
-        cache: "no-store",
-        signal,
-      });
-      const payload = response.ok ? await response.json().catch(() => null) : null;
-      for (const item of missing) {
-        const key = discoverScoreKey(item);
-        const rating = Number(payload?.items?.[key]?.rating);
-        discoverImdbScores.set(
-          key,
-          Number.isFinite(rating) && rating > 0 ? rating : null,
-        );
-      }
+      await postDiscoverImdbRatings(
+        missing.map((item) => ({
+          key: discoverScoreKey(item),
+          id: item.id,
+          mediaType: item.media_type,
+        })),
+        { signal },
+      );
     } catch (e) {
       if (isAbortError(e)) throw e;
     }
@@ -690,6 +707,8 @@ const TMDB_MAX_PAGES = 500;
 const FILL_AHEAD_PX = 800;
 // Tope de páginas de TMDb por tanda (filtros muy estrictos, p. ej. IMDb).
 const MAX_PAGES_PER_BATCH = 8;
+// Vista sin elección guardada.
+const DEFAULT_VIEW_MODE = "compact";
 // Retraso de la entrada de la barra de filtros desde que monta la página.
 const TOOLBAR_ENTRANCE_DELAY_MS = 500;
 // Tope mientras la tanda no ha encontrado ningún título.
@@ -1045,7 +1064,9 @@ export default function DiscoverClient() {
   const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
 
   // --- Vista ---
-  const [viewMode, setViewModeState] = useState("grid");
+  // Sin vista guardada: la cuadrícula compacta (8 pósters por fila en el
+  // ordenador), como Biblioteca.
+  const [viewMode, setViewModeState] = useState(DEFAULT_VIEW_MODE);
   const [imageMode, setImageModeState] = useState("poster");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const setViewMode = useCallback((mode) => {
@@ -1155,7 +1176,7 @@ export default function DiscoverClient() {
     setImdbRange(savedFilters.imdbRange);
     setMonetization(savedFilters.monetization);
     setViewModeState(
-      readStoredMode(STORAGE_KEYS.VIEW_MODE, ["list", "compact", "grid"], "grid"),
+      readStoredMode(STORAGE_KEYS.VIEW_MODE, ["list", "compact", "grid"], DEFAULT_VIEW_MODE),
     );
     setImageModeState(
       readStoredMode(STORAGE_KEYS.IMAGE_MODE, ["poster", "backdrop"], "poster"),
