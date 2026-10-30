@@ -20,7 +20,7 @@ test("claves de título normalizadas", () => {
 
 test("sin respuesta de TMDb no hay elección (null, no «sin póster»)", () => {
   assert.equal(pickListArtwork(null), null);
-  assert.deepEqual(pickListArtwork({ posters: [], backdrops: [] }), { poster: null, previewPoster: null, previewBackdrop: null, textlessPoster: null, coverPoster: null, dashboardBackdrop: null, dashboardBackdropAlt: null });
+  assert.deepEqual(pickListArtwork({ posters: [], backdrops: [] }), { poster: null, previewPoster: null, previewBackdrop: null, cardBackdrop: null, textlessPoster: null, coverPoster: null, dashboardBackdrop: null, dashboardBackdropAlt: null });
 });
 
 test("elige póster inglés y backdrop con idioma", () => {
@@ -35,6 +35,7 @@ test("elige póster inglés y backdrop con idioma", () => {
   assert.equal(picks.poster, "/en.jpg");
   assert.equal(picks.previewPoster, "/en.jpg");
   assert.equal(picks.previewBackdrop, "/bd-en.jpg");
+  assert.equal(picks.cardBackdrop, "/bd-en.jpg");
 });
 
 test("sin inglés, el español; sin ninguno de los dos, el del idioma original", () => {

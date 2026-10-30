@@ -31,6 +31,9 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import useCardEntrance from "@/hooks/useCardEntrance";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
+import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
+import { peekListArtwork, requestListArtwork } from "@/lib/tmdb/artworkBatch";
 import {
   estimateUserPageColumns,
   estimateUserPageEntranceCount,
@@ -38,7 +41,6 @@ import {
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import {
   SlidersHorizontal,
-  Loader2,
   Film,
   MonitorPlay,
   RotateCcw,
@@ -271,15 +273,72 @@ async function tmdbFetch(path, params = {}, signal) {
   return r.json();
 }
 
-function imageSrc(item, mode = "poster") {
-  if (mode === "backdrop") {
-    if (item?.backdrop_path) return `${IMG}/w780${item.backdrop_path}`;
-    return item?.poster_path
-      ? `${IMG}/w500${item.poster_path}`
-      : "/placeholder-poster.png";
-  }
-  const p = item?.poster_path || item?.backdrop_path;
-  return p ? `${IMG}/w500${p}` : "/placeholder-poster.png";
+// Imagen de la tarjeta con el criterio de Favoritos y Pendientes:
+// 1) la elegida en la ficha (kind `poster` o, en modo backdrop,
+//    `cardBackdrop`) y, sin ella, la más votada por todos;
+// 2) si no, la escalera de idioma (inglés → español → original → sin idioma)
+//    del lote de arte (/api/tmdb/artwork), con el mismo selector de backdrop;
+// 3) sin ninguna, la del motor (llega en es-ES).
+// Mientras el voto o el lote están en camino no se pinta la del motor: se veía
+// un instante y se cambiaba por la buena.
+function DiscoverCardImage({ item, type, mode, title }) {
+  const wantsBackdrop = mode === "backdrop";
+  const { path: ownPath, pending: ownPending } = useCardArtworkState(
+    type,
+    item.id,
+    wantsBackdrop ? "cardBackdrop" : "poster",
+  );
+  // undefined = lote en camino; null = sin respuesta (se usa la del motor).
+  const [ladder, setLadder] = useState(() => peekListArtwork(type, item.id));
+  useEffect(() => {
+    const peeked = peekListArtwork(type, item.id);
+    setLadder(peeked);
+    if (peeked !== undefined) return undefined;
+    let alive = true;
+    requestListArtwork(type, item.id).then((picks) => {
+      if (alive) setLadder(picks ?? null);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [type, item.id]);
+
+  const ladderPath = wantsBackdrop
+    ? ladder?.cardBackdrop || ladder?.previewBackdrop
+    : ladder?.poster;
+  const enginePath = wantsBackdrop
+    ? item.backdrop_path || item.poster_path
+    : item.poster_path || item.backdrop_path;
+  const pending = !ownPath && (ownPending || ladder === undefined);
+  const [failedPath, setFailedPath] = useState(null);
+  let path = ownPath || (pending ? null : ladderPath || enginePath || null);
+  if (path && path === failedPath) path = enginePath !== path ? enginePath : null;
+  const src = path ? `${IMG}/${wantsBackdrop ? "w780" : "w500"}${path}` : null;
+  const { imgRef, onLoad, ready, instant } = useImageLoadReady(src);
+
+  return (
+    <div className="relative h-full w-full bg-zinc-900">
+      {!src && !pending ? (
+        <div className="absolute inset-0 flex items-center justify-center text-zinc-700">
+          <Film className="h-8 w-8 opacity-60" />
+        </div>
+      ) : null}
+      {src ? (
+        <OptimizedImage
+          ref={imgRef}
+          src={src}
+          alt={title}
+          loading="lazy"
+          decoding="async"
+          onLoad={onLoad}
+          onError={() => setFailedPath(path)}
+          className={`absolute inset-0 h-full w-full object-cover ${
+            instant ? "" : "transition-opacity duration-300"
+          } ${ready ? "opacity-100" : "opacity-0"}`}
+        />
+      ) : null}
+    </div>
+  );
 }
 
 function isAbortError(e) {
@@ -784,13 +843,7 @@ function DiscoverCard({
   const aspectRatio =
     effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
   const image = (
-    <OptimizedImage
-      src={imageSrc(item, effectiveImageMode)}
-      alt={title}
-      className="h-full w-full object-cover"
-      loading="lazy"
-      decoding="async"
-    />
+    <DiscoverCardImage item={item} type={type} mode={effectiveImageMode} title={title} />
   );
   const shellClassName =
     "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
@@ -2037,13 +2090,6 @@ export default function DiscoverClient() {
         ) : null}
 
         <main className="relative min-h-[50vh]">
-          {loading && items.length === 0 && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500 mb-4" />
-              <p className="text-zinc-500 text-sm">Buscando títulos...</p>
-            </div>
-          )}
-
           {error && items.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 backdrop-blur-md text-red-200 text-sm">
@@ -2090,11 +2136,7 @@ export default function DiscoverClient() {
 
               {/* Marca del final: al acercarse a la pantalla, otra página. */}
               <div ref={sentinelRef} aria-hidden="true" className="h-px" />
-              <div className="flex h-20 items-center justify-center">
-                {loadingMore ? (
-                  <Loader2 className="w-6 h-6 animate-spin text-orange-500" aria-label="Cargando más" />
-                ) : null}
-              </div>
+              <div className="h-20" />
             </div>
           )}
         </main>

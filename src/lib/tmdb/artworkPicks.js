@@ -102,6 +102,9 @@ export function pickListArtwork(images, { originalLanguage } = {}) {
     poster,
     previewPoster: poster,
     previewBackdrop: pickLadderBackdrop(backdrops, { originalLanguage, minWidth: 780 })?.file_path || null,
+    // El de las tarjetas backdrop de Favoritos y Pendientes (mismo selector y
+    // ancho mínimo), para las páginas que lo piden por lote (Descubrir).
+    cardBackdrop: pickLadderBackdrop(backdrops, { originalLanguage })?.file_path || null,
     textlessPoster,
     coverPoster:
       textlessPoster ||
