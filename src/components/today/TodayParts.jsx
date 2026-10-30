@@ -142,7 +142,7 @@ export function StoryRail({ groups, seen, onOpen }) {
                 aria-label={`Ver historia de ${group.kind === "for-you" ? "Para ti" : group.media?.title}`}
               >
                 <span
-                  className={`rounded-full p-[2.5px] transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-pink-400 ${
+                  className={`sv-bar-lift rounded-full p-[2.5px] transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-pink-400 ${
                     unseen ? "bg-gradient-to-tr from-amber-400 via-pink-500 to-fuchsia-600" : "bg-zinc-700"
                   }`}
                 >
@@ -246,7 +246,7 @@ export function TodayHero({ story, tz, onPlay, onOpenPerson }) {
           type="button"
           onClick={onPlay}
           aria-label={`Reproducir la historia de ${story.media.title}`}
-          className="mx-auto my-5 block w-[38%] max-w-[170px] transition-transform duration-300 hover:scale-[1.03] focus-visible:outline-none"
+          className="sv-bar-lift mx-auto my-5 block w-[38%] max-w-[170px] transition-transform duration-300 hover:scale-[1.03] focus-visible:outline-none"
         >
           <Poster media={story.media} size="w342" className="aspect-[2/3] w-full rounded-xl shadow-2xl" />
         </button>

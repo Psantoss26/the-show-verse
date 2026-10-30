@@ -443,7 +443,8 @@ export default async function usersRoutes(fastify) {
       .insert(follows)
       .values({ followerId: req.user.id, followingId: target.id })
       .onConflictDoNothing();
-    await invalidateTodayFollowing(req.user.id);
+    // También el seguido: su columna «Seguimientos» de Hoy lo cuenta.
+    await Promise.all([invalidateTodayFollowing(req.user.id), invalidateTodayFollowing(target.id)]);
     // El seguido recibe la alerta «ha empezado a seguirte» (y su push).
     req.pushUserId = target.id;
     return reply.send({ following: true });
@@ -456,7 +457,7 @@ export default async function usersRoutes(fastify) {
     await db
       .delete(follows)
       .where(and(eq(follows.followerId, req.user.id), eq(follows.followingId, target.id)));
-    await invalidateTodayFollowing(req.user.id);
+    await Promise.all([invalidateTodayFollowing(req.user.id), invalidateTodayFollowing(target.id)]);
     return reply.send({ following: false });
   });
 

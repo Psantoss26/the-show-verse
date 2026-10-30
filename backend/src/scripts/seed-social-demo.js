@@ -200,7 +200,7 @@ async function clearTodayCache() {
   if (!redis) return 0;
   try {
     await redis.connect().catch(() => {});
-    const keys = await redis.keys('today:v1:*');
+    const keys = await redis.keys('today:v2:*');
     if (keys.length) await redis.del(...keys);
     return keys.length;
   } catch {

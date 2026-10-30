@@ -3126,6 +3126,15 @@ svg.recharts-surface *:focus {
   backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
 }
 
+/* Tarjetas de Social que se elevan al pasar el cursor y están tapadas en parte
+   por la barra fijada: no se mueven. Detrás del cristal (desenfoque con
+   saturate 190 %) su movimiento parpadeaba como manchas de color sobre los
+   controles. SocialClient pone `data-sv-under-bar` al entrar el cursor. */
+.sv-bar-lift[data-sv-under-bar] {
+  scale: none;
+  translate: none;
+}
+
 /* En móvil, conserva el mismo cristal en reposo que el buscador y escritorio.
    El acabado del navbar solo se aplica al fijarse, mediante data-menu-pinned.
    No interpolar la superficie mientras se anima su geometría. */

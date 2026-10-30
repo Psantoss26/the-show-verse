@@ -60,6 +60,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import Avatar from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import EntranceItem, { estimateVisibleRows } from "@/components/ui/EntranceItem";
 import { useSearchParams } from "next/navigation";
@@ -293,7 +294,7 @@ function CartelEvento({ evento, className = "", backdrop = false, size = "w185" 
       href={href}
       prefetch={false}
       aria-label={`Ver ${evento.title || evento.name || "ficha"}`}
-      className={`${className} shrink-0 overflow-hidden ${fondo} transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70`}
+      className={`${className} shrink-0 overflow-hidden ${fondo} sv-bar-lift transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70`}
     >
       {imagen}
     </Link>
@@ -598,13 +599,39 @@ export default function SocialClient({ initialView = "today", initialToday = {},
   // pide.
   const [agrupar, setAgruparState] = useState(leerAgrupadoGuardado);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  // Buscador de escritorio enfocado: mientras lo está, los desplegables sueltan
-  // su rótulo y su ancho mínimo para dejarle sitio (comportamiento de Historial).
-  const [desktopSearchFocused, setDesktopSearchFocused] = useState(false);
+  // Compactado de la barra de escritorio midiendo lo que cabe (Favoritos).
+  const toolbarSearchFitRef = usePageToolbarSearchFit();
 
   const filtersRef = useRef(null);
   const listaRef = useRef(null);
   const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
+
+  // Tarjetas que se elevan al pasar el cursor (`.sv-bar-lift`) y quedan en
+  // parte DETRÁS de la barra fijada: su movimiento se ve a través del cristal,
+  // que lo desenfoca y lo satura, y al barrer con el cursor las tarjetas de
+  // justo debajo encendían y apagaban manchas de color sobre los controles.
+  // Al entrar en una de ellas se mira si la tapa la barra y, si es así, se
+  // marca con `data-sv-under-bar` para que no se mueva (regla en globals.css).
+  const liftBajoBarraRef = useRef(null);
+  const marcarLiftBajoBarra = useCallback((e) => {
+    const target = e.target instanceof Element ? e.target : null;
+    const lift = target?.closest(".sv-bar-lift") || target?.closest(".group")?.querySelector(".sv-bar-lift") || null;
+    if (liftBajoBarraRef.current && liftBajoBarraRef.current !== lift) {
+      liftBajoBarraRef.current.removeAttribute("data-sv-under-bar");
+      liftBajoBarraRef.current = null;
+    }
+    const barra = filtersRef.current;
+    if (!lift || !barra || barra.getAttribute("data-menu-pinned") !== "true") {
+      lift?.removeAttribute("data-sv-under-bar");
+      return;
+    }
+    if (lift.getBoundingClientRect().top < barra.getBoundingClientRect().bottom) {
+      lift.setAttribute("data-sv-under-bar", "");
+      liftBajoBarraRef.current = lift;
+    } else {
+      lift.removeAttribute("data-sv-under-bar");
+    }
+  }, []);
 
   const setVista = useCallback((modo) => {
     setVistaState(modo);
@@ -815,17 +842,17 @@ export default function SocialClient({ initialView = "today", initialToday = {},
     "bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg";
   const activo = "bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white shadow-lg shadow-pink-500/20";
 
-  // Desplegables de Hoy. El día lleva el recuento de su pestaña; «Ayer» es el
-  // primer día anterior y el resto de la semana va por su nombre.
+  // Desplegables de Hoy. Cada día lleva el recuento de su pestaña en una
+  // insignia (como Portadas y fondos); el botón muestra solo el día. «Ayer» es
+  // el primer día anterior y el resto de la semana va por su nombre.
   const cuenta = (key) => hoyDias?.find((d) => d.key === key)?.count;
-  const conCuenta = (etiqueta, n) => (typeof n === "number" ? `${etiqueta} · ${n}` : etiqueta);
   const diaValor = hoyDia === "yesterday" ? hoyDias?.[1]?.key || "yesterday" : hoyDia;
   const opcionesDia = [
-    ["today", conCuenta("Hoy", cuenta("today"))],
+    ["today", "Hoy", cuenta("today")],
     ...(hoyDias || [])
       .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d.key))
-      .map((d, i) => [d.key, conCuenta(dayTabLabel(d.key, i + 1), d.count)]),
-    ["week", conCuenta("Semana", cuenta("week"))],
+      .map((d, i) => [d.key, dayTabLabel(d.key, i + 1), d.count]),
+    ["week", "Semana", cuenta("week")],
   ];
   if (!opcionesDia.some(([v]) => v === diaValor)) {
     opcionesDia.splice(1, 0, [diaValor, diaValor === "yesterday" ? "Ayer" : diaValor]);
@@ -851,16 +878,19 @@ export default function SocialClient({ initialView = "today", initialToday = {},
   const placeholder = esHoy ? "Buscar en Hoy..." : "Buscar en la actividad...";
 
   return (
-    <div>
+    <div onPointerOver={marcarLiftBajoBarra}>
       <div className="relative">
 
         {/* BARRA DE FILTROS (sticky, con el cristal del navbar al fijarse) */}
         <motion.div
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          className="relative sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] mb-6 space-y-1 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6"
-          initial={isBackNav ? false : { opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          // Como la de Favoritos e Historial: framer solo funde y la subida va
+          // en CSS (`.sv-toolbar-rise`, con `translate`). Animar `y` con framer
+          // bajo `transition-all` hacía que CSS persiguiera cada fotograma.
+          className={`${isBackNav ? "" : "sv-toolbar-rise "}relative sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] mb-6 space-y-1 ${isBackNav ? "transition-none" : "transition-all duration-300"} sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6`}
+          initial={isBackNav ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.3 }}
         >
           {/* Móvil: buscador + desplegar filtros */}
@@ -962,8 +992,11 @@ export default function SocialClient({ initialView = "today", initialToday = {},
             )}
           </MobileOptionsSheet>
 
-          {/* Escritorio: todo en una fila */}
-          <div className="relative z-10 hidden gap-3 lg:flex">
+          {/* Escritorio: todo en una fila, la MISMA barra que Favoritos e
+              Historial (`.sv-page-toolbar`): al estrecharse, los desplegables
+              pierden rótulo y luego valor, y el buscador pasa a lupa midiendo
+              lo que cabe (usePageToolbarSearchFit). */}
+          <div ref={toolbarSearchFitRef} className="sv-page-toolbar relative z-10 hidden gap-3 lg:flex">
             {/* El selector de alcance abre la barra: es el control que decide
                 QUÉ se está viendo, así que va antes que los filtros. */}
             <SelectorAlcance
@@ -972,22 +1005,29 @@ export default function SocialClient({ initialView = "today", initialToday = {},
               controlGlass={controlGlass}
               activo={activo}
             />
-            <div className="relative min-w-[220px] flex-1">
+            <div className="sv-page-toolbar-search relative flex-1">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-pink-500" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                onFocus={() => setDesktopSearchFocused(true)}
-                onBlur={() => setDesktopSearchFocused(false)}
                 placeholder={placeholder}
                 className={`h-11 w-full rounded-2xl py-2.5 pl-10 pr-10 text-sm text-white transition-all placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50 ${controlGlass}`}
               />
+              {q ? (
+                <button
+                  type="button"
+                  onClick={() => setQ("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-white/10"
+                >
+                  <X className="h-3.5 w-3.5 text-zinc-400" />
+                </button>
+              ) : null}
             </div>
             {esHoy ? (
               <>
-                {selectorQuien({ compact: desktopSearchFocused })}
-                {selectorDia({ compact: desktopSearchFocused })}
-                {selectorAgruparHoy({ compact: desktopSearchFocused })}
+                {selectorQuien()}
+                {selectorDia()}
+                {selectorAgruparHoy()}
                 <SelectorVista
                   vista={hoyVista}
                   setVista={setHoyVista}
@@ -1004,7 +1044,6 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                   opciones={FILTROS}
                   valor={filtro}
                   onChange={setFiltro}
-                  compact={desktopSearchFocused}
                 />
                 <SelectorSimple
                   icon={Layers3}
@@ -1012,7 +1051,6 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                   opciones={SOCIAL_GROUP_OPTIONS}
                   valor={agrupar}
                   onChange={setAgrupar}
-                  compact={desktopSearchFocused}
                 />
                 <SelectorSimple
                   icon={ArrowUpDown}
@@ -1023,7 +1061,6 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                   ]}
                   valor={orden}
                   onChange={setOrden}
-                  compact={desktopSearchFocused}
                 />
                 <SelectorVista
                   vista={vista}
@@ -1206,7 +1243,6 @@ function InlineDropdownMenu({
   mobileValueLabel = null,
   icon: Icon,
   children,
-  compact = false,
   compactMobile = false,
 }) {
   const [open, setOpen] = useState(false);
@@ -1215,23 +1251,26 @@ function InlineDropdownMenu({
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
 
+  // Igual que en Favoritos: el menú mide lo que su CONTENIDO, nunca menos que
+  // su botón (que en la barra estrecha se queda en un icono) ni más que la
+  // ventana.
   const updateMenuPosition = useCallback(() => {
     if (!buttonRef.current || typeof window === "undefined") return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const menuWidth = Math.min(
-      Math.max(rect.width, 180),
-      window.innerWidth - 24,
-    );
+    const menuMaxWidth = window.innerWidth - 24;
+    const measured = menuRef.current?.offsetWidth || rect.width;
     const left = Math.min(
       Math.max(12, rect.left),
-      Math.max(12, window.innerWidth - menuWidth - 12),
+      Math.max(12, window.innerWidth - Math.min(measured, menuMaxWidth) - 12),
     );
     const availableBelow = window.innerHeight - rect.bottom - 12;
     setMenuStyle({
       position: "fixed",
       top: rect.bottom + 8,
       left,
-      width: menuWidth,
+      width: "max-content",
+      minWidth: rect.width,
+      maxWidth: menuMaxWidth,
       maxHeight: Math.max(64, Math.min(448, availableBelow)),
       zIndex: 1000,
     });
@@ -1262,44 +1301,29 @@ function InlineDropdownMenu({
 
   return (
     <div ref={ref} className="relative w-full min-w-0 lg:w-auto lg:shrink">
+      {/* El botón de la barra de Favoritos: las clases `sv-page-toolbar-*`
+          dejan que la barra lo compacte (sin rótulo, luego solo icono). */}
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        // Al enfocar el buscador de escritorio, el rótulo se pliega y el botón
-        // suelta su ancho mínimo: es lo que permite que la fila entera quepa en
-        // 1024px sin desbordar (mismo mecanismo que Historial).
-        aria-label={compact ? `${label}: ${valueLabel}` : undefined}
-        // `gap-2` en móvil: con el selector de tres vistas a su lado, a «ORDEN:
-        // Reciente» le faltaban 4 px y se cortaba.
-        className={`inline-flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition-[min-width,background-color,color] hover:from-white/15 hover:to-white/10 lg:w-auto lg:max-w-none lg:gap-3 ${
-          compact ? "lg:min-w-0" : "lg:min-w-[140px]"
-        }`}
+        aria-label={`${label}: ${valueLabel}`}
+        className="sv-page-toolbar-trigger inline-flex h-11 w-full min-w-0 items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 lg:w-auto lg:min-w-[140px] lg:max-w-none"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon ? <Icon className="h-4 w-4 shrink-0 text-pink-500" /> : null}
-          {/* En el móvil, con el botón a media fila, el rótulo se lleva el sitio
-              que necesita el valor ("ORDEN: Re…"): ahí se esconde y manda el
-              icono, igual que hacen las páginas de usuario. */}
           <span
-            aria-hidden={compact}
-            className={`shrink-0 overflow-hidden whitespace-nowrap text-xs font-bold uppercase tracking-wider text-zinc-500 transition-[max-width,opacity] duration-200 ${
-              compact ? "max-w-0 opacity-0" : "max-w-24 opacity-100"
-            } ${compactMobile ? "hidden sm:inline" : ""}`}
+            className={`sv-page-toolbar-label text-xs font-bold uppercase tracking-wider text-zinc-500 ${
+              compactMobile ? "hidden sm:inline" : ""
+            }`}
           >
             {label}:
           </span>
-          <span className="min-w-0 truncate font-semibold text-white">
-            {/* En móvil, donde el botón ocupa media fila, se usa la versión
-                abreviada; a partir de `lg` cabe entera. */}
-            {mobileValueLabel ? (
-              <>
-                <span className="lg:hidden">{mobileValueLabel}</span>
-                <span className="hidden lg:inline">{valueLabel}</span>
-              </>
-            ) : (
-              valueLabel
-            )}
+          <span className="sv-page-toolbar-value hidden min-w-0 truncate font-semibold text-white sm:inline lg:overflow-visible lg:whitespace-nowrap">
+            {valueLabel}
+          </span>
+          <span className="sv-page-toolbar-value min-w-0 truncate font-semibold text-white sm:hidden">
+            {mobileValueLabel || valueLabel}
           </span>
         </div>
         <ChevronDown
@@ -1318,9 +1342,7 @@ function InlineDropdownMenu({
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
                 className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl backdrop-blur-2xl"
-                style={{
-                  ...menuStyle,
-                }}
+                style={menuStyle}
               >
                 <div
                   className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
@@ -1340,24 +1362,34 @@ function InlineDropdownMenu({
 // Dentro de la hoja de filtros móvil, cada opción es una píldora.
 function DropdownItem(props) {
   if (useInOptionsSheet()) {
-    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+    return <SheetOption active={props.active} onClick={props.onClick} count={props.count}>{props.children}</SheetOption>;
   }
   return <DropdownMenuItem {...props} />;
 }
 
-function DropdownMenuItem({ active, onClick, children }) {
+// `count`: insignia con el número de elementos de la opción, la misma de
+// CreditFilterControls (Portadas y fondos).
+function DropdownMenuItem({ active, onClick, children, count = null }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
+      className={`flex w-full items-center justify-between gap-6 rounded-xl px-3 py-2 text-left text-sm transition ${
         active
           ? "bg-white/10 font-bold text-white"
           : "text-zinc-300 hover:bg-white/5 hover:text-white"
       }`}
     >
-      <span className="font-medium">{children}</span>
-      {active ? <CheckCircle2 className="h-4 w-4 text-pink-500" /> : null}
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="whitespace-nowrap font-medium">{children}</span>
+        {count != null ? (
+          // `pt-px`: centra las cifras de PT Sans (ver SheetOption).
+          <span className="inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.08] px-1.5 pt-px text-[11px] font-bold tabular-nums leading-none text-zinc-400">
+            {count}
+          </span>
+        ) : null}
+      </span>
+      {active ? <CheckCircle2 className="h-4 w-4 shrink-0 text-pink-500" /> : null}
     </button>
   );
 }
@@ -1373,7 +1405,6 @@ function SelectorSimple({
   opciones,
   valor,
   onChange,
-  compact = false,
   compactMobile = false,
   etiquetasCortas = null,
 }) {
@@ -1385,15 +1416,15 @@ function SelectorSimple({
       valueLabel={actual}
       mobileValueLabel={corta}
       icon={icon}
-      compact={compact}
       compactMobile={compactMobile}
     >
       {({ close }) => (
         <>
-          {opciones.map(([v, etiqueta]) => (
+          {opciones.map(([v, etiqueta, count]) => (
             <DropdownItem
               key={v}
               active={valor === v}
+              count={typeof count === "number" ? count : null}
               onClick={() => {
                 onChange(v);
                 close();

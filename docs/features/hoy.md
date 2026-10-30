@@ -16,9 +16,11 @@ Vista por defecto de la sección Social (`/social`): lo más destacado de lo que
 
 Hoy es una opción más de la barra sticky de Social (`SocialClient`), junto a Siguiendo y Yo; en la barra se rotula «Actividad»: **Actividad / Siguiendo / Yo**. La barra es la misma en las tres opciones; con Actividad sus desplegables pasan a ser:
 - **Quién:** Siguiendo o Comunidad.
-- **Día:** Hoy, Ayer, cada día de la semana y Semana, con su recuento.
+- **Día:** Hoy, Ayer, cada día de la semana y Semana. Cada opción lleva su recuento en una insignia redonda, la misma que el número de elementos de los desplegables de Portadas y fondos; el botón muestra solo el día elegido.
 - **Agrupar:** por título, por persona o por hora.
 - **Vista** (botones de icono): rejilla de carteles o lista. Se recuerda en `localStorage` (`showverse:social:todayLayout`), aparte de la vista de Siguiendo / Yo.
+
+En escritorio es la MISMA barra que Favoritos e Historial: entra con el fundido de framer y la subida en CSS (`.sv-toolbar-rise`); los desplegables usan las clases `sv-page-toolbar-*` y la fila `.sv-page-toolbar` se compacta midiendo lo que cabe (`usePageToolbarSearchFit`): primero sin rótulos, luego solo iconos, y el buscador pasa a lupa cuando su texto no cabe. Cada desplegable mide lo que su contenido. Al fijarse bajo el navbar, sus superficies toman el cristal del navbar (`[data-menu-pinned]`). Las tarjetas que se elevan al pasar el cursor (`.sv-bar-lift`: historia destacada, anillos de historias, carteles y miniaturas de la actividad) no se mueven si la barra fijada las tapa en parte (`data-sv-under-bar`, lo pone `SocialClient` al entrar el cursor): detrás del cristal, que satura, su movimiento parpadeaba como manchas de color sobre los controles.
 
 El buscador filtra lo de Hoy por título o persona. En móvil, como el resto de menús, van en la hoja de filtros (`MobileOptionsSheet`). `TodayClient` es controlado: recibe esos valores como props y devuelve los recuentos de los días (`onDaysChange`). `SocialHub` (`src/app/social/SocialHub.jsx`) pone el fondo y la cabecera «Social.» con las cifras (Siguiendo, Seguidores, Activos). Cambiar de opción solo reescribe la URL, sin volver a pedir el RSC.
 
@@ -87,7 +89,7 @@ Maqueta como la Today de Trakt. En escritorio hay tres columnas con su título a
   - por título (por defecto);
   - por persona, con un bloque por persona;
   - por hora, en franjas mañana 5–12, tarde 12–18, noche 18–23 y madrugada. La madrugada cuenta como el final del día anterior.
-- **Seguimientos:** quién empezó a seguir a quién en la ventana (`follows` de la respuesta, hasta 30, de `loadFollows` en `todayActivity.js`: el seguidor pasa el filtro de Quién y el seguido tiene que estar activo). No son historias (no tienen título): van en su propio bloque.
+- **Seguimientos:** solo los tuyos: quién empezó a seguirte y a quién empezaste a seguir en la ventana, igual en Siguiendo y en Comunidad (`follows` de la respuesta, hasta 30, de `loadViewerFollows` en `todayActivity.js`; las dos cuentas tienen que estar activas). Los seguimientos entre otras personas no se muestran. En Comunidad se calculan fuera de la respuesta compartida, como «Para ti», y seguir o dejar de seguir borra la caché de Hoy de las dos cuentas. No son historias (no tienen título): van en su propio bloque.
 - **Más activos:** las 5 personas con más acciones en la ventana: puesto, cara, nombre, «N historias» y una barra fina proporcional al primero.
 - **Panel de persona** (`TodayPersonDrawer`): el mismo panel lateral que las secciones de DetailsClient (`SectionSheet`, acento `pink` y la foto en `leading`). Tiene:
   - pestañas Todo / Vistos / Notas / Reseñas con recuento;

@@ -8,7 +8,7 @@
 // cuenta), aquí hay una consulta por tabla para TODAS las cuentas a la vez,
 // acotada por fecha: el coste depende de la ventana, no de a cuántos sigues.
 
-import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm';
 
 import {
   follows,
@@ -49,8 +49,8 @@ const CACHE_TTL = { following: 30, community: 60 };
 
 export function todayCacheKey(scope, viewerId, day, tz) {
   return scope === 'community'
-    ? `today:v1:community:${tz}:${day}`
-    : `today:v1:following:${viewerId}:${day}`;
+    ? `today:v2:community:${tz}:${day}`
+    : `today:v2:following:${viewerId}:${day}`;
 }
 
 /** Al seguir o dejar de seguir, la pestaña Siguiendo debe cambiar ya. */
@@ -142,11 +142,11 @@ async function loadSourceRows(db, scope, followingIds, startAt, endAt) {
   ]);
 }
 
-// Seguimientos del día elegido: quién empezó a seguir a quién. Sin título, así
-// que no entran en las historias; van en su propio bloque. El seguidor pasa el
-// mismo filtro que el resto de autores y el seguido tiene que estar activo.
-async function loadFollows(db, scope, followingIds, range) {
-  if (scope === 'following' && !followingIds.length) return [];
+// Seguimientos del día elegido, solo los del que mira: quién empezó a seguirle
+// y a quién empezó a seguir él. Sin título, así que no entran en las historias;
+// van en su propio bloque. Igual en Siguiendo y en Comunidad (los seguimientos
+// entre terceros no se enseñan), y las dos cuentas tienen que estar activas.
+async function loadViewerFollows(db, viewerId, range) {
   const rows = await db
     .select({
       id: follows.id,
@@ -155,21 +155,25 @@ async function loadFollows(db, scope, followingIds, range) {
       at: follows.createdAt,
     })
     .from(follows)
-    .innerJoin(users, eq(users.id, follows.followingId))
     .where(and(
-      authorFilter(scope, follows.followerId, followingIds),
-      eq(users.isActive, true),
+      or(eq(follows.followerId, viewerId), eq(follows.followingId, viewerId)),
+      sql`${follows.followerId} in (select u.id from users u where u.is_active = true)`,
+      sql`${follows.followingId} in (select u.id from users u where u.is_active = true)`,
       gte(follows.createdAt, new Date(range.startAt)),
       lt(follows.createdAt, new Date(range.endAt)),
     ))
     .orderBy(desc(follows.createdAt))
     .limit(FOLLOWS_MAX);
-  return rows.map((row) => ({
-    key: `follow:${row.id}`,
-    followerId: row.followerId,
-    followingId: row.followingId,
-    at: new Date(row.at).toISOString(),
-  }));
+  if (!rows.length) return [];
+  const authors = await loadAuthors(db, [...new Set(rows.flatMap((row) => [row.followerId, row.followingId]))]);
+  return rows
+    .map((row) => ({
+      key: `follow:${row.id}`,
+      at: new Date(row.at).toISOString(),
+      user: authors.get(row.followerId) || null,
+      target: authors.get(row.followingId) || null,
+    }))
+    .filter((follow) => follow.user && follow.target);
 }
 
 function imagePaths(meta) {
@@ -307,7 +311,9 @@ async function loadForYou(db, viewerId, range, tz) {
     .slice(0, FOR_YOU_MAX);
 }
 
-async function buildToday(db, viewerId, { scope, range, tz, nowMs, withForYou = true }) {
+// `withViewer`: «Para ti» y los seguimientos, que dependen del que mira. En
+// Comunidad van fuera de la respuesta compartida.
+async function buildToday(db, viewerId, { scope, range, tz, nowMs, withViewer = true }) {
   let followingIds = [];
   let followingCount = 0;
   if (scope === 'following') {
@@ -336,26 +342,15 @@ async function buildToday(db, viewerId, { scope, range, tz, nowMs, withForYou = 
   const counted = countActionsByDay(all, [...days, week]);
   const selected = actionsInRange(all, range);
 
-  const followRows = await loadFollows(db, scope, followingIds, range).catch(() => []);
-  const [hydrated, authors, forYou] = await Promise.all([
+  const [hydrated, authors, forYou, followEvents] = await Promise.all([
     hydrateActions(db, selected),
-    loadAuthors(db, [...new Set([
-      ...selected.map((a) => a.userId),
-      ...followRows.flatMap((f) => [f.followerId, f.followingId]),
-    ])]),
-    withForYou ? loadForYou(db, viewerId, range, tz).catch(() => []) : null,
+    loadAuthors(db, [...new Set(selected.map((a) => a.userId))]),
+    withViewer ? loadForYou(db, viewerId, range, tz).catch(() => []) : null,
+    withViewer ? loadViewerFollows(db, viewerId, range).catch(() => []) : [],
   ]);
   const actions = hydrated
     .map(({ userId, mediaType, tmdbId, ...action }) => ({ ...action, user: authors.get(userId) || null }))
     .filter((action) => action.user);
-  const followEvents = followRows
-    .map(({ key, at, followerId, followingId }) => ({
-      key,
-      at,
-      user: authors.get(followerId) || null,
-      target: authors.get(followingId) || null,
-    }))
-    .filter((follow) => follow.user && follow.target);
 
   return {
     scope,
@@ -403,20 +398,26 @@ export async function getTodayActivity(db, viewer, { scope, day, now = Date.now(
   // Las fechas sueltas (?day=YYYY-MM-DD) no se cachean: son raras y no se
   // invalidarían al seguir a alguien.
   const cacheable = ['today', 'week'].includes(range.day) || day === 'yesterday';
-  const run = (withForYou = true) => buildToday(db, viewer.id, { scope: normalizedScope, range, tz, nowMs: now, withForYou });
+  const run = (withViewer = true) => buildToday(db, viewer.id, { scope: normalizedScope, range, tz, nowMs: now, withViewer });
 
   if (normalizedScope === 'following') {
     if (!cacheable) return run();
     return withCache(todayCacheKey('following', viewer.id, day || 'today', tz), CACHE_TTL.following, run);
   }
 
-  // Comunidad: lo de todos se cachea compartido; «Para ti» y a quién sigue el
-  // que mira dependen de él y se calculan aparte.
-  const [shared, forYou] = await Promise.all([
+  // Comunidad: lo de todos se cachea compartido; «Para ti», sus seguimientos y
+  // a quién sigue el que mira dependen de él y se calculan aparte.
+  const [shared, forYou, viewerFollowEvents] = await Promise.all([
     cacheable
       ? withCache(todayCacheKey('community', viewer.id, day || 'today', tz), CACHE_TTL.community, () => run(false))
       : run(false),
     loadForYou(db, viewer.id, range, tz).catch(() => []),
+    loadViewerFollows(db, viewer.id, range).catch(() => []),
   ]);
-  return { ...shared, forYou, viewerFollows: await viewerFollowsAmong(db, viewer.id, shared?.actions) };
+  return {
+    ...shared,
+    forYou,
+    follows: viewerFollowEvents,
+    viewerFollows: await viewerFollowsAmong(db, viewer.id, shared?.actions),
+  };
 }
