@@ -49,6 +49,12 @@ function userPageColumns(viewMode, imageMode) {
     : { base: 3, sm: 4, md: 5, lg: 6, xl: 6 };
 }
 
+// Columnas de la rejilla de Favoritos/Pendientes (y Descubrir) en la vista
+// actual, sin medir el DOM.
+export function estimateUserPageColumns({ viewMode, imageMode } = {}) {
+  return pickResponsiveColumns(userPageColumns(viewMode, imageMode));
+}
+
 // Tarjetas que cubren la pantalla en Favoritos/Pendientes. Sirve para las dos
 // decisiones de la entrada: cuántas se ANIMAN y cuántas se MONTAN en la primera
 // tanda. Si se montaban menos de las que se ven (antes, 24 fijas: tres filas en

@@ -31,7 +31,10 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import useCardEntrance from "@/hooks/useCardEntrance";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
-import { estimateUserPageEntranceCount } from "@/lib/ui/entranceFill";
+import {
+  estimateUserPageColumns,
+  estimateUserPageEntranceCount,
+} from "@/lib/ui/entranceFill";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import {
   SlidersHorizontal,
@@ -624,6 +627,8 @@ function SingleRange({ min, max, value, onChange, step = 1, label, format = (v) 
 const TMDB_MAX_PAGES = 500;
 // Margen bajo la pantalla que se deja ya cargado (px).
 const FILL_AHEAD_PX = 800;
+// Tope de páginas de TMDb por tanda (filtros muy estrictos, p. ej. IMDb).
+const MAX_PAGES_PER_BATCH = 8;
 
 // Campo de cristal de la hoja (buscadores y fechas).
 const SHEET_INPUT =
@@ -1030,20 +1035,40 @@ export default function DiscoverClient() {
   const keywordTimer = useRef(null);
   const [items, setItems] = useState([]);
   const [totalResults, setTotalResults] = useState(null);
-  const [totalPages, setTotalPages] = useState(1);
-  // Petición de página en curso: evita pedir dos veces la siguiente entre el
-  // `setPage` y el efecto que la carga.
-  const pageRequestRef = useRef(false);
-  const gridRef = useRef(null);
+  const [hasMore, setHasMore] = useState(false);
+  // Siguiente página de TMDb a pedir, tanda «más» en curso y copia de los
+  // títulos para leerlos desde la tanda sin depender del render.
+  const nextPageRef = useRef(1);
+  const moreAbortRef = useRef(null);
+  const itemsRef = useRef(items);
   const sentinelRef = useRef(null);
-  const [gridColumns, setGridColumns] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
 
   const hasSession = hydrated && !!session && !!account?.id;
   const imdbActive = debouncedImdbRange[0] > 0 || debouncedImdbRange[1] < 10;
+
+  // NO SE PIDE NADA HASTA QUE LOS FILTROS ESTÁN ASENTADOS.
+  //
+  // Los deslizadores van con retardo (useDebounce). Al restaurar los filtros
+  // guardados, los valores con retardo seguían 500 ms en los de por defecto:
+  // se cargaba la página sin esos filtros, el relleno de pantalla pedía más
+  // páginas y, al llegar los valores buenos, todo se sustituía por la página 1
+  // filtrada (parpadeo, contenido que desaparece y vuelve a cargarse). Igual
+  // con «Por ver» / «Vistas» antes de tener la sesión y los títulos valorados.
+  const sameRange = (a, b) => a[0] === b[0] && a[1] === b[1];
+  const filtersSettled =
+    sameRange(scoreRange, debouncedScoreRange) &&
+    sameRange(imdbRange, debouncedImdbRange) &&
+    sameRange(runtimeRange, debouncedRuntimeRange) &&
+    minVotes === debouncedMinVotes;
+  const seenReady =
+    seenMode === "all" ||
+    (hydrated &&
+      (!hasSession ||
+        ((content === "tv" || ratedMovieIds !== null) &&
+          (content === "movie" || ratedTvIds !== null))));
 
   useEffect(() => {
     const savedFilters = loadFiltersFromStorage();
@@ -1132,7 +1157,6 @@ export default function DiscoverClient() {
     setKeywordQuery("");
     setKeywordOptions([]);
     setSelectedKeywords([]);
-    setPage(1);
   }
 
   function sortByFor(type) {
@@ -1307,7 +1331,6 @@ export default function DiscoverClient() {
   const discoverParams = useMemo(() => {
     const base = {
       include_adult: "false",
-      page,
       watch_region: REGION,
     };
     if (selectedProviders.length)
@@ -1343,22 +1366,28 @@ export default function DiscoverClient() {
     debouncedMinVotes,
     debouncedRuntimeRange,
     selectedKeywords,
-    page,
   ]);
 
   // --- Fetch Items ---
-  useEffect(() => {
-    if (!filtersReady) return;
-
-    let cancelled = false;
-    const ac = new AbortController();
+  //
+  // CARGA EN TANDAS COMPLETAS. Antes se pedía una página de TMDb, se pintaba,
+  // se medían las columnas de la rejilla ya pintada (recortando la fila a
+  // medias un fotograma después) y se pedía la siguiente al ver la pantalla sin
+  // llenar: el contenido aparecía a trozos y la segunda fila se cortaba. Ahora
+  // se piden las páginas necesarias para llenar la pantalla (o la tanda
+  // siguiente) y se pinta TODO de una vez, ya en filas completas con las
+  // columnas calculadas de antemano.
+  //
+  // Una página de TMDb, con los filtros que se aplican en el cliente (vistas,
+  // IMDb y, en la búsqueda por título, los que /search no admite).
+  const fetchPage = async (pageNum, signal) => {
     async function fetchDiscoverForType(type) {
-      const params = { ...discoverParams, sort_by: sortByFor(type) };
+      const params = { ...discoverParams, page: pageNum, sort_by: sortByFor(type) };
       // Fechas con la clave de cada tipo (también con «Todo»).
       const dateKey = type === "movie" ? "primary_release_date" : "first_air_date";
       if (dateFrom) params[`${dateKey}.gte`] = dateFrom;
       if (dateTo) params[`${dateKey}.lte`] = dateTo;
-      const data = await tmdbFetch(`/discover/${type}`, params, ac.signal);
+      const data = await tmdbFetch(`/discover/${type}`, params, signal);
       return {
         list: (data?.results || []).map((it) => ({ ...it, media_type: type })),
         total: Number(data?.total_results) || 0,
@@ -1372,8 +1401,8 @@ export default function DiscoverClient() {
         content === "movie" ? "/search/movie" : content === "tv" ? "/search/tv" : "/search/multi";
       const data = await tmdbFetch(
         path,
-        { query: debouncedQ, page, include_adult: "false" },
-        ac.signal,
+        { query: debouncedQ, page: pageNum, include_adult: "false" },
+        signal,
       );
       const list = (data?.results || [])
         .map((it) => ({ ...it, media_type: it.media_type || content }))
@@ -1406,10 +1435,8 @@ export default function DiscoverClient() {
     }
     function applySeenFilter(list) {
       if (seenMode === "all" || !hasSession) return list;
-      const mSet = ratedMovieIds;
-      const tSet = ratedTvIds;
       return list.filter((it) => {
-        const set = it.media_type === "movie" ? mSet : tSet;
+        const set = it.media_type === "movie" ? ratedMovieIds : ratedTvIds;
         if (!(set instanceof Set)) return true;
         const has = set.has(it.id);
         return seenMode === "seen" ? has : !has;
@@ -1417,7 +1444,7 @@ export default function DiscoverClient() {
     }
     async function applyImdbFilter(list) {
       if (!imdbActive) return list;
-      const scores = await fetchDiscoverImdbScores(list, ac.signal);
+      const scores = await fetchDiscoverImdbScores(list, signal);
       return list.filter((_, index) => {
         const score = scores[index];
         return (
@@ -1427,69 +1454,108 @@ export default function DiscoverClient() {
         );
       });
     }
-    async function run() {
+
+    let result;
+    if (debouncedQ) {
+      result = await fetchSearch();
+    } else if (content === "movie" || content === "tv") {
+      result = await fetchDiscoverForType(content);
+    } else {
+      const [m, t] = await Promise.all([
+        fetchDiscoverForType("movie"),
+        fetchDiscoverForType("tv"),
+      ]);
+      result = {
+        total: m.total + t.total,
+        pages: Math.max(m.pages, t.pages),
+        list: [...m.list, ...t.list].sort(
+          (a, b) => (b.popularity || 0) - (a.popularity || 0),
+        ),
+      };
+    }
+    return { ...result, list: await applyImdbFilter(applySeenFilter(result.list)) };
+  };
+  const fetchPageRef = useRef(fetchPage);
+  useEffect(() => {
+    fetchPageRef.current = fetchPage;
+  });
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  // Páginas seguidas desde `startPage` hasta reunir `target` títulos nuevos
+  // (o acabarse). Devuelve la tanda entera para pintarla de una vez.
+  const collectBatch = useCallback(async (startPage, existing, target, signal) => {
+    const keys = new Set(existing.map((it) => `${it.media_type}-${it.id}`));
+    const added = [];
+    let total = 0;
+    let pages = 0;
+    let p = startPage;
+    for (;;) {
+      const r = await fetchPageRef.current(p, signal);
+      total = r.total;
+      pages = Math.min(r.pages, TMDB_MAX_PAGES);
+      for (const it of r.list) {
+        const key = `${it.media_type}-${it.id}`;
+        if (keys.has(key)) continue;
+        keys.add(key);
+        added.push(it);
+      }
+      if (added.length >= target || p >= pages || p - startPage + 1 >= MAX_PAGES_PER_BATCH) break;
+      p += 1;
+    }
+    return { added, total, nextPage: p + 1, hasMore: p < pages };
+  }, []);
+
+  // Títulos que llenan la pantalla (y dos filas de margen), redondeado a filas
+  // completas de la vista actual.
+  const batchTarget = useCallback(() => {
+    const cols = Math.max(1, estimateUserPageColumns({ viewMode, imageMode }));
+    const visible = estimateUserPageEntranceCount({ viewMode, imageMode });
+    return Math.ceil(visible / cols) * cols;
+  }, [viewMode, imageMode]);
+  const batchTargetRef = useRef(batchTarget);
+  useEffect(() => {
+    batchTargetRef.current = batchTarget;
+  }, [batchTarget]);
+
+  // Primera tanda: cada vez que cambian los filtros. Lo anterior sigue a la
+  // vista hasta que llega la tanda nueva entera, y se sustituye de golpe.
+  useEffect(() => {
+    if (!filtersReady || !filtersSettled || !seenReady) return;
+
+    const ac = new AbortController();
+    moreAbortRef.current?.abort();
+    moreAbortRef.current = null;
+    setLoadingMore(false);
+    setError(null);
+    setLoading(true);
+    (async () => {
       try {
-        setError(null);
-        if (page === 1) setLoading(true);
-        else setLoadingMore(true);
-
-        let list = [];
-        let total = 0;
-        let pages = 0;
-        if (debouncedQ) {
-          ({ list, total, pages } = await fetchSearch());
-        } else if (content === "movie" || content === "tv") {
-          ({ list, total, pages } = await fetchDiscoverForType(content));
-        } else {
-          const [m, t] = await Promise.all([
-            fetchDiscoverForType("movie"),
-            fetchDiscoverForType("tv"),
-          ]);
-          total = m.total + t.total;
-          pages = Math.max(m.pages, t.pages);
-          list = [...m.list, ...t.list].sort(
-            (a, b) => (b.popularity || 0) - (a.popularity || 0),
-          );
-        }
-        list = await applyImdbFilter(applySeenFilter(list));
-
-        if (cancelled) return;
-        setTotalResults(total);
-        setTotalPages(Math.min(pages, TMDB_MAX_PAGES));
-        setItems((prev) => {
-          if (page === 1) return list;
-          const existingKeys = new Set(
-            prev.map((it) => `${it.media_type}-${it.id}`),
-          );
-          const newItems = list.filter(
-            (it) => !existingKeys.has(`${it.media_type}-${it.id}`),
-          );
-          return [...prev, ...newItems];
-        });
+        const batch = await collectBatch(1, [], batchTargetRef.current(), ac.signal);
+        if (ac.signal.aborted) return;
+        nextPageRef.current = batch.nextPage;
+        setItems(batch.added);
+        setTotalResults(batch.total);
+        setHasMore(batch.hasMore);
       } catch (e) {
         if (!isAbortError(e) && !ac.signal.aborted) {
           console.error(e);
           setError(e?.message || "Error cargando.");
-          // NO limpiar items aquí si es un error temporal
         }
       } finally {
-        if (!cancelled) {
-          pageRequestRef.current = false;
-          setLoading(false);
-          setLoadingMore(false);
-        }
+        if (!ac.signal.aborted) setLoading(false);
       }
-    }
-    run();
-    return () => {
-      cancelled = true;
-      ac.abort();
-    };
+    })();
+    return () => ac.abort();
   }, [
     filtersReady,
+    filtersSettled,
+    seenReady,
+    collectBatch,
     content,
     discoverParams,
-    page,
+    sortPreset,
     seenMode,
     hasSession,
     ratedMovieIds,
@@ -1499,31 +1565,6 @@ export default function DiscoverClient() {
     debouncedQ,
     imdbActive,
     debouncedImdbRange,
-    sortPreset,
-  ]);
-
-  // Reset page on filter change
-  useEffect(() => {
-    if (!filtersReady) return;
-    setPage(1);
-  }, [
-    filtersReady,
-    content,
-    sortPreset,
-    selectedProviders,
-    monetization,
-    selectedGenres,
-    selectedCerts,
-    lang,
-    debouncedScoreRange,
-    debouncedImdbRange,
-    debouncedMinVotes,
-    debouncedRuntimeRange,
-    selectedKeywords,
-    dateFrom,
-    dateTo,
-    seenMode,
-    debouncedQ,
   ]);
 
   const providersFiltered = useMemo(() => {
@@ -1681,52 +1722,64 @@ export default function DiscoverClient() {
 
   // RELLENO DE PANTALLA
   //
-  // Se cargan páginas hasta que la rejilla pasa del borde inferior de la
-  // pantalla (con margen) y, mientras queden páginas, solo se pintan filas
-  // completas: el sobrante entra con la página siguiente. Así nunca queda una
-  // fila a medias ni la parte de abajo vacía.
-  const hasMore = page < totalPages;
-  const hasItems = items.length > 0;
+  // Mientras queden páginas solo se pintan filas completas (columnas
+  // calculadas, no medidas: así el recorte entra en el mismo render y no se ve
+  // una fila que desaparece). Al acercarse el final, otra tanda entera.
+  const [columns, setColumns] = useState(0);
   useEffect(() => {
-    const grid = gridRef.current;
-    if (!grid) return undefined;
-    const measure = () => {
-      const cols = getComputedStyle(grid)
-        .gridTemplateColumns.split(" ")
-        .filter(Boolean).length;
-      setGridColumns(cols);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(grid);
-    return () => observer.disconnect();
-  }, [viewMode, imageMode, hasItems]);
+    const update = () => setColumns(estimateUserPageColumns({ viewMode, imageMode }));
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [viewMode, imageMode]);
 
   const visibleItems = useMemo(() => {
-    if (!hasMore || gridColumns <= 1) return items;
-    return items.slice(0, Math.floor(items.length / gridColumns) * gridColumns);
-  }, [items, hasMore, gridColumns]);
+    if (!hasMore || columns <= 1) return items;
+    return items.slice(0, Math.floor(items.length / columns) * columns);
+  }, [items, hasMore, columns]);
 
-  const fillScreen = useCallback(() => {
-    if (!filtersReady || loading || loadingMore || !hasMore) return;
-    if (pageRequestRef.current) return;
+  const loadMore = useCallback(async () => {
+    if (!filtersReady || !filtersSettled || !seenReady) return;
+    if (loading || !hasMore || moreAbortRef.current) return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
     if (sentinel.getBoundingClientRect().top > window.innerHeight + FILL_AHEAD_PX) return;
-    pageRequestRef.current = true;
-    setPage((p) => p + 1);
-  }, [filtersReady, loading, loadingMore, hasMore]);
 
-  // Tras cada carga (o cambio de vista) y al desplazarse o cambiar el tamaño.
+    const ac = new AbortController();
+    moreAbortRef.current = ac;
+    setLoadingMore(true);
+    try {
+      const existing = itemsRef.current;
+      const batch = await collectBatch(
+        nextPageRef.current,
+        existing,
+        batchTargetRef.current(),
+        ac.signal,
+      );
+      if (ac.signal.aborted) return;
+      nextPageRef.current = batch.nextPage;
+      setItems([...existing, ...batch.added]);
+      setHasMore(batch.hasMore);
+    } catch (e) {
+      if (!isAbortError(e) && !ac.signal.aborted) console.error(e);
+    } finally {
+      if (moreAbortRef.current === ac) {
+        moreAbortRef.current = null;
+        setLoadingMore(false);
+      }
+    }
+  }, [filtersReady, filtersSettled, seenReady, loading, hasMore, collectBatch]);
+
+  // Tras cada tanda (o cambio de vista) y al desplazarse o cambiar el tamaño.
   useEffect(() => {
-    fillScreen();
-    window.addEventListener("scroll", fillScreen, { passive: true });
-    window.addEventListener("resize", fillScreen);
+    loadMore();
+    window.addEventListener("scroll", loadMore, { passive: true });
+    window.addEventListener("resize", loadMore);
     return () => {
-      window.removeEventListener("scroll", fillScreen);
-      window.removeEventListener("resize", fillScreen);
+      window.removeEventListener("scroll", loadMore);
+      window.removeEventListener("resize", loadMore);
     };
-  }, [fillScreen, visibleItems.length, viewMode, imageMode]);
+  }, [loadMore, loadingMore, visibleItems.length]);
 
   const entranceVisibleCount = estimateUserPageEntranceCount({ viewMode, imageMode });
 
@@ -2019,7 +2072,6 @@ export default function DiscoverClient() {
           {items.length > 0 && (
             <div>
               <div
-                ref={gridRef}
                 key={`grid-${viewMode}-${imageMode}`}
                 className={gridClassName}
               >
