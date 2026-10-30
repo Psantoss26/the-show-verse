@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Dashboards (inicio, Películas y Series) en el ordenador y la tableta: las filas de tarjetas backdrop ya no se ven más pequeñas que las de pósters según el ancho de pantalla. Cada tarjeta mide de ancho lo mismo que un póster de alto (300 px; 340 px desde 1280 px), en vez de repartirse la fila en 3-6 columnas, que la dejaba casi del ancho de un póster justo después de cada salto (por ejemplo, a 1280 o 1536 px). → [componentes](docs/frontend/components.md)
 - Continuar viendo en el móvil: en «Filtros y vista», la vista «Compacta» pasa a llamarse «Lista». → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Tarjetas de episodio (temporada y «Episodios» de la ficha de episodio): «EPISODIO N» en mayúsculas. → [componentes](docs/frontend/components.md)
 - Comentarios de una ficha abiertos desde la vista previa (modal o panel lateral): «Mis comentarios anteriores» ya no incluye reseñas tuyas importadas de Trakt, que no se pueden editar ni borrar desde la app (al eliminarlas salía «Comment not found»). Solo aparecen las publicadas en The Show Verse, igual que en la ficha. → [comunidad](docs/features/comunidad.md)

@@ -55,6 +55,7 @@ Piezas específicas de los dashboards (Inicio/Películas/Series/Secciones).
 | `useEngineRows.js` | Hook compartido que pide al backend las filas genéricas + recomendaciones (dedupe/rotación ya resuelta en servidor) para los tres dashboards; cachea en memoria y `localStorage` (`showverse:dashboard:engine:v3:*`). |
 | `DashboardSpotlightPreview.jsx` | Preview "spotlight" de un título dentro del dashboard (acciones rápidas: favorito, watchlist, play). |
 | `HeroSoundtrackPlayer.jsx` | Reproductor de banda sonora (Spotify) integrado en el hero del dashboard. |
+| `DashboardBackdropRow.jsx` | Fila de tarjetas backdrop (16:9) que en el ordenador alterna con las de pósters en los dashboards (`shouldUseDashboardBackdropRow` de `lib/dashboard/rowLayout.js`). En escritorio cada tarjeta tiene ancho fijo, tan ancha como alto es el póster de las filas vecinas (`!w-[300px] xl:!w-[340px]`, `slidesPerView: "auto"`), así que su tamaño no depende del ancho de la pantalla; las visibles enteras (alineación de la vista previa y paso de las flechas) se calculan del ancho de la fila. En el móvil, dos por fila. |
 | `DashboardRankNumber.jsx` | Número de ranking estilizado (estética "cristal") para listas tipo Top 10, con paletas por tono (`movies`, `series`, ...). |
 
 Ver también [[dashboards-implementation|Implementación de dashboards]].
