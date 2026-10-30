@@ -1,25 +1,64 @@
 "use client";
 
 
+// /src/components/DiscoverClient.jsx
+// Descubrir: misma disposición que Favoritos (fondo de manchas del color de la
+// página, cabecera con tres tarjetas, barra fijada con buscador y filtros
+// rápidos, modos de vista e imagen). Los filtros avanzados van en una hoja
+// (MobileOptionsSheet placement="side"): lateral desde 640px, inferior en
+// móvil.
+
 import OptimizedImage from "@/components/OptimizedImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { useAuth } from "@/context/AuthContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import PageStatCard from "@/components/ui/PageStatCard";
+import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import MobileOptionsSheet, {
+  SheetOption,
+  SheetOptionGroup,
+  useInOptionsSheet,
+} from "@/components/ui/MobileOptionsSheet";
+import {
+  ImageModeSegmented,
+  ImageModeSheetGroup,
+} from "@/components/ui/ImageModeSelector";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
+import useCardEntrance from "@/hooks/useCardEntrance";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { estimateUserPageEntranceCount } from "@/lib/ui/entranceFill";
+import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import {
   SlidersHorizontal,
   Loader2,
-  FilmIcon,
-  TvIcon,
+  Film,
+  MonitorPlay,
   RotateCcw,
   ChevronDown,
   X,
-  Check,
+  CheckCircle2,
   Search as SearchIcon,
   Calendar,
   Star,
   Clock,
+  Filter,
+  ArrowUpDown,
+  List,
+  Grid2X2,
+  LayoutGrid,
+  Compass,
+  Eye,
+  Tag,
+  Tv,
+  ShieldCheck,
+  Globe,
+  Hash,
+  Wallet,
 } from "lucide-react";
 
 /* =========================
@@ -45,8 +84,12 @@ const STORAGE_KEYS = {
   MIN_VOTES: "discover_min_votes",
   RUNTIME_RANGE: "discover_runtime_range",
   KEYWORDS: "discover_keywords",
+  KEYWORD_NAMES: "discover_keyword_names",
+  IMDB_RANGE: "discover_imdb_range",
+  MONETIZATION: "discover_monetization",
+  VIEW_MODE: "discover_view_mode",
+  IMAGE_MODE: "discover_image_mode",
 };
-const SECTION_STORAGE_PREFIX = "discover_section_open";
 const discoverImdbScores = new Map();
 const discoverImdbRequests = new Map();
 
@@ -65,18 +108,10 @@ function getDefaultDiscoverFilters() {
     minVotes: 0,
     runtimeRange: [0, 360],
     selectedKeywords: [],
+    keywordNames: {},
+    imdbRange: [0, 10],
+    monetization: [],
   };
-}
-
-function readStoredBoolean(key, fallback = false) {
-  if (typeof window === "undefined" || !key) return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (raw === null) return fallback;
-    return raw === "1";
-  } catch {
-    return fallback;
-  }
 }
 
 // Helper para cargar filtros desde localStorage
@@ -122,6 +157,17 @@ function loadFiltersFromStorage() {
         localStorage.getItem(STORAGE_KEYS.KEYWORDS) ||
           JSON.stringify(defaults.selectedKeywords),
       ),
+      keywordNames: JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.KEYWORD_NAMES) || "{}",
+      ),
+      imdbRange: JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.IMDB_RANGE) ||
+          JSON.stringify(defaults.imdbRange),
+      ),
+      monetization: JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.MONETIZATION) ||
+          JSON.stringify(defaults.monetization),
+      ),
     };
   } catch (e) {
     console.error("Error al cargar filtros desde localStorage:", e);
@@ -163,6 +209,18 @@ function saveFiltersToStorage(filters) {
     localStorage.setItem(
       STORAGE_KEYS.KEYWORDS,
       JSON.stringify(filters.selectedKeywords || []),
+    );
+    localStorage.setItem(
+      STORAGE_KEYS.KEYWORD_NAMES,
+      JSON.stringify(filters.keywordNames || {}),
+    );
+    localStorage.setItem(
+      STORAGE_KEYS.IMDB_RANGE,
+      JSON.stringify(filters.imdbRange || [0, 10]),
+    );
+    localStorage.setItem(
+      STORAGE_KEYS.MONETIZATION,
+      JSON.stringify(filters.monetization || []),
     );
   } catch (e) {
     console.error("Error al guardar filtros en localStorage:", e);
@@ -210,7 +268,13 @@ async function tmdbFetch(path, params = {}, signal) {
   return r.json();
 }
 
-function posterSrc(item) {
+function imageSrc(item, mode = "poster") {
+  if (mode === "backdrop") {
+    if (item?.backdrop_path) return `${IMG}/w780${item.backdrop_path}`;
+    return item?.poster_path
+      ? `${IMG}/w500${item.poster_path}`
+      : "/placeholder-poster.png";
+  }
   const p = item?.poster_path || item?.backdrop_path;
   return p ? `${IMG}/w500${p}` : "/placeholder-poster.png";
 }
@@ -271,118 +335,190 @@ async function fetchDiscoverImdbScore(item) {
   return request;
 }
 
+// Notas de IMDb de una página entera (filtro de IMDb): una sola petición para
+// los que aún no están en la caché.
+async function fetchDiscoverImdbScores(list, signal) {
+  const missing = list.filter((item) => {
+    const key = discoverScoreKey(item);
+    return key && !discoverImdbScores.has(key);
+  });
+  if (missing.length) {
+    try {
+      const response = await fetch("/api/imdb/ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: missing.map((item) => ({
+            key: discoverScoreKey(item),
+            id: item.id,
+            mediaType: item.media_type,
+          })),
+        }),
+        cache: "no-store",
+        signal,
+      });
+      const payload = response.ok ? await response.json().catch(() => null) : null;
+      for (const item of missing) {
+        const key = discoverScoreKey(item);
+        const rating = Number(payload?.items?.[key]?.rating);
+        discoverImdbScores.set(
+          key,
+          Number.isFinite(rating) && rating > 0 ? rating : null,
+        );
+      }
+    } catch (e) {
+      if (isAbortError(e)) throw e;
+    }
+  }
+  return list.map((item) => discoverImdbScores.get(discoverScoreKey(item)) ?? null);
+}
+
 /* =========================
    UI Components
 ========================= */
 
-function Section({
-  title,
-  right,
-  children,
-  defaultOpen = false,
-  overflowVisible = false,
-  storageKey,
-}) {
-  const [open, setOpen] = useState(!!defaultOpen);
-  const [storageReady, setStorageReady] = useState(() => !storageKey);
+const ORANGE_RING = "rgba(249,115,22,0.95)";
+
+// Dentro de la hoja de filtros (MobileOptionsSheet) el desplegable se pinta
+// como un grupo con todas sus opciones a la vista (como en Favoritos).
+function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return (
+      <SheetOptionGroup label={props.label} icon={props.icon}>
+        {props.children}
+      </SheetOptionGroup>
+    );
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  // Mismo criterio que Favoritos: el menú mide lo que su contenido, nunca
+  // menos que su botón ni más que la ventana.
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuMaxWidth = window.innerWidth - 24;
+    const measured = menuRef.current?.offsetWidth || rect.width;
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - Math.min(measured, menuMaxWidth) - 12),
+    );
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: "max-content",
+      minWidth: rect.width,
+      maxWidth: menuMaxWidth,
+      maxHeight: Math.max(64, Math.min(448, availableBelow)),
+      zIndex: 1000,
+    });
+  }, []);
 
   useEffect(() => {
-    if (!storageKey) {
-      setOpen(!!defaultOpen);
-      setStorageReady(true);
-      return;
-    }
-
-    setOpen(readStoredBoolean(storageKey, !!defaultOpen));
-    setStorageReady(true);
-  }, [defaultOpen, storageKey]);
+    if (!open) return;
+    const onDown = (e) => {
+      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
 
   useEffect(() => {
-    if (!storageKey || !storageReady) return;
-    try {
-      window.localStorage.setItem(storageKey, open ? "1" : "0");
-    } catch {
-      // ignore storage write errors
-    }
-  }, [open, storageKey, storageReady]);
+    if (!open) return;
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   return (
-    <details
-      open={open}
-      onToggle={(e) => setOpen(e.currentTarget.open)}
-      className={[
-        "group border-b border-white/5 last:border-0",
-        overflowVisible
-          ? "overflow-visible relative z-[150]"
-          : "overflow-hidden",
-      ].join(" ")}
-    >
-      <summary className="cursor-pointer select-none py-4 flex items-center justify-between hover:text-white transition-colors text-zinc-300">
-        <div className="font-semibold text-sm tracking-wide">{title}</div>
-        <div className="flex items-center gap-2">
-          {right}
-          <ChevronDown
-            className={`w-4 h-4 transition-transform duration-300 ${open ? "rotate-180 text-white" : "text-zinc-500"}`}
-          />
+    <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm sv-page-toolbar-trigger lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          {Icon && <Icon className="w-4 h-4 text-orange-500" />}
+          <span className="sv-page-toolbar-label text-zinc-500 font-bold text-xs uppercase tracking-wider">
+            {label}:
+          </span>
+          <span className="sv-page-toolbar-value min-w-0 truncate font-semibold text-white lg:overflow-visible lg:whitespace-nowrap">
+            {valueLabel}
+          </span>
         </div>
-      </summary>
-      <div className="pb-6 pt-1 animate-in slide-in-from-top-2 duration-200">
-        {children}
-      </div>
-    </details>
+        <ChevronDown
+          className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+                style={menuStyle}
+              >
+                <div
+                  className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
+                  style={{ scrollbarWidth: "thin" }}
+                >
+                  {children({ close: () => setOpen(false) })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
+    </div>
   );
 }
 
-function Chip({ active, children, onClick, className = "" }) {
+// Dentro de la hoja, cada opción es una píldora.
+function DropdownItem({ active, onClick, children }) {
+  if (useInOptionsSheet()) {
+    return (
+      <SheetOption active={active} onClick={onClick}>
+        {children}
+      </SheetOption>
+    );
+  }
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 border
-        ${
-          active
-            ? "bg-orange-500 text-black border-transparent font-bold shadow-[0_0_10px_rgba(249,115,22,0.3)]"
-            : "bg-black/20 backdrop-blur-md border-transparent text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
-        } ${className}`}
+      className={`w-full px-3 py-2 rounded-xl text-left text-sm transition flex items-center justify-between gap-6
+        ${active ? "bg-white/10 text-white font-bold" : "text-zinc-300 hover:bg-white/5 hover:text-white"}`}
     >
-      {children}
+      <span className="font-medium whitespace-nowrap">{children}</span>
+      {active ? (
+        <CheckCircle2 className="w-4 h-4 shrink-0 text-orange-500" />
+      ) : (
+        <span aria-hidden="true" className="w-4 h-4 shrink-0" />
+      )}
     </button>
-  );
-}
-
-function RadioRow({
-  name,
-  value,
-  checked,
-  onChange,
-  children,
-  disabled = false,
-}) {
-  return (
-    <label
-      className={`flex items-center gap-3 py-2 cursor-pointer group ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-    >
-      <div
-        className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors
-                ${checked ? "border-orange-500" : "border-zinc-600 group-hover:border-zinc-400"}`}
-      >
-        {checked && <div className="w-2 h-2 rounded-full bg-orange-500" />}
-      </div>
-      <input
-        type="radio"
-        name={name}
-        value={value}
-        checked={checked}
-        onChange={() => !disabled && onChange(value)}
-        disabled={disabled}
-        className="hidden"
-      />
-      <span
-        className={`text-sm transition-colors ${checked ? "text-white font-medium" : "text-zinc-400 group-hover:text-zinc-300"}`}
-      >
-        {children}
-      </span>
-    </label>
   );
 }
 
@@ -394,6 +530,7 @@ function DualRange({
   onChange,
   step = 1,
   label,
+  format = (v) => v,
 }) {
   const [a, setA] = useState(valueMin);
   const [b, setB] = useState(valueMax);
@@ -409,196 +546,199 @@ function DualRange({
   const maxPercent = ((maxVal - min) / (max - min)) * 100;
 
   const commit = (valA, valB) => {
-    const sorted = [valA, valB].sort((x, y) => x - y);
-    onChange(sorted);
+    onChange([valA, valB].sort((x, y) => x - y));
   };
 
   return (
-    <div className="mt-1 group">
-      <div className="flex items-center justify-between text-xs text-zinc-500 mb-3 font-medium group-hover:text-zinc-400 transition-colors">
+    <div className="group">
+      <div className="flex items-center justify-between text-xs text-zinc-400 mb-2 font-bold">
         <span>{label}</span>
-        <span className="font-mono text-orange-500 font-bold tracking-tight">
-          {minVal} - {maxVal}
+        <span className="tabular-nums text-orange-400">
+          {format(minVal)} – {format(maxVal)}
         </span>
       </div>
-
       <div className="relative h-8 w-full px-2 py-1.5 overflow-visible">
-        {/* Track Fondo */}
-        <div className="absolute top-1/2 left-2 right-2 h-1 bg-zinc-800 rounded-full -translate-y-1/2" />
-
-        {/* Track Activo */}
+        <div className="absolute top-1/2 left-2 right-2 h-1 bg-white/10 rounded-full -translate-y-1/2" />
         <div
-          className="absolute top-1/2 h-1 bg-orange-500 rounded-full -translate-y-1/2 transition-all duration-75"
+          className="absolute top-1/2 h-1 bg-orange-500 rounded-full -translate-y-1/2"
           style={{
-            left: `calc(${minPercent}% + 8px)`,
-            width: `calc(${maxPercent - minPercent}% - 0px)`,
+            left: `calc(8px + (100% - 16px) * ${minPercent / 100})`,
+            width: `calc((100% - 16px) * ${(maxPercent - minPercent) / 100})`,
           }}
         />
-
-        {/* Input A */}
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={a}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            setA(v);
-            commit(v, b);
-          }}
-          className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none z-20 range-thumb-interactive"
-        />
-
-        {/* Input B */}
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={b}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            setB(v);
-            commit(a, v);
-          }}
-          className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none z-20 range-thumb-interactive"
-        />
+        {[
+          [a, setA, (v) => commit(v, b)],
+          [b, setB, (v) => commit(a, v)],
+        ].map(([value, setValue, onCommit], index) => (
+          <input
+            key={index}
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            aria-label={`${label} ${index === 0 ? "mínimo" : "máximo"}`}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setValue(v);
+              onCommit(v);
+            }}
+            className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none z-20 range-thumb-interactive"
+          />
+        ))}
       </div>
     </div>
   );
 }
 
-function SingleRange({ min, max, value, onChange, step = 1, label }) {
+function SingleRange({ min, max, value, onChange, step = 1, label, format = (v) => v }) {
   const percent = ((value - min) / (max - min)) * 100;
-
   return (
-    <div className="mt-1 group">
-      <div className="flex items-center justify-between text-xs text-zinc-500 mb-3 font-medium group-hover:text-zinc-400 transition-colors">
+    <div className="group">
+      <div className="flex items-center justify-between text-xs text-zinc-400 mb-2 font-bold">
         <span>{label}</span>
-        <span className="font-mono text-orange-500 font-bold">{value}</span>
+        <span className="tabular-nums text-orange-400">{format(value)}</span>
       </div>
       <div className="relative h-8 w-full px-2 py-1.5 overflow-visible">
-        <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2 h-1 bg-zinc-800 rounded-full"></div>
+        <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2 h-1 bg-white/10 rounded-full" />
         <div
-          className="absolute h-1 bg-orange-500 rounded-full top-1/2 -translate-y-1/2 transition-all duration-75"
-          style={{ left: "8px", width: `calc(${percent}% - 8px)` }}
-        ></div>
+          className="absolute h-1 bg-orange-500 rounded-full top-1/2 -translate-y-1/2"
+          style={{ left: "8px", width: `calc((100% - 16px) * ${percent / 100})` }}
+        />
         <input
           type="range"
           min={min}
           max={max}
           step={step}
           value={value}
+          aria-label={label}
           onChange={(e) => onChange(Number(e.target.value))}
           className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none z-20 range-thumb-interactive cursor-pointer"
-          style={{ pointerEvents: "auto" }}
         />
       </div>
     </div>
   );
 }
 
+// TMDb no sirve más allá de la página 500.
+const TMDB_MAX_PAGES = 500;
+// Margen bajo la pantalla que se deja ya cargado (px).
+const FILL_AHEAD_PX = 800;
+
+// Campo de cristal de la hoja (buscadores y fechas).
+const SHEET_INPUT =
+  "w-full h-10 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 shadow-lg text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 [color-scheme:dark]";
+
 const SORT_OPTIONS = [
-  {
-    id: "pop_desc",
-    label: "Popularidad descendente",
-    hint: "Tendencia primero",
-  },
-  {
-    id: "pop_asc",
-    label: "Popularidad ascendente",
-    hint: "Menos populares primero",
-  },
-  { id: "rating_desc", label: "Mejor valoradas", hint: "Nota más alta" },
-  { id: "rating_asc", label: "Peor valoradas", hint: "Nota más baja" },
-  { id: "date_desc", label: "Más recientes", hint: "Estreno más nuevo" },
-  { id: "date_asc", label: "Más antiguas", hint: "Estreno más antiguo" },
+  { id: "pop_desc", label: "Popularidad ↓", short: "Popular" },
+  { id: "pop_asc", label: "Popularidad ↑", short: "Menos popular" },
+  { id: "rating_desc", label: "Mejor valoradas", short: "Mejor" },
+  { id: "rating_asc", label: "Peor valoradas", short: "Peor" },
+  { id: "date_desc", label: "Más recientes", short: "Reciente" },
+  { id: "date_asc", label: "Más antiguas", short: "Antigua" },
 ];
 
-function SortMenu({ value, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const current = useMemo(
-    () => SORT_OPTIONS.find((o) => o.id === value) || SORT_OPTIONS[0],
-    [value],
-  );
+const CONTENT_OPTIONS = [
+  { id: "movie", label: "Películas" },
+  { id: "tv", label: "Series" },
+  { id: "all", label: "Todo" },
+];
 
-  useEffect(() => {
-    const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, []);
+const MONETIZATION_OPTIONS = [
+  { id: "flatrate", label: "Suscripción" },
+  { id: "free", label: "Gratis" },
+  { id: "ads", label: "Con anuncios" },
+  { id: "rent", label: "Alquiler" },
+  { id: "buy", label: "Compra" },
+];
 
-  return (
-    <div className="relative z-[200]" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full h-10 px-3 rounded-xl bg-black/20 backdrop-blur-md border border-transparent text-zinc-200 hover:bg-black/30 transition flex items-center justify-between group shadow-inner"
-      >
-        <span className="text-sm font-medium truncate">{current.label}</span>
-        <ChevronDown
-          className={`w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-      {open && (
-        <div className="absolute isolate z-[250] mt-1 w-full rounded-2xl border border-white/10 bg-black/85 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-2xl shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden py-1">
-          {SORT_OPTIONS.map((opt) => {
-            const active = opt.id === value;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => {
-                  onChange(opt.id);
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 transition flex items-center justify-between gap-3
-                                    ${active ? "bg-white/10 text-orange-500 font-bold" : "text-zinc-300 hover:bg-white/5"}`}
-              >
-                <span className="text-sm">{opt.label}</span>
-                {active && <Check className="w-3.5 h-3.5" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+const LANGUAGE_OPTIONS = [
+  { id: "", label: "Cualquiera" },
+  { id: "en", label: "Inglés" },
+  { id: "es", label: "Español" },
+  { id: "fr", label: "Francés" },
+  { id: "it", label: "Italiano" },
+  { id: "de", label: "Alemán" },
+  { id: "ja", label: "Japonés" },
+  { id: "ko", label: "Coreano" },
+  { id: "zh", label: "Chino" },
+  { id: "pt", label: "Portugués" },
+  { id: "hi", label: "Hindi" },
+  { id: "da", label: "Danés" },
+  { id: "sv", label: "Sueco" },
+  { id: "no", label: "Noruego" },
+];
+
+// Atajos de fechas de estreno: [desde, hasta] en AAAA-MM-DD.
+function getDatePresets() {
+  const year = new Date().getFullYear();
+  return [
+    { id: "this_year", label: "Este año", from: `${year}-01-01`, to: `${year}-12-31` },
+    { id: "last_5", label: "Últimos 5 años", from: `${year - 4}-01-01`, to: "" },
+    { id: "2010s", label: "Años 2010", from: "2010-01-01", to: "2019-12-31" },
+    { id: "2000s", label: "Años 2000", from: "2000-01-01", to: "2009-12-31" },
+    { id: "90s", label: "Años 90", from: "1990-01-01", to: "1999-12-31" },
+    { id: "classic", label: "Clásicos", from: "", to: "1979-12-31" },
+  ];
 }
 
-function DiscoverHoverIndicator({ type, tmdbScore, imdbScore }) {
+function readStoredMode(key, allowed, fallback) {
+  try {
+    const value = window.localStorage.getItem(key);
+    return allowed.includes(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredMode(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // ignore storage write errors
+  }
+}
+
+function itemYear(item) {
+  return (item?.release_date || item?.first_air_date || "").slice(0, 4);
+}
+
+function itemDate(item) {
+  return item?.release_date || item?.first_air_date || "";
+}
+
+function DiscoverHoverIndicator({ type, tmdbScore, imdbScore, compact = false }) {
   const normalizedTmdbScore = Number(tmdbScore);
   const normalizedImdbScore = Number(imdbScore);
   const hasTmdbScore =
     Number.isFinite(normalizedTmdbScore) && normalizedTmdbScore > 0;
   const hasImdbScore =
     Number.isFinite(normalizedImdbScore) && normalizedImdbScore > 0;
+  const itemClassName = compact ? "h-7 w-8" : "h-9 w-10";
+  const iconClassName = compact ? "h-4 w-4" : "h-5 w-5";
+  const scoreClassName = compact ? "h-7 w-8 text-sm" : "h-9 w-10";
 
   return (
     <div
-      className={`pointer-events-none absolute bottom-2 left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} px-1.5 text-white opacity-0 shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 lg:group-focus-visible:translate-y-0 lg:group-focus-visible:scale-100 lg:group-focus-visible:opacity-100`}
+      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-1" : "bottom-2 px-1.5"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white opacity-0 shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100`}
       aria-hidden="true"
     >
       <span
-        className={`flex h-9 w-10 shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}
+        className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}
       >
         {type === "movie" ? (
-          <FilmIcon className="h-5 w-5" />
+          <Film className={iconClassName} />
         ) : (
-          <TvIcon className="h-5 w-5" />
+          <MonitorPlay className={iconClassName} />
         )}
       </span>
       {hasTmdbScore ? (
-        <span className="flex h-9 w-10 shrink-0 items-center justify-center font-black leading-none tabular-nums text-sky-400">
+        <span className={`flex ${scoreClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-sky-400`}>
           {normalizedTmdbScore.toFixed(1)}
         </span>
       ) : null}
       {hasImdbScore ? (
-        <span className="flex h-9 w-10 shrink-0 items-center justify-center font-black leading-none tabular-nums text-amber-300">
+        <span className={`flex ${scoreClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-amber-300`}>
           {normalizedImdbScore.toFixed(1)}
         </span>
       ) : null}
@@ -606,42 +746,153 @@ function DiscoverHoverIndicator({ type, tmdbScore, imdbScore }) {
   );
 }
 
-function DiscoverCard({ item }) {
+function DiscoverCard({
+  item,
+  viewMode = "grid",
+  imageMode = "poster",
+  index = 0,
+  totalItems = 0,
+  animateWithin = 24,
+}) {
   const router = useRouter();
-  const [imdbScore, setImdbScore] = useState(null);
-  const isMovie = item.media_type === "movie";
-  const title = isMovie ? item.title : item.name;
-  const href = `/details/${item.media_type}/${item.id}`;
+  const scoreKey = discoverScoreKey(item);
+  const [hoverImdbScore, setImdbScore] = useState(null);
+  // El filtro de IMDb deja las notas de toda la página en la caché.
+  const imdbScore = hoverImdbScore ?? discoverImdbScores.get(scoreKey) ?? null;
+  const type = item.media_type === "tv" ? "tv" : "movie";
+  const title = (type === "movie" ? item.title : item.name) || "Sin título";
+  const year = itemYear(item);
+  const href = `/details/${type}/${item.id}`;
+  const previewClick = usePreviewOpen();
+  const onPreviewClick = previewClick(item, { mediaType: type });
   const handleCardIntent = useCallback(() => {
     router.prefetch(href);
     void fetchDiscoverImdbScore(item).then(setImdbScore);
   }, [href, item, router]);
+  const intentProps = {
+    onMouseEnter: handleCardIntent,
+    onFocus: handleCardIntent,
+    onTouchStart: handleCardIntent,
+  };
+  // En lista la miniatura es siempre horizontal (como en Favoritos).
+  const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
+  const aspectRatio =
+    effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
+  const image = (
+    <OptimizedImage
+      src={imageSrc(item, effectiveImageMode)}
+      alt={title}
+      className="h-full w-full object-cover"
+      loading="lazy"
+      decoding="async"
+    />
+  );
+  const shellClassName =
+    "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
+
+  // Entrada como en Favoritos: las que caben en pantalla, escalonadas, UNA vez
+  // al montar. La rejilla va con `key` de vista e imagen, así que al cambiar
+  // de vista se vuelve a montar y se repite. Al volver atrás, sin entrada.
+  const isBackNav = useIsHistoryNavigation();
+  const [{ shouldAnimate, animDelay }] = useState(() => ({
+    shouldAnimate: !isBackNav && index < Math.max(1, animateWithin),
+    animDelay: totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03,
+  }));
+  const shellRef = useRef(null);
+  useCardEntrance(shellRef, {
+    enabled: shouldAnimate,
+    delayS: animDelay,
+    durationS: viewMode === "list" || viewMode === "compact" ? 0.25 : 0.2,
+    fromTransform:
+      viewMode === "list" || viewMode === "compact"
+        ? "translateY(10px) scale(0.95)"
+        : "scale(0.95)",
+  });
+
+  if (viewMode === "list") {
+    const tmdb = Number(item.vote_average);
+    return (
+      <div ref={shellRef} className={shellClassName}>
+        <Link
+          href={href}
+          prefetch={false}
+          onClick={onPreviewClick}
+          {...intentProps}
+          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(249,115,22,0.95)]"
+        >
+          <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
+            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
+              {image}
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+              <h4 className="text-white font-bold text-base leading-tight truncate transition-colors group-hover:text-orange-300">
+                {title}
+              </h4>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold leading-tight text-zinc-400 tabular-nums">
+                <span className={`inline-flex items-center gap-1 ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
+                  {type === "movie" ? <Film className="h-3.5 w-3.5" /> : <MonitorPlay className="h-3.5 w-3.5" />}
+                  {type === "movie" ? "Película" : "Serie"}
+                </span>
+                {year && <span>{year}</span>}
+                {Number.isFinite(tmdb) && tmdb > 0 ? (
+                  <span className="text-sky-400">TMDb {tmdb.toFixed(1)}</span>
+                ) : null}
+                {imdbScore ? (
+                  <span className="text-amber-300">IMDb {Number(imdbScore).toFixed(1)}</span>
+                ) : null}
+              </div>
+              {item.overview ? (
+                <p className="max-sm:hidden text-sm leading-snug text-zinc-400 line-clamp-2">
+                  {item.overview}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </Link>
+      </div>
+    );
+  }
+
+  if (viewMode === "compact") {
+    return (
+      <div ref={shellRef} className={shellClassName}>
+        <Link href={href} prefetch={false} onClick={onPreviewClick} {...intentProps} className="block">
+          <HoverExpandCard
+            cellClassName={aspectRatio}
+            className="group overflow-hidden rounded-lg bg-zinc-900 shadow-md"
+          >
+            {image}
+            <DiscoverHoverIndicator
+              type={type}
+              tmdbScore={item.vote_average}
+              imdbScore={imdbScore}
+              compact
+            />
+          </HoverExpandCard>
+        </Link>
+      </div>
+    );
+  }
 
   return (
-    <Link
-      href={href}
-      prefetch={false}
-      className="group relative flex h-full w-full flex-col rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
-      onMouseEnter={handleCardIntent}
-      onFocus={handleCardIntent}
-      onTouchStart={handleCardIntent}
-    >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300 lg:group-hover:shadow-blue-900/20">
-        <OptimizedImage
-          src={posterSrc(item)}
-          alt={title}
-          className="h-full w-full object-cover transition-transform duration-500 ease-out lg:group-hover:scale-110"
-          loading="lazy"
-          decoding="async"
-        />
-
-        <DiscoverHoverIndicator
-          type={item.media_type}
-          tmdbScore={item.vote_average}
-          imdbScore={imdbScore}
-        />
-      </div>
-    </Link>
+    <div ref={shellRef} className={shellClassName}>
+      <Link href={href} prefetch={false} onClick={onPreviewClick} {...intentProps} className="block">
+        <div
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-orange-900/20 transition-shadow duration-300`}
+        >
+          <div
+            className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_var(--sv-discover-ring)]"
+            style={{ "--sv-discover-ring": ORANGE_RING }}
+          />
+          {image}
+          <DiscoverHoverIndicator
+            type={type}
+            tmdbScore={item.vote_average}
+            imdbScore={imdbScore}
+          />
+        </div>
+      </Link>
+    </div>
   );
 }
 
@@ -653,10 +904,11 @@ function ProviderIcon({ provider, active, onToggle }) {
       type="button"
       onClick={onToggle}
       title={provider.provider_name}
-      className={`relative w-full aspect-square rounded-xl overflow-hidden transition-all duration-200 group
+      aria-pressed={active ? "true" : "false"}
+      className={`relative w-full aspect-square rounded-xl overflow-hidden transition-all duration-200
         ${
           active
-            ? "ring-2 ring-emerald-500 scale-95 opacity-100" // Verde
+            ? "ring-2 ring-orange-500 scale-95 opacity-100"
             : "opacity-60 hover:opacity-100 hover:scale-105 ring-1 ring-white/10"
         }`}
     >
@@ -668,17 +920,50 @@ function ProviderIcon({ provider, active, onToggle }) {
           loading="lazy"
         />
       ) : (
-        <div className="w-full h-full bg-black/20 backdrop-blur-md flex items-center justify-center text-[10px] text-zinc-500 border border-white/5">
+        <div className="w-full h-full bg-white/5 flex items-center justify-center text-[10px] text-zinc-500">
           {provider.provider_name?.slice(0, 2)}
         </div>
       )}
-
       {active && (
-        <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center backdrop-blur-[1px]">
-          <Check className="w-6 h-6 text-emerald-500 drop-shadow-md stroke-[3]" />
+        <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center">
+          <CheckCircle2 className="w-5 h-5 text-orange-400 drop-shadow-md" />
         </div>
       )}
     </button>
+  );
+}
+
+// Botón segmentado de la barra (vista): mismo dibujo que Favoritos en naranja.
+function ViewModeSegmented({ value, onChange }) {
+  const options = [
+    { id: "list", label: "Lista", Icon: List },
+    { id: "compact", label: "Compacta", Icon: Grid2X2 },
+    { id: "grid", label: "Cuadrícula", Icon: LayoutGrid },
+  ];
+  return (
+    <div
+      role="group"
+      aria-label="Vista"
+      className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg"
+    >
+      {options.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onChange(id)}
+          title={label}
+          aria-label={label}
+          aria-pressed={value === id}
+          className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+            value === id
+              ? "bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/20"
+              : "text-zinc-400 hover:text-white hover:bg-white/10"
+          }`}
+        >
+          <Icon className="w-4 h-4" />
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -688,6 +973,26 @@ function ProviderIcon({ provider, active, onToggle }) {
 export default function DiscoverClient() {
   const { session, account, hydrated } = useAuth();
   const [filtersReady, setFiltersReady] = useState(false);
+  const toolbarSearchFitRef = usePageToolbarSearchFit();
+  const filtersRef = useRef(null);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
+
+  // --- Vista ---
+  const [viewMode, setViewModeState] = useState("grid");
+  const [imageMode, setImageModeState] = useState("poster");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const setViewMode = useCallback((mode) => {
+    setViewModeState(mode);
+    writeStoredMode(STORAGE_KEYS.VIEW_MODE, mode);
+  }, []);
+  const setImageMode = useCallback((mode) => {
+    setImageModeState(mode);
+    writeStoredMode(STORAGE_KEYS.IMAGE_MODE, mode);
+  }, []);
+
+  // --- Búsqueda por título ---
+  const [q, setQ] = useState("");
+  const debouncedQ = useDebounce(q.trim(), 400);
 
   // --- State Filters (con defaults SSR-safe; se restauran tras montar) ---
   const [content, setContent] = useState("movie");
@@ -695,6 +1000,7 @@ export default function DiscoverClient() {
   const [providersAll, setProvidersAll] = useState([]);
   const [selectedProviders, setSelectedProviders] = useState([]);
   const [providerQuery, setProviderQuery] = useState("");
+  const [monetization, setMonetization] = useState([]);
   const [seenMode, setSeenMode] = useState("all");
   const [ratedMovieIds, setRatedMovieIds] = useState(null);
   const [ratedTvIds, setRatedTvIds] = useState(null);
@@ -708,24 +1014,36 @@ export default function DiscoverClient() {
 
   // Sliders States + Debounce
   const [scoreRange, setScoreRange] = useState([0, 10]);
+  const [imdbRange, setImdbRange] = useState([0, 10]);
   const [minVotes, setMinVotes] = useState(0);
   const [runtimeRange, setRuntimeRange] = useState([0, 360]);
 
   const debouncedScoreRange = useDebounce(scoreRange, 500);
+  const debouncedImdbRange = useDebounce(imdbRange, 500);
   const debouncedMinVotes = useDebounce(minVotes, 500);
   const debouncedRuntimeRange = useDebounce(runtimeRange, 500);
 
   const [keywordQuery, setKeywordQuery] = useState("");
   const [keywordOptions, setKeywordOptions] = useState([]);
   const [selectedKeywords, setSelectedKeywords] = useState([]);
+  const [keywordNames, setKeywordNames] = useState({});
   const keywordTimer = useRef(null);
   const [items, setItems] = useState([]);
+  const [totalResults, setTotalResults] = useState(null);
+  const [totalPages, setTotalPages] = useState(1);
+  // Petición de página en curso: evita pedir dos veces la siguiente entre el
+  // `setPage` y el efecto que la carga.
+  const pageRequestRef = useRef(false);
+  const gridRef = useRef(null);
+  const sentinelRef = useRef(null);
+  const [gridColumns, setGridColumns] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
 
   const hasSession = hydrated && !!session && !!account?.id;
+  const imdbActive = debouncedImdbRange[0] > 0 || debouncedImdbRange[1] < 10;
 
   useEffect(() => {
     const savedFilters = loadFiltersFromStorage();
@@ -742,6 +1060,15 @@ export default function DiscoverClient() {
     setMinVotes(savedFilters.minVotes);
     setRuntimeRange(savedFilters.runtimeRange);
     setSelectedKeywords(savedFilters.selectedKeywords);
+    setKeywordNames(savedFilters.keywordNames);
+    setImdbRange(savedFilters.imdbRange);
+    setMonetization(savedFilters.monetization);
+    setViewModeState(
+      readStoredMode(STORAGE_KEYS.VIEW_MODE, ["list", "compact", "grid"], "grid"),
+    );
+    setImageModeState(
+      readStoredMode(STORAGE_KEYS.IMAGE_MODE, ["poster", "backdrop"], "poster"),
+    );
     setFiltersReady(true);
   }, []);
 
@@ -762,6 +1089,9 @@ export default function DiscoverClient() {
       minVotes,
       runtimeRange,
       selectedKeywords,
+      keywordNames,
+      imdbRange,
+      monetization,
     });
   }, [
     filtersReady,
@@ -778,12 +1108,17 @@ export default function DiscoverClient() {
     minVotes,
     runtimeRange,
     selectedKeywords,
+    keywordNames,
+    imdbRange,
+    monetization,
   ]);
 
+  // Restablece los filtros (no el tipo de contenido ni la búsqueda).
   function resetFilters() {
     setSortPreset("pop_desc");
     setSelectedProviders([]);
     setProviderQuery("");
+    setMonetization([]);
     setSeenMode("all");
     setDateFrom("");
     setDateTo("");
@@ -791,6 +1126,7 @@ export default function DiscoverClient() {
     setSelectedCerts([]);
     setLang("");
     setScoreRange([0, 10]);
+    setImdbRange([0, 10]);
     setMinVotes(0);
     setRuntimeRange([0, 360]);
     setKeywordQuery("");
@@ -840,16 +1176,18 @@ export default function DiscoverClient() {
 
         const movieGenres = gm?.genres || [];
         const tvGenres = gt?.genres || [];
-        const movieProviders = (pm?.results || []).sort((a, b) =>
-          (a?.provider_name || "").localeCompare(b?.provider_name || ""),
-        );
-        const tvProviders = (pt?.results || []).sort((a, b) =>
-          (a?.provider_name || "").localeCompare(b?.provider_name || ""),
-        );
+        // Orden de TMDb (por relevancia en la región): las grandes primero.
+        const byPriority = (a, b) =>
+          (a?.display_priorities?.[REGION] ?? a?.display_priority ?? 999) -
+          (b?.display_priorities?.[REGION] ?? b?.display_priority ?? 999);
+        const movieProviders = (pm?.results || []).sort(byPriority);
+        const tvProviders = (pt?.results || []).sort(byPriority);
         const movieCerts = (cm?.certifications?.[REGION] || [])
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
           .map((c) => c.certification)
           .filter(Boolean);
         const tvCerts = (ct?.certifications?.[REGION] || [])
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
           .map((c) => c.certification)
           .filter(Boolean);
 
@@ -865,23 +1203,14 @@ export default function DiscoverClient() {
           const genreMap = new Map();
           [...movieGenres, ...tvGenres].forEach((g) => genreMap.set(g.id, g));
           const provMap = new Map();
-          [...movieProviders, ...tvProviders].forEach((p) =>
-            provMap.set(p.provider_id, p),
-          );
-          const certSet = new Set([...movieCerts, ...tvCerts]);
+          [...movieProviders, ...tvProviders].forEach((p) => {
+            if (!provMap.has(p.provider_id)) provMap.set(p.provider_id, p);
+          });
           setGenresAll(
             [...genreMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
           );
-          setProvidersAll(
-            [...provMap.values()].sort((a, b) =>
-              a.provider_name.localeCompare(b.provider_name),
-            ),
-          );
-          setCertsAll(
-            [...certSet.values()].sort((a, b) =>
-              String(a).localeCompare(String(b)),
-            ),
-          );
+          setProvidersAll([...provMap.values()].sort(byPriority));
+          setCertsAll([...new Set([...movieCerts, ...tvCerts])]);
         }
       } catch (e) {
         if (!isAbortError(e) && !ac.signal.aborted) console.error(e);
@@ -897,19 +1226,15 @@ export default function DiscoverClient() {
   // --- Keyword Search ---
   useEffect(() => {
     if (keywordTimer.current) clearTimeout(keywordTimer.current);
-    const q = keywordQuery.trim();
-    if (!q) {
+    const kq = keywordQuery.trim();
+    if (!kq) {
       setKeywordOptions([]);
       return;
     }
     const ac = new AbortController();
     keywordTimer.current = setTimeout(async () => {
       try {
-        const data = await tmdbFetch(
-          "/search/keyword",
-          { query: q },
-          ac.signal,
-        );
+        const data = await tmdbFetch("/search/keyword", { query: kq }, ac.signal);
         setKeywordOptions((data?.results || []).slice(0, 10));
       } catch {}
     }, 280);
@@ -978,16 +1303,17 @@ export default function DiscoverClient() {
     ratedTvIds,
   ]);
 
-  // --- Params (Using Debounced values) ---
+  // --- Params comunes de /discover (con valores debounced) ---
   const discoverParams = useMemo(() => {
     const base = {
-      sort_by: sortByFor(content === "tv" ? "tv" : "movie"),
       include_adult: "false",
       page,
       watch_region: REGION,
     };
     if (selectedProviders.length)
       base.with_watch_providers = selectedProviders.join("|");
+    if (monetization.length)
+      base.with_watch_monetization_types = monetization.join("|");
     if (selectedGenres.length) base.with_genres = selectedGenres.join(",");
     if (selectedCerts.length) {
       base.certification_country = REGION;
@@ -1006,19 +1332,10 @@ export default function DiscoverClient() {
 
     if (selectedKeywords.length)
       base.with_keywords = selectedKeywords.join("|");
-
-    if (content === "movie") {
-      if (dateFrom) base["primary_release_date.gte"] = dateFrom;
-      if (dateTo) base["primary_release_date.lte"] = dateTo;
-    } else if (content === "tv") {
-      if (dateFrom) base["first_air_date.gte"] = dateFrom;
-      if (dateTo) base["first_air_date.lte"] = dateTo;
-    }
     return base;
   }, [
-    content,
-    sortPreset,
     selectedProviders,
+    monetization,
     selectedGenres,
     selectedCerts,
     lang,
@@ -1026,8 +1343,6 @@ export default function DiscoverClient() {
     debouncedMinVotes,
     debouncedRuntimeRange,
     selectedKeywords,
-    dateFrom,
-    dateTo,
     page,
   ]);
 
@@ -1039,8 +1354,55 @@ export default function DiscoverClient() {
     const ac = new AbortController();
     async function fetchDiscoverForType(type) {
       const params = { ...discoverParams, sort_by: sortByFor(type) };
+      // Fechas con la clave de cada tipo (también con «Todo»).
+      const dateKey = type === "movie" ? "primary_release_date" : "first_air_date";
+      if (dateFrom) params[`${dateKey}.gte`] = dateFrom;
+      if (dateTo) params[`${dateKey}.lte`] = dateTo;
       const data = await tmdbFetch(`/discover/${type}`, params, ac.signal);
-      return (data?.results || []).map((it) => ({ ...it, media_type: type }));
+      return {
+        list: (data?.results || []).map((it) => ({ ...it, media_type: type })),
+        total: Number(data?.total_results) || 0,
+        pages: Number(data?.total_pages) || 0,
+      };
+    }
+    // Búsqueda por título: TMDb no admite filtros en /search, así que se
+    // aplican aquí los que se pueden comprobar con el resultado.
+    async function fetchSearch() {
+      const path =
+        content === "movie" ? "/search/movie" : content === "tv" ? "/search/tv" : "/search/multi";
+      const data = await tmdbFetch(
+        path,
+        { query: debouncedQ, page, include_adult: "false" },
+        ac.signal,
+      );
+      const list = (data?.results || [])
+        .map((it) => ({ ...it, media_type: it.media_type || content }))
+        .filter((it) => it.media_type === "movie" || it.media_type === "tv")
+        .filter((it) => {
+          const genres = it.genre_ids || [];
+          if (selectedGenres.some((g) => !genres.includes(g))) return false;
+          if (lang && it.original_language !== lang) return false;
+          const vote = Number(it.vote_average) || 0;
+          if (vote < debouncedScoreRange[0] || vote > debouncedScoreRange[1]) return false;
+          if ((Number(it.vote_count) || 0) < debouncedMinVotes) return false;
+          const date = itemDate(it);
+          if (dateFrom && (!date || date < dateFrom)) return false;
+          if (dateTo && (!date || date > dateTo)) return false;
+          return true;
+        });
+      const compare = {
+        pop_asc: (a, b) => (a.popularity || 0) - (b.popularity || 0),
+        rating_desc: (a, b) => (b.vote_average || 0) - (a.vote_average || 0),
+        rating_asc: (a, b) => (a.vote_average || 0) - (b.vote_average || 0),
+        date_desc: (a, b) => itemDate(b).localeCompare(itemDate(a)),
+        date_asc: (a, b) => itemDate(a).localeCompare(itemDate(b)),
+      }[sortPreset];
+      if (compare) list.sort(compare);
+      return {
+        list,
+        total: Number(data?.total_results) || 0,
+        pages: Number(data?.total_pages) || 0,
+      };
     }
     function applySeenFilter(list) {
       if (seenMode === "all" || !hasSession) return list;
@@ -1053,6 +1415,18 @@ export default function DiscoverClient() {
         return seenMode === "seen" ? has : !has;
       });
     }
+    async function applyImdbFilter(list) {
+      if (!imdbActive) return list;
+      const scores = await fetchDiscoverImdbScores(list, ac.signal);
+      return list.filter((_, index) => {
+        const score = scores[index];
+        return (
+          score != null &&
+          score >= debouncedImdbRange[0] &&
+          score <= debouncedImdbRange[1]
+        );
+      });
+    }
     async function run() {
       try {
         setError(null);
@@ -1060,20 +1434,28 @@ export default function DiscoverClient() {
         else setLoadingMore(true);
 
         let list = [];
-        if (content === "movie") list = await fetchDiscoverForType("movie");
-        else if (content === "tv") list = await fetchDiscoverForType("tv");
-        else {
+        let total = 0;
+        let pages = 0;
+        if (debouncedQ) {
+          ({ list, total, pages } = await fetchSearch());
+        } else if (content === "movie" || content === "tv") {
+          ({ list, total, pages } = await fetchDiscoverForType(content));
+        } else {
           const [m, t] = await Promise.all([
             fetchDiscoverForType("movie"),
             fetchDiscoverForType("tv"),
           ]);
-          list = [...m, ...t].sort(
+          total = m.total + t.total;
+          pages = Math.max(m.pages, t.pages);
+          list = [...m.list, ...t.list].sort(
             (a, b) => (b.popularity || 0) - (a.popularity || 0),
           );
         }
-        list = applySeenFilter(list);
+        list = await applyImdbFilter(applySeenFilter(list));
 
         if (cancelled) return;
+        setTotalResults(total);
+        setTotalPages(Math.min(pages, TMDB_MAX_PAGES));
         setItems((prev) => {
           if (page === 1) return list;
           const existingKeys = new Set(
@@ -1092,6 +1474,7 @@ export default function DiscoverClient() {
         }
       } finally {
         if (!cancelled) {
+          pageRequestRef.current = false;
           setLoading(false);
           setLoadingMore(false);
         }
@@ -1113,6 +1496,10 @@ export default function DiscoverClient() {
     ratedTvIds,
     dateFrom,
     dateTo,
+    debouncedQ,
+    imdbActive,
+    debouncedImdbRange,
+    sortPreset,
   ]);
 
   // Reset page on filter change
@@ -1124,23 +1511,26 @@ export default function DiscoverClient() {
     content,
     sortPreset,
     selectedProviders,
+    monetization,
     selectedGenres,
     selectedCerts,
     lang,
     debouncedScoreRange,
+    debouncedImdbRange,
     debouncedMinVotes,
     debouncedRuntimeRange,
     selectedKeywords,
     dateFrom,
     dateTo,
     seenMode,
+    debouncedQ,
   ]);
 
   const providersFiltered = useMemo(() => {
-    const q = providerQuery.trim().toLowerCase();
-    if (!q) return providersAll;
+    const pq = providerQuery.trim().toLowerCase();
+    if (!pq) return providersAll;
     return providersAll.filter((p) =>
-      (p?.provider_name || "").toLowerCase().includes(q),
+      (p?.provider_name || "").toLowerCase().includes(pq),
     );
   }, [providersAll, providerQuery]);
 
@@ -1149,464 +1539,784 @@ export default function DiscoverClient() {
     [selectedProviders],
   );
 
+  const toggleIn = (setter, value) =>
+    setter((prev) =>
+      prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value],
+    );
+
+  const contentNoun = content === "tv" ? "Series" : content === "all" ? "Títulos" : "Películas";
+  const datePresets = useMemo(getDatePresets, []);
+
+  // Filtros avanzados activos, como píldoras que se quitan con un toque (bajo
+  // la barra) y para la cifra del botón y de la tarjeta.
+  const activeFilters = useMemo(() => {
+    const chips = [];
+    if (selectedProviders.length) {
+      const names = providersAll
+        .filter((p) => selectedProvidersSet.has(p.provider_id))
+        .map((p) => p.provider_name);
+      chips.push({
+        key: "providers",
+        label: names.length === 1 ? names[0] : `${selectedProviders.length} plataformas`,
+        clear: () => setSelectedProviders([]),
+      });
+    }
+    if (monetization.length)
+      chips.push({
+        key: "monetization",
+        label: MONETIZATION_OPTIONS.filter((o) => monetization.includes(o.id))
+          .map((o) => o.label)
+          .join(" · "),
+        clear: () => setMonetization([]),
+      });
+    if (seenMode !== "all")
+      chips.push({
+        key: "seen",
+        label: seenMode === "seen" ? "Vistas" : "Por ver",
+        clear: () => setSeenMode("all"),
+      });
+    if (dateFrom || dateTo)
+      chips.push({
+        key: "dates",
+        label: dateFrom && dateTo
+          ? `${formatDateDMY(dateFrom)} – ${formatDateDMY(dateTo)}`
+          : dateFrom
+            ? `Desde ${formatDateDMY(dateFrom)}`
+            : `Hasta ${formatDateDMY(dateTo)}`,
+        clear: () => {
+          setDateFrom("");
+          setDateTo("");
+        },
+      });
+    if (selectedGenres.length) {
+      const names = genresAll
+        .filter((g) => selectedGenres.includes(g.id))
+        .map((g) => g.name);
+      chips.push({
+        key: "genres",
+        label: names.length ? names.join(" · ") : `${selectedGenres.length} géneros`,
+        clear: () => setSelectedGenres([]),
+      });
+    }
+    if (selectedCerts.length)
+      chips.push({
+        key: "certs",
+        label: `Edad: ${selectedCerts.join(" · ")}`,
+        clear: () => setSelectedCerts([]),
+      });
+    if (lang)
+      chips.push({
+        key: "lang",
+        label: LANGUAGE_OPTIONS.find((o) => o.id === lang)?.label || lang,
+        clear: () => setLang(""),
+      });
+    if (scoreRange[0] > 0 || scoreRange[1] < 10)
+      chips.push({
+        key: "score",
+        label: `TMDb ${scoreRange[0]}–${scoreRange[1]}`,
+        clear: () => setScoreRange([0, 10]),
+      });
+    if (imdbRange[0] > 0 || imdbRange[1] < 10)
+      chips.push({
+        key: "imdb",
+        label: `IMDb ${imdbRange[0]}–${imdbRange[1]}`,
+        clear: () => setImdbRange([0, 10]),
+      });
+    if (minVotes > 0)
+      chips.push({
+        key: "votes",
+        label: `≥ ${minVotes.toLocaleString("es-ES")} votos`,
+        clear: () => setMinVotes(0),
+      });
+    if (runtimeRange[0] > 0 || runtimeRange[1] < 360)
+      chips.push({
+        key: "runtime",
+        label: `${runtimeRange[0]}–${runtimeRange[1]} min`,
+        clear: () => setRuntimeRange([0, 360]),
+      });
+    if (selectedKeywords.length)
+      chips.push({
+        key: "keywords",
+        label: selectedKeywords.map((id) => keywordNames[id] || `#${id}`).join(" · "),
+        clear: () => setSelectedKeywords([]),
+      });
+    return chips;
+  }, [
+    selectedProviders,
+    selectedProvidersSet,
+    providersAll,
+    monetization,
+    seenMode,
+    dateFrom,
+    dateTo,
+    selectedGenres,
+    genresAll,
+    selectedCerts,
+    lang,
+    scoreRange,
+    imdbRange,
+    minVotes,
+    runtimeRange,
+    selectedKeywords,
+    keywordNames,
+  ]);
+
+  // Filtros que /search no admite: se avisa si hay alguno puesto.
+  const ignoredBySearch =
+    !!debouncedQ &&
+    (selectedProviders.length > 0 ||
+      monetization.length > 0 ||
+      selectedCerts.length > 0 ||
+      runtimeRange[0] > 0 ||
+      runtimeRange[1] < 360 ||
+      selectedKeywords.length > 0);
+
+  const averageScore = useMemo(() => {
+    const scores = items
+      .map((it) => Number(it.vote_average))
+      .filter((v) => Number.isFinite(v) && v > 0);
+    if (!scores.length) return "—";
+    return (scores.reduce((sum, v) => sum + v, 0) / scores.length).toFixed(1);
+  }, [items]);
+
+  // RELLENO DE PANTALLA
+  //
+  // Se cargan páginas hasta que la rejilla pasa del borde inferior de la
+  // pantalla (con margen) y, mientras queden páginas, solo se pintan filas
+  // completas: el sobrante entra con la página siguiente. Así nunca queda una
+  // fila a medias ni la parte de abajo vacía.
+  const hasMore = page < totalPages;
+  const hasItems = items.length > 0;
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return undefined;
+    const measure = () => {
+      const cols = getComputedStyle(grid)
+        .gridTemplateColumns.split(" ")
+        .filter(Boolean).length;
+      setGridColumns(cols);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, [viewMode, imageMode, hasItems]);
+
+  const visibleItems = useMemo(() => {
+    if (!hasMore || gridColumns <= 1) return items;
+    return items.slice(0, Math.floor(items.length / gridColumns) * gridColumns);
+  }, [items, hasMore, gridColumns]);
+
+  const fillScreen = useCallback(() => {
+    if (!filtersReady || loading || loadingMore || !hasMore) return;
+    if (pageRequestRef.current) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    if (sentinel.getBoundingClientRect().top > window.innerHeight + FILL_AHEAD_PX) return;
+    pageRequestRef.current = true;
+    setPage((p) => p + 1);
+  }, [filtersReady, loading, loadingMore, hasMore]);
+
+  // Tras cada carga (o cambio de vista) y al desplazarse o cambiar el tamaño.
+  useEffect(() => {
+    fillScreen();
+    window.addEventListener("scroll", fillScreen, { passive: true });
+    window.addEventListener("resize", fillScreen);
+    return () => {
+      window.removeEventListener("scroll", fillScreen);
+      window.removeEventListener("resize", fillScreen);
+    };
+  }, [fillScreen, visibleItems.length, viewMode, imageMode]);
+
+  const entranceVisibleCount = estimateUserPageEntranceCount({ viewMode, imageMode });
+
+  const statsLoading = !filtersReady || (loading && totalResults == null);
+  const sortLabel = SORT_OPTIONS.find((o) => o.id === sortPreset)?.label || SORT_OPTIONS[0].label;
+  const contentLabel = CONTENT_OPTIONS.find((o) => o.id === content)?.label || "Películas";
+
+  const gridClassName = (() => {
+    if (viewMode === "list") return "grid grid-cols-1 xl:grid-cols-2 gap-4";
+    if (viewMode === "compact") {
+      return `grid gap-2 ${
+        imageMode === "backdrop"
+          ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
+          : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
+      }`;
+    }
+    return `grid gap-3 ${
+      imageMode === "backdrop"
+        ? "grid-cols-2 md:grid-cols-3"
+        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"
+    }`;
+  })();
+
+  const contentDropdown = (
+    <InlineDropdown label="Tipo" valueLabel={contentLabel} icon={Filter}>
+      {({ close }) =>
+        CONTENT_OPTIONS.map((opt) => (
+          <DropdownItem
+            key={opt.id}
+            active={content === opt.id}
+            onClick={() => {
+              setContent(opt.id);
+              close();
+            }}
+          >
+            {opt.label}
+          </DropdownItem>
+        ))
+      }
+    </InlineDropdown>
+  );
+
+  const sortDropdown = (
+    <InlineDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown}>
+      {({ close }) =>
+        SORT_OPTIONS.map((opt) => (
+          <DropdownItem
+            key={opt.id}
+            active={sortPreset === opt.id}
+            onClick={() => {
+              setSortPreset(opt.id);
+              close();
+            }}
+          >
+            {opt.label}
+          </DropdownItem>
+        ))
+      }
+    </InlineDropdown>
+  );
+
+  const searchInput = (placeholder) => (
+    <>
+      <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-500 z-10 pointer-events-none" />
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder={placeholder}
+        aria-label="Buscar por título"
+        className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-orange-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+      />
+      {q && (
+        <button
+          type="button"
+          onClick={() => setQ("")}
+          aria-label="Borrar búsqueda"
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
+        >
+          <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
+        </button>
+      )}
+    </>
+  );
+
+  const filterCountBadge = activeFilters.length ? (
+    <span className="inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 pt-px text-[11px] font-black leading-none text-black tabular-nums">
+      {activeFilters.length}
+    </span>
+  ) : null;
+
   // --- Render ---
   return (
-    <div className="min-h-screen bg-black text-zinc-100 font-sans">
-      <div className="max-w-[1800px] mx-auto p-4 lg:p-8">
-        <header className="mb-8">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-orange-500" />
-              <span className="text-orange-400 font-bold uppercase tracking-widest text-xs">
-                EXPLORAR
-              </span>
-            </div>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              Descubrir
-              <span className="text-orange-500">.</span>
-            </h1>
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg">
-              Filtra y busca películas o series con criterios avanzados.
-            </p>
-          </div>
-        </header>
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-orange-500/30">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        {/* Manchas abstractas naranjas y negras (como las rojas de Favoritos) */}
+        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-orange-500/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-orange-600/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-orange-800/25 blur-[120px] sm:blur-[150px]" />
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-8">
-          {/* --- Sidebar --- */}
-          <aside className="space-y-6 relative">
-            {/* Contenido / Reset */}
-            <div className="relative isolate overflow-hidden rounded-[2rem] border border-transparent bg-black/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] p-4 shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)]">
-              <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70 -z-10" />
-              <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">
-                Contenido
-              </h3>
-              <div className="flex isolate transform-gpu items-center rounded-xl p-1 mb-4 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
-                {["movie", "tv", "all"].map((type) => {
-                  const labels = {
-                    movie: "Películas",
-                    tv: "Series",
-                    all: "Todo",
-                  };
-                  const active = content === type;
-                  return (
-                    <button
-                      key={type}
-                      onClick={() => setContent(type)}
-                      className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200
-                                                ${active ? "bg-white/10 text-white shadow-md" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
-                    >
-                      {labels[type]}
-                    </button>
-                  );
-                })}
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        {/* Header */}
+        <motion.header
+          className="mb-6 sm:mb-10"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-px w-12 bg-orange-500" />
+                <span className="text-orange-400 font-bold uppercase tracking-widest text-xs">
+                  EXPLORAR
+                </span>
               </div>
+              <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+                Descubrir<span className="text-orange-500">.</span>
+              </h1>
+              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
+                Filtra y busca películas o series con criterios avanzados.
+              </p>
+            </div>
+
+            <motion.div
+              className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              {[
+                {
+                  label: "Resultados",
+                  value: totalResults == null ? "—" : totalResults.toLocaleString("es-ES"),
+                  icon: Compass,
+                  colorClass: "text-orange-400",
+                },
+                {
+                  label: "Filtros activos",
+                  shortLabel: "Filtros",
+                  value: activeFilters.length,
+                  icon: SlidersHorizontal,
+                  colorClass: "text-sky-400",
+                },
+                {
+                  label: "Nota media",
+                  shortLabel: "Nota",
+                  value: averageScore,
+                  icon: Star,
+                  colorClass: "text-amber-300",
+                  iconClassName: "fill-amber-300",
+                },
+              ].map((card, index) => (
+                <motion.div
+                  key={card.label}
+                  className="min-w-0 flex-1 lg:flex-none"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.5 + index * 0.1 }}
+                >
+                  <PageStatCard loading={statsLoading} {...card} />
+                </motion.div>
+              ))}
+            </motion.div>
+          </div>
+        </motion.header>
+
+        {/* Barra: búsqueda + filtros rápidos + vista */}
+        <motion.div
+          ref={filtersRef}
+          data-menu-pinned={filtersPinned}
+          className="sv-toolbar-rise sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] mb-6 space-y-1 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
+        >
+          {/* Mobile: search + toggle */}
+          <div className="relative z-10 flex gap-2 lg:hidden">
+            <div className="relative flex-1">{searchInput("Buscar...")}</div>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              aria-label="Filtros y vista"
+              className={`relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                filtersOpen
+                  ? "text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)]"
+                  : "text-zinc-200 hover:bg-black/30"
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              {activeFilters.length ? (
+                <span className="absolute -right-1 -top-1">{filterCountBadge}</span>
+              ) : null}
+            </button>
+          </div>
+
+          {/* Desktop: Single row */}
+          <div ref={toolbarSearchFitRef} className="sv-page-toolbar relative z-10 hidden lg:flex gap-3">
+            <div className="sv-page-toolbar-search relative flex-1">
+              {searchInput("Buscar por título...")}
+            </div>
+            {contentDropdown}
+            {sortDropdown}
+            <div className="relative min-w-0 lg:shrink">
               <button
-                onClick={resetFilters}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-md shadow-sm text-xs font-medium text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+                type="button"
+                onClick={() => setFiltersOpen(true)}
+                className={`h-11 min-w-0 inline-flex items-center gap-2 px-4 rounded-2xl transition text-sm sv-page-toolbar-trigger bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:from-white/15 hover:to-white/10 ${
+                  filtersOpen ? "text-orange-300" : "text-zinc-200"
+                }`}
               >
-                <RotateCcw className="w-3 h-3" /> Reset filtros
+                <SlidersHorizontal className="w-4 h-4 shrink-0 text-orange-500" />
+                <span className="sv-page-toolbar-value whitespace-nowrap font-semibold text-white">
+                  Filtros avanzados
+                </span>
+                {filterCountBadge}
               </button>
             </div>
+            <ViewModeSegmented value={viewMode} onChange={setViewMode} />
+            <ImageModeSegmented value={imageMode} onChange={setImageMode} accent="orange" />
+          </div>
+        </motion.div>
 
-            {/* Filtros Accordions */}
-            <div className="relative isolate overflow-hidden rounded-[2rem] border border-transparent bg-black/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] p-4 shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)] space-y-1 !overflow-visible">
-              <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70 -z-10" />
-              <Section
-                title="Ordenar"
-                defaultOpen
-                storageKey={`${SECTION_STORAGE_PREFIX}:sort`}
-                right={
-                  <span className="text-[10px] text-zinc-500">
-                    {
-                      SORT_OPTIONS.find(
-                        (o) => o.id === sortPreset,
-                      )?.label.split(" ")[0]
-                    }
-                  </span>
-                }
-                overflowVisible
+        {/* Filtros avanzados activos */}
+        {activeFilters.length > 0 || ignoredBySearch ? (
+          <div className="-mt-2 mb-5 flex flex-wrap items-center gap-2">
+            {activeFilters.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={chip.clear}
+                className="inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full bg-gradient-to-br from-white/10 to-white/5 px-3 text-xs font-bold text-zinc-200 shadow-lg transition hover:from-white/15 hover:to-white/10"
+                title="Quitar filtro"
               >
-                <div className="text-xs text-zinc-500 mb-2">
-                  Ordenar resultados por
-                </div>
-                <SortMenu value={sortPreset} onChange={setSortPreset} />
-              </Section>
+                <span className="min-w-0 truncate">{chip.label}</span>
+                <X className="h-3.5 w-3.5 shrink-0 text-orange-400" aria-hidden="true" />
+              </button>
+            ))}
+            {activeFilters.length > 1 ? (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="px-2 text-xs font-bold text-orange-400 hover:text-orange-300"
+              >
+                Quitar todos
+              </button>
+            ) : null}
+            {ignoredBySearch ? (
+              <p className="w-full text-xs text-zinc-500">
+                La búsqueda por título no admite plataformas, certificación,
+                duración ni keywords: esos filtros no se aplican mientras buscas.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
-              <Section
-                title="Dónde se puede ver"
-                storageKey={`${SECTION_STORAGE_PREFIX}:providers`}
-                right={
-                  <span className="text-[10px] text-zinc-500">
-                    {selectedProviders.length > 0
-                      ? selectedProviders.length
-                      : ""}
-                  </span>
-                }
-              >
-                <div className="space-y-3">
-                  <div className="relative">
-                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
-                    <input
-                      value={providerQuery}
-                      onChange={(e) => setProviderQuery(e.target.value)}
-                      placeholder="Buscar plataforma..."
-                      className="w-full h-9 pl-9 pr-3 rounded-xl bg-black/20 backdrop-blur-md border border-transparent text-xs text-zinc-200 focus:outline-none focus:bg-black/30 placeholder:text-zinc-500 shadow-inner"
-                    />
-                  </div>
-                  {selectedProviders.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pb-2 border-b border-zinc-800/50">
-                      {providersAll
-                        .filter((p) => selectedProvidersSet.has(p.provider_id))
-                        .map((p) => (
-                          <div key={p.provider_id} className="w-8 h-8">
-                            <ProviderIcon
-                              provider={p}
-                              active
-                              onToggle={() =>
-                                setSelectedProviders((prev) =>
-                                  prev.filter((id) => id !== p.provider_id),
-                                )
-                              }
-                            />
-                          </div>
-                        ))}
-                      <button
-                        onClick={() => setSelectedProviders([])}
-                        className="text-[10px] text-red-400 hover:underline px-1"
-                      >
-                        Borrar
-                      </button>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-5 gap-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
-                    {providersFiltered.length === 0 ? (
-                      <div className="col-span-5 text-center text-xs text-zinc-600 py-2">
-                        Sin resultados
-                      </div>
-                    ) : (
-                      providersFiltered.map((p) => {
-                        const active = selectedProvidersSet.has(p.provider_id);
-                        return (
-                          <ProviderIcon
-                            key={p.provider_id}
-                            provider={p}
-                            active={active}
-                            onToggle={() =>
-                              setSelectedProviders((prev) =>
-                                active
-                                  ? prev.filter((id) => id !== p.provider_id)
-                                  : [...prev, p.provider_id],
-                              )
-                            }
-                          />
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </Section>
-
-              <Section
-                title="Filtros"
-                defaultOpen
-                storageKey={`${SECTION_STORAGE_PREFIX}:seen`}
-              >
-                <div className="space-y-1">
-                  <div className="text-[10px] font-bold text-zinc-600 uppercase mb-2">
-                    Muéstrame
-                  </div>
-                  <RadioRow
-                    name="seenMode"
-                    value="all"
-                    checked={seenMode === "all"}
-                    onChange={setSeenMode}
-                  >
-                    Todo
-                  </RadioRow>
-                  <RadioRow
-                    name="seenMode"
-                    value="unseen"
-                    checked={seenMode === "unseen"}
-                    onChange={setSeenMode}
-                    disabled={!hasSession}
-                  >
-                    {content === "tv" ? "Series por ver" : "Películas por ver"}
-                  </RadioRow>
-                  <RadioRow
-                    name="seenMode"
-                    value="seen"
-                    checked={seenMode === "seen"}
-                    onChange={setSeenMode}
-                    disabled={!hasSession}
-                  >
-                    {content === "tv" ? "Series vistas" : "Películas vistas"}
-                  </RadioRow>
-                </div>
-              </Section>
-
-              <Section
-                title="Fechas de estreno"
-                storageKey={`${SECTION_STORAGE_PREFIX}:dates`}
-              >
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-zinc-500">Desde</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
-                      <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        className="w-full h-9 pl-9 pr-2 rounded-xl bg-black/20 backdrop-blur-md border border-transparent text-xs text-zinc-200 focus:outline-none focus:bg-black/30 shadow-inner"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-zinc-500">Hasta</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
-                      <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        className="w-full h-9 pl-9 pr-2 rounded-xl bg-black/20 backdrop-blur-md border border-transparent text-xs text-zinc-200 focus:outline-none focus:bg-black/30 shadow-inner"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </Section>
-
-              <Section
-                title="Géneros"
-                storageKey={`${SECTION_STORAGE_PREFIX}:genres`}
-                right={
-                  <span className="text-[10px] text-zinc-500">
-                    {selectedGenres.length > 0 ? selectedGenres.length : ""}
-                  </span>
-                }
-              >
-                <div className="flex flex-wrap gap-2">
-                  {genresAll.map((g) => (
-                    <Chip
-                      key={g.id}
-                      active={selectedGenres.includes(g.id)}
-                      onClick={() =>
-                        setSelectedGenres((prev) =>
-                          prev.includes(g.id)
-                            ? prev.filter((x) => x !== g.id)
-                            : [...prev, g.id],
-                        )
-                      }
-                    >
-                      {g.name}
-                    </Chip>
-                  ))}
-                </div>
-              </Section>
-
-              <Section
-                title="Certificación"
-                storageKey={`${SECTION_STORAGE_PREFIX}:certs`}
-              >
-                <div className="flex flex-wrap gap-2">
-                  {certsAll.map((c) => (
-                    <Chip
-                      key={c}
-                      active={selectedCerts.includes(c)}
-                      onClick={() =>
-                        setSelectedCerts((prev) =>
-                          prev.includes(c)
-                            ? prev.filter((x) => x !== c)
-                            : [...prev, c],
-                        )
-                      }
-                    >
-                      {c}
-                    </Chip>
-                  ))}
-                </div>
-              </Section>
-
-              <Section
-                title="Puntuación"
-                storageKey={`${SECTION_STORAGE_PREFIX}:score`}
-                right={<Star className="w-3 h-3 text-orange-500" />}
-              >
-                <DualRange
-                  label="Puntuación (0-10)"
-                  min={0}
-                  max={10}
-                  step={0.5}
-                  valueMin={scoreRange[0]}
-                  valueMax={scoreRange[1]}
-                  onChange={setScoreRange}
-                />
-                <div className="mt-4">
-                  <SingleRange
-                    label="Mínimo de votos"
-                    min={0}
-                    max={5000}
-                    step={50}
-                    value={minVotes}
-                    onChange={setMinVotes}
-                  />
-                </div>
-              </Section>
-
-              <Section
-                title="Duración"
-                storageKey={`${SECTION_STORAGE_PREFIX}:runtime`}
-                right={<Clock className="w-3 h-3 text-zinc-500" />}
-              >
-                <DualRange
-                  label="Minutos"
-                  min={0}
-                  max={360}
-                  step={15}
-                  valueMin={runtimeRange[0]}
-                  valueMax={runtimeRange[1]}
-                  onChange={setRuntimeRange}
-                />
-              </Section>
-
-              <Section
-                title="Keywords"
-                storageKey={`${SECTION_STORAGE_PREFIX}:keywords`}
-              >
-                <input
-                  value={keywordQuery}
-                  onChange={(e) => setKeywordQuery(e.target.value)}
-                  placeholder="Buscar keyword..."
-                  className="w-full h-9 px-3 rounded-xl bg-black/20 backdrop-blur-md border border-transparent text-xs text-zinc-200 focus:outline-none focus:bg-black/30 shadow-inner mb-2"
-                />
-                {keywordOptions.length > 0 && (
-                  <div className="bg-black/85 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden mb-2 shadow-lg">
-                    {keywordOptions.map((k) => (
-                      <button
-                        key={k.id}
-                        onClick={() => {
-                          setSelectedKeywords((p) =>
-                            p.includes(k.id) ? p : [...p, k.id],
-                          );
-                          setKeywordQuery("");
-                          setKeywordOptions([]);
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 text-zinc-300"
-                      >
-                        {k.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  {selectedKeywords.map((id) => (
-                    <div
-                      key={id}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-black/20 backdrop-blur-md text-[10px] text-zinc-300 border border-transparent"
-                    >
-                      #{id}{" "}
-                      <button
-                        onClick={() =>
-                          setSelectedKeywords((p) => p.filter((x) => x !== id))
-                        }
-                      >
-                        <X className="w-3 h-3 hover:text-white" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </Section>
+        <main className="relative min-h-[50vh]">
+          {loading && items.length === 0 && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-500 mb-4" />
+              <p className="text-zinc-500 text-sm">Buscando títulos...</p>
             </div>
-          </aside>
+          )}
 
-          {/* --- Main Grid --- */}
-          <main className="relative min-h-[60vh]">
-            {/* 1. Loader inicial (solo si NO hay items previos) */}
-            {loading && items.length === 0 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-yellow-500 mb-4" />
-                <p className="text-zinc-500 text-sm">Buscando títulos...</p>
+          {error && items.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 backdrop-blur-md text-red-200 text-sm">
+                {error}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* 2. Error (solo si NO hay items) */}
-            {error && items.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 backdrop-blur-md text-red-200 text-sm shadow-[0_8px_24px_-12px_rgba(239,68,68,0.5)]">
-                  {error}
-                </div>
+          {!loading && !error && items.length === 0 && (
+            <div className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
+              <Compass className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
+              <p className="text-zinc-500 font-medium">No se encontraron resultados.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  resetFilters();
+                  setQ("");
+                }}
+                className="mt-4 text-orange-500 text-sm font-bold hover:underline"
+              >
+                Limpiar búsqueda y filtros
+              </button>
+            </div>
+          )}
+
+          {items.length > 0 && (
+            <div>
+              <div
+                ref={gridRef}
+                key={`grid-${viewMode}-${imageMode}`}
+                className={gridClassName}
+              >
+                {visibleItems.map((item, idx) => (
+                  <DiscoverCard
+                    key={`${item.media_type}-${item.id}`}
+                    item={item}
+                    index={idx}
+                    totalItems={visibleItems.length}
+                    animateWithin={entranceVisibleCount}
+                    viewMode={viewMode}
+                    imageMode={imageMode}
+                  />
+                ))}
               </div>
-            )}
 
-            {/* 3. Empty State (sin resultados) */}
-            {!loading && !error && items.length === 0 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 rounded-[2rem] border border-dashed border-white/10 bg-black/20 backdrop-blur-md shadow-lg h-fit my-auto">
-                <FilmIcon className="w-12 h-12 text-zinc-500 mb-4" />
-                <h3 className="text-lg font-bold text-zinc-300">
-                  No se encontraron resultados
-                </h3>
-                <p className="text-zinc-500 text-sm mt-2 max-w-xs mx-auto">
-                  Intenta ajustar tus filtros o limpiar la búsqueda.
-                </p>
-                <button
-                  onClick={resetFilters}
-                  className="mt-6 text-yellow-500 hover:text-yellow-400 transition-colors text-sm font-semibold"
-                >
-                  Limpiar todos los filtros
-                </button>
+              {/* Marca del final: al acercarse a la pantalla, otra página. */}
+              <div ref={sentinelRef} aria-hidden="true" className="h-px" />
+              <div className="flex h-20 items-center justify-center">
+                {loadingMore ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-orange-500" aria-label="Cargando más" />
+                ) : null}
               </div>
-            )}
-
-            {/* 4. Grid de resultados: se mantiene estable al refrescar filtros. */}
-            {items.length > 0 && (
-              <div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-4 gap-y-8">
-                  {items.map((item) => (
-                    <DiscoverCard
-                      key={`${item.media_type}-${item.id}`}
-                      item={item}
-                    />
-                  ))}
-                </div>
-
-                <div className="mt-12 flex justify-center pb-8">
-                  <button
-                    onClick={() => setPage((p) => p + 1)}
-                    disabled={loadingMore}
-                    className="px-8 py-3 rounded-full border border-transparent bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] hover:bg-white/5 hover:shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)] text-zinc-200 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {loadingMore ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : null}
-                    {loadingMore ? "Cargando..." : "Cargar más resultados"}
-                  </button>
-                </div>
-              </div>
-            )}
-
-          </main>
-        </div>
+            </div>
+          )}
+        </main>
       </div>
-      {/* Custom Styles */}
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #3f3f46;
-          border-radius: 2px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #52525b;
-        }
 
+      {/* Filtros avanzados: lateral desde 640px, hoja inferior en móvil */}
+      <MobileOptionsSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Filtros avanzados"
+        subtitle={
+          activeFilters.length
+            ? `${activeFilters.length} ${activeFilters.length === 1 ? "filtro activo" : "filtros activos"}`
+            : "Sin filtros"
+        }
+        accent="orange"
+        placement="side"
+        footer={
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={resetFilters}
+              disabled={!activeFilters.length && sortPreset === "pop_desc"}
+              className="flex min-h-11 items-center gap-2 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm font-bold text-zinc-200 shadow-lg transition hover:from-white/15 hover:to-white/10 disabled:pointer-events-none disabled:opacity-40"
+            >
+              <RotateCcw className="h-4 w-4 text-orange-400" />
+              Restablecer
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(false)}
+              className="flex min-h-11 flex-1 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 px-4 text-sm font-black text-white shadow-lg shadow-orange-500/20 transition hover:from-orange-400 hover:to-orange-500"
+            >
+              {totalResults == null
+                ? "Ver resultados"
+                : `Ver ${totalResults.toLocaleString("es-ES")} resultados`}
+            </button>
+          </div>
+        }
+      >
+        {/* Lo que en escritorio va en la barra */}
+        <div className="space-y-5 lg:hidden">
+          {contentDropdown}
+          {sortDropdown}
+          <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+            <SheetOption icon={List} active={viewMode === "list"} onClick={() => setViewMode("list")}>
+              Lista
+            </SheetOption>
+            <SheetOption icon={Grid2X2} active={viewMode === "compact"} onClick={() => setViewMode("compact")}>
+              Compacta
+            </SheetOption>
+            <SheetOption icon={LayoutGrid} active={viewMode === "grid"} onClick={() => setViewMode("grid")}>
+              Cuadrícula
+            </SheetOption>
+          </SheetOptionGroup>
+          <ImageModeSheetGroup value={imageMode} onChange={setImageMode} />
+        </div>
+
+        <SheetOptionGroup label="Dónde se puede ver" icon={Tv} layout="stack">
+          <div className="relative">
+            <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+            <input
+              value={providerQuery}
+              onChange={(e) => setProviderQuery(e.target.value)}
+              placeholder="Buscar plataforma..."
+              className={`${SHEET_INPUT} pl-10 pr-3`}
+            />
+          </div>
+          <div className="grid grid-cols-6 gap-2 max-h-[200px] overflow-y-auto p-1 [scrollbar-width:thin]">
+            {providersFiltered.length === 0 ? (
+              <div className="col-span-6 text-center text-xs text-zinc-500 py-2">
+                Sin resultados
+              </div>
+            ) : (
+              providersFiltered.map((p) => (
+                <ProviderIcon
+                  key={p.provider_id}
+                  provider={p}
+                  active={selectedProvidersSet.has(p.provider_id)}
+                  onToggle={() => toggleIn(setSelectedProviders, p.provider_id)}
+                />
+              ))
+            )}
+          </div>
+        </SheetOptionGroup>
+
+        <SheetOptionGroup label="Tipo de acceso" icon={Wallet}>
+          {MONETIZATION_OPTIONS.map((opt) => (
+            <SheetOption
+              key={opt.id}
+              active={monetization.includes(opt.id)}
+              onClick={() => toggleIn(setMonetization, opt.id)}
+            >
+              {opt.label}
+            </SheetOption>
+          ))}
+        </SheetOptionGroup>
+
+        <SheetOptionGroup label="Muéstrame" icon={Eye}>
+          <SheetOption active={seenMode === "all"} onClick={() => setSeenMode("all")}>
+            Todo
+          </SheetOption>
+          <SheetOption
+            active={seenMode === "unseen"}
+            onClick={() => setSeenMode("unseen")}
+            disabled={!hasSession}
+          >
+            {contentNoun} por ver
+          </SheetOption>
+          <SheetOption
+            active={seenMode === "seen"}
+            onClick={() => setSeenMode("seen")}
+            disabled={!hasSession}
+          >
+            {contentNoun} vistas
+          </SheetOption>
+        </SheetOptionGroup>
+
+        <SheetOptionGroup label="Fechas de estreno" icon={Calendar} layout="stack">
+          <div className="flex flex-wrap gap-2">
+            {datePresets.map((preset) => (
+              <SheetOption
+                key={preset.id}
+                active={dateFrom === preset.from && dateTo === preset.to}
+                onClick={() => {
+                  setDateFrom(preset.from);
+                  setDateTo(preset.to);
+                }}
+              >
+                {preset.label}
+              </SheetOption>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ["Desde", dateFrom, setDateFrom],
+              ["Hasta", dateTo, setDateTo],
+            ].map(([label, value, setValue]) => (
+              <label key={label} className="space-y-1">
+                <span className="block text-[11px] font-bold text-zinc-500">{label}</span>
+                <input
+                  type="date"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  className={`${SHEET_INPUT} px-3`}
+                />
+              </label>
+            ))}
+          </div>
+        </SheetOptionGroup>
+
+        <SheetOptionGroup label="Géneros" icon={Tag}>
+          {genresAll.map((g) => (
+            <SheetOption
+              key={g.id}
+              active={selectedGenres.includes(g.id)}
+              onClick={() => toggleIn(setSelectedGenres, g.id)}
+            >
+              {g.name}
+            </SheetOption>
+          ))}
+        </SheetOptionGroup>
+
+        <SheetOptionGroup label="Certificación" icon={ShieldCheck}>
+          {certsAll.map((c) => (
+            <SheetOption
+              key={c}
+              active={selectedCerts.includes(c)}
+              onClick={() => toggleIn(setSelectedCerts, c)}
+            >
+              {c}
+            </SheetOption>
+          ))}
+        </SheetOptionGroup>
+
+        <SheetOptionGroup label="Idioma original" icon={Globe} layout="scroll">
+          {LANGUAGE_OPTIONS.map((opt) => (
+            <SheetOption key={opt.id || "any"} active={lang === opt.id} onClick={() => setLang(opt.id)}>
+              {opt.label}
+            </SheetOption>
+          ))}
+        </SheetOptionGroup>
+
+        <SheetOptionGroup label="Puntuación" icon={Star} layout="stack">
+          <DualRange
+            label="TMDb"
+            min={0}
+            max={10}
+            step={0.5}
+            valueMin={scoreRange[0]}
+            valueMax={scoreRange[1]}
+            onChange={setScoreRange}
+          />
+          <DualRange
+            label="IMDb"
+            min={0}
+            max={10}
+            step={0.5}
+            valueMin={imdbRange[0]}
+            valueMax={imdbRange[1]}
+            onChange={setImdbRange}
+          />
+          <SingleRange
+            label="Mínimo de votos en TMDb"
+            min={0}
+            max={5000}
+            step={50}
+            value={minVotes}
+            onChange={setMinVotes}
+            format={(v) => v.toLocaleString("es-ES")}
+          />
+        </SheetOptionGroup>
+
+        <SheetOptionGroup label="Duración" icon={Clock} layout="stack">
+          <DualRange
+            label="Minutos"
+            min={0}
+            max={360}
+            step={15}
+            valueMin={runtimeRange[0]}
+            valueMax={runtimeRange[1]}
+            onChange={setRuntimeRange}
+          />
+        </SheetOptionGroup>
+
+        <SheetOptionGroup label="Keywords" icon={Hash} layout="stack">
+          <div className="relative">
+            <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+            <input
+              value={keywordQuery}
+              onChange={(e) => setKeywordQuery(e.target.value)}
+              placeholder="Buscar keyword (en inglés)..."
+              className={`${SHEET_INPUT} pl-10 pr-3`}
+            />
+          </div>
+          {keywordOptions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {keywordOptions.map((k) => (
+                <SheetOption
+                  key={k.id}
+                  active={selectedKeywords.includes(k.id)}
+                  onClick={() => {
+                    setSelectedKeywords((p) => (p.includes(k.id) ? p : [...p, k.id]));
+                    setKeywordNames((names) => ({ ...names, [k.id]: k.name }));
+                    setKeywordQuery("");
+                    setKeywordOptions([]);
+                  }}
+                >
+                  {k.name}
+                </SheetOption>
+              ))}
+            </div>
+          )}
+          {selectedKeywords.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {selectedKeywords.map((id) => (
+                <SheetOption
+                  key={id}
+                  active
+                  onClick={() => setSelectedKeywords((p) => p.filter((x) => x !== id))}
+                >
+                  {keywordNames[id] || `#${id}`}
+                </SheetOption>
+              ))}
+            </div>
+          )}
+        </SheetOptionGroup>
+      </MobileOptionsSheet>
+
+      <style jsx global>{`
         .range-thumb-interactive::-webkit-slider-thumb {
           pointer-events: auto;
-          width: 12px;
-          height: 12px;
+          width: 16px;
+          height: 16px;
           background: #f97316;
           border-radius: 50%;
           cursor: pointer;
@@ -1615,8 +2325,8 @@ export default function DiscoverClient() {
         }
         .range-thumb-interactive::-moz-range-thumb {
           pointer-events: auto;
-          width: 12px;
-          height: 12px;
+          width: 16px;
+          height: 16px;
           background: #f97316;
           border: none;
           border-radius: 50%;

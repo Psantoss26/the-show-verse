@@ -13,6 +13,9 @@ const ACCENTS = {
   emerald: {
     active: "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20",
   },
+  orange: {
+    active: "bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/20",
+  },
 };
 
 const OPTIONS = [

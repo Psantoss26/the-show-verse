@@ -74,6 +74,9 @@ export default function MobileOptionsSheet({
   // "screen": a todo el ancho (páginas, en móvil). "sectionSheet": encima de
   // una vista lateral (SectionSheet), que desde 640px es un panel a la
   // derecha: la hoja sube dentro de su ancho en vez de cruzar la pantalla.
+  // "side": en móvil es la hoja inferior de siempre; desde 640px, un panel a
+  // la derecha de toda la altura que entra de lado (filtros avanzados de
+  // Descubrir).
   placement = "screen",
   // Capa de la hoja: por encima de un modal con z mayor (p. ej. el de
   // episodios vistos) hay que subirla.
@@ -82,6 +85,9 @@ export default function MobileOptionsSheet({
   // capas de modal: debajo de un modal pintado dentro de la página (no en un
   // portal) le quitaría el suyo, así que ahí se desactiva.
   pausePageBelow = true,
+  // Pie fijo bajo el contenido desplazable (p. ej. «Restablecer» / «Ver
+  // resultados»).
+  footer = null,
   children,
 }) {
   const titleId = useId();
@@ -135,8 +141,11 @@ export default function MobileOptionsSheet({
 
   if (!present || !portalReady) return null;
 
+  const side = placement === "side";
   const onDragStart = (event) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    // De lado no se arrastra hacia abajo para cerrar.
+    if (side && window.matchMedia?.("(min-width: 640px)").matches) return;
     dragRef.current = { y: event.clientY, t: performance.now(), id: event.pointerId };
     setDragging(true);
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -184,6 +193,8 @@ export default function MobileOptionsSheet({
         tabIndex={-1}
         className={`relative flex max-h-[min(85dvh,44rem)] w-full flex-col overflow-hidden rounded-t-[2rem] outline-none ${
           placement === "sectionSheet" ? "sm:ml-auto sm:w-[30rem] sm:rounded-bl-[2rem] lg:w-[34rem]" : ""
+        } ${
+          side ? "sv-options-sheet-side sm:ml-auto sm:h-full sm:max-h-none sm:w-[26rem] sm:rounded-none sm:rounded-l-[2rem] lg:w-[28rem]" : ""
         } ${LIQUID_GLASS_PANEL} ${
           closing ? "sv-options-sheet-out" : "sv-options-sheet-in"
         }`}
@@ -199,13 +210,15 @@ export default function MobileOptionsSheet({
         {/* Cabecera: asa + título + cerrar. Se arrastra hacia abajo para
             cerrar (solo aquí, para no pelear con el scroll del contenido). */}
         <header
-          className={`shrink-0 touch-none select-none px-5 pb-3 pt-2.5 ${LIQUID_GLASS_MODAL_HEADER}`}
+          className={`shrink-0 touch-none select-none px-5 pb-3 pt-2.5 ${
+            side ? "sm:touch-auto sm:pt-[calc(var(--sv-safe-top,0px)+1.25rem)]" : ""
+          } ${LIQUID_GLASS_MODAL_HEADER}`}
           onPointerDown={onDragStart}
           onPointerMove={onDragMove}
           onPointerUp={onDragEnd}
           onPointerCancel={onDragEnd}
         >
-          <div aria-hidden="true" className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/25" />
+          <div aria-hidden="true" className={`mx-auto mb-3 h-1 w-10 rounded-full bg-white/25 ${side ? "sm:hidden" : ""}`} />
           <div className="flex items-center gap-3">
             {Icon ? (
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.07] ${ACCENTS[accent] || ACCENTS.zinc}`}>
@@ -232,11 +245,20 @@ export default function MobileOptionsSheet({
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.5rem,calc(var(--sv-safe-bottom,0px)+1rem))] pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+            footer ? "pb-5" : "pb-[max(1.5rem,calc(var(--sv-safe-bottom,0px)+1rem))]"
+          }`}
+        >
           <OptionsSheetContext.Provider value={accent}>
             <div className="space-y-5">{children}</div>
           </OptionsSheetContext.Provider>
         </div>
+        {footer ? (
+          <div className="shrink-0 border-t border-white/[0.06] px-5 pb-[max(1rem,calc(var(--sv-safe-bottom,0px)+0.75rem))] pt-3">
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body,

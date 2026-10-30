@@ -652,6 +652,38 @@ html:not([data-avatar-boot]) .alerts-boot {
   animation: sv-options-sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
+/* Variante lateral (placement="side"): desde 640px entra y sale por la
+   derecha, igual de solo-transform. */
+@keyframes sv-options-side-in {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes sv-options-side-out {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+
+@media (min-width: 640px) {
+  .sv-options-sheet-side.sv-options-sheet-in {
+    animation-name: sv-options-side-in;
+  }
+
+  .sv-options-sheet-side.sv-options-sheet-out {
+    animation-name: sv-options-side-out;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sv-options-sheet-in,
   .sv-options-sheet-out {
