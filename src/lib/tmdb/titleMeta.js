@@ -23,8 +23,9 @@ function positiveMinutes(value) {
 }
 
 /**
- * { genres: [≤2 nombres en español], runtime: minutos | null } de la ficha.
- * En series, la duración es la de un episodio.
+ * { genres: [≤2 nombres en español], runtime: minutos | null, year: "1999" | "" }
+ * de la ficha. En series, la duración es la de un episodio. El año sirve a las
+ * listas cuyos elementos guardados no traen fecha (Mis listas, Comunidad).
  */
 export function pickTitleMeta(details, mediaType) {
   const genres = (Array.isArray(details?.genres) ? details.genres : [])
@@ -37,7 +38,9 @@ export function pickTitleMeta(details, mediaType) {
         positiveMinutes(details?.last_episode_to_air?.runtime) ??
         positiveMinutes(details?.next_episode_to_air?.runtime)
       : positiveMinutes(details?.runtime);
-  return { genres, runtime };
+  const date = String(details?.release_date || details?.first_air_date || "");
+  const year = /^\d{4}/.test(date) ? date.slice(0, 4) : "";
+  return { genres, runtime, year };
 }
 
 /** 148 → «2 h 28 min»; 45 → «45 min»; 120 → «2 h». */

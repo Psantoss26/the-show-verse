@@ -934,6 +934,10 @@ export default function FilterableListItems({
                     >
                       <TitleRow
                         item={entry.item}
+                        // Las listas de la comunidad guardan `tmdbId`, no `id`:
+                        // la fila pide portada, géneros, duración y año con el
+                        // id de TMDb que ya resolvió `getMeta`.
+                        id={entry.meta.href ? entry.meta.id : undefined}
                         mediaType={entry.meta.mediaType}
                         href={entry.meta.href}
                         onClick={

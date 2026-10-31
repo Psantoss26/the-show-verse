@@ -15,22 +15,22 @@ test("claves de título: solo movie/tv con id numérico", () => {
 
 test("película: dos primeros géneros y duración", () => {
   const meta = pickTitleMeta(
-    { genres: [{ name: "Acción" }, { name: "Ciencia ficción" }, { name: "Drama" }], runtime: 136 },
+    { genres: [{ name: "Acción" }, { name: "Ciencia ficción" }, { name: "Drama" }], runtime: 136, release_date: "1999-03-30" },
     "movie",
   );
-  assert.deepEqual(meta, { genres: ["Acción", "Ciencia ficción"], runtime: 136 });
+  assert.deepEqual(meta, { genres: ["Acción", "Ciencia ficción"], runtime: 136, year: "1999" });
 });
 
 test("serie: géneros de TV traducidos y duración del episodio", () => {
   const meta = pickTitleMeta(
-    { genres: [{ name: "Sci-Fi & Fantasy" }, { name: "Drama" }], episode_run_time: [], last_episode_to_air: { runtime: 47 } },
+    { genres: [{ name: "Sci-Fi & Fantasy" }, { name: "Drama" }], episode_run_time: [], last_episode_to_air: { runtime: 47 }, first_air_date: "2011-04-17" },
     "tv",
   );
-  assert.deepEqual(meta, { genres: ["Ciencia ficción y fantasía", "Drama"], runtime: 47 });
+  assert.deepEqual(meta, { genres: ["Ciencia ficción y fantasía", "Drama"], runtime: 47, year: "2011" });
 });
 
 test("sin duración ni géneros", () => {
-  assert.deepEqual(pickTitleMeta({ runtime: 0 }, "movie"), { genres: [], runtime: null });
+  assert.deepEqual(pickTitleMeta({ runtime: 0 }, "movie"), { genres: [], runtime: null, year: "" });
 });
 
 test("formato de duración", () => {

@@ -91,6 +91,8 @@ export function TitleRow({
   posterPath = null,
   posterLoading = false,
   onPosterError = null,
+  // Id de TMDb cuando el elemento no lo trae en `id` (Comunidad: `tmdbId`).
+  id: customId,
   title: customTitle,
   year: customYear,
   voteAverage: customVoteAverage,
@@ -104,7 +106,7 @@ export function TitleRow({
 }) {
   const type = item?.media_type === "tv" || mediaType === "tv" ? "tv" : "movie";
   const title = customTitle || item?.title || item?.name || "Sin título";
-  const year =
+  const ownYear =
     customYear !== undefined
       ? customYear
       : String(item?.release_date || item?.first_air_date || "").slice(0, 4);
@@ -117,16 +119,19 @@ export function TitleRow({
   // ni el logo ni «—».
   const shouldShowImdb = hasImdbScore || (showImdb && imdbLoading);
 
-  const targetHref = href || (item?.id ? `/details/${type}/${item.id}` : "#");
-  const { meta: titleMeta, pending: titleMetaPending } = useTitleMeta(type, item?.id, {
+  const itemId = customId ?? item?.id;
+  const targetHref = href || (itemId ? `/details/${type}/${itemId}` : "#");
+  const { meta: titleMeta, pending: titleMetaPending } = useTitleMeta(type, itemId, {
     enabled: showTitleMeta,
   });
   const runtime = formatRuntime(titleMeta?.runtime);
+  // Los elementos guardados de Mis listas y Comunidad no traen fecha.
+  const year = ownYear || titleMeta?.year || "";
   const genres = titleMeta?.genres?.length ? titleMeta.genres.join(" · ") : "";
 
   // Portada elegida en la ficha o, sin ella, la más votada (la de las
   // tarjetas). Mientras no se sabe si hay votada no se pinta la automática.
-  const { path: ownPoster, pending: ownPosterPending } = useCardArtworkState(type, item?.id, "poster");
+  const { path: ownPoster, pending: ownPosterPending } = useCardArtworkState(type, itemId, "poster");
   const resolvedPosterPath =
     ownPoster ||
     (posterPath !== null && posterPath !== undefined
