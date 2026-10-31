@@ -6,6 +6,12 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 // (memoria o disco): se muestra de golpe en vez de con fundido.
 const FAST_LOAD_MS = 200;
 
+// Espera máxima a `decode()` antes de enseñar la imagen ya cargada. Chrome deja
+// esa promesa PENDIENTE mientras no pinta la página (ventana en segundo plano o
+// tapada, panel oculto…), a veces para siempre: la imagen estaba descargada pero
+// se quedaba a opacidad 0 y la tarjeta se veía vacía (pósters de «Temporadas»).
+const DECODE_TIMEOUT_MS = 150;
+
 // Estado de carga real de un <img>: `ready` solo es true cuando los bytes de
 // `src` han llegado Y están decodificados, nunca antes. Las tarjetas de las
 // páginas de usuario marcaban la portada como lista en cuanto conocían la URL
@@ -24,6 +30,10 @@ const FAST_LOAD_MS = 200;
 // - Si no, se espera a `load` + `decode()` y se hace el fundido normal desde
 //   el placeholder.
 // - Si falla la carga se queda el placeholder en vez del icono de imagen rota.
+// - `decode()` solo se espera `DECODE_TIMEOUT_MS`: si no responde, la imagen
+//   (ya cargada) se enseña igual.
+// - Si al cambiar `src` la imagen ya está completa (el `load` llegó antes de
+//   hidratar o se perdió), se da por lista sin esperar un evento que no vendrá.
 export default function useImageLoadReady(src) {
   const imgRef = useRef(null);
   const initialSrcRef = useRef(src);
@@ -38,13 +48,11 @@ export default function useImageLoadReady(src) {
   useLayoutEffect(() => {
     const img = imgRef.current;
     if (!src || !img) return;
+    if (!img.complete || img.naturalWidth === 0 || img.getAttribute("src") !== src) return;
     // Solo cuenta como "instantánea" la URL con la que montó la tarjeta: las
     // que llegan después (selector asíncrono + preload) mantienen su fundido.
-    if (src !== initialSrcRef.current) return;
-    if (img.complete && img.naturalWidth > 0) {
-      setInstantSrc(src);
-      setLoadedSrc(src);
-    }
+    if (src === initialSrcRef.current) setInstantSrc(src);
+    setLoadedSrc(src);
   }, [src]);
 
   const onLoad = useCallback((event) => {
@@ -57,11 +65,18 @@ export default function useImageLoadReady(src) {
       if (fast) setInstantSrc(loaded);
       setLoadedSrc(loaded);
     };
-    if (typeof img.decode === "function") {
-      img.decode().then(markReady, markReady);
-    } else {
+    if (typeof img.decode !== "function") {
       markReady();
+      return;
     }
+    let done = false;
+    const once = () => {
+      if (done) return;
+      done = true;
+      markReady();
+    };
+    img.decode().then(once, once);
+    setTimeout(once, DECODE_TIMEOUT_MS);
   }, []);
 
   return {
