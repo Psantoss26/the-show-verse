@@ -2830,6 +2830,68 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
   }
 }
 
+/* DESPLIEGUE DE LA BARRA DE STATS del marcador móvil (modo 'compact', ver
+   MOBILE_STATS_REVEAL_BASE en details/MobileDetailsHero) y lo que la acompaña.
+   - Insignias: entran UNA A UNA mientras se abre el hueco (sube 10px, de 94%
+     a tamaño real y aparece), con la curva del alto (iOS, 520ms) y empezando
+     a 90ms, cuando ya hay sitio: si arrancan a la vez que el alto, el
+     recorte de la fila se come la mitad de la subida. Antes la pista ENTERA
+     bajaba 6px desde arriba, a contracorriente del panel. `translate`/`scale`
+     sueltos (no `transform`) y transiciones, no animaciones: si el dedo
+     vuelve arriba a medio despliegue, se recogen desde donde estén. Al
+     plegarse, sin cascada y en 160ms: se van antes de que el hueco las corte.
+   - Fila de iconos bajo el marcador (Plataformas · Actividad · Enlaces ·
+     Compartir): al revelarse, además de subir la fila, cada píldora entra con
+     el rebote de los botones de acción de la portada, en cascada. La opacidad
+     va en la propia píldora (el cristal), nunca en un ancestro.
+   Solo la opacidad de las insignias: no llevan cristal (el panel sí). */
+@media (max-width: 639px) {
+  .sv-stats-unfold [data-scoreboard-stats] > * > * > * {
+    transition:
+      opacity 160ms ease-out,
+      translate 220ms cubic-bezier(0.32, 0.72, 0, 1),
+      scale 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .sv-stats-unfold[data-mobile-reveal-stats="hidden"] [data-scoreboard-stats] > * > * > * {
+    opacity: 0;
+    translate: 0 10px;
+    scale: 0.94;
+  }
+
+  .sv-stats-unfold[data-mobile-reveal-stats="shown"] [data-scoreboard-stats] > * > * > * {
+    transition-duration: 380ms, 520ms, 520ms;
+    transition-delay: calc(90ms + var(--sv-stat-i, 0) * 35ms);
+  }
+
+  .sv-stats-unfold [data-scoreboard-stats] > * > * > :nth-child(2) { --sv-stat-i: 1; }
+  .sv-stats-unfold [data-scoreboard-stats] > * > * > :nth-child(3) { --sv-stat-i: 2; }
+  .sv-stats-unfold [data-scoreboard-stats] > * > * > :nth-child(4) { --sv-stat-i: 3; }
+  .sv-stats-unfold [data-scoreboard-stats] > * > * > :nth-child(5) { --sv-stat-i: 4; }
+  .sv-stats-unfold [data-scoreboard-stats] > * > * > :nth-child(n + 6) { --sv-stat-i: 5; }
+
+  .sv-mobile-pill-cascade[data-mobile-reveal="shown"] > * > * {
+    animation: sv-mobile-detail-action-reveal 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  .sv-mobile-pill-cascade[data-mobile-reveal="shown"] > * > :nth-child(1) { animation-delay: 30ms; }
+  .sv-mobile-pill-cascade[data-mobile-reveal="shown"] > * > :nth-child(2) { animation-delay: 70ms; }
+  .sv-mobile-pill-cascade[data-mobile-reveal="shown"] > * > :nth-child(3) { animation-delay: 110ms; }
+  .sv-mobile-pill-cascade[data-mobile-reveal="shown"] > * > :nth-child(n + 4) { animation-delay: 150ms; }
+}
+
+@media (max-width: 639px) and (prefers-reduced-motion: reduce) {
+  .sv-stats-unfold [data-scoreboard-stats] > * > * > * {
+    transition: opacity 160ms ease-out !important;
+    translate: none !important;
+    scale: none !important;
+  }
+
+  .sv-mobile-pill-cascade[data-mobile-reveal="shown"] > * > * {
+    animation: none;
+  }
+}
+
 @keyframes sv-mobile-actions-rise {
   from {
     transform: translate3d(0, 20px, 0);
@@ -3600,6 +3662,7 @@ html[data-details-sequence-transition] .sv-topbar {
   .sv-mobile-actions-scroll-reveal,
   .sv-mobile-actions-scroll-reveal > * > *,
   .sv-mobile-actions-rise,
+  .sv-mobile-pill-cascade > * > *,
   [data-mobile-reveal-piece],
   [class*="animate-sv-mobile-scoreboard-reveal"] > *,
   [class*="animate-sv-mobile-secondary-reveal"] > *

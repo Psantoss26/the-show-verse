@@ -48,6 +48,16 @@ import { PEEK_HANDOFF_TARGET_ATTR, isPeekHandoffTarget } from '@/lib/navigation/
 // (backdrop root). La pista es `minmax(0, …fr)` para que plegada mida 0 aunque
 // el scroller de dentro tenga relleno: lo que sobresale lo recorta la propia
 // fila (`overflow-hidden`).
+//
+// Desplegar y plegar NO van con la misma curva. Al desplegarse (520ms, curva
+// de hoja de iOS) la velocidad inicial es la mitad que con la de antes
+// (`0.22,1,0.36,1`): aquella crecía ~20px en el primer fotograma y medio y,
+// con el dedo subiendo la página a la vez, el borde inferior del panel daba un
+// tirón hacia abajo antes de seguir al scroll. Al plegarse (volver arriba del
+// todo) se queda en 420ms, lo que dura la salida de los bloques animados
+// (`sv-mobile-reveal-out`). Las insignias de dentro entran en cascada mientras
+// se abre el hueco (`.sv-stats-unfold` en globals.css): antes la pista entera
+// bajaba 6px desde ARRIBA, a contracorriente del panel que crece hacia abajo.
 const MOBILE_STATS_REVEAL_ATTR = 'data-mobile-reveal-stats'
 export const MOBILE_STATS_REVEAL_BASE = [
     'max-sm:[&_[data-scoreboard-stats]]:grid max-sm:[&_[data-scoreboard-stats]]:grid-rows-[minmax(0,1fr)]',
@@ -58,11 +68,11 @@ export const MOBILE_STATS_REVEAL_BASE = [
     'max-sm:[&_[data-scoreboard-stats]>*]:overflow-y-hidden max-sm:[&_[data-scoreboard-stats]>*]:[scrollbar-width:none]',
     'max-sm:[&_[data-scoreboard-stats]]:transition-[grid-template-rows,border-color]',
     'max-sm:[&_[data-scoreboard-stats]]:duration-[420ms] max-sm:[&_[data-scoreboard-stats]]:ease-[cubic-bezier(0.22,1,0.36,1)]',
+    'max-sm:[&[data-mobile-reveal-stats=shown]_[data-scoreboard-stats]]:duration-[520ms] max-sm:[&[data-mobile-reveal-stats=shown]_[data-scoreboard-stats]]:ease-[cubic-bezier(0.32,0.72,0,1)]',
     'max-sm:motion-reduce:[&_[data-scoreboard-stats]]:transition-none',
-    // Animate only the content, preserving the panel's glass backdrop.
-    'max-sm:[&_[data-scoreboard-stats]>*>*]:transition-[opacity,translate] max-sm:[&_[data-scoreboard-stats]>*>*]:duration-[420ms] max-sm:[&_[data-scoreboard-stats]>*>*]:ease-[cubic-bezier(0.22,1,0.36,1)]',
-    'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]>*>*]:opacity-0 max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]>*>*]:-translate-y-1.5',
-    'max-sm:motion-reduce:[&_[data-scoreboard-stats]>*>*]:transition-none max-sm:motion-reduce:[&_[data-scoreboard-stats]>*>*]:translate-none',
+    // Solo el contenido (cada insignia, en cascada): el cristal del panel se
+    // conserva. Ver `.sv-stats-unfold` en globals.css.
+    'sv-stats-unfold',
     'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:grid-rows-[minmax(0,0fr)]',
     'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:border-transparent',
 ].join(' ')
@@ -145,12 +155,13 @@ function holdBelowGrowingStats(el, statsTargets) {
 // lados hasta todo el ancho, a la vez y con la misma curva. La transición solo
 // existe desde la primera apertura (`data-mobile-stats-animated`, lo pone el
 // revelado): antes animaba también el ancho inicial al publicarse
-// `--mobile-actions-w` y el marcador entraba encogiendo. Duración y curva van
+// `--mobile-actions-w` y el marcador entraba encogiendo. Al desplegarse lleva
+// la duración y la curva del alto (520ms, ver arriba). Duración y curva van
 // en la misma variante: un `transition-duration` suelto anima TODO
 // (`transition-property` vale `all` por defecto).
 const MOBILE_STATS_ANIMATED_ATTR = 'data-mobile-stats-animated'
 export const MOBILE_STATS_REVEAL_WIDEN =
-    'max-sm:data-[mobile-reveal-stats=shown]:w-full max-sm:motion-safe:data-[mobile-stats-animated]:transition-[width] max-sm:motion-safe:data-[mobile-stats-animated]:duration-[420ms] max-sm:motion-safe:data-[mobile-stats-animated]:ease-[cubic-bezier(0.22,1,0.36,1)]'
+    'max-sm:data-[mobile-reveal-stats=shown]:w-full max-sm:motion-safe:data-[mobile-stats-animated]:transition-[width] max-sm:motion-safe:data-[mobile-stats-animated]:duration-[420ms] max-sm:motion-safe:data-[mobile-stats-animated]:ease-[cubic-bezier(0.22,1,0.36,1)] max-sm:motion-safe:data-[mobile-stats-animated]:data-[mobile-reveal-stats=shown]:duration-[520ms] max-sm:motion-safe:data-[mobile-stats-animated]:data-[mobile-reveal-stats=shown]:ease-[cubic-bezier(0.32,0.72,0,1)]'
 export const MOBILE_REVEAL_BASE =
     'max-sm:transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none'
 const MOBILE_REVEAL_ATTR = 'data-mobile-reveal'

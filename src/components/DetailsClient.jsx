@@ -11313,9 +11313,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             <div className="order-3 mb-2 w-full sm:hidden">
               {/* Entra al cruzar el navbar, cuando se ve, en vez de animarse
                   oculta al montar la ficha. El hero descuenta el crecimiento
-                  pendiente de las stats para no revelarla detrás del navbar. */}
+                  pendiente de las stats para no revelarla detrás del navbar.
+                  Con 60ms de retardo: si se revela a la vez que la fila de
+                  píldoras (un deslizamiento rápido), entra detrás de ella y no
+                  en bloque con ella. */}
               <div
-                className={`${MOBILE_REVEAL_BASE} ${detailsRestored || sequenceTransitionActive ? "" : MOBILE_SECONDARY_REVEAL_ANIMATION}`}
+                className={`${MOBILE_REVEAL_BASE} ${detailsRestored || sequenceTransitionActive ? "" : `${MOBILE_SECONDARY_REVEAL_ANIMATION} max-sm:*:[animation-delay:60ms]`}`}
                 {...heroRevealProps}
               >
               <DetailsInfoTabs
@@ -11475,8 +11478,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               {/* Teléfono: Plataformas, Actividad (si tus amigos han tocado
                   el título), Enlaces y Compartir en una fila de iconos bajo
                   el marcador. Cada uno abre su modal. Se revela con el scroll
-                  al pasar el navbar inferior, como en las temporadas. */}
-              <div className={`mt-3 sm:hidden ${MOBILE_REVEAL_BASE} ${detailsRestored || sequenceTransitionActive ? "" : MOBILE_SECONDARY_REVEAL_ANIMATION}`} {...heroRevealProps}>
+                  al pasar el navbar inferior, como en las temporadas: sube la
+                  fila y sus píldoras entran en cascada, como los botones de la
+                  portada (`.sv-mobile-pill-cascade` en globals.css). */}
+              <div className={`mt-3 sm:hidden ${MOBILE_REVEAL_BASE} ${detailsRestored || sequenceTransitionActive ? "" : `${MOBILE_SECONDARY_REVEAL_ANIMATION} sv-mobile-pill-cascade`}`} {...heroRevealProps}>
                 <ScoreboardPillRow>
                   <ScoreboardPill
                     iconOnly
