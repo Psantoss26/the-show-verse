@@ -41,8 +41,9 @@ import { getLevelState, getLevelSummaries } from '../level/store.js';
 // perfil sigue siendo su punto de entrada histórico.
 export { countCompletedShows, getCompletedShowsCount };
 
-const RECENT_WATCHED_SCAN = 40; // filas a escanear para deduplicar por título
-const RECENT_WATCHED_LIMIT = 5;
+const RECENT_WATCHED_SCAN = 80; // filas a escanear para deduplicar por título
+// Dos filas de cinco en «Actividad reciente» del Perfil.
+const RECENT_WATCHED_LIMIT = 10;
 const WATCHLIST_PREVIEW_LIMIT = 5;
 const FOLLOWING_PREVIEW_LIMIT = 12;
 export const PROFILE_FAVORITES_MAX = 5;

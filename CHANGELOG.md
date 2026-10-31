@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Perfil, «Actividad reciente»: muestra los 10 últimos títulos vistos en dos filas, en vez de 5 en una. En el móvil la fila se sigue deslizando de lado, ahora con dos pósters por columna. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Dashboard, tarjeta grande destacada: al pasar el ratón, la imagen se amplía suavemente en vez de saltar de golpe. → [componentes](docs/frontend/components.md)
 - Temporadas (ficha rápida y ficha completa): al pasar el ratón por una temporada, el póster se amplía suavemente desde el primer momento. Antes, con los pósters recién cargados, el zoom saltaba de golpe y solo iba suave tras cambiar de vista y volver. → [componentes](docs/frontend/components.md)
 - Ficha rápida abierta desde los dashboards: el scroll vuelve a ser fluido. Los esqueletos de carga del dashboard de detrás (cientos de tarjetas aún sin imagen) animaban su brillo desde JavaScript en cada fotograma y se comían el procesador; ahora el brillo lo mueve el navegador sin cálculo y se detiene mientras hay un modal abierto. Los carruseles del modal tampoco se recalculan al desplazar. Medido con CPU ×4: de 22,5 a 8,7 ms por fotograma. → [componentes](docs/frontend/components.md)

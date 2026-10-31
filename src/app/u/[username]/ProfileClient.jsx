@@ -228,6 +228,9 @@ function ProfilePosterGrid({
   prioritizeHorizontalScroll = false,
   fixedIndicator = false,
   showFixedIndicator = true,
+  // Dos filas: en móvil la tira desliza por columnas de dos pósters; desde
+  // 640 px, rejilla de cinco columnas (10 títulos = dos filas).
+  twoRows = false,
   // Índice de la primera tarjeta en la cascada de entrada del resumen (las tres
   // filas forman una sola cascada); `null` = sin entrada (al volver atrás).
   entranceStart = null,
@@ -242,12 +245,16 @@ function ProfilePosterGrid({
       data-mobile-page-swipe-ignore={prioritizeHorizontalScroll || undefined}
       role="region"
       aria-label={label}
-      className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden @[640px]/detail-page:grid @[640px]/detail-page:grid-cols-5 @[640px]/detail-page:overflow-visible @[640px]/detail-page:pb-0"
+      className={`${
+        twoRows
+          ? "grid grid-flow-col grid-rows-2 auto-cols-[calc((100%_-_1.5rem)_/_3)] @[640px]/detail-page:grid-flow-row @[640px]/detail-page:grid-rows-none @[640px]/detail-page:auto-cols-auto"
+          : "flex"
+      } gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden @[640px]/detail-page:grid @[640px]/detail-page:grid-cols-5 @[640px]/detail-page:overflow-visible @[640px]/detail-page:pb-0`}
     >
       {items.map((item, index) => (
         <div
           key={`${item.mediaType}:${item.tmdbId}`}
-          className={`w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start @[640px]/detail-page:w-auto${
+          className={`${twoRows ? "min-w-0" : "w-[calc((100%_-_1.5rem)_/_3)] shrink-0"} snap-start @[640px]/detail-page:w-auto${
             entranceStart == null ? "" : " sv-section-card-grow"
           }`}
           style={entranceStart == null ? undefined : profileEntranceDelay(entranceStart + index)}
@@ -1336,6 +1343,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   viewerTitleStates={viewerTitleStates}
                   label="Actividad reciente"
                   prioritizeHorizontalScroll
+                  twoRows
                   entranceStart={entranceStart(10)}
                 />
               ) : (
