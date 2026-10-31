@@ -119,7 +119,12 @@ test('un visto automático no se repite como acción', () => {
   assert.deepEqual(out.map((a) => `${a.type}:${a.tmdbId}`), ['watched:603', 'rating:1399']);
 });
 
-import { completionMarks, detectContinueWatchingAdds, nextInCollection } from './notificationsCore.js';
+import {
+  completionMarks,
+  detectContinueWatchingAdds,
+  nextInCollection,
+  seasonCompletionEvents,
+} from './notificationsCore.js';
 
 test('Continuar viendo: primer recibo en curso o tras terminar; no los latidos', () => {
   const out = detectContinueWatchingAdds([
@@ -164,4 +169,23 @@ test('colección: la siguiente por estreno, saltando las ya vistas', () => {
   assert.equal(nextInCollection(parts, 3).id, 4);
   assert.equal(nextInCollection(parts, 4), null);
   assert.equal(nextInCollection(parts, 99), null);
+});
+
+test('temporada completada: una por momento, solo en la ventana y no al completar la serie', () => {
+  const since = new Date(at(5));
+  const times = { a: at(1), b: at(8), c: at(10), d: at(10), e: at(12) };
+  const marks = { seasons: new Map([['a', 1], ['b', 2], ['c', 3], ['d', 4], ['e', 5]]), showRowId: null };
+  const out = seasonCompletionEvents(1399, marks, (id) => times[id], since);
+  assert.deepEqual(out.map((e) => [e.season, e.type, e.episode]), [
+    [2, 'season_completed', null],
+    [4, 'season_completed', null],
+    [5, 'season_completed', null],
+  ]);
+  assert.equal(out[0].id, 'season-completed:1399:2');
+
+  // La que cierra la serie (y las del mismo lote) quedan para `show_completed`.
+  const withShow = seasonCompletionEvents(1399, { ...marks, showRowId: 'e' }, (id) => times[id], since);
+  assert.deepEqual(withShow.map((e) => e.season), [2, 4]);
+  const sameBatch = seasonCompletionEvents(1399, { ...marks, showRowId: 'd' }, (id) => times[id], since);
+  assert.deepEqual(sameBatch.map((e) => e.season), [2, 5]);
 });

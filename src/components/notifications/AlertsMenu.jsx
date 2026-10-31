@@ -68,6 +68,7 @@ const ACTIONS = {
 const EVENTS = {
   cw_added: { Icon: MonitorPlay, tone: "text-emerald-400" },
   auto_watched: { Icon: CheckCircle2, tone: "text-emerald-400" },
+  season_completed: { Icon: Trophy, tone: "text-amber-400", filled: true },
   show_completed: { Icon: Trophy, tone: "text-amber-400", filled: true },
   collection_next: { Icon: Layers, tone: "text-purple-400" },
   new_follower: { Icon: UserPlus, tone: "text-sky-400" },
@@ -149,6 +150,7 @@ function AlertText({ kind, item }) {
     if (item.type === "auto_watched") {
       return <>Has terminado {code}<Title item={item} />: pasa de Continuar viendo a visto</>;
     }
+    if (item.type === "season_completed") return <>Has completado la temporada {item.season} de <Title item={item} /></>;
     if (item.type === "show_completed") return <>Has completado la serie <Title item={item} /></>;
     if (item.type === "new_follower") {
       return <><span className="font-bold text-white">{followerName(item)}</span> ha empezado a seguirte</>;

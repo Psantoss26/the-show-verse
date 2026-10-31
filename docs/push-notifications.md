@@ -1,6 +1,6 @@
 # Notificaciones: dentro de la app y en el dispositivo
 
-Los avisos (progreso sincronizado, vistos, series completadas, recordatorios de
+Los avisos (progreso sincronizado, vistos, temporadas y series completadas, recordatorios de
 puntuar y reseñar, seguidores nuevos) salen de la misma fuente que la campana del navbar:
 `getUserNotifications` en `backend/src/lib/notifications.js`. Hay dos formas de
 enseñarlos:
@@ -39,6 +39,14 @@ Todas las ventanas emergentes usan el mismo diseño liquid glass
    últimos 15 minutos que no se hayan enviado (`push_deliveries`). Las del
    mismo título van en una sola notificación: *"Has terminado S01E03. Puntúa
    el episodio S01E03"*.
+
+   Terminar una temporada (todos sus episodios emitidos vistos por primera
+   vez) da la novedad `season_completed` y, si aún no la has puntuado, el
+   recordatorio de la temporada: *"Has completado la temporada 2. Puntúa la
+   temporada 2"*, que lleva a la ficha de la temporada. Marcar varias
+   temporadas de golpe avisa solo de la última del lote, y la temporada que
+   cierra la serie no se avisa aparte: la cubre *"Has completado la serie"*
+   (`seasonCompletionEvents` en `lib/notificationsCore.js`).
 4. Se envía a cada dispositivo de `push_subscriptions`. Los destinos que el
    servicio da por muertos (404/410, `UNREGISTERED`) se borran.
 5. En el dispositivo:

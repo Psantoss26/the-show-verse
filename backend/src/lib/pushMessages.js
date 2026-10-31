@@ -75,6 +75,8 @@ function eventText(item) {
     }
     case 'auto_watched':
       return code ? `Has terminado ${code}` : 'Has terminado la película';
+    case 'season_completed':
+      return `Has completado la temporada ${item.season}`;
     case 'show_completed':
       return 'Has completado la serie';
     case 'collection_next':

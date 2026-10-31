@@ -227,6 +227,7 @@ function alertSentence({ kind, item }) {
       return `${code ? `${code} añadido` : "Añadida"} a Continuar viendo${platform ? ` · ${platform}` : ""}`;
     }
     if (item.type === "auto_watched") return code ? `Has terminado ${code}` : "Has terminado la película";
+    if (item.type === "season_completed") return `Has completado la temporada ${item.season}`;
     if (item.type === "show_completed") return "Has completado la serie";
     if (item.type === "collection_next") {
       return item.afterTitle ? `Siguiente de la saga después de ${item.afterTitle}` : "Siguiente de la saga";
@@ -247,6 +248,7 @@ function alertSentence({ kind, item }) {
 const ALERT_LOOK = {
   cw_added: { icon: "progress", label: "Continuar viendo" },
   auto_watched: { icon: "autoWatched", label: "Visto" },
+  season_completed: { icon: "completed", label: "Temporada completada" },
   show_completed: { icon: "completed", label: "Serie completada" },
   collection_next: { icon: "saga", label: "Saga" },
   new_follower: { icon: "follow", label: "Nuevo seguidor" },

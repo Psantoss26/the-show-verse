@@ -101,6 +101,41 @@ export function completionMarks(rowsAsc, seasonEpisodeCounts, isShowComplete) {
 }
 
 /**
+ * Novedades "Has completado la temporada N" a partir de las marcas de
+ * `completionMarks` de UNA serie. Solo las terminadas dentro de la ventana y:
+ *   - una por momento: marcar varias temporadas de golpe avisa solo de la
+ *     última de ese lote, no de cada una;
+ *   - ninguna en el momento en que se completó la serie, que ya tiene su
+ *     propia novedad (`show_completed`).
+ *
+ * @param tmdbId     serie.
+ * @param marks      resultado de `completionMarks`.
+ * @param eventAtFor función (rowId) => momento del visionado (o null).
+ * @param since      inicio de la ventana.
+ * @returns eventos `season_completed`, sin título ni cartel.
+ */
+export function seasonCompletionEvents(tmdbId, marks, eventAtFor, since) {
+  const showAt = marks?.showRowId ? new Date(eventAtFor(marks.showRowId)).getTime() : NaN;
+  const byInstant = new Map();
+  for (const [rowId, season] of marks?.seasons || []) {
+    const at = new Date(eventAtFor(rowId));
+    const t = at.getTime();
+    if (!Number.isFinite(t) || at < since || t === showAt || rowId === marks.showRowId) continue;
+    const current = byInstant.get(t);
+    if (!current || season > current.season) byInstant.set(t, { season, createdAt: at });
+  }
+  return [...byInstant.values()].map(({ season, createdAt }) => ({
+    id: `season-completed:${tmdbId}:${season}`,
+    type: 'season_completed',
+    tmdbId: Number(tmdbId),
+    mediaType: 'tv',
+    season,
+    episode: null,
+    createdAt,
+  }));
+}
+
+/**
  * Recordatorios de puntuar y reseñar lo terminado:
  *   - película: puntuar y reseñar;
  *   - serie completada: puntuar y reseñar la serie;

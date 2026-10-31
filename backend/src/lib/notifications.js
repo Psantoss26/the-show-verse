@@ -5,7 +5,7 @@
 //   - novedades:
 //       · entradas automáticas en "Continuar viendo" y pasos automáticos a
 //         visto: los recibos de progreso (streaming_events);
-//       · series completadas: el mismo criterio que el perfil;
+//       · temporadas y series completadas: el mismo criterio que el perfil;
 //       · siguiente película de una colección: TMDb (belongs_to_collection);
 //       · nuevos seguidores: la tabla follows.
 
@@ -31,6 +31,7 @@ import {
   nextInCollection,
   parseEntityKey,
   ratingTargetKey,
+  seasonCompletionEvents,
   reviewTargetKey,
   splitAutoCompleted,
   watchEventAt,
@@ -143,8 +144,9 @@ async function getReminders(db, userId, watched, completions) {
 }
 
 // Temporadas y series TERMINADAS por los visionados de la ventana. Devuelve las
-// marcas de cada serie (para los recordatorios) y las series completadas por
-// primera vez dentro de la ventana (novedad "Has completado la serie").
+// marcas de cada serie (para los recordatorios) y las temporadas y series
+// completadas por primera vez dentro de la ventana (novedades "Has completado
+// la temporada N" y "Has completado la serie").
 async function getShowCompletions(db, userId, watched, since) {
   const completions = new Map();
   const completedShows = [];
@@ -191,9 +193,12 @@ async function getShowCompletions(db, userId, watched, since) {
     );
     completions.set(tmdbId, marks);
 
+    const eventAtFor = (rowId) => eventAtById.get(rowId)
+      || showRows.find((row) => String(row.id) === rowId)?.watchedAt;
+    completedShows.push(...seasonCompletionEvents(tmdbId, marks, eventAtFor, since));
+
     if (!marks.showRowId) continue;
-    const completedAt = eventAtById.get(marks.showRowId)
-      || showRows.find((row) => String(row.id) === marks.showRowId)?.watchedAt;
+    const completedAt = eventAtFor(marks.showRowId);
     if (!completedAt || new Date(completedAt) < since) continue;
     completedShows.push({
       id: `show-completed:${tmdbId}`,

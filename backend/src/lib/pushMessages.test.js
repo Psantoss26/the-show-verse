@@ -74,3 +74,14 @@ test('push: un avatar data: no viaja en el mensaje', () => {
   }, { now: NOW });
   assert.equal(message.image, null);
 });
+
+test('push: temporada completada y su recordatorio van juntos y llevan a la temporada', () => {
+  const messages = buildPushMessages({
+    events: [{ id: 'season-completed:1399:2', type: 'season_completed', tmdbId: 1399, mediaType: 'tv', season: 2, episode: null, title: 'Juego de tronos', createdAt: ago(1) }],
+    reminders: [{ id: 'r', type: 'reminder', level: 'season', tmdbId: 1399, mediaType: 'tv', season: 2, episode: null, title: 'Juego de tronos', createdAt: ago(1), needsRating: true, needsReview: false }],
+  }, { now: NOW });
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].body, 'Has completado la temporada 2. Puntúa la temporada 2');
+  assert.equal(messages[0].url, '/details/tv/1399/season/2');
+  assert.equal(messages[0].type, 'season_completed');
+});
