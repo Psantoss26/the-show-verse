@@ -187,6 +187,24 @@ const ACTIVITY_POSTER_CLASS =
 const ACTIVITY_REVIEW_POSTER_CLASS =
   "h-32 w-[5.4rem] rounded-lg @[1280px]/detail-page:h-40 @[1280px]/detail-page:w-[6.75rem] @[1536px]/detail-page:h-48 @[1536px]/detail-page:w-32";
 
+// Vista lista de Diario, Favoritos, Pendientes y Puntuaciones: el cartel 2:3
+// parte del tamaño de móvil (57×80 px) y crece con el ancho de la página hasta
+// 75×112 px; con un cartel fijo, en un monitor 2K la fila se quedaba en una
+// tira diminuta. Tamaño intermedio a propósito: el de la lista con póster de
+// Actividad (96×144) resultaba demasiado grande para estas filas.
+const PROFILE_LIST_POSTER_CLASS =
+  "h-20 w-[3.55rem] @[1280px]/detail-page:h-24 @[1280px]/detail-page:w-16 @[1536px]/detail-page:h-28 @[1536px]/detail-page:w-[4.67rem]";
+// Fila y textos que acompañan al cartel al crecer.
+const PROFILE_LIST_ROW_CLASS =
+  "gap-3 p-2.5 @[1536px]/detail-page:gap-4 @[1536px]/detail-page:p-3";
+const PROFILE_LIST_TITLE_CLASS =
+  "text-sm @[1536px]/detail-page:text-base";
+const PROFILE_LIST_META_CLASS =
+  "text-xs @[1536px]/detail-page:text-sm";
+// Cartel de la tarjeta de Reseñas: igual criterio, de 64×96 a 85×128 px.
+const PROFILE_REVIEW_POSTER_CLASS =
+  "h-24 w-16 @[1280px]/detail-page:h-28 @[1280px]/detail-page:w-[4.67rem] @[1536px]/detail-page:h-32 @[1536px]/detail-page:w-[5.33rem]";
+
 // Los eventos de Perfil pueden representar un episodio sin cambiar el tipo
 // público de la serie (`tv`). Conservamos la serie como ficha padre, pero la
 // preview debe recibir su temporada y episodio concretos.
@@ -1078,7 +1096,7 @@ function ReviewCard({ item }) {
       <Link
         href={`/details/${type}/${item.tmdbId}`}
         onClick={previewClick(item)}
-        className="h-24 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-sm"
+        className={`${PROFILE_REVIEW_POSTER_CLASS} flex-shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-sm`}
       >
         {src ? (
           <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
@@ -1093,7 +1111,7 @@ function ReviewCard({ item }) {
           <Link
             href={`/details/${type}/${item.tmdbId}`}
             onClick={previewClick(item)}
-            className="text-sm font-bold text-white hover:text-emerald-400"
+            className={`${PROFILE_LIST_TITLE_CLASS} font-bold text-white hover:text-emerald-400`}
           >
             {item.title || "Ver ficha"}
           </Link>
@@ -1242,7 +1260,7 @@ function ProfileListCard({ item }) {
 }
 
 
-function ProfileMediaListItem({ item, showStars, viewerState, compact = false }) {
+function ProfileMediaListItem({ item, showStars, viewerState, compact = false, statusRow = false }) {
   const previewClick = usePreviewOpen();
   const type = getItemMediaType(item);
   const title = getItemTitle(item) || "Sin título";
@@ -1250,26 +1268,41 @@ function ProfileMediaListItem({ item, showStars, viewerState, compact = false })
   const date = getItemDate(item);
   const rating = viewerState?.rating ?? item?.userRating ?? item?.user_rating ?? item?.rating;
   const hasRating = Number(rating) > 0;
-  const sizeClass = compact ? "h-14 w-10" : "h-20 w-[3.55rem]";
+  const watched = Boolean(viewerState?.watched ?? item?.watched);
+  // Favoritos: visto y puntuación en una tercera línea, bajo título y datos,
+  // con los mismos colores que la píldora de la cuadrícula (PosterTile).
+  const showStatusRow = statusRow && !showStars && (watched || hasRating);
+  const sizeClass = compact ? "h-14 w-10" : PROFILE_LIST_POSTER_CLASS;
 
   return (
     <Link
       href={`/details/${type}/${item?.tmdbId || item?.id}`}
       onClick={previewClick(item, { mediaType: type })}
-      className="group flex min-w-0 items-center gap-3 rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] p-2.5 shadow-lg transition hover:from-white/[0.13] hover:to-white/[0.06]"
+      className={`group flex min-w-0 items-center ${PROFILE_LIST_ROW_CLASS} rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] shadow-lg transition hover:from-white/[0.13] hover:to-white/[0.06]`}
     >
       <span className={`${sizeClass} shrink-0 overflow-hidden rounded-xl bg-zinc-900`}>
         {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold text-white transition-colors group-hover:text-emerald-300">{title}</span>
-        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+        <span className={`block truncate ${PROFILE_LIST_TITLE_CLASS} font-bold text-white transition-colors group-hover:text-emerald-300`}>{title}</span>
+        <span className={`mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 ${PROFILE_LIST_META_CLASS} text-zinc-500`}>
           <span>{type === "tv" ? "Serie" : "Película"}</span>
           {date ? <span>{new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(date)}</span> : null}
         </span>
         {showStars && hasRating ? <span className="mt-1.5 block"><Stars rating={Number(rating)} /></span> : null}
+        {showStatusRow ? (
+          <span className={`mt-1.5 flex items-center gap-2 ${PROFILE_LIST_META_CLASS}`}>
+            {watched ? (
+              <span className="flex items-center text-emerald-400" title="Visto">
+                <Eye className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">Visto</span>
+              </span>
+            ) : null}
+            {hasRating ? <span className="font-black tabular-nums leading-none text-amber-300">{rating}</span> : null}
+          </span>
+        ) : null}
       </span>
-      {!showStars && hasRating ? <span className="shrink-0 text-sm font-black tabular-nums text-amber-300">{rating}</span> : null}
+      {!showStars && !statusRow && hasRating ? <span className="shrink-0 text-sm font-black tabular-nums text-amber-300">{rating}</span> : null}
     </Link>
   );
 }
@@ -1287,15 +1320,15 @@ function DiaryListItem({ item, viewerState, onOpenGroup }) {
     ? `/details/tv/${item.tmdbId}/season/${episode.season}/episode/${episode.episode}`
     : `/details/${type}/${item?.tmdbId || item?.id}`;
   const rating = viewerState?.rating ?? item?.rating;
-  const cardClassName = "flex w-full min-w-0 items-center gap-3 p-2.5 text-left transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70";
+  const cardClassName = `flex w-full min-w-0 items-center ${PROFILE_LIST_ROW_CLASS} text-left transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70`;
   const cardContent = (
     <>
-      <span className="h-20 w-[3.55rem] shrink-0 overflow-hidden rounded-xl bg-zinc-900">
+      <span className={`${PROFILE_LIST_POSTER_CLASS} shrink-0 overflow-hidden rounded-xl bg-zinc-900`}>
         {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold text-white transition-colors group-hover:text-emerald-300">{title}</span>
-        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+        <span className={`block truncate ${PROFILE_LIST_TITLE_CLASS} font-bold text-white transition-colors group-hover:text-emerald-300`}>{title}</span>
+        <span className={`mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 ${PROFILE_LIST_META_CLASS} text-zinc-500`}>
           {grouped ? (
             <span className="font-semibold text-emerald-300">{episodeGroup.length} episodios</span>
           ) : episode ? (
@@ -1569,6 +1602,7 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates, animate
               item={item}
               showStars={showStars}
               viewerState={viewerTitleStates[titleStateKey(item)]}
+              statusRow={fixedIndicator === "favorite"}
             />
           </ProfileEntrance>
         ))}
@@ -1638,7 +1672,12 @@ function estimateFillCount(config, controls) {
 
   let rowHeight;
   if (!isPosters || view === "list") {
-    rowHeight = 88; // filas de lista / reseñas / actividad (aprox.)
+    // Filas de lista / reseñas / actividad (aprox.). En la lista de carteles la
+    // fila crece con el cartel (PROFILE_LIST_POSTER_CLASS).
+    const width = window.innerWidth || 0;
+    rowHeight = isPosters
+      ? width >= 1536 ? 144 : width >= 1280 ? 124 : 108
+      : 88;
   } else {
     const container = Math.min(window.innerWidth || 1120, 1120) - 32;
     const gap = view === "compact" ? 8 : 12;
