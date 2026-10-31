@@ -52,7 +52,7 @@ export function shouldRenderCachedListDuringAuthHydration({
 // caché propia la pantalla se quedaba vacía 2-3 s (más en las propias, que
 // esperan también a la sesión). Pero quien llega desde /lists ya tiene esa
 // lista en la caché del índice (`showverse:lists:index:<fuente>:<ámbito>:v1`, v2 en colecciones,
-// ver app/lists/page.jsx) con su nombre, descripción, recuento y portada: con
+// ver app/lists/ListsClient.jsx) con su nombre, descripción, recuento y portada: con
 // eso se pinta la cabecera al instante y solo los títulos esperan.
 
 const LISTS_INDEX_CACHE_PREFIX = 'showverse:lists:index:'

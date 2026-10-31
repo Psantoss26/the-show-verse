@@ -47,7 +47,7 @@ test("la captura global replica el gesto de Perfil, también en fichas de usuari
   const [navigation, layout, lists, detailsTabs, traktEpisodesModal] = await Promise.all([
     readFile(new URL("../../components/MobileUserPageSwipeNavigation.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../app/layout.jsx", import.meta.url), "utf8"),
-    readFile(new URL("../../app/lists/page.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../../app/lists/ListsClient.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../components/details/DetailsInfoTabs.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../components/trakt/TraktEpisodesWatchedModal.jsx", import.meta.url), "utf8"),
   ]);

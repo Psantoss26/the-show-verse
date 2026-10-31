@@ -247,7 +247,7 @@ Capas:
 
 Archivos principales:
 - `src/components/DiscoverClient.jsx`
-- `src/app/lists/page.jsx`
+- `src/app/lists/page.jsx` (servidor) y `src/app/lists/ListsClient.jsx`
 - `src/app/calendar/page.jsx`
 - `src/app/history/HistoryClient.jsx`
 
@@ -262,7 +262,8 @@ Patrón dominante:
 - Normalmente no tienen TTL explícito.
 
 Excepciones:
-- `lists/page.jsx` cachea ratings de OMDb en `sessionStorage` con TTL de 24 horas.
+- La pestaña de `/lists` (Mis listas, Comunidad o Colecciones) va además en la cookie `showverse_lists_source` (`lib/lists/listsSourcePrefs.js`): `lists/page.jsx` la lee en el servidor para que el HTML traiga ya el título y el contenido de esa pestaña al recargar, en vez de la de Comunidad hasta hidratar.
+- `ListsClient.jsx` cachea ratings de OMDb en `sessionStorage` con TTL de 24 horas.
 - `useTraktLists` usa `fetch(..., { cache: "no-store" })`, así que las listas de Trakt se refrescan siempre.
 
 ## 9. APIs auxiliares con TTL claro

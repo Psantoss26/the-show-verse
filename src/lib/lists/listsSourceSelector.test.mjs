@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const listsPage = readFileSync(
-  new URL("../../app/lists/page.jsx", import.meta.url),
+  new URL("../../app/lists/ListsClient.jsx", import.meta.url),
   "utf8",
 );
 

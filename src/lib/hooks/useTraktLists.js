@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // Surface A (discover): la fuente ahora es nuestro backend (community_lists),
 // no Trakt directamente. Cada resultado llega como { list, user, previewPosters }
 // (ver backend/src/community/normalize.js:listRowToApi). Lo aplanamos al shape
-// que ya consume src/app/lists/page.jsx (list.name/description/item_count/likes,
+// que ya consume src/app/lists/ListsClient.jsx (list.name/description/item_count/likes,
 // list.user, list.previewPosters), usando list.id (uuid interno de
 // community_lists) como identificador. OJO: a propósito NO propagamos
 // list.ids.{slug,trakt} aquí — page.jsx (getTraktListKey/buildInternalUrl)

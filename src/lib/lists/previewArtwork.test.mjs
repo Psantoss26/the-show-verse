@@ -8,7 +8,7 @@ import {
 } from "./previewArtwork.js";
 
 const listsPage = readFileSync(
-  new URL("../../app/lists/page.jsx", import.meta.url),
+  new URL("../../app/lists/ListsClient.jsx", import.meta.url),
   "utf8",
 );
 // El colage de portada ya no vive dentro de /lists: es un componente compartido

@@ -1,0 +1,3253 @@
+// /src/app/lists/ListsClient.jsx
+"use client";
+
+import OptimizedImage from "@/components/OptimizedImage";
+import Link from "next/link";
+import {
+  DEFAULT_LISTS_SOURCE,
+  writeListsSourceCookie,
+} from "@/lib/lists/listsSourcePrefs";
+import { LoginRequiredCard } from "@/components/auth/LoginRequiredScreen";
+import { createPortal } from "react-dom";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  useDeferredValue,
+  useTransition,
+  memo,
+} from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { FreeMode } from "swiper/modules";
+import "swiper/swiper-bundle.css";
+
+import useTmdbLists from "@/lib/hooks/useTmdbLists";
+import { getListDetails } from "@/lib/api/backendLists";
+import { getDetails, getExternalIds } from "@/lib/api/tmdb";
+import { fetchOmdbByImdb } from "@/lib/api/omdb";
+import { useAuth } from "@/context/AuthContext";
+import useCardEntrance from "@/hooks/useCardEntrance";
+import {
+  hasCollectionLikes,
+  mergeCollectionLikes,
+  readCollectionLikes,
+} from "@/lib/lists/collectionLikesCache";
+import { formatPageTitle } from "@/lib/pageTitle";
+import LiquidButton from "@/components/LiquidButton";
+import Avatar from "@/components/ui/Avatar";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import PosterStack from "@/components/details/PosterStack";
+import {
+  titleStateKey,
+  useViewerTitleStates,
+} from "@/components/social/useViewerTitleStates";
+import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { resolveListItemIndicator } from "@/lib/lists/listItemHoverIndicator";
+import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
+import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
+import { requestListArtwork } from "@/lib/tmdb/artworkBatch";
+import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
+import { prefetchListDetails } from "@/lib/lists/detailsPrefetch";
+import { stripHtml } from "@/lib/details/formatters";
+
+import {
+  Loader2,
+  Plus,
+  ListVideo,
+  RefreshCcw,
+  Search,
+  ArrowUpDown,
+  LayoutGrid,
+  StretchHorizontal,
+  Rows,
+  CheckCircle2,
+  ChevronDown,
+  X,
+  Layers,
+  SlidersHorizontal,
+  Film,
+  Tv,
+  MonitorPlay,
+  Users,
+  Heart,
+  BookmarkPlus,
+  Eye,
+  Globe,
+} from "lucide-react";
+import PageStatCard from "@/components/ui/PageStatCard";
+import { useSlidingSectionIndicator } from "@/components/ui/useSlidingSectionIndicator";
+import { listsHeaderStats } from "@/lib/lists/headerStats";
+import { FEATURED_COLLECTION_IDS } from "@/lib/tmdb/featuredCollections";
+import useTraktLists from "@/lib/hooks/useTraktLists";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
+import ListPosterCard from "@/components/lists/ListPosterCard";
+import ListCountPills from "@/components/lists/ListCountPills";
+import FlipReorder from "@/components/ui/FlipReorder";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
+import { getOwnCardPoster } from "@/lib/artworkApi";
+import useOwnCardPoster, { useOwnCardPostersVersion } from "@/lib/hooks/useOwnCardPoster";
+import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
+
+// ================== UTILS & CACHE ==================
+const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const LISTS_SOURCE_CACHE_TTL_MS = 20 * 60 * 1000;
+const LIST_PREVIEW_CACHE_TTL_MS = 30 * 60 * 1000;
+const imdbRatingsCache = new Map();
+const PRELOAD_FIRST_N_LISTS = 3;
+const LISTS_MENU_PREFS_KEY = "showverse:lists:menu:v2";
+const VALID_SORT_MODES = new Set([
+  "items_desc",
+  "items_asc",
+  "likes_desc",
+  "likes_asc",
+  "popularity_desc",
+  "popularity_asc",
+  "name_asc",
+  "name_desc",
+]);
+const VALID_VIEW_MODES = new Set(["grid", "rows", "list"]);
+const VALID_SOURCES = new Set(["personal", "trakt", "collections"]);
+const LIST_SOURCE_OPTIONS = [
+  { value: "personal", label: "Mis listas", Icon: ListVideo },
+  { value: "trakt", label: "Comunidad", Icon: Users },
+  { value: "collections", label: "Colecciones", Icon: Layers },
+];
+
+// `borderColor` es el anillo al pasar el ratón por un cartel: casi opaco, como
+// el de ListPosterCard. Con transparencia se mezclaba con carteles claros y se
+// leía blanco en vez del color de la página.
+const LIST_ROW_ACCENTS = {
+  personal: {
+    borderColor: "rgba(168, 85, 247, 0.92)",
+    shadowColor: "168, 85, 247",
+    textClass: "text-purple-400",
+  },
+  trakt: {
+    borderColor: "rgba(168, 85, 247, 0.92)",
+    shadowColor: "168, 85, 247",
+    textClass: "text-purple-400",
+  },
+  collections: {
+    borderColor: "rgba(234, 179, 8, 0.92)",
+    shadowColor: "234, 179, 8",
+    textClass: "text-yellow-400",
+  },
+  default: {
+    borderColor: "rgba(168, 85, 247, 0.92)",
+    shadowColor: "168, 85, 247",
+    textClass: "text-purple-400",
+  },
+};
+
+const readOmdbCache = (imdbId) => {
+  if (!imdbId || typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(`showverse:omdb:${imdbId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      ...parsed,
+      fresh: Date.now() - (parsed?.t || 0) < OMDB_CACHE_TTL_MS,
+    };
+  } catch {
+    return null;
+  }
+};
+const writeOmdbCache = (imdbId, patch) => {
+  if (!imdbId || typeof window === "undefined") return;
+  try {
+    const prev = readOmdbCache(imdbId) || {};
+    const next = {
+      t: Date.now(),
+      imdbRating: patch?.imdbRating ?? prev?.imdbRating ?? null,
+    };
+    window.sessionStorage.setItem(
+      `showverse:omdb:${imdbId}`,
+      JSON.stringify(next),
+    );
+  } catch {
+    // ignore
+  }
+};
+
+function getListCacheKey(listOrSource, maybeId) {
+  if (typeof listOrSource === "object" && listOrSource !== null) {
+    return `${listOrSource?.source || "unknown"}:${String(listOrSource?.id || "")}`;
+  }
+  return `${String(listOrSource || "unknown")}:${String(maybeId || "")}`;
+}
+
+function ListsLoaderState({
+  message = "Cargando listas...",
+  fullscreen = false,
+}) {
+  return (
+    <div
+      className={
+        fullscreen
+          ? "min-h-screen bg-black flex items-center justify-center"
+          : "flex flex-col items-center justify-center py-32"
+      }
+    >
+      <div className="flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
+        <span className="text-neutral-500 text-sm font-medium animate-pulse">
+          {message}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function readListsMenuPrefs() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LISTS_MENU_PREFS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      query: typeof parsed?.query === "string" ? parsed.query : "",
+      sortMode: VALID_SORT_MODES.has(parsed?.sortMode)
+        ? parsed.sortMode
+        : "items_desc",
+      viewMode: VALID_VIEW_MODES.has(parsed?.viewMode)
+        ? parsed.viewMode
+        : "rows",
+      // Migración silenciosa de las preferencias antiguas: "tmdb" era el
+      // nombre histórico de las listas propias, no su proveedor real.
+      source:
+        parsed?.source === "tmdb"
+          ? "personal"
+          : VALID_SOURCES.has(parsed?.source)
+            ? parsed.source
+            : "trakt",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeListsMenuPrefs(prefs) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LISTS_MENU_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // ignore
+  }
+}
+
+function readSessionJsonCache(key, ttlMs) {
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const t = Number(parsed?.t || 0);
+    if (!t || Date.now() - t > ttlMs) return null;
+    return parsed?.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionJsonCache(key, data) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), data }));
+  } catch {
+    // ignore
+  }
+}
+
+// Colecciones destacadas: una sola petición compartida por la precarga en
+// segundo plano y por el cambio de pestaña, para que pulsar "Colecciones"
+// mientras la precarga vuela no dispare una segunda petición, sino que espere
+// a la que ya está en curso. Una respuesta vacía o fallida no se memoriza.
+//
+// GUARDADAS ENTRE VISITAS (localStorage, no solo la sesión): son casi siempre
+// las mismas, así que se pintan al instante con la copia guardada y se
+// refrescan detrás. Antes cada sesión nueva empezaba de cero y la pestaña
+// esperaba al catálogo y, fila a fila, a cada colección y a su arte.
+// v6: cada colección trae ya sus películas (`previewItems`) y el arte de las
+// primeras: las filas se pintan sin pedir nada más.
+const FEATURED_COLLECTIONS_CACHE_KEY = "showverse:lists:featured-collections:v6";
+// Hasta cuándo vale la copia guardada para pintar (se refresca siempre detrás).
+const FEATURED_COLLECTIONS_STORE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+// Una copia más reciente que esto no se refresca: evita pedir el catálogo en
+// cada cambio de pestaña.
+const FEATURED_COLLECTIONS_FRESH_MS = 30 * 60 * 1000;
+const FEATURED_COLLECTIONS_URL = "/api/tmdb/collections/featured?v=6";
+let featuredCollectionsRequest = null;
+
+function readStoredFeaturedCollections() {
+  if (typeof window === "undefined") return null;
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(FEATURED_COLLECTIONS_CACHE_KEY) || "null",
+    );
+    const t = Number(parsed?.t || 0);
+    if (!t || Date.now() - t > FEATURED_COLLECTIONS_STORE_TTL_MS) return null;
+    const data = parsed?.data;
+    return Array.isArray(data) && data.length > 0 ? { data, t } : null;
+  } catch {
+    return null;
+  }
+}
+
+function readCachedFeaturedCollections() {
+  return readStoredFeaturedCollections()?.data || null;
+}
+
+function writeStoredFeaturedCollections(cols) {
+  try {
+    window.localStorage.setItem(
+      FEATURED_COLLECTIONS_CACHE_KEY,
+      JSON.stringify({ t: Date.now(), data: cols }),
+    );
+  } catch {
+    // Sin espacio o sin almacenamiento: queda la copia de esta pestaña.
+  }
+}
+
+function fetchFeaturedCollections({ force = false } = {}) {
+  if (featuredCollectionsRequest) return featuredCollectionsRequest;
+
+  const request = fetch(FEATURED_COLLECTIONS_URL, {
+    cache: force ? "no-cache" : "default",
+  })
+    .then((res) => res.json().catch(() => ({})))
+    .then((j) => (Array.isArray(j?.collections) ? j.collections : []))
+    .catch(() => [])
+    .then((cols) => {
+      if (cols.length > 0) writeStoredFeaturedCollections(cols);
+      return cols;
+    })
+    .finally(() => {
+      // Only share in-flight work; completed promises must not bypass the TTL.
+      if (featuredCollectionsRequest === request) featuredCollectionsRequest = null;
+    });
+  featuredCollectionsRequest = request;
+  return request;
+}
+
+function loadFeaturedCollections({ force = false } = {}) {
+  if (!force) {
+    const cached = readCachedFeaturedCollections();
+    if (cached) return Promise.resolve(cached);
+  }
+  return fetchFeaturedCollections({ force });
+}
+
+// ¿Toca refrescar la copia guardada? (Se pinta igual mientras llega.)
+function featuredCollectionsStale() {
+  const stored = readStoredFeaturedCollections();
+  return !stored || Date.now() - stored.t > FEATURED_COLLECTIONS_FRESH_MS;
+}
+
+// Sin copia guardada y con la pestaña Colecciones elegida, la petición sale en
+// cuanto se evalúa este módulo: en paralelo a la hidratación, no después.
+if (typeof window !== "undefined") {
+  try {
+    const prefs = JSON.parse(window.localStorage.getItem(LISTS_MENU_PREFS_KEY) || "null");
+    if (prefs?.source === "collections" && featuredCollectionsStale()) {
+      fetchFeaturedCollections();
+    }
+  } catch {
+    // Preferencias ilegibles: se pedirá al elegir la pestaña.
+  }
+}
+
+// Películas de una colección del catálogo, listas para su fila (o null si el
+// catálogo no las trae). `complete`: con el arte de las primeras ya elegido.
+const catalogPreviewMemo = new WeakMap();
+function catalogPreviewItems(list) {
+  if (list?.source !== "collections" || !Array.isArray(list?.previewItems)) return null;
+  let items = catalogPreviewMemo.get(list.previewItems);
+  if (!items) {
+    items = dedupePreviewItems(list.previewItems);
+    catalogPreviewMemo.set(list.previewItems, items);
+  }
+  return items;
+}
+
+// Lo que pinta la tarjeta de una lista: lo cargado o, en las PRIMERAS
+// colecciones, sus películas del catálogo desde el primer render (sin pasar
+// por el esqueleto). Las demás siguen montándose al entrar en pantalla
+// (`ensureListItems`, ya sin red): dárselas todas de golpe montaba los 255
+// carruseles y sus ~950 tarjetas al abrir la pestaña.
+function listItemsState(itemsMap, list, index) {
+  const loaded = itemsMap[getListCacheKey(list)];
+  if (loaded !== undefined && loaded !== null) return loaded;
+  if (index >= PRELOAD_FIRST_N_LISTS) return loaded;
+  const fromCatalog = catalogPreviewItems(list);
+  return fromCatalog && previewArtworkComplete(fromCatalog) ? fromCatalog : loaded;
+}
+
+function previewArtworkComplete(items) {
+  return items
+    .slice(0, 5)
+    .every((item) => item?._listPreviewPoster !== undefined);
+}
+
+/* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
+const useIsMobileLayout = (breakpointPx = 768) => {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(`(max-width:${breakpointPx - 1}px)`).matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mq = window.matchMedia(`(max-width:${breakpointPx - 1}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+
+    if (mq.addEventListener) mq.addEventListener("change", update);
+    else mq.addListener(update);
+
+    window.addEventListener("orientationchange", update);
+    window.addEventListener("resize", update);
+
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      else mq.removeListener(update);
+
+      window.removeEventListener("orientationchange", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [breakpointPx]);
+
+  return isMobile;
+};
+
+/* --- InView: lazy load por proximidad al viewport --- */
+// Efectos que deben aplicarse ANTES del primer pintado (preferencias, cachés):
+// en el servidor no hay layout effect, de ahí el respaldo.
+const useClientLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+// `eager`: comprueba la posición ANTES del primer pintado y, si ya está cerca,
+// nace a la vista. El aviso del observador llega más tarde (0,4-1 s al pasar a
+// «filas», con 255 secciones montándose) y la fila pintaba antes el esqueleto.
+// Solo en las PRIMERAS secciones: la entrada de cada tarjeta (WAAPI, en su
+// layout effect) invalida el layout entre medida y medida, y medir las 255
+// costaba ~230 ms. Las demás esperan al observador.
+const EAGER_IN_VIEW_MARGIN = 320;
+const EAGER_IN_VIEW_ROWS = 6;
+
+const useInView = ({ rootMargin = "320px 0px", threshold = 0.01, eager = false } = {}) => {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
+
+  useClientLayoutEffect(() => {
+    if (!eager || typeof window === "undefined") return;
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    if (rect.top < window.innerHeight + EAGER_IN_VIEW_MARGIN && rect.bottom > -EAGER_IN_VIEW_MARGIN) {
+      setInView(true);
+    }
+    // Solo al montar.
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setInView(true);
+      },
+      { rootMargin, threshold },
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [rootMargin, threshold]);
+
+  return [ref, inView];
+};
+
+/* --- Scroll infinito: pide más al acercarse al final ---
+   El observador se rehace al terminar cada carga: si tras ella el centinela
+   sigue a la vista (página corta, pantalla alta), su primera notificación ya
+   lo dice y se pide la siguiente sin esperar a otro scroll. */
+function LoadMoreSentinel({ onVisible, loading, failed = false }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    // Tras un fallo no se observa: se reintenta con el botón (si no, el
+    // centinela, aún a la vista, volvería a pedir en bucle).
+    if (!el || loading || failed || typeof IntersectionObserver === "undefined") return undefined;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) onVisible?.();
+      },
+      { rootMargin: "1200px 0px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [onVisible, loading, failed]);
+
+  return (
+    <div ref={ref} className="flex min-h-16 items-center justify-center pt-8" aria-live="polite">
+      {loading ? (
+        <span className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-400">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Cargando más listas…
+        </span>
+      ) : failed ? (
+        <button
+          type="button"
+          onClick={() => onVisible?.()}
+          className="rounded-xl bg-gradient-to-br from-white/10 to-white/5 px-5 py-2.5 text-sm font-bold text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white"
+        >
+          No se pudieron cargar más listas · Reintentar
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// Póster de un título en las vistas de listas y colecciones: la portada
+// elegida en la ficha o, sin ella, la más votada (`getOwnCardPoster`, que sale
+// de memoria; quien lo use se suscribe con `useOwnCardPostersVersion`), como
+// las tarjetas del detalle de listas y colecciones; si no, la de la vista
+// previa (arte sin texto) o la del item.
+function listItemPosterPath(item) {
+  const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
+  return (
+    getOwnCardPoster(mediaType, item?.id) ||
+    item?._listPreviewPoster ||
+    item?.poster_path ||
+    null
+  );
+}
+
+function ListPreviewPosterStrip({ items = [], alt = "" }) {
+  useOwnCardPostersVersion();
+  const previewItems = items.slice(0, 5);
+
+  if (!previewItems.length) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-zinc-700">
+        <ListVideo className="h-6 w-6" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full items-stretch justify-center gap-px p-0.5">
+      {previewItems.map((item, index) => (
+        // Cada hueco con la proporción del póster (sin bandas): en el móvil
+        // caben tres a buen tamaño, desde sm los cinco.
+        <div
+          key={`${item?.media_type || "movie"}:${item?.id || index}`}
+          className={`aspect-[2/3] h-full shrink-0 overflow-hidden rounded-[3px] bg-zinc-950 ${index >= 3 ? "max-sm:hidden" : ""}`}
+        >
+          <TmdbImg
+            filePath={listItemPosterPath(item)}
+            size="w154"
+            alt={`${alt}: título ${index + 1}`}
+            className="h-full w-full object-cover"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Quien la llame se suscribe con `useOwnCardPostersVersion` (ver
+// `listItemPosterPath`).
+function getPosterStackUrls(items = []) {
+  return items
+    .slice(0, 5)
+    .map(listItemPosterPath)
+    .filter(Boolean)
+    .map((filePath) =>
+      /^https?:\/\//i.test(filePath)
+        ? filePath
+        : `https://image.tmdb.org/t/p/w342${filePath}`,
+    );
+}
+
+function Dropdown({ valueLabel, icon: Icon, children, className = "" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  return (
+    <div
+      ref={ref}
+      className={`relative ${open ? "z-[99999]" : "z-10"} ${className}`}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
+      >
+        <div className="flex items-center gap-2 truncate">
+          {Icon && <Icon className="w-4 h-4 text-purple-500" />}
+          <span className="font-semibold text-white truncate">
+            {valueLabel}
+          </span>
+        </div>
+        <ChevronDown
+          className={`w-3.5 h-3.5 shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.14, ease: "easeOut" }}
+            className="absolute right-0 top-full z-[99999] mt-2 w-full rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+          >
+            <div className="space-y-1">
+              {children({ close: () => setOpen(false) })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full px-3 py-2 rounded-xl text-left text-xs sm:text-sm transition flex items-center justify-between ${
+        active
+          ? "bg-white/10 text-white font-bold"
+          : "text-zinc-300 hover:bg-white/5 hover:text-white"
+      }`}
+    >
+      <span className="font-medium">{children}</span>
+      {active && <CheckCircle2 className="w-4 h-4 text-purple-500" />}
+    </button>
+  );
+}
+
+// La pastilla de la sección activa se desliza entre botones
+// (useSlidingSectionIndicator).
+const LIST_SOURCE_ACTIVE_PILL = "bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg shadow-purple-500/20";
+
+function ListsSourceSelector({ source, onChange, className = "" }) {
+  const navRef = useRef(null);
+  const { ready, indicator } = useSlidingSectionIndicator({
+    navRef,
+    activeKey: source,
+    groupId: "lists-source",
+    className: LIST_SOURCE_ACTIVE_PILL,
+  });
+  return (
+    <nav
+      ref={navRef}
+      aria-label="Fuente de listas"
+      className={`relative inline-flex h-11 max-w-full shrink-0 gap-1 overflow-x-auto rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
+    >
+      {indicator}
+      {LIST_SOURCE_OPTIONS.map(({ value, label, Icon }) => {
+        const active = source === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            data-section-key={value}
+            onClick={() => onChange(value)}
+            aria-pressed={active}
+            aria-label={label}
+            title={label}
+            className={`relative z-10 flex h-full items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-bold transition-all lg:px-3.5 ${
+              active
+                ? `text-white ${ready ? "" : LIST_SOURCE_ACTIVE_PILL}`
+                : "text-zinc-400 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            {/* En escritorio cada sección muestra su título, no solo la activa. */}
+            <span className="hidden lg:inline">{label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  // EL MENÚ VA EN UN PORTAL, con posición fija calculada ANTES de pintarlo:
+  // la misma capa que los selectores de Favoritas y del detalle de una lista.
+  //
+  // Antes iba dentro de la barra de herramientas y parpadeaba al abrir y al
+  // cerrar (verificado fotograma a fotograma en Chromium):
+  //   - La barra lleva su propio `backdrop-blur`, y un desenfoque dentro de otro
+  //     no se compone mientras dura la animación: el menú salía sin blur, con el
+  //     cartel de detrás nítido, y el desenfoque entraba de golpe al final.
+  //   - Al cerrar, su contenedor bajaba de `z-[99999]` a `z-10` en el acto, con
+  //     la salida aún animándose: el menú se hundía entre las tarjetas.
+  //   - Se pintaba con 448px de alto máximo y un fotograma después se recortaba
+  //     al hueco real, con un salto de tamaño al aparecer.
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuMaxWidth = window.innerWidth - 24;
+    // Ancho real del menú ya pintado (en la primera llamada aún no existe).
+    const measured = menuRef.current?.offsetWidth || rect.width;
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - Math.min(measured, menuMaxWidth) - 12),
+    );
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: "max-content",
+      minWidth: rect.width,
+      maxWidth: menuMaxWidth,
+      maxHeight: Math.max(64, Math.min(448, availableBelow)),
+      zIndex: 1000,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
+  const toggle = () => {
+    // La posición se calcula en el mismo gesto: el menú nace ya en su sitio y
+    // con su alto final, sin un fotograma intermedio.
+    if (!open) updateMenuPosition();
+    setOpen((v) => !v);
+  };
+
+  return (
+    <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          {/* `shrink-0`: en una columna estrecha (móvil) se recorta el valor,
+              no el icono ni el rótulo. */}
+          {Icon && <Icon className="w-4 h-4 shrink-0 text-purple-500" />}
+          <span className="shrink-0 text-zinc-500 font-bold text-xs uppercase tracking-wider">
+            {label}:
+          </span>
+          <span className="min-w-0 truncate font-semibold text-white">
+            {valueLabel}
+          </span>
+        </div>
+        <ChevronDown
+          className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+                style={{
+                  ...menuStyle,
+                }}
+              >
+                <div
+                  className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
+                  style={{ scrollbarWidth: "thin" }}
+                >
+                  <div className="space-y-1">
+                    {children({ close: () => setOpen(false) })}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+// --- CREATION MODAL ---
+function CreateListModal({ open, onClose, onCreate, creating, error }) {
+  const [name, setName] = useState("");
+  const [desc, setDesc] = useState("");
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        // Liquid glass algo más contenido que el de los modales de la ficha
+        // (LIQUID_GLASS_PANEL: 16px y saturación 140%), con dos reflejos
+        // morados muy tenues. Sobre un fondo casi negro el cristal no tiene
+        // qué refractar: lo que despega el panel sin trazar un borde es la luz
+        // del propio vidrio y el halo morado difuso de la sombra. Sin reflejo
+        // interior (`inset 0 1px`): dibujaba una línea en el canto superior.
+        className="relative w-full max-w-md overflow-hidden rounded-[2rem] bg-black/[0.32] bg-[linear-gradient(135deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.02)_45%,rgba(0,0,0,0.12)_100%),radial-gradient(120%_70%_at_15%_0%,rgba(168,85,247,0.16),transparent_60%),radial-gradient(90%_60%_at_100%_100%,rgba(139,92,246,0.10),transparent_65%)] backdrop-blur-[12px] backdrop-saturate-[130%] shadow-[0_24px_60px_-16px_rgba(0,0,0,0.85),0_0_44px_-10px_rgba(168,85,247,0.28)]"
+      >
+        <div className="flex items-center justify-between px-6 pt-6">
+          <h3 className="text-xl font-bold text-white">Nueva lista</h3>
+          <button
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] text-zinc-400 transition hover:bg-white/10 hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-5 px-6 pb-6 pt-5">
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
+              Nombre
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-xl bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition hover:bg-white/[0.08] focus:bg-white/[0.09] focus:ring-2 focus:ring-purple-500/40"
+              placeholder="Mi lista de favoritos..."
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
+              Descripción (opcional)
+            </label>
+            <textarea
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              className="w-full rounded-xl bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition hover:bg-white/[0.08] focus:bg-white/[0.09] focus:ring-2 focus:ring-purple-500/40 h-24 resize-none"
+              placeholder="De qué trata esta lista..."
+            />
+          </div>
+          {error && (
+            <p className="text-red-400 text-xs">
+              {error}
+              {/* Límite de listas del plan (ver backendLists.js). */}
+              {/Con Pro/.test(String(error)) ? (
+                <>
+                  {" "}
+                  <Link href="/planes" className="font-bold text-emerald-400 underline-offset-2 hover:underline">
+                    Ver planes
+                  </Link>
+                </>
+              ) : null}
+            </p>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-xl bg-white/[0.06] py-3 text-sm font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                onCreate(name, desc);
+                setName("");
+                setDesc("");
+              }}
+              disabled={creating || !name.trim()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/25 transition hover:from-purple-400 hover:to-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300/60 disabled:cursor-not-allowed disabled:from-white/[0.06] disabled:to-white/[0.06] disabled:text-zinc-500 disabled:shadow-none"
+            >
+              {creating && <Loader2 className="w-4 h-4 animate-spin" />} Crear
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function formatIndicatorScore(value) {
+  const score = Number(value);
+  if (!Number.isFinite(score)) return null;
+  return Number.isInteger(score) ? String(score) : score.toFixed(1);
+}
+
+function ListItemHoverIndicator({
+  mediaType,
+  viewerState,
+  tmdbScore,
+  imdbScore,
+}) {
+  const indicator = resolveListItemIndicator({
+    mediaType,
+    favorite: viewerState?.favorite,
+    watchlist: viewerState?.watchlist,
+    watched: viewerState?.watched,
+    plays: viewerState?.plays,
+    userRating: viewerState?.rating,
+    tmdbRating: tmdbScore,
+    imdbRating: imdbScore,
+  });
+  const itemClassName = "flex h-9 w-10 shrink-0 items-center justify-center";
+  const scoreClassName = `${itemClassName} text-xl font-black leading-none tabular-nums`;
+
+  return (
+    <div
+      className={`pointer-events-none absolute bottom-2 left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 items-center overflow-hidden rounded-full px-1.5 opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 lg:group-focus-within:translate-y-0 lg:group-focus-within:scale-100 lg:group-focus-within:opacity-100 will-change-transform transform-gpu`}
+      aria-hidden="true"
+    >
+      <span
+        className={`${itemClassName} ${
+          indicator.leading === "favorite"
+            ? "text-red-400"
+            : indicator.leading === "watchlist" || indicator.leading === "movie"
+              ? "text-sky-400"
+              : "text-violet-400"
+        }`}
+      >
+        {indicator.leading === "favorite" ? (
+          <Heart className="h-5 w-5 fill-current" />
+        ) : indicator.leading === "watchlist" ? (
+          <BookmarkPlus className="h-5 w-5 fill-current" />
+        ) : indicator.leading === "movie" ? (
+          <Film className="h-5 w-5" />
+        ) : (
+          <MonitorPlay className="h-5 w-5" />
+        )}
+      </span>
+
+      {indicator.watched?.kind === "count" ? (
+        <span className={`${scoreClassName} text-emerald-400`}>
+          {indicator.watched.value}
+        </span>
+      ) : indicator.watched?.kind === "watched" ? (
+        <span className={`${itemClassName} text-emerald-400`}>
+          <Eye className="h-5 w-5" />
+        </span>
+      ) : null}
+
+      {indicator.rating ? (
+        <span className={`${scoreClassName} text-amber-300`}>
+          {formatIndicatorScore(indicator.rating.value)}
+        </span>
+      ) : null}
+      {indicator.tmdbRating ? (
+        <span className={`${scoreClassName} text-sky-400`}>
+          {Number(indicator.tmdbRating).toFixed(1)}
+        </span>
+      ) : null}
+      {indicator.imdbRating ? (
+        <span className={`${scoreClassName} text-amber-300`}>
+          {Number(indicator.imdbRating).toFixed(1)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+const ListItemCard = memo(function ListItemCard({
+  item,
+  isMobile,
+  accent = "trakt",
+  viewerState,
+}) {
+  const initialTmdbScore = Number(item?.vote_average ?? item?.voteAverage);
+  const initialImdbScore = Number(item?.imdbRating ?? item?.imdb_rating);
+  const [tmdbScore, setTmdbScore] = useState(
+    Number.isFinite(initialTmdbScore) && initialTmdbScore > 0
+      ? initialTmdbScore
+      : null,
+  );
+  const [imdbScore, setImdbScore] = useState(
+    Number.isFinite(initialImdbScore) && initialImdbScore > 0
+      ? initialImdbScore
+      : null,
+  );
+  const [imgFailed, setImgFailed] = useState(false);
+
+  const title = item?.title || item?.name || "—";
+  const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
+  const href = `/details/${mediaType}/${item.id}`;
+  const previewClick = usePreviewOpen();
+  // Portada elegida en la ficha o, sin ella, la más votada: manda y no espera
+  // a la automática. Si no, el póster con la escalera de idioma (inglés
+  // primero), como en Favoritos: lo pone ListItemsRow. Mientras se resuelve no
+  // se pinta el de TMDb (llega en es-ES); solo el ya elegido de la vista
+  // previa, si lo hay.
+  const cardPoster = useOwnCardPoster(mediaType, item?.id);
+  const posterPath =
+    cardPoster ||
+    (item?._englishPosterPending
+      ? item?._listPreviewPoster || null
+      : item?.poster_path || item?.backdrop_path || null);
+  const posterUrl = posterPath
+    ? `https://image.tmdb.org/t/p/w342${posterPath}`
+    : null;
+  const accentStyle = LIST_ROW_ACCENTS[accent] || LIST_ROW_ACCENTS.default;
+  const hoverShadow = [
+    `0 18px 48px -24px rgba(${accentStyle.shadowColor}, 0.72)`,
+    `0 10px 24px -18px rgba(${accentStyle.shadowColor}, 0.58)`,
+    "0 16px 30px -24px rgba(0, 0, 0, 0.75)",
+  ].join(", ");
+  useEffect(() => {
+    setImgFailed(false);
+  }, [posterPath]);
+
+  useEffect(() => {
+    setTmdbScore(
+      Number.isFinite(initialTmdbScore) && initialTmdbScore > 0
+        ? initialTmdbScore
+        : null,
+    );
+    setImdbScore(
+      Number.isFinite(initialImdbScore) && initialImdbScore > 0
+        ? initialImdbScore
+        : null,
+    );
+  }, [initialImdbScore, initialTmdbScore, item?.id, mediaType]);
+
+  const prefetchImdb = useCallback(async () => {
+    if (!item?.id) return;
+    if (viewerState?.favorite || (tmdbScore && imdbScore)) return;
+    const key = `${mediaType}:${item.id}`;
+
+    let details = null;
+    if (!tmdbScore) {
+      try {
+        details = await getDetails(mediaType, item.id, {
+          appendToResponse: "external_ids",
+        });
+        const publicScore = Number(details?.vote_average);
+        if (Number.isFinite(publicScore) && publicScore > 0) {
+          setTmdbScore(publicScore);
+        }
+      } catch {
+        // La ausencia de puntuación pública no bloquea el resto del indicador.
+      }
+    }
+
+    if (imdbRatingsCache.has(key)) {
+      setImdbScore(imdbRatingsCache.get(key));
+      return;
+    }
+
+    try {
+      const ext =
+        details?.external_ids || (await getExternalIds(mediaType, item.id));
+      const imdbId = ext?.imdb_id || details?.imdb_id || null;
+      if (!imdbId) return;
+
+      const cached = readOmdbCache(imdbId);
+      if (cached?.imdbRating) {
+        setImdbScore(cached.imdbRating);
+        imdbRatingsCache.set(key, cached.imdbRating);
+        if (cached.fresh) return;
+      }
+
+      const omdb = await fetchOmdbByImdb(imdbId);
+      const r =
+        omdb?.imdbRating && omdb.imdbRating !== "N/A"
+          ? Number(omdb.imdbRating)
+          : null;
+      const safe = Number.isFinite(r) ? r : null;
+
+      if (safe) {
+        setImdbScore(safe);
+        imdbRatingsCache.set(key, safe);
+        writeOmdbCache(imdbId, { imdbRating: safe });
+      }
+    } catch {
+      // ignore
+    }
+  }, [imdbScore, item?.id, mediaType, tmdbScore, viewerState?.favorite]);
+
+  // En móvil evitamos disparar OMDb por “hover”.
+  const prefetchEnabled = !isMobile;
+
+  return (
+    <Link
+      href={href}
+      onClick={previewClick(item, { mediaType })}
+      className="relative z-0 block w-full select-none hover:z-[50] focus:z-[50] focus:outline-none"
+      draggable={false}
+      onDragStart={(e) => e.preventDefault()}
+      onMouseEnter={prefetchEnabled ? prefetchImdb : undefined}
+      onFocus={prefetchEnabled ? prefetchImdb : undefined}
+    >
+      <motion.div
+        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-800/80 shadow-lg transform-gpu will-change-transform after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_var(--card-ring-hover)]"
+        whileHover={{
+          y: -6,
+          zIndex: 50,
+          boxShadow: hoverShadow,
+        }}
+        whileTap={{ y: -2 }}
+        transition={{ type: "spring", stiffness: 360, damping: 26 }}
+        style={{ "--card-ring-hover": accentStyle.borderColor }}
+      >
+        {posterUrl && !imgFailed ? (
+          <OptimizedImage
+            src={posterUrl}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            className="h-full w-full object-cover grayscale-[18%] transition-transform duration-500 transform-gpu group-hover:scale-[1.08] group-hover:-translate-y-1 group-hover:grayscale-0"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-neutral-900 text-zinc-600">
+            {mediaType === "movie" ? (
+              <Film className="h-8 w-8 opacity-60" />
+            ) : (
+              <Tv className="h-8 w-8 opacity-60" />
+            )}
+          </div>
+        )}
+
+        <ListItemHoverIndicator
+          mediaType={mediaType}
+          viewerState={viewerState}
+          tmdbScore={tmdbScore}
+          imdbScore={imdbScore}
+        />
+      </motion.div>
+    </Link>
+  );
+});
+
+// Criterios de «Ordenar». La popularidad solo existe en las colecciones (media
+// de la popularidad de TMDb de sus películas, ver toCollectionSummary).
+const SORT_OPTIONS = [
+  { id: "items_desc", label: "Más items" },
+  { id: "items_asc", label: "Menos items" },
+  { id: "likes_desc", label: "Más likes" },
+  { id: "likes_asc", label: "Menos likes" },
+  { id: "popularity_desc", label: "Más populares", collectionsOnly: true },
+  { id: "popularity_asc", label: "Menos populares", collectionsOnly: true },
+  { id: "name_asc", label: "A-Z" },
+  { id: "name_desc", label: "Z-A" },
+];
+
+function sortOptionsFor(source) {
+  return SORT_OPTIONS.filter((option) => !option.collectionsOnly || source === "collections");
+}
+
+// El orden guardado puede ser de colecciones (popularidad): en las demás
+// pestañas no aplica y se ordena como por defecto, sin perder la preferencia.
+function effectiveSortMode(sortMode, source) {
+  return sortOptionsFor(source).some((option) => option.id === sortMode) ? sortMode : "items_desc";
+}
+
+function sortLists(lists, mode) {
+  const arr = [...lists];
+  switch (mode) {
+    case "name_asc":
+      return arr.sort((a, b) => (a?.name || "").localeCompare(b?.name || ""));
+    case "name_desc":
+      return arr.sort((a, b) => (b?.name || "").localeCompare(a?.name || ""));
+    case "items_desc":
+      return arr.sort((a, b) => (b?.item_count || 0) - (a?.item_count || 0));
+    case "items_asc":
+      return arr.sort((a, b) => (a?.item_count || 0) - (b?.item_count || 0));
+    case "likes_desc":
+      return arr.sort((a, b) => (b?.likes || 0) - (a?.likes || 0));
+    case "likes_asc":
+      return arr.sort((a, b) => (a?.likes || 0) - (b?.likes || 0));
+    case "popularity_desc":
+      return arr.sort((a, b) => (b?.popularity || 0) - (a?.popularity || 0));
+    case "popularity_asc":
+      return arr.sort((a, b) => (a?.popularity || 0) - (b?.popularity || 0));
+    default:
+      return arr;
+  }
+}
+
+function getTraktUsername(list) {
+  return list?.user?.username || list?.user?.ids?.slug || list?.user || "trakt";
+}
+
+function getTraktListKey(list) {
+  // Preferimos slug (más estable), si no id
+  return list?.ids?.slug || list?.ids?.trakt || list?.id;
+}
+
+function buildInternalUrl(list) {
+  const src = list?.source;
+  if (src === "personal") return `/lists/${list?.id}`;
+
+  if (src === "trakt") {
+    // Comunidad: el detalle se sirve por id interno (uuid) desde nuestra BBDD.
+    const id = list?.id;
+    if (!id) return null;
+    return `/lists/community/${encodeURIComponent(String(id))}`;
+  }
+
+  // Colecciones: ruta interna a vista detallada
+  if (src === "collections") return `/lists/collection/${list?.id}`;
+
+  return null;
+}
+
+function buildExternalUrl(list) {
+  const src = list?.source;
+  if (src === "personal") return null;
+  if (src === "trakt") return list?.traktUrl || null;
+  if (src === "collections")
+    return `https://www.themoviedb.org/collection/${list?.id}`;
+  return null;
+}
+
+function dedupePreviewItems(items) {
+  const seenIdentity = new Set();
+  const seenDisplay = new Set();
+  const out = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
+    const title = String(item?.title || item?.name || "")
+      .trim()
+      .toLowerCase();
+    const poster = item?.poster_path || item?.backdrop_path || "";
+    const identityKey =
+      item?.id !== undefined && item?.id !== null
+        ? `${mediaType}:${item.id}`
+        : `${mediaType}:${title}:${poster}`;
+    const displayKey = `${mediaType}:${title || poster}`;
+
+    if (seenIdentity.has(identityKey) || seenDisplay.has(displayKey)) continue;
+    seenIdentity.add(identityKey);
+    seenDisplay.add(displayKey);
+    out.push(item);
+  }
+
+  return out;
+}
+
+/* ========= fila tipo Dashboard: drag con ratón + 3 completas en móvil ========= */
+// Tarjetas del primer pintado de cada fila: las 7 visibles en el ordenador
+// ancho más una asomando.
+const ROW_INITIAL_SLIDES = 8;
+
+function ListItemsRow({ items: rawItems, isMobile, accent = "trakt" }) {
+  // Pósters de la fila con el mismo criterio que Favoritos (inglés → español
+  // → original → sin idioma), del lote /api/tmdb/artwork.
+  const items = useEnglishPosterItems(rawItems, true, { holdOriginalPosters: true });
+  const swiperRef = useRef(null);
+  const [isHoveredRow, setIsHoveredRow] = useState(false);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+  const { authenticated } = useAuth();
+  const viewerItems = useMemo(
+    () =>
+      (Array.isArray(items) ? items : []).map((item) => ({
+        tmdbId: item?.id,
+        mediaType:
+          item?.media_type === "tv" || (!item?.title && item?.name)
+            ? "tv"
+            : "movie",
+      })),
+    [items],
+  );
+  const viewerStates = useViewerTitleStates(viewerItems, authenticated);
+  // Primero solo las tarjetas que caben a la vista (7 como mucho) y el resto
+  // en cuanto el navegador queda libre: montar los carruseles enteros al pasar
+  // a «filas» (~100 tarjetas en Colecciones) retrasaba el cambio de vista.
+  const [showAllSlides, setShowAllSlides] = useState(false);
+  useEffect(() => {
+    if (showAllSlides) return undefined;
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(() => setShowAllSlides(true), { timeout: 400 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(() => setShowAllSlides(true), 120);
+    return () => window.clearTimeout(id);
+  }, [showAllSlides]);
+
+  if (!Array.isArray(items) || items.length === 0) return null;
+  const slideItems = showAllSlides ? items : items.slice(0, ROW_INITIAL_SLIDES);
+
+  const breakpointsRow = {
+    0: { slidesPerView: 3, spaceBetween: 12 },
+    640: { slidesPerView: 4, spaceBetween: 14 },
+    768: { slidesPerView: 5, spaceBetween: 16 },
+    1024: { slidesPerView: 6, spaceBetween: 18 },
+    1280: { slidesPerView: 7, spaceBetween: 20 },
+  };
+
+  const updateNav = (swiper) => {
+    if (!swiper) return;
+    const hasOverflow = !swiper.isLocked;
+    setCanPrev(hasOverflow && !swiper.isBeginning);
+    setCanNext(hasOverflow && !swiper.isEnd);
+  };
+
+  const handleSwiper = (swiper) => {
+    swiperRef.current = swiper;
+    updateNav(swiper);
+  };
+
+  const handlePrevClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const swiper = swiperRef.current;
+    if (!swiper) return;
+    const target = Math.max((swiper.activeIndex || 0) - 7, 0);
+    swiper.slideTo(target);
+  };
+
+  const handleNextClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const swiper = swiperRef.current;
+    if (!swiper) return;
+    const maxIndex = swiper.slides.length - 1;
+    const target = Math.min((swiper.activeIndex || 0) + 7, maxIndex);
+    swiper.slideTo(target);
+  };
+
+  const showPrev = isHoveredRow && canPrev;
+  const showNext = isHoveredRow && canNext;
+
+  return (
+    <div className="-mx-4 sm:mx-0">
+      <div
+        className="relative z-0 px-3 hover:z-[40] sm:px-0"
+        onMouseEnter={() => setIsHoveredRow(true)}
+        onMouseLeave={() => setIsHoveredRow(false)}
+      >
+        <div
+          className="relative z-0"
+          style={{ overflowX: "clip", overflowY: "visible" }}
+        >
+          <Swiper
+            data-mobile-page-swipe-ignore
+            slidesPerView={3}
+            spaceBetween={12}
+            onSwiper={handleSwiper}
+            onSlideChange={updateNav}
+            onResize={updateNav}
+            onReachBeginning={updateNav}
+            onReachEnd={updateNav}
+            breakpoints={breakpointsRow}
+            loop={false}
+            watchOverflow
+            allowTouchMove
+            simulateTouch
+            grabCursor={!isMobile}
+            threshold={isMobile ? 2 : 5}
+            touchRatio={isMobile ? 1.5 : 1}
+            preventClicks
+            preventClicksPropagation
+            touchStartPreventDefault={false}
+            freeMode={
+              !isMobile
+                ? { enabled: true, momentum: true, momentumRatio: 0.5 }
+                : false
+            }
+            modules={[FreeMode]}
+            className="relative z-0 !overflow-visible pb-8 pt-7"
+          >
+            {slideItems.map((item, idx) => {
+              const mt = item?.media_type || (item?.title ? "movie" : "tv");
+              return (
+                <SwiperSlide
+                  key={`${mt}-${item?.id}-${idx}`}
+                  className="relative !h-auto select-none !overflow-visible !z-0 hover:!z-[50] focus-within:!z-[50]"
+                >
+                  <ListItemCard
+                    item={item}
+                    isMobile={isMobile}
+                    accent={accent}
+                    viewerState={
+                      viewerStates[
+                        titleStateKey({
+                          tmdbId: item?.id,
+                          mediaType: mt,
+                        })
+                      ]
+                    }
+                  />
+                </SwiperSlide>
+              );
+            })}
+          </Swiper>
+        </div>
+
+        <AnimatePresence>
+          {showPrev && !isMobile && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              type="button"
+              onClick={handlePrevClick}
+              className="absolute inset-y-0 -left-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-left-10"
+              aria-label="Anterior"
+            >
+              <motion.span
+                className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+                whileHover={{ x: -4 }}
+              >
+                ‹
+              </motion.span>
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showNext && !isMobile && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              type="button"
+              onClick={handleNextClick}
+              className="absolute inset-y-0 -right-8 z-30 hidden w-7 items-center justify-center text-white/75 transition-colors hover:text-white pointer-events-auto sm:flex xl:-right-10"
+              aria-label="Siguiente"
+            >
+              <motion.span
+                className="relative text-4xl font-semibold drop-shadow-[0_0_12px_rgba(0,0,0,0.95)]"
+                whileHover={{ x: 4 }}
+              >
+                ›
+              </motion.span>
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+function ListItemsRowSkeleton({ isMobile, pulse = true }) {
+  const n = isMobile ? 3 : 7;
+  return (
+    <div className="-mx-4 px-3 pt-7 sm:mx-0 sm:px-0">
+      <div className="flex gap-[10px] overflow-hidden">
+        {Array.from({ length: n }).map((_, i) => (
+          <div
+            key={i}
+            className={`w-[30%] sm:w-[22%] md:w-[18%] lg:w-[14%] aspect-[2/3] shrink-0 rounded-xl bg-zinc-900/40 border border-white/5 ${pulse ? "animate-pulse" : ""}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** ✅ Wrapper: Link interno si existe, si no anchor externo, si no div */
+function ListNavWrapper({ list, className = "", children }) {
+  const href = list?.internalUrl || null;
+  const ext = list?.externalUrl || null;
+
+  if (href) {
+    return (
+      <Link href={href} scroll className={className}>
+        {children}
+      </Link>
+    );
+  }
+
+  if (ext) {
+    return (
+      <a href={ext} target="_blank" rel="noreferrer" className={className}>
+        {children}
+      </a>
+    );
+  }
+
+  return <div className={className}>{children}</div>;
+}
+
+// Entrada escalonada de las tarjetas de lista. El retardo se corta a los 0,36s
+// para que, en una rejilla de treinta y tantas colecciones, la última no entre
+// segundo y medio después de la primera: lo que se busca es que el bloque
+// "aterrice", no un desfile.
+const LIST_ENTRANCE_STEP = 0.035;
+const LIST_ENTRANCE_MAX_DELAY = 0.36;
+
+// `instant`: al volver atrás la página se pinta estática (ver
+// useIsHistoryNavigation), sin la entrada escalonada de las filas.
+// La entrada es de Web Animations y UNA sola vez por tarjeta (useCardEntrance):
+// con la de framer, una tarjeta que cambiaba de sitio durante su entrada (p. ej.
+// al llegar los me gusta con «Más likes») se quedaba invisible.
+function ListEntrance({ index = 0, className = "", instant = false, flipKey, children }) {
+  const ref = useRef(null);
+  useCardEntrance(ref, {
+    enabled: !instant,
+    delayS: Math.min(index * LIST_ENTRANCE_STEP, LIST_ENTRANCE_MAX_DELAY),
+    durationS: 0.34,
+    fromTransform: "translateY(14px)",
+  });
+  // `data-flip-key`: <FlipReorder> la recoloca al cambiar el orden.
+  return (
+    <div ref={ref} className={className} data-list-flip={flipKey ? "" : undefined} data-flip-key={flipKey}>
+      {children}
+    </div>
+  );
+}
+
+// Pósters de la tarjeta en MÓVIL: en fila, todos del mismo tamaño y sin girar
+// (el abanico de PosterStack ocupa el doble de alto), sin marco alrededor de
+// cada póster. Cinco huecos fijos: la fila mide lo mismo tenga la lista los
+// títulos que tenga.
+const ROW_POSTER_SLOTS = 5;
+
+function PosterRow({ posters, loading, pulse, alt }) {
+  if (loading) {
+    return (
+      <div className="flex justify-center gap-1.5">
+        {Array.from({ length: ROW_POSTER_SLOTS }, (_, index) => (
+          <div
+            key={index}
+            className={`aspect-[2/3] w-[calc((100%-4*0.375rem)/5)] rounded-lg bg-white/[0.06] ${pulse ? "animate-pulse" : ""}`}
+          />
+        ))}
+      </div>
+    );
+  }
+  if (!posters.length) {
+    return (
+      <div className="flex aspect-[5/1.6] items-center justify-center opacity-10">
+        <ListVideo className="h-12 w-12" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex justify-center gap-1.5">
+      {posters.slice(0, ROW_POSTER_SLOTS).map((src, index) => (
+        <div
+          key={`${src}-${index}`}
+          className="relative aspect-[2/3] w-[calc((100%-4*0.375rem)/5)] overflow-hidden rounded-lg"
+        >
+          {/* Solo la imagen: sin marco, fondo ni sombra que dibujen un borde. */}
+          <OptimizedImage
+            src={src}
+            alt={`${alt}: título ${index + 1}`}
+            loading="lazy"
+            className="block h-full w-full object-cover"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const GridListCard = memo(function GridListCard({
+  list,
+  itemsState,
+  ensureListItems,
+}) {
+  const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
+  const [ref, inView] = useInView();
+
+  useEffect(() => {
+    if (inView) ensureListItems(cacheKey);
+  }, [inView, ensureListItems, cacheKey]);
+
+  const isLoading = itemsState == null;
+  // El hueco solo late mientras la petición está EN CURSO (`null`), no mientras
+  // aún no se ha pedido (`undefined`, la tarjeta lejos de la pantalla; se pide
+  // 320px antes de entrar, así que a la vista ya late). Con todas latiendo, en
+  // Colecciones había ~1200 `animate-pulse` infinitos: en reposo los mueve el
+  // compositor, pero en cuanto el hilo principal anima algo (el desplegable del
+  // menú móvil, que anima la altura) cada fotograma recalculaba el estilo de
+  // todos ellos: 57-75 ms por fotograma con CPU x4, frente a 14-18 en Comunidad.
+  const isPending = itemsState === null;
+  const items = Array.isArray(itemsState) ? itemsState : [];
+  // Elección propia o más votada de cada título: al cambiar, se recalcula.
+  useOwnCardPostersVersion();
+  const previewPosters = getPosterStackUrls(items);
+  const description = stripHtml(list?.description);
+  const itemCount = Number(list?.item_count || 0);
+  const likes = Number(list?.likes || 0);
+  const username = list?.user?.username || list?.user?.name || null;
+  const avatar = list?.user?.images?.avatar?.full || null;
+  const SourceIcon =
+    list?.source === "collections"
+      ? Layers
+      : list?.source === "trakt"
+        ? Users
+        : ListVideo;
+  const sourceLabel =
+    list?.source === "collections"
+      ? "Colección TMDb"
+      : list?.source === "trakt"
+        ? username || "Comunidad"
+        : "Mi lista";
+
+  return (
+    <div ref={ref} className="group/card relative h-full">
+      <ListNavWrapper
+        list={list}
+        className="group block h-full rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-400"
+      >
+        <article
+          data-list-showcase-card={list?.source || "unknown"}
+          className={`relative isolate flex h-full flex-col overflow-hidden rounded-3xl transform-gpu transition-all duration-500 ${LIQUID_GLASS_CARD} hover:brightness-110 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(168,85,247,0.92)]`}
+        >
+          <LiquidGlassOpticalLayers />
+
+          {/* Móvil: fila compacta. */}
+          <div className="relative z-10 w-full bg-gradient-to-b from-white/5 to-transparent px-3 pb-2 pt-3 sm:hidden">
+            <PosterRow posters={previewPosters} loading={isLoading} pulse={isPending} alt={list?.name || "Lista"} />
+          </div>
+
+          <div className="relative z-10 hidden h-52 w-full overflow-visible bg-gradient-to-b from-white/5 to-transparent p-6 sm:block">
+            {isLoading ? (
+              <div className="flex h-full w-full items-center justify-center">
+                <div
+                  className={`h-40 w-56 rounded-2xl bg-white/[0.06] ${isPending ? "animate-pulse" : ""}`}
+                />
+              </div>
+            ) : previewPosters.length > 0 ? (
+              <div className="flex h-full w-full items-center justify-center overflow-visible">
+                <PosterStack
+                  posters={previewPosters}
+                  alt={list?.name || "Lista"}
+                  preventNavigation={false}
+                />
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center opacity-10">
+                <ListVideo className="h-20 w-20" />
+              </div>
+            )}
+          </div>
+
+          <div className="relative z-10 flex flex-1 flex-col justify-between bg-black/25 px-4 pb-3 pt-3 sm:p-5">
+            <div>
+              <h3 className="line-clamp-1 text-base font-bold leading-tight text-white transition-colors group-hover:text-indigo-400 sm:text-lg">
+                {list?.name || "Lista"}
+              </h3>
+              {description && (
+                <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-zinc-400 sm:mt-2 sm:line-clamp-2">
+                  {description}
+                </p>
+              )}
+            </div>
+
+            {/* `@container`: en tarjetas estrechas (rejilla de 4 columnas) las
+                píldoras de items y me gusta no dejan sitio al nombre, que se
+                quedaba en «T…»; entonces solo va el avatar (nombre en `title`). */}
+            <footer className="@container mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-3 sm:mt-4 sm:pt-4">
+              <div className="flex min-w-0 items-center gap-2" title={sourceLabel}>
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[10px] font-black text-white ring-1 ring-white/20">
+                  {list?.source === "trakt" ? (
+                    <Avatar src={avatar} name={sourceLabel} />
+                  ) : (
+                    <SourceIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                  )}
+                </span>
+                <span className="hidden max-w-[120px] truncate text-xs font-medium text-zinc-300 transition-colors group-hover:text-white @[17.5rem]:inline">
+                  {sourceLabel}
+                </span>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                <ListCountPills itemCount={itemCount} likes={likes} />
+              </div>
+            </footer>
+          </div>
+        </article>
+      </ListNavWrapper>
+    </div>
+  );
+});
+
+const RowListSection = memo(function RowListSection({
+  list,
+  index = 0,
+  itemsState,
+  ensureListItems,
+  isMobile,
+}) {
+  const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
+  const [ref, inView] = useInView({ eager: index < EAGER_IN_VIEW_ROWS });
+
+  useEffect(() => {
+    if (inView) ensureListItems(cacheKey);
+  }, [inView, ensureListItems, cacheKey]);
+
+  const isLoading = itemsState === null;
+  const items = Array.isArray(itemsState) ? itemsState : [];
+  const hasResolvedItems = itemsState !== undefined;
+
+  return (
+    <section ref={ref} className="space-y-4">
+      <div className="flex items-start justify-between gap-3 border-b border-white/5 pb-3 sm:items-end">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <ListNavWrapper
+              list={list}
+              className="group/title min-w-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            >
+              <h3 className="truncate text-2xl font-black text-white transition-colors group-hover/title:text-purple-400 sm:text-3xl">
+                {list.name}
+              </h3>
+            </ListNavWrapper>
+
+            <ListCountPills itemCount={list.item_count} likes={list?.likes} />
+          </div>
+
+          {list.description && (
+            <p className="text-sm text-zinc-500 mt-1 line-clamp-1 max-w-3xl">
+              {list.description}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <ListItemsRowSkeleton isMobile={isMobile} />
+      ) : items.length > 0 && !inView ? (
+        // Ya cargada pero lejos de la pantalla (p. ej. al venir de otra vista):
+        // su carrusel se monta al acercarse, con el mismo hueco reservado.
+        <ListItemsRowSkeleton isMobile={isMobile} pulse={false} />
+      ) : items.length > 0 ? (
+        <ListItemsRow items={items} isMobile={isMobile} accent={list?.source} />
+      ) : hasResolvedItems ? (
+        <div className="h-40 flex items-center justify-center bg-zinc-900/20 rounded-2xl border border-dashed border-white/5 text-zinc-600 text-sm">
+          Lista vacía
+        </div>
+      ) : null}
+    </section>
+  );
+});
+
+const ListModeRow = memo(function ListModeRow({
+  list,
+  itemsState,
+  ensureListItems,
+}) {
+  const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
+  const [ref, inView] = useInView();
+
+  useEffect(() => {
+    if (inView) ensureListItems(cacheKey);
+  }, [inView, ensureListItems, cacheKey]);
+
+  const isLoading = itemsState == null;
+  // Solo late lo que se está cargando (ver GridListCard).
+  const isPending = itemsState === null;
+  const items = Array.isArray(itemsState) ? itemsState : [];
+
+  return (
+    <div ref={ref}>
+      {/* ✅ antes: Link fijo a /lists/:id */}
+      <ListNavWrapper list={list} className="group block">
+        <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all sm:gap-5">
+          {/* Ancho = huecos 2:3 del alto interior (3 en el móvil, 5 desde sm).
+              Sin fondo ni borde: con menos de cinco títulos no queda caja negra. */}
+          <div className="h-[5.5rem] w-[10.75rem] shrink-0 overflow-hidden rounded-lg sm:h-24 sm:w-[19.5rem] lg:h-28 lg:w-[22.75rem]">
+            {isLoading ? (
+              <div
+                className={`w-full h-full bg-zinc-900/40 ${isPending ? "animate-pulse" : ""}`}
+              />
+            ) : (
+              <ListPreviewPosterStrip items={items} alt={list.name} />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            {/* La fila es alta: en el móvil el título usa hasta dos líneas y,
+                desde sm, la descripción. */}
+            <h3 className="line-clamp-2 text-base font-bold leading-snug text-white group-hover:text-purple-400 transition-colors sm:truncate sm:text-lg">
+              {list.name}
+            </h3>
+            <p className="mt-0.5 text-sm text-zinc-400 truncate sm:line-clamp-2 sm:whitespace-normal">
+              {list.description || "—"}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4 pr-1">
+            <div className="text-right hidden sm:block">
+              <span className="text-xs text-zinc-500 uppercase font-bold tracking-wider block">
+                Items
+              </span>
+              <span className="text-sm font-bold text-white">
+                {list.item_count}
+              </span>
+            </div>
+          </div>
+        </div>
+      </ListNavWrapper>
+    </div>
+  );
+});
+
+// Precarga la ficha de la tarjeta bajo el puntero/foco/dedo (ver
+// lib/lists/detailsPrefetch).
+function handleListPrefetch(event) {
+  const link = event.target?.closest?.('a[href^="/lists/"]');
+  if (link) prefetchListDetails(link.getAttribute("href"));
+}
+
+// Iconos y colores de las tarjetas de la cabecera (lib/lists/headerStats).
+const STAT_ICONS = { layers: Layers, film: Film, list: ListVideo, heart: Heart, globe: Globe };
+const STAT_TONES = {
+  purple: "text-purple-400",
+  sky: "text-sky-400",
+  amber: "text-amber-400",
+  rose: "text-rose-400",
+  emerald: "text-emerald-400",
+};
+
+// Tarjetas fuera de pantalla sin layout ni pintado (`content-visibility: auto`,
+// Baseline 2024). Con el menú móvil abierto arriba del todo, el desplegable
+// empuja hacia abajo TODO el contenido (en Colecciones, ~60.000 px) y cada
+// fotograma recorría el pintado de todas las tarjetas: 24-27 ms por fotograma
+// con CPU x4, 17-18 ms con esto. El alto de reserva solo cuenta antes del primer
+// pintado de cada tarjeta (`auto` recuerda luego el real). No afecta al cristal
+// (medido con la sonda invert(1)). NO en el modo «filas»: sus pósters crecen
+// por fuera de la sección al pasar el ratón y las flechas cuelgan a los lados,
+// y la contención de pintado los recortaría.
+const OFFSCREEN_SKIP_GRID =
+  "[content-visibility:auto] [contain-intrinsic-size:auto_240px] sm:[contain-intrinsic-size:auto_380px]";
+const OFFSCREEN_SKIP_LIST =
+  "[content-visibility:auto] [contain-intrinsic-size:auto_90px]";
+
+// CONTENIDO DE LA PÁGINA, memoizado. Abrir o cerrar el menú móvil (y cualquier
+// otro estado de la barra) re-renderizaba la página entera: con las ~245
+// colecciones eran ~100 ms de React en el primer fotograma del desplegable (dev,
+// CPU x4), que se veía como un tirón al abrir y al cerrar. Así solo se vuelve a
+// pintar cuando cambia algo que de verdad afecta a las tarjetas.
+const ListsContent = memo(function ListsContent({
+  contentSource,
+  contentLists,
+  sourceInitialized,
+  source,
+  viewMode,
+  itemsMap,
+  ensureListItems,
+  isMobile,
+  isBackNav,
+  communityHasMore = false,
+  communityLoadingMore = false,
+  communityLoadMoreError = false,
+  onCommunityLoadMore,
+}) {
+  // Firma del orden pintado: al cambiar (otro criterio de orden, o llegan las
+  // listas del criterio nuevo) <FlipReorder> desliza cada tarjeta a su sitio y
+  // las nuevas entran con su animación, en vez de saltar.
+  const orderKey = contentLists.map((l) => `${l.source}-${l.id}`).join("|");
+  return (
+    <AnimatePresence mode="wait" initial={!isBackNav}>
+      <motion.div
+        key={contentSource}
+        // Marca la fuente que se está pintando de verdad, que durante la
+        // carga NO es la seleccionada. Sirve de asidero para comprobar el
+        // relevo, igual que `data-lists-view-selector` en la barra.
+        data-lists-content={contentSource}
+        // PRECARGA de la ficha (datos y pósters de sus títulos) al pasar
+        // el ratón, enfocar o tocar una tarjeta: al abrirla está completa
+        // desde el primer fotograma. Un solo manejador para todas.
+        onPointerOver={handleListPrefetch}
+        onFocus={handleListPrefetch}
+        onTouchStart={handleListPrefetch}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{
+          opacity: 0,
+          y: -8,
+          // La transición de salida va DENTRO de `exit`: es la forma que
+          // Framer resuelve para el desmontaje (una clave `exit` dentro de
+          // `transition` no la aplicaría).
+          transition: { duration: 0.16, ease: "easeIn" },
+        }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {contentLists.length === 0 ? (
+          // Sin resultados solo se anuncia cuando la fuente está resuelta:
+          // durante la carga inicial, un "no hay listas" que dura un instante
+          // es peor que no decir nada todavía.
+          sourceInitialized ? (
+            <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
+              <ListVideo className="w-16 h-16 text-neutral-700 mb-4" />
+              <h3 className="text-xl font-bold text-neutral-300">
+                {source === "collections"
+                  ? "No hay colecciones"
+                  : "No hay listas"}
+              </h3>
+              <p className="text-zinc-500 mt-2">
+                {source === "personal"
+                  ? "Crea una nueva lista arriba para empezar."
+                  : "Prueba cambiando el modo o el buscador."}
+              </p>
+            </div>
+          ) : null
+        ) : (
+          <>
+            {viewMode === "grid" && (
+              <FlipReorder
+                className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4"
+                orderKey={orderKey}
+                itemSelector="[data-list-flip]"
+              >
+                {contentLists.map((l, index) => (
+                  <ListEntrance
+                    key={`${l.source}-${l.id}`}
+                    flipKey={`${l.source}-${l.id}`}
+                    index={index}
+                    instant={isBackNav}
+                    className={`h-full ${OFFSCREEN_SKIP_GRID}`}
+                  >
+                    <GridListCard
+                      list={l}
+                      itemsState={listItemsState(itemsMap, l, index)}
+                      ensureListItems={ensureListItems}
+                    />
+                  </ListEntrance>
+                ))}
+              </FlipReorder>
+            )}
+
+            {viewMode === "rows" && (
+              <FlipReorder className="space-y-12" orderKey={orderKey} itemSelector="[data-list-flip]">
+                {contentLists.map((l, index) => (
+                  <ListEntrance key={`${l.source}-${l.id}`} flipKey={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
+                    <RowListSection
+                      list={l}
+                      index={index}
+                      itemsState={listItemsState(itemsMap, l, index)}
+                      ensureListItems={ensureListItems}
+                      isMobile={isMobile}
+                    />
+                  </ListEntrance>
+                ))}
+              </FlipReorder>
+            )}
+
+            {viewMode === "list" && (
+              <FlipReorder className="flex flex-col gap-3" orderKey={orderKey} itemSelector="[data-list-flip]">
+                {contentLists.map((l, index) => (
+                  <ListEntrance
+                    key={`${l.source}-${l.id}`}
+                    flipKey={`${l.source}-${l.id}`}
+                    index={index}
+                    instant={isBackNav}
+                    className={OFFSCREEN_SKIP_LIST}
+                  >
+                    <ListModeRow
+                      list={l}
+                      itemsState={listItemsState(itemsMap, l, index)}
+                      ensureListItems={ensureListItems}
+                    />
+                  </ListEntrance>
+                ))}
+              </FlipReorder>
+            )}
+
+            {/* Comunidad: siguiente página al acercarse al final. DENTRO del
+                contenido, para que nazca con él: fuera, durante el relevo
+                entre pestañas (sale lo anterior y aún no ha entrado esto)
+                quedaba arriba, a la vista, y pedía más listas —«Cargando más
+                listas…»— antes de enseñar ninguna. */}
+            {contentSource === "trakt" && communityHasMore ? (
+              <LoadMoreSentinel
+                onVisible={onCommunityLoadMore}
+                loading={communityLoadingMore}
+                failed={communityLoadMoreError}
+              />
+            ) : null}
+          </>
+        )}
+      </motion.div>
+    </AnimatePresence>
+  );
+});
+
+// ================== MAIN PAGE ==================
+export default function ListsClient({ initialSource = DEFAULT_LISTS_SOURCE }) {
+  const isMobile = useIsMobileLayout(768);
+  // Al volver atrás/adelante la página se pinta ESTÁTICA, como el resto de
+  // páginas de contenido: sin entradas de cabecera, barra ni filas.
+  //
+  // Nunca en el render de HIDRATACIÓN de una carga completa: la marca de
+  // historial vive en sessionStorage (30 s), así que recargar justo después de
+  // un «atrás» la daba por buena y el cliente no coincidía con el HTML del
+  // servidor, que trae las entradas animadas. Se fija en el primer render: si
+  // cambiara después, `ListEntrance` remontaría las filas.
+  const historyNavigation = useIsHistoryNavigation();
+  const hydrationDone = useHydrationReady();
+  const [isBackNav] = useState(() => hydrationDone && historyNavigation);
+  const [isPending, startTransition] = useTransition();
+
+  const {
+    canUse,
+    lists,
+    loading,
+    initialized: personalInitialized,
+    error,
+    refresh,
+    loadMore,
+    hasMore,
+    create,
+  } = useTmdbLists();
+  const { session, account, hydrated: authHydrated } = useAuth();
+
+  const [authStatus, setAuthStatus] = useState("checking");
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    document.title = formatPageTitle("Listas");
+  }, []);
+  const deferredQuery = useDeferredValue(query);
+  const [sortMode, setSortMode] = useState("items_desc");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const filtersRef = useRef(null);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
+  const [viewMode, setViewMode] = useState("rows"); // ✅ por defecto como “Dashboard”
+
+  // ✅ NUEVO: selector de fuente
+  // La del servidor (cookie), para que el primer HTML ya traiga su título.
+  const [source, setSource] = useState(initialSource); // 'personal' | 'trakt' | 'collections'
+  const [prefsHydrated, setPrefsHydrated] = useState(false);
+  // Último contenido que SÍ estuvo listo (ver el relevo entre fuentes, más abajo).
+  const [readyContent, setReadyContent] = useState({ source, lists: [] });
+
+  // Comunidad: el orden y la búsqueda los aplica el servidor sobre TODAS las
+  // listas guardadas, y se recorren por páginas (scroll infinito). Antes se
+  // pedía una sola página de 30 y el resto no se veía nunca.
+  const communitySortMode = effectiveSortMode(sortMode, "trakt");
+  const communityQuery = source === "trakt" ? deferredQuery.trim().toLowerCase() : "";
+  const trakt = useTraktLists({
+    mode: "popular",
+    sort: communitySortMode,
+    query: communityQuery,
+  });
+  const [featuredCollections, setFeaturedCollections] = useState([]);
+  const featuredCollectionsCount = featuredCollections.length;
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const [collectionsResolvedKey, setCollectionsResolvedKey] = useState(null);
+  const [searchedCollections, setSearchedCollections] = useState([]);
+  // Me gusta públicos de las colecciones: id -> número. Se piden en lote para
+  // las colecciones de la pestaña (destacadas o buscadas) y permiten ordenar
+  // por likes. Se parte de los ya conocidos en la sesión (collectionLikesCache):
+  // las colecciones no se pintan sin sus likes, para que no cambien de sitio.
+  const [collectionLikes, setCollectionLikes] = useState(readCollectionLikes);
+
+  // Map: `${source}:${id}` -> undefined (no pedido) | null (cargando) | Array(items)
+  const [itemsMap, setItemsMap] = useState({});
+  const itemsMapRef = useRef(itemsMap);
+  // Claves sembradas desde caché antes del pintado y aún sin refrescar.
+  const seededPreviewsRef = useRef(new Set());
+  const inFlight = useRef(new Set());
+  const controllersRef = useRef(new Map()); // cacheKey -> AbortController
+
+  useEffect(() => {
+    itemsMapRef.current = itemsMap;
+  }, [itemsMap]);
+
+  // ANTES DEL PRIMER PINTADO. Con un efecto normal el primer fotograma salía
+  // con la pestaña por defecto ("trakt") y el contenido vacío, y un instante
+  // después cambiaba a la pestaña guardada con su propio relevo animado: al
+  // volver atrás desde una lista se veía la página vacía (solo la cabecera y su
+  // trazo morado) unos 300 ms, más si la pestaña tenía que cargar.
+  useClientLayoutEffect(() => {
+    const prefs = readListsMenuPrefs();
+    if (prefs) {
+      setQuery(prefs.query);
+      setSortMode(prefs.sortMode);
+      setViewMode(prefs.viewMode);
+      setSource(prefs.source);
+      setReadyContent({ source: prefs.source, lists: [] });
+    }
+    // Catálogo de colecciones guardado: la pestaña se pinta en este mismo
+    // primer fotograma, sin esperar a ninguna petición.
+    const storedCollections = readCachedFeaturedCollections();
+    if (storedCollections) setFeaturedCollections(storedCollections);
+    setPrefsHydrated(true);
+  }, []);
+
+  // Copia guardada vieja: se refresca detrás, sin dejar de pintarla.
+  useEffect(() => {
+    if (!prefsHydrated || source !== "collections") return;
+    if (!featuredCollectionsStale()) return;
+    let alive = true;
+    fetchFeaturedCollections().then((cols) => {
+      if (alive && cols.length > 0) setFeaturedCollections(cols);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [prefsHydrated, source]);
+
+  useEffect(() => {
+    if (!prefsHydrated) return;
+    writeListsMenuPrefs({
+      query,
+      sortMode,
+      viewMode,
+      source,
+    });
+    writeListsSourceCookie(source);
+  }, [prefsHydrated, query, sortMode, viewMode, source]);
+
+  // ✅ Auth. «Sin sesión» solo cuando AuthContext ha terminado de comprobarla
+  // (`hydrated`): al arrancar su sesión es `null` hasta recuperar el perfil
+  // (caché o /api/auth/me), y al recargar Mis listas salía un instante el
+  // aviso de iniciar sesión aunque la hubiera.
+  useEffect(() => {
+    if (session && account?.id) setAuthStatus("authenticated");
+    else if (authHydrated) setAuthStatus("anonymous");
+  }, [session, account, authHydrated]);
+
+  const safePersonalLists = Array.isArray(lists) ? lists : [];
+  const collectionsQueryKey =
+    source !== "collections"
+      ? null
+      : deferredQuery.trim()
+        ? `search:${deferredQuery.trim().toLowerCase()}`
+        : "featured";
+  const activeListsCacheKey = useMemo(() => {
+    const scope =
+      source === "trakt"
+        ? `popular:${communitySortMode}:${communityQuery}`
+        : source === "collections"
+          ? collectionsQueryKey || "featured"
+          : "personal";
+    // Colecciones en v2: sus entradas llevan ya la popularidad (para ordenar
+    // por ella sin recolocar las tarjetas al llegar las vivas). Comunidad en
+    // v2: guarda todas las páginas recorridas, por orden y búsqueda; v4: POR
+    // USUARIO (el índice no incluye las listas propias de quien mira, así que
+    // la copia de antes de iniciar sesión no vale después).
+    const viewerScope = source === "trakt" ? `:${account?.id || "anon"}` : "";
+    return `showverse:lists:index:${source}:${scope}${viewerScope}:${source === "personal" ? "v1" : source === "trakt" ? "v4" : "v2"}`;
+  }, [source, collectionsQueryKey, communitySortMode, communityQuery, account?.id]);
+
+  // Caché de la pestaña ACTIVA, leída en el mismo render que su clave. Antes era
+  // un estado que se actualizaba en un efecto: justo después de cambiar de
+  // pestaña aún contenía la caché de la ANTERIOR, la nueva parecía lista con
+  // datos ajenos y, al corregirse, el relevo podía quedarse vacío hasta que
+  // llegaban sus listas. Hasta tener las preferencias (primer render, igual que
+  // el HTML del servidor) no se lee nada.
+  const cachedActiveLists = useMemo(() => {
+    if (!prefsHydrated) return [];
+    const cached = readSessionJsonCache(
+      activeListsCacheKey,
+      LISTS_SOURCE_CACHE_TTL_MS,
+    );
+    return Array.isArray(cached) ? cached : [];
+  }, [prefsHydrated, activeListsCacheKey]);
+  // Totales de la comunidad guardados con sus páginas (cabecera al volver).
+  const cachedCommunityTotals = useMemo(() => {
+    if (!prefsHydrated || source !== "trakt") return null;
+    const cached = readSessionJsonCache(`${activeListsCacheKey}:totals`, LISTS_SOURCE_CACHE_TTL_MS);
+    return cached && typeof cached === "object" ? cached : null;
+  }, [prefsHydrated, source, activeListsCacheKey]);
+  const communityTotals = trakt?.totals || cachedCommunityTotals;
+  // Al volver, la caché trae todas las páginas que se habían recorrido y la
+  // petición viva empieza por la primera: hasta alcanzarlas se siguen pintando
+  // las de la caché (si no, el contenido encogería y el scroll saltaría).
+  // Si una página falla se deja de alcanzar (sin reintentos en bucle) y se
+  // pinta lo vivo con el botón de reintentar.
+  // Las listas vivas de la comunidad son del orden ELEGIDO solo cuando su
+  // respuesta ya ha llegado (`resultsSort`). Hasta entonces el hook conserva las
+  // del orden anterior: no se pintan reordenadas en el cliente (eran solo las
+  // ya cargadas, no las primeras de verdad, y luego se reordenaba otra vez) ni
+  // se guardan bajo la clave del orden nuevo.
+  const communityFresh = source === "trakt" && trakt?.resultsSort === communitySortMode;
+  const communityCatchingUp =
+    communityFresh &&
+    !!trakt?.hasMore &&
+    !trakt?.loadMoreError &&
+    cachedActiveLists.length > (Array.isArray(trakt?.lists) ? trakt.lists.length : 0);
+
+  // ✅ precarga las colecciones destacadas en segundo plano estando en otra
+  // pestaña. Antes solo se pedían al pulsar "Colecciones", y la primera vez de
+  // cada sesión la página seguía mostrando las listas anteriores un par de
+  // segundos hasta que llegaban. Se espera a que el navegador esté ocioso para
+  // no competir con la carga de la fuente visible.
+  useEffect(() => {
+    if (!prefsHydrated || source === "collections") return;
+    if (featuredCollectionsCount > 0) return;
+
+    let alive = true;
+    const run = () => {
+      loadFeaturedCollections().then((cols) => {
+        if (alive && cols.length > 0) setFeaturedCollections(cols);
+      });
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(run, { timeout: 2000 });
+      return () => {
+        alive = false;
+        window.cancelIdleCallback(idleId);
+      };
+    }
+    const timeoutId = window.setTimeout(run, 600);
+    return () => {
+      alive = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [prefsHydrated, source, featuredCollectionsCount]);
+
+  // ✅ carga colecciones destacadas cuando toca
+  useEffect(() => {
+    if (source !== "collections") {
+      return;
+    }
+    if (deferredQuery.trim()) {
+      return;
+    }
+    if (featuredCollectionsCount > 0) {
+      setCollectionsResolvedKey("featured");
+      return;
+    }
+
+    let alive = true;
+    setCollectionsLoading(true);
+    loadFeaturedCollections().then((cols) => {
+      if (!alive) return;
+      setFeaturedCollections(cols);
+      setCollectionsResolvedKey("featured");
+      setCollectionsLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [source, deferredQuery, featuredCollectionsCount]);
+
+  // Me gusta de las colecciones visibles, en una petición. Se vuelven a pedir al
+  // montar (p. ej. al volver de una ficha donde se ha dado me gusta).
+  const collectionIds = useMemo(() => {
+    if (source !== "collections") return [];
+    // The featured IDs are already known: fetch likes alongside the catalog.
+    if (!deferredQuery.trim() && !featuredCollections.length) return FEATURED_COLLECTION_IDS;
+    const cols = deferredQuery.trim() ? searchedCollections : featuredCollections;
+    return (Array.isArray(cols) ? cols : [])
+      .map((c) => Number(c?.id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+  }, [source, deferredQuery, searchedCollections, featuredCollections]);
+  const collectionIdsKey = collectionIds.join(",");
+  // Las colecciones de la pestaña tienen ya sus likes (o no hay colecciones).
+  const collectionLikesReady = hasCollectionLikes(collectionLikes, collectionIds);
+  const collectionsWaitForLikes = effectiveSortMode(sortMode, source).startsWith("likes_");
+
+  useEffect(() => {
+    if (!collectionIdsKey) return;
+    const controller = new AbortController();
+    fetch(`/api/community/collections/likes?ids=${collectionIdsKey}`, {
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const likes = json?.likes;
+        if (!likes || typeof likes !== "object") throw new Error("likes");
+        const counts = {};
+        for (const [id, entry] of Object.entries(likes)) counts[id] = Number(entry?.likes) || 0;
+        mergeCollectionLikes(counts);
+        setCollectionLikes((prev) => ({ ...prev, ...counts }));
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") return;
+        // Sin servidor de likes no se bloquea la pestaña: las que falten, a 0
+        // (sin guardarlo en la sesión, para pedirlas de nuevo la próxima vez).
+        setCollectionLikes((prev) => {
+          const next = { ...prev };
+          for (const id of collectionIdsKey.split(",")) if (!Object.hasOwn(next, id)) next[id] = 0;
+          return next;
+        });
+      });
+    return () => controller.abort();
+  }, [collectionIdsKey]);
+
+  // ✅ búsqueda dinámica de colecciones
+  useEffect(() => {
+    if (source !== "collections" || !deferredQuery.trim()) {
+      setSearchedCollections([]);
+      return;
+    }
+
+    let alive = true;
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        setCollectionsLoading(true);
+        const res = await fetch(
+          `/api/tmdb/collections/search?query=${encodeURIComponent(deferredQuery)}`,
+          { signal: controller.signal, cache: "force-cache" },
+        );
+        const j = await res.json().catch(() => ({}));
+        if (!alive) return;
+        setSearchedCollections(
+          Array.isArray(j?.collections) ? j.collections : [],
+        );
+      } catch (e) {
+        if (e?.name !== "AbortError" && alive) {
+          setSearchedCollections([]);
+        }
+      } finally {
+        if (alive) {
+          setCollectionsResolvedKey(
+            `search:${deferredQuery.trim().toLowerCase()}`,
+          );
+          setCollectionsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [source, deferredQuery]);
+
+  // ✅ lista activa según fuente
+  const fetchedActiveLists = useMemo(() => {
+    if (source === "personal") {
+      return safePersonalLists.map((l) => ({
+        ...l,
+        source: "personal",
+        internalUrl: buildInternalUrl({ ...l, source: "personal" }),
+        externalUrl: null,
+      }));
+    }
+
+    if (source === "trakt") {
+      const arr = Array.isArray(trakt?.lists) ? trakt.lists : [];
+      return arr.map((l) => ({
+        ...l,
+        source: "trakt",
+        internalUrl: buildInternalUrl({ ...l, source: "trakt" }),
+        externalUrl: buildExternalUrl({ ...l, source: "trakt" }),
+      }));
+    }
+
+    // Colecciones: usar búsqueda si hay query, sino destacadas
+    const cols = deferredQuery.trim()
+      ? Array.isArray(searchedCollections)
+        ? searchedCollections
+        : []
+      : Array.isArray(featuredCollections)
+        ? featuredCollections
+        : [];
+
+    // Only sorting by likes needs these counts before displaying the catalog.
+    if (collectionsWaitForLikes && !collectionLikesReady) return [];
+
+    return cols.map((c) => ({
+      ...c,
+      likes: collectionLikes[c?.id] ?? c?.likes ?? 0,
+      source: "collections",
+      internalUrl: buildInternalUrl({ ...c, source: "collections" }), // null
+      externalUrl: buildExternalUrl({ ...c, source: "collections" }),
+    }));
+  }, [
+    source,
+    safePersonalLists,
+    trakt?.lists,
+    featuredCollections,
+    searchedCollections,
+    collectionLikes,
+    collectionLikesReady,
+    collectionsWaitForLikes,
+    deferredQuery,
+  ]);
+
+  useEffect(() => {
+    if (!Array.isArray(fetchedActiveLists) || fetchedActiveLists.length === 0) {
+      return;
+    }
+    // Sin pisar las páginas de la caché con menos mientras se alcanzan, ni
+    // guardar las del orden anterior bajo la clave del nuevo.
+    if (communityCatchingUp) return;
+    if (source === "trakt" && !communityFresh) return;
+    writeSessionJsonCache(activeListsCacheKey, fetchedActiveLists);
+  }, [activeListsCacheKey, fetchedActiveLists, communityCatchingUp, source, communityFresh]);
+
+  useEffect(() => {
+    if (source !== "trakt" || !trakt?.totals) return;
+    writeSessionJsonCache(`${activeListsCacheKey}:totals`, trakt.totals);
+  }, [source, activeListsCacheKey, trakt?.totals]);
+
+  // Alcanzar las páginas de la caché, una tras otra.
+  const traktLoadMore = trakt?.loadMore;
+  useEffect(() => {
+    if (!communityCatchingUp || trakt?.loading || trakt?.loadingMore) return;
+    traktLoadMore?.();
+  }, [communityCatchingUp, trakt?.loading, trakt?.loadingMore, traktLoadMore]);
+
+  const activeLists = useMemo(() => {
+    const cached = Array.isArray(cachedActiveLists) ? cachedActiveLists : [];
+    // Comunidad: lo vivo si es del orden elegido; si no, la caché de ese orden
+    // (ya ordenada por el servidor) o nada todavía, y entonces se sigue
+    // pintando lo anterior (ver `readyContent`) hasta que llegue.
+    if (source === "trakt") {
+      return communityFresh && fetchedActiveLists.length > 0 && !communityCatchingUp
+        ? fetchedActiveLists
+        : cached;
+    }
+    if (fetchedActiveLists.length > 0) return fetchedActiveLists;
+    // Colecciones de la caché del índice con los likes más recientes de la
+    // sesión (p. ej. el me gusta recién dado en su ficha): pintan ya el orden
+    // final y no se recolocan cuando llegan las vivas.
+    if (source !== "collections") return cached;
+    return cached.map((c) =>
+      Object.hasOwn(collectionLikes, String(c?.id))
+        ? { ...c, likes: collectionLikes[c.id] }
+        : c,
+    );
+  }, [fetchedActiveLists, cachedActiveLists, source, collectionLikes, communityCatchingUp, communityFresh]);
+
+  // Criterios de la pestaña y el que se aplica de verdad (la popularidad solo
+  // en Colecciones).
+  const sortOptions = sortOptionsFor(source);
+  const activeSortMode = effectiveSortMode(sortMode, source);
+  const activeSortLabel =
+    sortOptions.find((option) => option.id === activeSortMode)?.label || "Más items";
+
+  const filtered = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+
+
+    // Para colecciones, si hay búsqueda ya viene filtrado del servidor
+    if (source === "collections" && q) {
+      return sortLists(activeLists, activeSortMode);
+    }
+
+    // Para las listas propias y de comunidad, filtrar localmente (en la
+    // comunidad, al instante sobre lo cargado mientras llega la búsqueda del
+    // servidor).
+    const base = q
+      ? activeLists.filter((l) => (l?.name || "").toLowerCase().includes(q))
+      : activeLists;
+    // Comunidad ya ordenada por el servidor con este criterio: se respeta su
+    // orden (las listas de usuarios delante; su A-Z puede diferir del de
+    // `localeCompare` y las páginas siguientes se intercalarían).
+    // Comunidad: siempre en el orden del servidor (lo vivo y la caché lo son).
+    if (source === "trakt") return base;
+    return sortLists(base, activeSortMode);
+  }, [activeLists, deferredQuery, activeSortMode, source]);
+
+  const visibleCount = filtered.length;
+
+  const activeListsMap = useMemo(
+    () => new Map(activeLists.map((list) => [getListCacheKey(list), list])),
+    [activeLists],
+  );
+
+  // Al cambiar de fuente abortamos solicitudes en vuelo, pero conservamos caché resuelta.
+  useEffect(() => {
+    controllersRef.current.forEach((c) => c.abort());
+    controllersRef.current.clear();
+    inFlight.current.clear();
+  }, [source]);
+
+  const listsTitle =
+    source === "personal"
+      ? "Mis Listas"
+      : source === "trakt"
+        ? "Listas de la comunidad"
+        : "Colecciones";
+
+  const subtitle =
+    source === "personal"
+      ? `${safePersonalLists.length} listas creadas`
+      : source === "trakt"
+        ? `${communityTotals?.lists ?? visibleCount} listas`
+        : `${visibleCount} colecciones`;
+
+  // ✅ ensureListItems multi-origen
+  const ensureListItems = useCallback(
+    async (listLike) => {
+      const listObj =
+        typeof listLike === "object" && listLike !== null
+          ? listLike
+          : activeListsMap.get(String(listLike)) ||
+            activeListsMap.get(getListCacheKey(source, listLike));
+      const listId = String(listObj?.id || "");
+      const cacheKey = getListCacheKey(listObj);
+
+      if (!listId) return;
+
+      // ya cargado o cargando. Lo sembrado desde caché antes del pintado
+      // (ver más abajo) cuenta como pintado, no como cargado: se refresca igual
+      // que antes, manteniendo a la vista la vista previa cacheada.
+      const seeded = seededPreviewsRef.current.has(cacheKey);
+      if (itemsMapRef.current[cacheKey] !== undefined && !seeded) return;
+      if (inFlight.current.has(cacheKey)) return;
+      seededPreviewsRef.current.delete(cacheKey);
+
+      const src = listObj?.source || source;
+      // v2 contiene el backdrop inglés/neutro y el póster inglés ya resueltos;
+      // no reutilizamos la antigua caché de pósteres para evitar un flash previo.
+      const previewCacheKey = `showverse:lists:preview:${cacheKey}:v2`;
+      const cachedPreview = readSessionJsonCache(
+        previewCacheKey,
+        LIST_PREVIEW_CACHE_TTL_MS,
+      );
+
+      inFlight.current.add(cacheKey);
+      if (Array.isArray(cachedPreview)) {
+        setItemsMap((prev) => ({
+          ...prev,
+          [cacheKey]: cachedPreview,
+        }));
+      } else {
+        setItemsMap((prev) => ({ ...prev, [cacheKey]: null }));
+      }
+
+      const ctrl = new AbortController();
+      controllersRef.current.set(cacheKey, ctrl);
+
+      const resolveAndStorePreview = async (rawItems) => {
+        const deduped = dedupePreviewItems(rawItems);
+        // Arte elegido en el servidor y en lote (/api/tmdb/artwork): con
+        // cientos de colecciones, pedir /images por título desde aquí hacía
+        // que TMDb respondiera 429.
+        const items = await enrichListPreviewArtwork(deduped, {
+          resolvePicks: requestListArtwork,
+          resolveImages: fetchTmdbImages,
+          limit: 5,
+        });
+        if (ctrl.signal.aborted) return;
+        writeSessionJsonCache(previewCacheKey, items);
+        setItemsMap((prev) => ({ ...prev, [cacheKey]: items }));
+      };
+
+      try {
+        if (src === "personal") {
+          const json = await getListDetails({
+            listId,
+            page: 1,
+            language: "es-ES",
+            signal: ctrl.signal,
+          });
+          await resolveAndStorePreview(
+            Array.isArray(json?.items) ? json.items : [],
+          );
+          return;
+        }
+
+        if (src === "trakt") {
+          // Comunidad: una muestra de items de la lista y el artwork final
+          // resuelto antes de pintar la tarjeta. La muestra suele venir ya con
+          // el índice (`previewItems`); solo si no, se pide la lista.
+          let sample = Array.isArray(listObj?.previewItems) ? listObj.previewItems : null;
+          if (!sample) {
+            const res = await fetch(
+              `/api/community/lists/${encodeURIComponent(listId)}?limit=12`,
+              { signal: ctrl.signal, cache: "no-store" },
+            );
+            const j = await res.json().catch(() => ({}));
+            sample = Array.isArray(j?.items) ? j.items : [];
+          }
+          await resolveAndStorePreview(
+            sample
+              .filter((it) => it?.tmdbId)
+              .map((it) => ({
+                id: it.tmdbId,
+                media_type: it.mediaType === "tv" ? "tv" : "movie",
+                poster_path: it.posterPath || null,
+                backdrop_path: it.backdropPath || null,
+                title: it.title || null,
+                name: it.title || null,
+              })),
+          );
+          return;
+        }
+
+        // collections: las películas vienen con el catálogo; solo falta el
+        // arte de las primeras si el servidor no lo tenía aún (en frío).
+        const fromCatalog = catalogPreviewItems(listObj);
+        if (fromCatalog) {
+          if (previewArtworkComplete(fromCatalog)) {
+            writeSessionJsonCache(previewCacheKey, fromCatalog);
+            setItemsMap((prev) => ({ ...prev, [cacheKey]: fromCatalog }));
+          } else {
+            await resolveAndStorePreview(fromCatalog);
+          }
+          return;
+        }
+        const res = await fetch(
+          // `lite`: solo sus películas; la vista previa no usa créditos ni
+          // taquilla, que son una petición más a TMDb por película.
+          `/api/tmdb/collection?id=${encodeURIComponent(listId)}&lite=1`,
+          {
+            signal: ctrl.signal,
+            cache: "no-store",
+          },
+        );
+        const j = await res.json().catch(() => ({}));
+        await resolveAndStorePreview(Array.isArray(j?.items) ? j.items : []);
+      } catch (e) {
+        if (e?.name === "AbortError") {
+          // vuelve a “no pedido” para que pueda pedirse después
+          setItemsMap((prev) => {
+            const next = { ...prev };
+            delete next[cacheKey];
+            return next;
+          });
+          return;
+        }
+        setItemsMap((prev) => ({ ...prev, [cacheKey]: [] }));
+      } finally {
+        inFlight.current.delete(cacheKey);
+        controllersRef.current.delete(cacheKey);
+      }
+    },
+    [activeListsMap, source],
+  );
+
+  // VISTAS PREVIAS CACHEADAS ANTES DEL PINTADO. `ensureListItems` las recupera
+  // en un efecto, así que al volver a la página las filas salían un instante
+  // vacías (esqueleto) aunque estuvieran en caché. Aquí se siembran todas las
+  // que haya, de una vez y antes de pintar; la petición de refresco sigue
+  // lanzándose como siempre (ver `seededPreviewsRef`).
+  useClientLayoutEffect(() => {
+    if (!prefsHydrated || filtered.length === 0) return;
+    const seeds = {};
+    for (const list of filtered) {
+      const cacheKey = getListCacheKey(list);
+      if (itemsMapRef.current[cacheKey] !== undefined) continue;
+      const cached = readSessionJsonCache(
+        `showverse:lists:preview:${cacheKey}:v2`,
+        LIST_PREVIEW_CACHE_TTL_MS,
+      );
+      if (!Array.isArray(cached)) continue;
+      seeds[cacheKey] = cached;
+      seededPreviewsRef.current.add(cacheKey);
+    }
+    if (Object.keys(seeds).length === 0) return;
+    itemsMapRef.current = { ...itemsMapRef.current, ...seeds };
+    setItemsMap((prev) => ({ ...seeds, ...prev }));
+  }, [prefsHydrated, filtered]);
+
+  // ✅ precarga solo las primeras N listas visibles (el resto lo hace InView)
+  useEffect(() => {
+    const first = filtered.slice(0, PRELOAD_FIRST_N_LISTS);
+    for (const l of first) ensureListItems(getListCacheKey(l));
+  }, [filtered, ensureListItems]);
+
+  const handleCreate = async (name, desc) => {
+    setCreating(true);
+    try {
+      await create({ name, description: desc });
+      setCreateOpen(false);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    // aborta todo lo que estuviera volando + limpia previews (evita estados raros)
+    controllersRef.current.forEach((c) => c.abort());
+    controllersRef.current.clear();
+    inFlight.current.clear();
+    setItemsMap({});
+
+    if (source === "personal") refresh();
+    else if (source === "trakt") trakt?.refresh?.();
+    else {
+      // collections: limpiar búsqueda y re-fetch destacadas
+      setQuery("");
+      setSearchedCollections([]);
+      setFeaturedCollections([]);
+      setCollectionsLoading(true);
+      loadFeaturedCollections({ force: true })
+        .then((cols) => setFeaturedCollections(cols))
+        .finally(() => setCollectionsLoading(false));
+    }
+  };
+
+  const loadingUnified =
+    source === "personal"
+      ? loading
+      : source === "trakt"
+        ? trakt?.loading
+        : collectionsLoading;
+
+  const sourceInitialized =
+    cachedActiveLists.length > 0
+      ? true
+      : !prefsHydrated
+        ? false
+        : source === "personal"
+          ? !!personalInitialized
+          : source === "trakt"
+            // Lista para el orden elegido: con su respuesta (o su caché, arriba).
+            ? !!trakt?.initialized && communityFresh
+            : (!collectionsWaitForLikes || collectionLikesReady) &&
+              (collectionsResolvedKey === collectionsQueryKey ||
+                // Destacadas ya precargadas: listas en este mismo render, sin
+                // esperar al efecto que marca `collectionsResolvedKey`.
+                (collectionsQueryKey === "featured" &&
+                  featuredCollectionsCount > 0));
+
+  useEffect(() => {
+    if (hasCompletedInitialLoad) return;
+    if (authStatus === "authenticated" && sourceInitialized) {
+      setHasCompletedInitialLoad(true);
+    }
+  }, [authStatus, sourceInitialized, hasCompletedInitialLoad]);
+
+  // CONTENIDO QUE SE PINTA, que no siempre es el de la fuente seleccionada.
+  //
+  // Al cambiar de fuente, `filtered` se vacía en el acto —las listas nuevas aún
+  // no han llegado— y la rejilla desaparecía entera hasta que la petición
+  // terminaba. Medido en Chromium: el documento pasaba de 6195px a 964px durante
+  // ~330ms y volvía de golpe con el contenido nuevo ya montado. Eso era el corte:
+  // primero un hueco en blanco, luego una aparición instantánea.
+  //
+  // La solución no es tapar el hueco con un esqueleto —seguirían siendo dos
+  // saltos— sino no dejar de pintar: mientras la fuente nueva no está lista se
+  // conserva lo último que SÍ lo estuvo, y el relevo ocurre en un solo paso,
+  // ya con datos, animado por el <AnimatePresence> de más abajo. El usuario
+  // tiene respuesta inmediata igualmente: la pestaña activa y el título cambian
+  // al pulsar, y el botón de sincronizar gira mientras carga.
+  useEffect(() => {
+    if (!sourceInitialized) return;
+    setReadyContent({ source, lists: filtered });
+  }, [source, sourceInitialized, filtered]);
+
+  // Con la fuente ya lista se pinta SIEMPRE lo vivo, para que buscar y ordenar
+  // sigan siendo instantáneos dentro de la misma fuente.
+  const contentSource = sourceInitialized || readyContent.lists.length === 0 ? source : readyContent.source;
+  const contentLists = sourceInitialized ? filtered : readyContent.lists;
+
+  // Tarjetas de la cabecera: las de lo que se está pintando (durante el relevo
+  // entre pestañas, las de la anterior hasta que la nueva está lista).
+  const statsLists = contentSource === "collections" && source === "collections" && contentLists.length === 0
+    ? (deferredQuery.trim() ? searchedCollections : featuredCollections)
+    : contentLists;
+  const headerStats = useMemo(
+    () =>
+      listsHeaderStats(
+        contentSource,
+        statsLists,
+        contentSource === "trakt" ? communityTotals : null,
+      ),
+    [contentSource, statsLists, communityTotals],
+  );
+  const headerStatsLoading = !sourceInitialized && statsLists.length === 0;
+  // Las tarjetas entran una sola vez, al llegar a la página; al volver atrás
+  // salen quietas, como el resto de la cabecera.
+  const [statsEntry] = useState(() => !isBackNav);
+
+  const errorUnified =
+    source === "personal" ? error : source === "trakt" ? trakt?.error : "";
+
+  const loadingMessage =
+    authStatus === "checking"
+      ? "Preparando listas..."
+      : source === "collections"
+        ? "Cargando colecciones..."
+        : "Cargando listas...";
+
+  const showInitialLoader = false;
+
+  const showContentLoader = false;
+
+  // ✅ readonly: Trakt y Colecciones no crean/borran ni loadMore
+  const canEdit = !!canUse && source === "personal";
+
+  // Sin sesión, Comunidad y Colecciones se ven enteras; solo Mis listas pide
+  // iniciar sesión, y en su sitio: la cabecera y las pestañas se quedan para
+  // poder volver a las otras (antes la pantalla de login sustituía la página
+  // entera y, como la pestaña se guarda, se quedaba ahí al recargar).
+  const personalLocked = authStatus === "anonymous" && source === "personal";
+
+  return (
+    // Fondo `bg-black`, el mismo del <body> (como Favoritos y Pendientes): la
+    // barra superior va sobre el <body>, y con otro tono la página empezaba
+    // bajo ella y la barra se veía como una franja negra con su borde.
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-purple-500/30">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-purple-600/15 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-purple-700/20 blur-[120px] sm:blur-[150px]" />
+        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-blue-800/25 blur-[120px] sm:blur-[150px]" />
+      </div>
+
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        {/* Header */}
+        <motion.header
+          className="mb-6 sm:mb-10"
+          initial={false}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-px w-12 bg-purple-500" />
+                <span className="text-purple-400 font-bold uppercase tracking-widest text-xs">
+                  {source === "collections"
+                    ? "SAGAS"
+                    : source === "trakt"
+                      ? "COMUNIDAD"
+                      : "TUS LISTAS"}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 sm:gap-6">
+                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+                  {source === "collections"
+                    ? "Colecciones"
+                    : source === "trakt"
+                      ? "Listas de la comunidad"
+                      : "Mis Listas"}
+                  <span className="text-purple-500">.</span>
+                </h1>
+
+                {personalLocked ? null : (
+                <motion.div
+                  initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.3 }}
+                  className="shrink-0"
+                >
+                  <LiquidButton
+                    onClick={handleRefresh}
+                    disabled={loadingUnified}
+                    loading={loadingUnified}
+                    activeColor="purple"
+                    groupId="lists-header-actions"
+                    title="Sincronizar listas"
+                    className="!h-11 !w-11 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15 sm:!h-12 sm:!w-12"
+                  >
+                    <RefreshCcw className="h-5 w-5" />
+                  </LiquidButton>
+                </motion.div>
+                )}
+              </div>
+              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
+                {source === "collections"
+                  ? "Explora colecciones temáticas de películas."
+                  : source === "trakt"
+                    ? "Descubre y explora listas populares de la comunidad."
+                    : "Gestiona y organiza tus listas personales."}
+              </p>
+            </div>
+
+            {/* Tarjetas de información a la altura del título, como en
+                Historial o En progreso: tres por pestaña, con lo que se está
+                mostrando (lib/lists/headerStats).
+                Entran igual que en Historial (bloque que sube y tarjetas
+                escalonadas) solo al llegar a la página. Al cambiar de pestaña
+                NO se vuelven a montar: cada tarjeta va con la clave de su
+                posición y solo se relevan, animados, el icono, la cifra y la
+                etiqueta que cambian (`animateChanges` de PageStatCard). */}
+            {personalLocked ? null : (
+            <motion.div
+              data-lists-stats={contentSource}
+              className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+              initial={statsEntry ? { opacity: 0, y: 20 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              {headerStats.map((stat, index) => (
+                <motion.div
+                  key={index}
+                  data-list-stat={stat.key}
+                  aria-busy={headerStatsLoading || (contentSource === "collections" && stat.key === "likes" && !collectionLikesReady)}
+                  className="flex min-w-0 flex-1 lg:flex-none"
+                  initial={statsEntry ? { opacity: 0, scale: 0.9 } : false}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.5 + index * 0.1 }}
+                >
+                  <PageStatCard
+                    label={stat.label}
+                    value={stat.value}
+                    icon={STAT_ICONS[stat.icon] || ListVideo}
+                    colorClass={STAT_TONES[stat.tone] || "text-white"}
+                    loading={headerStatsLoading || (contentSource === "collections" && stat.key === "likes" && !collectionLikesReady)}
+                    animateChanges
+                    iconKey={stat.icon}
+                    swapGroup={contentSource}
+                    swapIndex={index}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+            )}
+          </div>
+        </motion.header>
+
+        {/* Filtros Sticky */}
+        <motion.div
+          ref={filtersRef}
+          data-menu-pinned={filtersPinned}
+          className="relative sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[60] space-y-3 mb-6 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))]"
+          initial={isBackNav ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
+        >
+          {/* Móvil: barra y desplegable en el mismo envoltorio, como en
+              Historial: el desplegable queda a 8 px de la barra (antes se
+              sumaban el espaciado del contenedor, el del panel y uno propio)
+              y, fijada la barra, se superpone justo debajo de ella. */}
+          <div data-lists-mobile-toolbar="" className="relative z-10 lg:hidden">
+          {/* Mobile: search + toggle */}
+          <div className="relative z-10 flex gap-2 lg:hidden">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500 z-10 pointer-events-none" />
+              <input
+                value={query}
+                onChange={(e) =>
+                  startTransition(() => setQuery(e.target.value))
+                }
+                placeholder={
+                  source === "collections"
+                    ? "Buscar colecciones..."
+                    : "Buscar listas..."
+                }
+                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+              />
+              {query && (
+                <button
+                  onClick={() => startTransition(() => setQuery(""))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
+                </button>
+              )}
+            </div>
+            {/* Las secciones, entre el buscador y el botón de la hoja. */}
+            <div className="flex shrink-0 gap-2">
+            <ListsSourceSelector
+              source={source}
+              onChange={(nextSource) =>
+                startTransition(() => setSource(nextSource))
+              }
+            />
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+              aria-haspopup="dialog"
+              aria-expanded={mobileFiltersOpen}
+              aria-label={
+                mobileFiltersOpen ? "Cerrar filtros" : "Abrir filtros"
+              }
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                mobileFiltersOpen
+                  ? "text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
+                  : "text-zinc-200 hover:bg-black/30"
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+            </div>
+          </div>
+
+          {/* Mobile: hoja de filtros y vista */}
+          <MobileOptionsSheet
+            open={mobileFiltersOpen}
+            onClose={() => setMobileFiltersOpen(false)}
+            id="lists-mobile-filters"
+            accent="purple"
+          >
+            <InlineDropdown
+              label="Ordenar"
+              valueLabel={activeSortLabel}
+              icon={ArrowUpDown}
+            >
+              {({ close }) => (
+                <>
+                  {sortOptions.map((option) => (
+                    <DropdownItem
+                      key={option.id}
+                      active={activeSortMode === option.id}
+                      onClick={() => {
+                        startTransition(() => setSortMode(option.id));
+                        close();
+                      }}
+                    >
+                      {option.label}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+            </InlineDropdown>
+            <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+              <SheetOption
+                icon={LayoutGrid}
+                active={viewMode === "grid"}
+                onClick={() => startTransition(() => setViewMode("grid"))}
+              >
+                Rejilla
+              </SheetOption>
+              <SheetOption
+                icon={Rows}
+                active={viewMode === "rows"}
+                onClick={() => startTransition(() => setViewMode("rows"))}
+              >
+                Filas
+              </SheetOption>
+              <SheetOption
+                icon={StretchHorizontal}
+                active={viewMode === "list"}
+                onClick={() => startTransition(() => setViewMode("list"))}
+              >
+                Lista
+              </SheetOption>
+            </SheetOptionGroup>
+            {canEdit && (
+              <SheetOptionGroup label="Acciones" layout="stack">
+                <SheetAction
+                  icon={Plus}
+                  onClick={() => {
+                    setMobileFiltersOpen(false);
+                    setCreateOpen(true);
+                  }}
+                >
+                  Crear lista
+                </SheetAction>
+              </SheetOptionGroup>
+            )}
+          </MobileOptionsSheet>
+          </div>
+
+          {/* Desktop */}
+          <div className="hidden lg:flex gap-3 relative z-10">
+            <ListsSourceSelector
+              source={source}
+              onChange={(nextSource) =>
+                startTransition(() => setSource(nextSource))
+              }
+            />
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500 z-10 pointer-events-none" />
+              <input
+                value={query}
+                onChange={(e) =>
+                  startTransition(() => setQuery(e.target.value))
+                }
+                placeholder={
+                  source === "collections"
+                    ? "Buscar colecciones..."
+                    : "Buscar listas..."
+                }
+                className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+              />
+              {query && (
+                <button
+                  onClick={() => startTransition(() => setQuery(""))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
+                </button>
+              )}
+            </div>
+
+            <InlineDropdown
+              label="Ordenar"
+              valueLabel={activeSortLabel}
+              icon={ArrowUpDown}
+            >
+              {({ close }) => (
+                <>
+                  {sortOptions.map((option) => (
+                    <DropdownItem
+                      key={option.id}
+                      active={activeSortMode === option.id}
+                      onClick={() => {
+                        startTransition(() => setSortMode(option.id));
+                        close();
+                      }}
+                    >
+                      {option.label}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+            </InlineDropdown>
+
+            <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+              <button
+                onClick={() => startTransition(() => setViewMode("grid"))}
+                className={`h-full px-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
+                  viewMode === "grid"
+                    ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => startTransition(() => setViewMode("rows"))}
+                className={`h-full px-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
+                  viewMode === "rows"
+                    ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <Rows className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => startTransition(() => setViewMode("list"))}
+                className={`h-full px-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
+                  viewMode === "list"
+                    ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                    : "text-zinc-400 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <StretchHorizontal className="w-4 h-4" />
+              </button>
+            </div>
+
+            {canEdit && (
+              <button
+                onClick={() => setCreateOpen(true)}
+                className="h-11 px-4 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 text-white font-bold text-sm transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 shrink-0 hover:from-purple-400 hover:to-purple-500 focus:outline-none"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Crear</span>
+              </button>
+            )}
+          </div>
+        </motion.div>
+
+        <AnimatePresence>
+          {createOpen && canEdit && (
+            <CreateListModal
+              open={createOpen}
+              onClose={() => setCreateOpen(false)}
+              onCreate={handleCreate}
+              creating={creating}
+              error={errorUnified}
+            />
+          )}
+        </AnimatePresence>
+
+        {errorUnified && !personalLocked ? (
+          <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-200 text-sm">
+            {String(errorUnified)}
+          </div>
+        ) : null}
+
+        {/* CONTENT
+            Relevo entre fuentes. `mode="wait"` encadena salida y entrada en vez
+            de superponerlas: con alturas tan distintas entre una rejilla de
+            colecciones y una de listas propias, solaparlas obligaría a
+            posicionarlas en absoluto y el pie de página daría un salto. La salida
+            es corta (0,16s) a propósito, porque el relevo solo se dispara cuando
+            los datos nuevos YA están, y la espera no debe notarse.
+            La clave es `contentSource`, no `source`: así el bloque no sale de
+            escena en cuanto se pulsa la pestaña, sino cuando hay algo con lo que
+            sustituirlo. */}
+        {/* Sin montar hasta conocer la pestaña guardada (se lee antes del
+            pintado): si no, el primer fotograma era la pestaña por defecto y el
+            relevo a la buena se veía como una página vacía. Al volver atrás,
+            sin entrada (`initial={false}`). */}
+        {personalLocked ? (
+          <LoginRequiredCard
+            message="Inicia sesión para gestionar tus listas personalizadas."
+            next="/lists"
+          />
+        ) : prefsHydrated ? (
+          <ListsContent
+            contentSource={contentSource}
+            contentLists={contentLists}
+            sourceInitialized={sourceInitialized}
+            source={source}
+            viewMode={viewMode}
+            itemsMap={itemsMap}
+            ensureListItems={ensureListItems}
+            isMobile={isMobile}
+            isBackNav={isBackNav}
+            communityHasMore={source === "trakt" && !!trakt?.hasMore && !communityCatchingUp}
+            communityLoadingMore={!!trakt?.loadingMore}
+            communityLoadMoreError={!!trakt?.loadMoreError}
+            onCommunityLoadMore={trakt?.loadMore}
+          />
+        ) : null}
+
+        {/* Carga adicional de listas propias si el backend la expone. */}
+        {source === "personal" && hasMore && !loadingUnified && (
+          <div className="flex justify-center pt-8">
+            <button
+              onClick={loadMore}
+              className="px-6 py-3 rounded-xl transition shadow-lg bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-lg text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none font-bold"
+            >
+              Cargar más listas
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

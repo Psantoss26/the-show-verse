@@ -5,7 +5,7 @@ import test from "node:test";
 import { resolveListItemIndicator } from "./listItemHoverIndicator.js";
 
 const listsPage = readFileSync(
-  new URL("../../app/lists/page.jsx", import.meta.url),
+  new URL("../../app/lists/ListsClient.jsx", import.meta.url),
   "utf8",
 );
 
