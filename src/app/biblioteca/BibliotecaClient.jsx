@@ -13,7 +13,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowUpDown,
   CheckCircle2,
@@ -50,6 +50,11 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
+import FlipReorder from "@/components/ui/FlipReorder";
+import useCardEntrance from "@/hooks/useCardEntrance";
+import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { estimateUserPageEntranceCount } from "@/lib/ui/entranceFill";
 
 
 // ================== CONSTANTS ==================
@@ -538,6 +543,9 @@ function GroupDivider({
   isFirstGroup = false,
 }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  const isBackNav = useIsHistoryNavigation();
+  const reduceMotion = useReducedMotion();
+  const skipMotion = isBackNav || reduceMotion;
   const [isSticky, setIsSticky] = useState(false);
   const ref = useRef(null);
   const [transitioningThreshold, setTransitioningThreshold] = useState(108);
@@ -572,9 +580,13 @@ function GroupDivider({
       className={`sticky z-[60] ${isFirstGroup ? mobileFiltersOpen ? "mt-0 mb-4" : "mt-2 mb-4" : "my-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
         mobileFiltersOpen ? "top-[232px]" : "top-[108px]"
       }`}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      // Solo opacidad al entrar, como Favoritos: trasladar el divisor sticky
+      // alteraría la medición del punto de acople. Al retroceder no se anima.
+      initial={skipMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={
+        skipMotion ? { duration: 0 } : { duration: 0.24, ease: "easeOut" }
+      }
     >
       <div
         className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg transition-all duration-300 ${isSticky ? "shadow-md" : "shadow-xl"}`}
@@ -694,6 +706,7 @@ function LibraryMediaCard({
   posterPending = false,
   backdropPending = false,
   animated = true,
+  animateWithin = 24,
 }) {
   const title = item?.title || "Sin título";
   const year = item?.year ? String(item.year) : "";
@@ -731,12 +744,33 @@ function LibraryMediaCard({
   const imageSrc = imageCandidates[imageIndex] || null;
   const addedAtLabel = formatEpoch(item?.addedAt);
 
-  // Misma animación de entrada que Favoritos: anima solo las primeras 24
-  // tarjetas (lo visible al entrar), independientemente del tamaño de la
-  // biblioteca, con un retardo escalonado por índice.
-  const animDelay =
-    totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 24;
+  // Misma entrada que Favoritos (FavoriteCard): se animan las tarjetas que
+  // caben en pantalla en la vista actual, con retardo escalonado por índice.
+  // Se decide UNA vez al montar y se juega UNA sola vez con Web Animations
+  // (`useCardEntrance`): la entrada de framer con `layout` se repetía al
+  // reordenar y la tarjeta volvía a fundirse desde opacidad 0. Al retroceder
+  // no se anima: la página se ve tal cual estaba.
+  const isBackNav = useIsHistoryNavigation();
+  const [{ shouldAnimate, animDelay }] = useState(() => ({
+    shouldAnimate: !isBackNav && index < Math.max(1, animateWithin),
+    animDelay: totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03,
+  }));
+  const shellRef = useRef(null);
+  useCardEntrance(shellRef, {
+    enabled: shouldAnimate,
+    delayS: animDelay,
+    durationS: viewMode === "list" || viewMode === "compact" ? 0.25 : 0.2,
+    fromTransform:
+      viewMode === "list" || viewMode === "compact"
+        ? "translateY(10px) scale(0.95)"
+        : "scale(0.95)",
+  });
+  // Portada: placeholder hasta que la imagen ha llegado y está decodificada, y
+  // luego fundido (o de golpe si sale de caché), igual que SmartPoster de
+  // Favoritos. Antes el <img> se pintaba a trozos sobre el icono.
+  const { imgRef, onLoad, ready, instant } = useImageLoadReady(imageSrc);
+  // La recolocación al cambiar el orden la anima <FlipReorder> por esta clave.
+  const flipKey = String(item?.id ?? "");
   const enableHoverLift =
     animated &&
     totalItems <= 120 &&
@@ -755,16 +789,23 @@ function LibraryMediaCard({
 
   const renderMedia = () => (
     <div className="relative w-full h-full">
-      <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+      <div
+        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 ${
+          instant ? "" : "transition-opacity duration-300"
+        } ${ready ? "opacity-0" : "opacity-100"}`}
+      >
+        {/* El icono entra con retraso (`starting:`): si la portada sale de
+            caché en unos ms no llega a asomar y no se ve parpadear. */}
         {isMovie ? (
-          <Film className="w-8 h-8 text-zinc-700" />
+          <Film className="w-8 h-8 text-zinc-700 transition-opacity duration-200 delay-200 starting:opacity-0" />
         ) : (
-          <MonitorPlay className="w-8 h-8 text-zinc-700" />
+          <MonitorPlay className="w-8 h-8 text-zinc-700 transition-opacity duration-200 delay-200 starting:opacity-0" />
         )}
       </div>
 
       {imageSrc && (
         <OptimizedImage
+          ref={imgRef}
           key={imageSrc}
           src={imageSrc}
           alt={title}
@@ -773,6 +814,7 @@ function LibraryMediaCard({
           loading={index < EAGER_IMAGE_COUNT ? "eager" : "lazy"}
           fetchPriority={index < EAGER_IMAGE_COUNT ? "high" : "auto"}
           decoding="async"
+          onLoad={onLoad}
           onError={() => {
             setImageIndex((prev) =>
               prev < imageCandidates.length - 1
@@ -780,7 +822,9 @@ function LibraryMediaCard({
                 : imageCandidates.length,
             );
           }}
-          className="absolute inset-0 w-full h-full object-cover"
+          className={`absolute inset-0 w-full h-full object-cover ${
+            instant ? "" : "transition-opacity duration-300"
+          } ${ready ? "opacity-100" : "opacity-0"}`}
         />
       )}
     </div>
@@ -788,17 +832,11 @@ function LibraryMediaCard({
 
   if (viewMode === "list") {
     return (
-      <motion.div
+      <div
+        ref={shellRef}
         className={shellClassName}
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{
-          duration: 0.25,
-          delay: shouldAnimate ? animDelay : 0,
-          ease: [0.25, 0.1, 0.25, 1],
-        }}
-        layout
+        data-flip-key={flipKey}
+        data-library-card=""
       >
         <article
           className={`relative block bg-zinc-900/30 rounded-xl transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)] ${canOpen ? "cursor-pointer hover:bg-zinc-900/60" : ""}`}
@@ -836,23 +874,17 @@ function LibraryMediaCard({
             </div>
           </div>
         </article>
-      </motion.div>
+      </div>
     );
   }
 
   if (viewMode === "compact") {
     return (
-      <motion.div
+      <div
+        ref={shellRef}
         className={shellClassName}
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{
-          duration: 0.25,
-          delay: shouldAnimate ? animDelay : 0,
-          ease: [0.25, 0.1, 0.25, 1],
-        }}
-        layout
+        data-flip-key={flipKey}
+        data-library-card=""
       >
         <div className="block">
           <HoverExpandCard
@@ -870,21 +902,16 @@ function LibraryMediaCard({
             />
           </HoverExpandCard>
         </div>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div
+    <div
+      ref={shellRef}
       className={shellClassName}
-      initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      transition={{
-        duration: 0.25,
-        delay: shouldAnimate ? animDelay : 0,
-      }}
-      layout
+      data-flip-key={flipKey}
+      data-library-card=""
     >
       <div className="block">
         <article
@@ -896,7 +923,7 @@ function LibraryMediaCard({
           <LibraryHoverIndicator isMovie={isMovie} resolution={primaryRes} />
         </article>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -905,6 +932,10 @@ function LibraryMediaCard({
 export default function BibliotecaClient() {
   const { updatePreference, authenticated, hydrated } = useAuth();
   const { t } = useTranslation();
+  // Entrada de la página como la de Favoritos; al retroceder se pinta estática.
+  const isBackNav = useIsHistoryNavigation();
+  const reduceMotion = useReducedMotion();
+  const skipStatsAnimation = isBackNav || reduceMotion;
 
   // Estado inicial IDÉNTICO en servidor y cliente (loading=true) para no romper
   // la hidratación. El contenido cacheado se aplica en un layout effect (abajo),
@@ -1464,6 +1495,14 @@ export default function BibliotecaClient() {
     return entries;
   }, [filteredItems, groupBy]);
 
+  // Firma del ORDEN visible (con el grupo de cada título): cuando cambia,
+  // <FlipReorder> anima la recolocación de las tarjetas, como en Favoritos.
+  const flipOrderKey = useMemo(() => {
+    const keysOf = (list) => list.map((item) => item.id).join(",");
+    if (!grouped) return keysOf(filteredItems);
+    return grouped.map((group) => `${group.key}:${keysOf(group.items)}`).join("|");
+  }, [grouped, filteredItems]);
+
   // Labels
   const sortLabels = {
     "added-desc": "Recientes",
@@ -1488,8 +1527,9 @@ export default function BibliotecaClient() {
   const loadedItemsCount = Array.isArray(data?.items) ? data.items.length : 0;
   const visibleRenderedCount = Math.min(visibleCount, filteredItems.length);
   const shouldAnimateCards = filteredItems.length <= 180;
-  // El contenedor no anima: cada tarjeta se anima por sí misma (como Favoritos).
-  const contentMotionProps = { initial: false };
+  // Nº de tarjetas a animar a la entrada = las que caben en pantalla en la vista
+  // actual (mismo cálculo que Favoritos y Pendientes), no un tope fijo.
+  const entranceVisibleCount = estimateUserPageEntranceCount({ viewMode, imageMode });
 
   function getItemsGridClass(withTopMargin = false) {
     if (viewMode === "list") {
@@ -1546,6 +1586,8 @@ export default function BibliotecaClient() {
     return { src: null, pending: false };
   }
 
+  // `index` es la posición GLOBAL de la tarjeta (también con grupos) y
+  // `totalItems` el total filtrado: deciden el escalonado de la entrada.
   function renderCard(item, index = 0, totalItems = 0) {
     const posterArtwork = getTmdbArtworkState(item, "poster");
     const backdropArtwork = getTmdbArtworkState(item, "backdrop");
@@ -1563,6 +1605,7 @@ export default function BibliotecaClient() {
         posterPending={posterArtwork.pending}
         backdropPending={backdropArtwork.pending}
         animated={shouldAnimateCards}
+        animateWithin={entranceVisibleCount}
       />
     );
   }
@@ -1784,24 +1827,12 @@ export default function BibliotecaClient() {
     }
 
     // Montado pero todavía sin contenido y cargando (p. ej. primer acceso sin
-    // caché): esqueletos *inline* dentro del shell, no a pantalla completa.
+    // caché): como Favoritos, la rejilla no pinta nada (las estadísticas de la
+    // cabecera muestran la carga) y las tarjetas entran en cascada al llegar.
+    // Un esqueleto aquí desaparecía de golpe justo cuando las tarjetas
+    // arrancaban desde opacidad 0: se veía un vacío entre ambos.
     if (loading && filteredItems.length === 0) {
-      return (
-        <div key="loading-skeleton" className={getItemsGridClass(true)}>
-          {Array.from({ length: 24 }).map((_, i) => (
-            <div
-              key={i}
-              className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-900 shadow-lg ring-1 ring-white/5"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-neutral-800/50 via-neutral-900/50 to-neutral-800/50 animate-pulse" />
-              <div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"
-                style={{ backgroundSize: "200% 100%" }}
-              />
-            </div>
-          ))}
-        </div>
-      );
+      return <div key="loading-placeholder" className="min-h-[60vh]" />;
     }
 
     if (filteredItems.length === 0) {
@@ -1811,8 +1842,7 @@ export default function BibliotecaClient() {
           className="py-24 text-center border border-dashed border-white/10 rounded-[2rem] bg-black/20 bg-gradient-to-br from-white/5 to-transparent backdrop-blur-lg shadow-lg mt-6"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
+          transition={{ duration: 0.4 }}
         >
           <FolderKanban className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
           <p className="text-xl font-bold text-white mb-2">Sin resultados</p>
@@ -1847,14 +1877,14 @@ export default function BibliotecaClient() {
         remaining -= group.items.length;
       }
 
+      // Índice global de cada tarjeta para el escalonado de la entrada.
+      let globalCardIndex = 0;
       return (
-        <motion.div
-          key={`grouped-${viewMode}-${imageMode}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-        >
+        <div key="grouped">
+          <FlipReorder
+            orderKey={flipOrderKey}
+            itemSelector="[data-library-card]"
+          >
           {visibleGrouped.map((group, groupIndex) => (
             <div key={group.key}>
               <GroupDivider
@@ -1865,17 +1895,17 @@ export default function BibliotecaClient() {
                 mobileFiltersOpen={mobileFiltersOpen}
                 isFirstGroup={groupIndex === 0}
               />
-              <motion.div
+              <div
                 key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
                 className={getItemsGridClass(true)}
-                {...contentMotionProps}
               >
-                {group.items.map((item, idx) =>
-                  renderCard(item, idx, group.items.length),
+                {group.items.map((item) =>
+                  renderCard(item, globalCardIndex++, filteredItems.length),
                 )}
-              </motion.div>
+              </div>
             </div>
           ))}
+          </FlipReorder>
 
           {hasMoreItems && (
             <div className="mt-6 text-center">
@@ -1889,27 +1919,23 @@ export default function BibliotecaClient() {
               <div ref={loadMoreRef} className="h-2 w-full" />
             </div>
           )}
-        </motion.div>
+        </div>
       );
     }
 
     const visibleItems = filteredItems.slice(0, visibleLimit);
     return (
-      <motion.div
-        key={`flat-grid-${viewMode}-${imageMode}`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-      >
-        <motion.div
+      <div key="flat">
+        <FlipReorder
+          key={`flat-grid-${viewMode}-${imageMode}`}
           className={getItemsGridClass(false)}
-          {...contentMotionProps}
+          orderKey={flipOrderKey}
+          itemSelector="[data-library-card]"
         >
           {visibleItems.map((item, idx) =>
-            renderCard(item, idx, visibleItems.length),
+            renderCard(item, idx, filteredItems.length),
           )}
-        </motion.div>
+        </FlipReorder>
         {hasMoreItems && (
           <div className="mt-6 text-center">
             <button
@@ -1922,7 +1948,7 @@ export default function BibliotecaClient() {
             <div ref={loadMoreRef} className="h-2 w-full" />
           </div>
         )}
-      </motion.div>
+      </div>
     );
   }
 
@@ -1976,9 +2002,11 @@ export default function BibliotecaClient() {
         {/* ====== HEADER ====== */}
         <motion.header
           className="mb-6 sm:mb-10"
-          initial={{ opacity: 0, y: -20 }}
+          initial={isBackNav ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={
+            isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }
+          }
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
@@ -1992,6 +2020,13 @@ export default function BibliotecaClient() {
                 <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
                   Biblioteca<span className="text-amber-500">.</span>
                 </h1>
+                <motion.div
+                  initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={
+                    isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.3 }
+                  }
+                >
                 <LiquidButton
                   onClick={() =>
                     fetchLibrary({
@@ -2011,42 +2046,66 @@ export default function BibliotecaClient() {
                     className={`w-5 h-5 text-white ${refreshing ? "animate-spin" : ""}`}
                   />
                 </LiquidButton>
+                </motion.div>
               </div>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
                 Contenido del servidor Plex.
               </p>
             </div>
 
-            {!loading && (
+            {/* Siempre montadas (con su estado de carga), como en Favoritos:
+                antes aparecían al terminar de cargar y empujaban la cabecera. */}
             <motion.div
               className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
-              initial={{ opacity: 0, y: 20 }}
+              initial={skipStatsAnimation ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
+              transition={
+                skipStatsAnimation ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
+              }
             >
-              <PageStatCard
-                className="flex-1 lg:flex-none lg:w-auto"
-                label="Total"
-                value={stats.total}
-                icon={HardDrive}
-                colorClass="text-amber-400"
-              />
-              <PageStatCard
-                className="flex-1 lg:flex-none lg:w-auto"
-                label="Películas"
-                value={stats.movies}
-                icon={Film}
-                colorClass="text-sky-400"
-              />
-              <PageStatCard
-                className="flex-1 lg:flex-none lg:w-auto"
-                label="Series"
-                value={stats.shows}
-                icon={Tv}
-                colorClass="text-purple-400"
-              />
+              <motion.div
+                className="min-w-0 flex-1 lg:flex-none"
+                initial={skipStatsAnimation ? false : { opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={skipStatsAnimation ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
+              >
+                <PageStatCard
+                  loading={loading}
+                  label="Total"
+                  value={stats.total}
+                  icon={HardDrive}
+                  colorClass="text-amber-400"
+                />
+              </motion.div>
+              <motion.div
+                className="min-w-0 flex-1 lg:flex-none"
+                initial={skipStatsAnimation ? false : { opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={skipStatsAnimation ? { duration: 0 } : { duration: 0.4, delay: 0.6 }}
+              >
+                <PageStatCard
+                  loading={loading}
+                  label="Películas"
+                  value={stats.movies}
+                  icon={Film}
+                  colorClass="text-sky-400"
+                />
+              </motion.div>
+              <motion.div
+                className="min-w-0 flex-1 lg:flex-none"
+                initial={skipStatsAnimation ? false : { opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={skipStatsAnimation ? { duration: 0 } : { duration: 0.4, delay: 0.7 }}
+              >
+                <PageStatCard
+                  loading={loading}
+                  label="Series"
+                  value={stats.shows}
+                  icon={Tv}
+                  colorClass="text-purple-400"
+                />
+              </motion.div>
             </motion.div>
-            )}
           </div>
         </motion.header>
 
@@ -2054,12 +2113,17 @@ export default function BibliotecaClient() {
         <motion.div
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          className={`sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-1 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6 ${
+          data-grouped={groupBy !== "none" ? "" : undefined}
+          className={`${isBackNav ? "" : "sv-toolbar-rise "}sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-1 ${isBackNav ? "transition-none" : "transition-all duration-300"} sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.5 }}
+          // Solo el fundido: la subida va en CSS (`.sv-toolbar-rise`), como en
+          // Favoritos (en móvil la quita si hay agrupación).
+          initial={isBackNav ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={
+            isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }
+          }
         >
           {/* Mobile: search + toggle */}
           <div className="relative z-10 flex gap-2 lg:hidden">
@@ -2167,7 +2231,7 @@ export default function BibliotecaClient() {
         {/* Mensaje de renderizado progresivo eliminado por solicitud del usuario */}
 
         {/* ====== CONTENT ====== */}
-        <AnimatePresence mode="wait">{renderContent()}</AnimatePresence>
+        {renderContent()}
       </div>
     </div>
   );
