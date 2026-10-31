@@ -4295,8 +4295,16 @@ export default function DetailModal({
                 // fondo. Aquí solo hay imágenes, ningún `backdrop-filter`
                 // debajo, y se anuncia `transform`, que es justo lo que se
                 // anima.
-                willChange: "transform",
-                backfaceVisibility: "hidden",
+                //
+                // CON EL HERO FIJO (tablet, reducir movimiento) NO hay capa
+                // propia: no hay nada que animar, y en Chrome de Android esa
+                // capa dentro del contenedor enmascarado solo se rasterizaba
+                // por la zona visible. Al bajar y volver arriba, la parte que
+                // había salido de pantalla se quedaba sin repintar: la imagen
+                // aparecía cortada, con un trozo en negro.
+                ...(pinnedHero
+                  ? null
+                  : { willChange: "transform", backfaceVisibility: "hidden" }),
               }}
               className="absolute inset-0 w-full h-full"
             >
