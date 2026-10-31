@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha rápida: la información, las pestañas y el reparto aparecen en cuanto llegan sus datos (unos 300 ms medidos), sin esperar a «Títulos similares», que tarda alrededor de un segundo más en calcularse. Abrir un título hace menos peticiones: el reparto se pide una vez en lugar de dos, y las recomendaciones una vez en lugar de tres, compartidas con la ficha completa. → [componentes](docs/frontend/components.md)
 - Ficha de serie, «Temporadas»: los pósters ya no desaparecen dejando las tarjetas vacías. Pasaba si la imagen terminaba de cargar con la ventana en segundo plano o tapada: el navegador no avisaba de que estaba lista para pintarse y el póster se quedaba invisible. Ahora se enseña en cuanto ha cargado, como mucho 150 ms después. El arreglo vale para todas las portadas que entran con fundido (Favoritos, Pendientes, listas, Descubrir, personas, temporadas). → [componentes](docs/frontend/components.md)
 - Temporadas en vista de tarjetas (ficha y su vista lateral): ya no aparece el botón de IMDb en la esquina superior derecha. El nombre de la temporada, como «Los destructores inmortales, Hidan y Kakuzu», se ve en hasta dos líneas en vez de cortarse en una. → [componentes](docs/frontend/components.md)
 - Episodios vistos: la columna de temporadas ya no muestra la barra de desplazamiento vertical. Se sigue desplazando con la rueda o el panel táctil, como la fila de temporadas en el móvil. → [componentes](docs/frontend/components.md)

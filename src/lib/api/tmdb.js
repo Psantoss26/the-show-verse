@@ -557,18 +557,43 @@ export async function getVideos(
 // ordenadas con criterio propio): las calcula el servidor en
 // /api/tmdb/recommendations. Si la ruta falla, la página 1 de TMDb pasada por
 // el mismo filtro y orden.
+//
+// En el navegador, una petición por título y sesión: la ficha rápida y la
+// precarga de la ficha completa piden las mismas a la vez (y el modo estricto
+// de React lo repite), y cada una tardaba ~1-2 s en el servidor. Se comparte
+// la promesa en vuelo y el resultado bueno se recuerda 10 minutos.
+const RECOMMENDATIONS_TTL_MS = 10 * 60 * 1000;
+const recommendationsCache = new Map(); // "movie:603" -> { promise, expiresAt }
+
+async function fetchRecommendationsRoute(type, id) {
+  try {
+    const res = await fetch(
+      `/api/tmdb/recommendations?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`,
+    );
+    const data = res.ok ? await res.json() : null;
+    if (Array.isArray(data?.results)) return data;
+  } catch {
+    // Respaldo del llamador.
+  }
+  return null;
+}
+
 export async function getRecommendations(type, id) {
   if (!type || !id) return null;
   if (!IS_SERVER) {
-    try {
-      const res = await fetch(
-        `/api/tmdb/recommendations?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`,
-      );
-      const data = res.ok ? await res.json() : null;
-      if (Array.isArray(data?.results)) return data;
-    } catch {
-      // Respaldo de abajo.
+    const key = `${type}:${id}`;
+    let entry = recommendationsCache.get(key);
+    if (!entry || entry.expiresAt <= Date.now()) {
+      const promise = fetchRecommendationsRoute(type, id);
+      entry = { promise, expiresAt: Date.now() + RECOMMENDATIONS_TTL_MS };
+      recommendationsCache.set(key, entry);
+      // Un fallo no se recuerda: la próxima vez se vuelve a intentar.
+      promise.then((data) => {
+        if (!data && recommendationsCache.get(key) === entry) recommendationsCache.delete(key);
+      });
     }
+    const data = await entry.promise;
+    if (data) return data;
   }
   const data = await tmdb(`/${type}/${id}/recommendations`);
   return {

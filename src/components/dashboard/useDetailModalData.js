@@ -5,8 +5,8 @@
 // más rico) de datos de la ficha rápida del dashboard. Devuelve { loading, data }.
 // Nunca lanza: captura errores y degrada campo a campo.
 //
-// Estrategia: detalles + créditos + recomendaciones en paralelo (contenido
-// principal) y, en segundo plano y de forma independiente, IDs externos -> OMDb
+// Estrategia: detalles + créditos en paralelo (contenido principal), las
+// recomendaciones aparte (son lentas y solo alimentan su fila) y, en segundo plano y de forma independiente, IDs externos -> OMDb
 // (premios) + IMDb (nota), y la comunidad de Trakt (sentimientos + scoreboard).
 // Se cancela con un flag al desmontar o cambiar de item.
 
@@ -135,9 +135,13 @@ function formatEpisodeRuntimePerEpisode(source) {
   return lastEpisodeRuntime;
 }
 
-async function fetchModalTmdbCast(mediaType, id) {
+// Reparto (y, en películas, el equipo técnico para «Dirección») en UNA
+// petición. Antes se pedían además los créditos traducidos (`getCredits`) solo
+// como respaldo y para sacar el director: la misma lista dos veces por título.
+// En series el respaldo de `aggregate_credits` ya es `tv/{id}/credits`.
+async function fetchModalTmdbCredits(mediaType, id) {
   if (!TMDB_API_KEY || !id || (mediaType !== "tv" && mediaType !== "movie")) {
-    return [];
+    return { cast: [], crew: [] };
   }
 
   const fetchJson = async (path) => {
@@ -154,14 +158,33 @@ async function fetchModalTmdbCast(mediaType, id) {
     const aggregateCast = normalizeCastFromTmdb(aggregate?.cast, {
       isAggregate: true,
     });
-    if (aggregateCast.length) return aggregateCast;
+    if (aggregateCast.length) return { cast: aggregateCast, crew: [] };
 
     const credits = await fetchJson(`tv/${id}/credits`);
-    return normalizeCastFromTmdb(credits?.cast, { isAggregate: false });
+    return {
+      cast: normalizeCastFromTmdb(credits?.cast, { isAggregate: false }),
+      crew: [],
+    };
   }
 
   const credits = await fetchJson(`movie/${id}/credits`);
-  return normalizeCastFromTmdb(credits?.cast, { isAggregate: false });
+  return {
+    cast: normalizeCastFromTmdb(credits?.cast, { isAggregate: false }),
+    crew: Array.isArray(credits?.crew) ? credits.crew : [],
+  };
+}
+
+// Si la petición directa falla, los créditos traducidos de siempre.
+async function fetchModalCredits(mediaType, id) {
+  try {
+    return await fetchModalTmdbCredits(mediaType, id);
+  } catch {
+    const credits = await getCredits(mediaType, id).catch(() => null);
+    return {
+      cast: normalizeCastFromTmdb(credits?.cast, { isAggregate: false }),
+      crew: Array.isArray(credits?.crew) ? credits.crew : [],
+    };
+  }
 }
 
 const EMPTY_PRODUCTION = {
@@ -858,14 +881,25 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
       year: yearOf(item) || null,
     });
 
+    // «Títulos similares» va APARTE: sus recomendaciones combinan Trakt y TMDb
+    // en el servidor y tardan ~1 s más que la ficha. Dentro del mismo
+    // `Promise.all`, la cabecera, las pestañas y el reparto esperaban a esa
+    // fila aunque ya tuvieran sus datos.
+    (async () => {
+      const recs = await getRecommendations(mediaType, id).catch(() => null);
+      if (cancelled) return;
+      setData((prev) => ({
+        ...prev,
+        recommendations: Array.isArray(recs?.results) ? recs.results : [],
+      }));
+    })();
+
     (async () => {
       let details = null;
       try {
-        const [detailsRes, credits, recs, modalTmdbCast] = await Promise.all([
+        const [detailsRes, credits] = await Promise.all([
           detailsPromise,
-          getCredits(mediaType, id).catch(() => null),
-          getRecommendations(mediaType, id).catch(() => null),
-          fetchModalTmdbCast(mediaType, id).catch(() => []),
+          fetchModalCredits(mediaType, id).catch(() => ({ cast: [], crew: [] })),
         ]);
         if (cancelled) return;
 
@@ -937,24 +971,16 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
             ? source.vote_count
             : null;
 
-        const fallbackCast = normalizeCastFromTmdb(credits?.cast, {
-          isAggregate: false,
-        });
+        const tmdbCast = Array.isArray(credits?.cast) ? credits.cast : [];
         const movieDirectors =
           mediaType === "movie" ? getMovieDirectorsFromCrew(credits?.crew) : [];
         // Reparto: SOLO los intérpretes, en el orden de TMDb, igual que el
         // Reparto Principal de DetailsClient. El director o los creadores no
         // van delante de los actores (siguen en «Dirección» / «Creación»).
         const cast = buildCastDataForUI({
-          baseCast:
-            Array.isArray(modalTmdbCast) && modalTmdbCast.length
-              ? modalTmdbCast
-              : fallbackCast,
+          baseCast: tmdbCast,
           creativeCredits: [],
         });
-        const recommendations = Array.isArray(recs?.results)
-          ? recs.results
-          : [];
 
         // Producción: derivable de getDetails (production_companies, networks,
         // production_countries, status, original_language).
@@ -1082,9 +1108,8 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
           tmdbVotes,
           tmdbRatingResolved: true,
           cast,
-          fullCast: Array.isArray(modalTmdbCast) && modalTmdbCast.length ? modalTmdbCast : fallbackCast,
+          fullCast: tmdbCast,
           tvCreators: Array.isArray(details?.created_by) ? details.created_by : [],
-          recommendations,
           production,
           // Datos crudos para el modal de episodios vistos (solo TV): array de
           // temporadas de TMDb y fecha de estreno ISO sin formatear.
