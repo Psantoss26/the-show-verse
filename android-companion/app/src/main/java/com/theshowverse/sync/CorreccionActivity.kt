@@ -79,6 +79,7 @@ class CorreccionActivity : AppCompatActivity() {
 
         construir()
         setContentView(ScrollView(this).apply { addView(raiz) })
+        BarrasDelSistema.ajustar(this)
         cargar()
     }
 

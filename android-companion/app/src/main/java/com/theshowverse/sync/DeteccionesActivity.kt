@@ -78,6 +78,7 @@ class DeteccionesActivity : AppCompatActivity() {
         )
 
         setContentView(ScrollView(this).apply { addView(raiz) })
+        BarrasDelSistema.ajustar(this)
     }
 
     // Al volver de una corrección la lista ya ha cambiado.

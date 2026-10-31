@@ -45,6 +45,16 @@ dirección), abre el enlace en el navegador, que lo pasa a la PWA si está en su
 instalada. Ese aviso solo queda para cuando no hay nada que pueda abrir el
 enlace.
 
+Las pantallas nativas (panel, detecciones, corrección y, en la completa, servidor
+y rendimiento) usan `Theme.TSVSync`, siempre oscuro sobre negro como la PWA, y
+llaman a `BarrasDelSistema.ajustar` tras `setContentView`: con targetSdk 35,
+Android 15 dibuja de borde a borde, así que el contenido se aparta de las barras,
+la cámara y el teclado con sus huecos (sustituye a `adjustResize`).
+
+Al detectar una ficha navegando, el aviso de Sync lleva de título solo el de la
+película o serie (`notif_browsing` en `src/sync`); la completa lo precede de
+«En The Show Verse:».
+
 El registro de detecciones del móvil es **nativo**. Va con el token de
 vinculación contra `/api/streaming/device/*`, porque Sync no tiene sesión web.
 La web (`/detections`) solo enseña las de la extensión del navegador: el

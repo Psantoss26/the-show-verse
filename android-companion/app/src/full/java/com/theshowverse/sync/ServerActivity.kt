@@ -91,6 +91,7 @@ class ServerActivity : AppCompatActivity() {
         )
 
         setContentView(ScrollView(this).apply { addView(raiz) })
+        BarrasDelSistema.ajustar(this)
     }
 
     private fun guardar() {

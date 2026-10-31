@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Tema del panel nativo de sincronización (sigue el modo del sistema). -->
-    <style name="Theme.TSVSync" parent="Theme.Material3.DayNight.NoActionBar">
+    <!-- Tema de las pantallas nativas (panel de sincronización, detecciones…):
+         SIEMPRE oscuro y sobre negro puro, como la PWA instalada. El negro de la
+         ventana es el que se ve detrás de las barras del sistema
+         (BarrasDelSistema). -->
+    <style name="Theme.TSVSync" parent="Theme.Material3.Dark.NoActionBar">
         <item name="android:windowActionBar">false</item>
+        <item name="android:windowBackground">@color/tsv_black</item>
+        <item name="android:statusBarColor">@color/tsv_black</item>
+        <item name="android:navigationBarColor">@color/tsv_black</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="colorPrimary">@color/tsv_amber</item>
     </style>
 
 </resources>

@@ -4,5 +4,7 @@
 <resources>
     <string name="app_name">The Show Verse Sync</string>
     <string name="status_not_paired">No vinculado. Abre The Show Verse (la web o la app instalada desde el navegador), entra en Ajustes → Conexiones y pulsa «Vincular app Android».</string>
+    <!-- Ficha detectada al navegar: solo el título de la película o serie. -->
+    <string name="notif_browsing">%1$s</string>
     <string name="detections_not_paired">Este dispositivo no está vinculado. Abre The Show Verse → Ajustes → Conexiones y pulsa «Vincular app Android».</string>
 </resources>

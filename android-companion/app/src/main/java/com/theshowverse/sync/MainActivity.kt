@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        BarrasDelSistema.ajustar(this)
         prefs = Prefs(this)
         if (prefs.isPaired()) ProgressOutbox.schedule(this)
         requestNotifPermissionIfNeeded()

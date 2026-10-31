@@ -78,6 +78,7 @@ class RendimientoActivity : AppCompatActivity() {
         )
 
         setContentView(ScrollView(this).apply { addView(raiz) })
+        BarrasDelSistema.ajustar(this)
     }
 
     override fun onSupportNavigateUp(): Boolean {
