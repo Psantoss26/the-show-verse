@@ -1796,7 +1796,7 @@ export default function TraktEpisodesWatchedModal({
           ) : viewMode === "list" ? (
             <>
               {/* Sidebar Temporadas (Desktop) */}
-              <div className="hidden w-64 flex-col overflow-y-auto bg-white/[0.02] backdrop-blur-xl sv-scroll md:flex">
+              <div className="hidden w-64 flex-col overflow-y-auto bg-white/[0.02] backdrop-blur-xl no-scrollbar md:flex">
                 <div className="p-3 space-y-1">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
