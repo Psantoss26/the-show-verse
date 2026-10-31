@@ -1777,7 +1777,7 @@ export default function SeasonDetailsClient({
                   onClear: () => handleRate(null),
                   min: 1,
                   max: 10,
-                  step: 1,
+                  step: 0.5,
                 }}
                 onEditCover={season?.id ? () => setCoverEditing(true) : null}
                 trailer={{

@@ -374,7 +374,7 @@ export default function SeasonPeek({ item, origin, onClose, onOpenFull }) {
         onClear: () => handleRate(null),
         min: 1,
         max: 10,
-        step: 1,
+        step: 0.5,
       }}
     />
   );
