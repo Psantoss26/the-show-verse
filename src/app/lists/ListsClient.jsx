@@ -134,10 +134,11 @@ const LIST_ROW_ACCENTS = {
     shadowColor: "168, 85, 247",
     textClass: "text-purple-400",
   },
+  // Colecciones con el mismo morado que las listas: antes iba en amarillo.
   collections: {
-    borderColor: "rgba(234, 179, 8, 0.92)",
-    shadowColor: "234, 179, 8",
-    textClass: "text-yellow-400",
+    borderColor: "rgba(168, 85, 247, 0.92)",
+    shadowColor: "168, 85, 247",
+    textClass: "text-purple-400",
   },
   default: {
     borderColor: "rgba(168, 85, 247, 0.92)",
