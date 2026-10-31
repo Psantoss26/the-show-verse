@@ -10217,6 +10217,7 @@ export default function DetailsClient({
         watchedBySeasonRewatch={rewatchWatchedBySeason}
         rewatchWatchedBySeason={rewatchWatchedBySeason}
         onToggleEpisodeRewatch={toggleEpisodeRewatch}
+        onRefreshPlays={episodesMachine.refreshShowPlays}
       />
 
       {/* Modal de añadir a lista - Permite agregar el contenido a listas personalizadas del usuario */}

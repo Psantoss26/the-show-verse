@@ -2032,6 +2032,7 @@ export default function SeasonDetailsClient({
         rewatchStartAt={seasonEpisodesMachine.rewatchStartAt}
         watchedBySeasonRewatch={seasonEpisodesMachine.rewatchWatchedBySeason}
         onToggleEpisodeRewatch={seasonEpisodesMachine.toggleEpisodeRewatch}
+        onRefreshPlays={seasonEpisodesMachine.refreshShowPlays}
       />
 
       <ExternalLinksModal

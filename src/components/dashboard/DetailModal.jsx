@@ -3432,6 +3432,7 @@ export default function DetailModal({
           watchedBySeasonRewatch={episodesWatched.rewatchWatchedBySeason}
           rewatchWatchedBySeason={episodesWatched.rewatchWatchedBySeason}
           onToggleEpisodeRewatch={episodesWatched.toggleEpisodeRewatch}
+          onRefreshPlays={episodesWatched.refreshShowPlays}
         />
       )}
 

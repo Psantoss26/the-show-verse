@@ -258,6 +258,7 @@ export default function TraktEpisodesWatchedModal({
   onToggleMovieWatched,
 
   onToggleShowWatched, // marcar serie completa (global)
+  onRefreshPlays, // () => vuelve a leer plays y rewatches (quita los que quedan vacíos)
 }) {
   const serverOnline = useServerOnline();
   const router = useRouter();
@@ -291,6 +292,12 @@ export default function TraktEpisodesWatchedModal({
   );
 
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Al abrir el historial, plays al día: no enseña rewatches que se han quedado
+  // sin visionados por cambios hechos fuera de este modal.
+  useEffect(() => {
+    if (historyOpen) onRefreshPlays?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyOpen]);
   const [historyLimit, setHistoryLimit] = useState(60);
   const [deleteRunBusyId, setDeleteRunBusyId] = useState("");
   // Rewatch del historial pendiente de confirmar su borrado: { id, startedAt }.
@@ -888,6 +895,7 @@ export default function TraktEpisodesWatchedModal({
       await onToggleShowWatched(
         showCompleted ? null : new Date().toISOString(),
       );
+      onRefreshPlays?.();
     } catch (e) {
       setShowError(e?.message || "Error al actualizar la serie");
     }
@@ -955,6 +963,7 @@ export default function TraktEpisodesWatchedModal({
       }
 
       await onAddShowPlay(watchedAt, { preset: addPlayPreset });
+      onRefreshPlays?.();
 
       // Si hay fecha, la usamos como “id” del rewatch y cambiamos a esa vista
       if (watchedAt) {
@@ -1032,6 +1041,7 @@ export default function TraktEpisodesWatchedModal({
           );
         }
         await onToggleEpisodeWatched(sn, en);
+        onRefreshPlays?.();
         return;
       }
 

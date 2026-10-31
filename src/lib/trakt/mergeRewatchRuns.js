@@ -109,3 +109,31 @@ export function mergeRewatchRuns(currentRuns, incomingRuns) {
 
   return Array.from(mergedById.values()).sort(byStartedAtDesc);
 }
+
+/**
+ * Quita los rewatches que se han quedado sin visionados: los que ya tuvieron
+ * alguno (el servidor les dio datos: `progressCount`) y ahora no tienen ningún
+ * play en su ventana, de su inicio al inicio del siguiente. Pasa al borrar o
+ * desmarcar todos sus episodios, desde la vista que sea; el servidor deja de
+ * derivarlos, pero la copia de localStorage seguía en «Historial de
+ * visionados». Un rewatch creado a mano que aún no ha tenido ninguno se queda.
+ *
+ * @param runs      runs fusionados (cualquier orden).
+ * @param playTimes momentos (ISO) de todos los plays de episodios de la serie;
+ *                  sin lista, no se quita nada.
+ */
+export function pruneEmptyRewatchRuns(runs, playTimes) {
+  const list = Array.isArray(runs) ? runs : [];
+  if (!Array.isArray(playTimes)) return list;
+  const times = playTimes.map(toTs).filter(Number.isFinite).sort((a, b) => a - b);
+  const asc = [...list].sort((a, b) => toTs(a?.startedAt) - toTs(b?.startedAt));
+  const empty = new Set();
+  asc.forEach((run, index) => {
+    if (typeof run?.progressCount !== "number") return;
+    const start = toTs(run.startedAt);
+    if (!Number.isFinite(start)) return;
+    const end = index + 1 < asc.length ? toTs(asc[index + 1].startedAt) : Infinity;
+    if (!times.some((t) => t >= start && t < end)) empty.add(run);
+  });
+  return empty.size ? list.filter((run) => !empty.has(run)) : list;
+}

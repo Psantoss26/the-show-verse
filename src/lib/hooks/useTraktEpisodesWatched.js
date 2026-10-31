@@ -25,7 +25,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { statusRetryDelay } from "@/lib/trakt/statusRetry";
-import { mergeRewatchRuns } from "@/lib/trakt/mergeRewatchRuns";
+import { mergeRewatchRuns, pruneEmptyRewatchRuns } from "@/lib/trakt/mergeRewatchRuns";
 import {
   traktGetShowWatched,
   traktGetShowPlays,
@@ -470,17 +470,41 @@ export function useTraktEpisodesWatched({
           return;
         }
 
-        if (Array.isArray(r?.rewatchRuns) && r.rewatchRuns.length > 0) {
-          setRewatchRuns((prev) => {
-            const mergedRuns = mergeRewatchRuns(prev, r.rewatchRuns);
-            try {
-              window.localStorage.setItem(
-                rewatchRunsStorageKey,
-                JSON.stringify(mergedRuns),
-              );
-            } catch {}
-            return mergedRuns;
-          });
+        // Fusiona los runs del servidor y quita los que se han quedado sin
+        // plays (también cuando el servidor ya no devuelve ninguno).
+        const incomingRuns = Array.isArray(r?.rewatchRuns) ? r.rewatchRuns : [];
+        const currentRuns = rewatchRunsRef.current || [];
+        const nextRuns = pruneEmptyRewatchRuns(
+          incomingRuns.length > 0
+            ? mergeRewatchRuns(currentRuns, incomingRuns)
+            : currentRuns,
+          r?.playTimes,
+        );
+        if (nextRuns !== currentRuns) {
+          rewatchRunsRef.current = nextRuns;
+          setRewatchRuns(nextRuns);
+          try {
+            window.localStorage.setItem(
+              rewatchRunsStorageKey,
+              JSON.stringify(nextRuns),
+            );
+          } catch {}
+        }
+        // La vista abierta era uno de los rewatches quitados: vuelve a Global.
+        const activeView = activeEpisodesViewRef.current;
+        const activeRunGone =
+          activeView &&
+          activeView !== "global" &&
+          currentRuns.some((run) => run?.id === activeView) &&
+          !nextRuns.some((run) => run?.id === activeView);
+        if (activeRunGone) {
+          setActiveEpisodesView("global");
+          try {
+            window.localStorage.setItem(episodesViewStorageKey, "global");
+          } catch {}
+          setRewatchStartAt(null);
+          startAtIso = null;
+          endBeforeIso = null;
         }
 
         setShowPlays(
@@ -536,6 +560,7 @@ export function useTraktEpisodesWatched({
       type,
       connected,
       rewatchRunsStorageKey,
+      episodesViewStorageKey,
       cacheRewatchViewState,
       restoreRewatchViewStateFromCache,
     ],
@@ -721,6 +746,7 @@ export function useTraktEpisodesWatched({
             loaded: true,
           });
         }
+
       } catch {
         const rollbackWatchedBySeason = {
           ...normalizeWatchedBySeasonMap(watchedBySeasonRef.current),
@@ -740,6 +766,21 @@ export function useTraktEpisodesWatched({
     },
     [type, connected, episodeBusyKey, watchedBySeason, id, title, applyWatchedBySeasonState],
   );
+
+  // Vuelve a leer los plays de la vista abierta: el modal de episodios lo pide
+  // tras cada cambio, venga de este hook o del de la página que lo abre, para
+  // que «Historial de visionados» quite los rewatches que se quedan sin plays
+  // (pruneEmptyRewatchRuns en loadTraktShowPlays).
+  const refreshShowPlays = useCallback(() => {
+    const windowState = resolveRewatchWindow(
+      activeEpisodesViewRef.current,
+      rewatchRunsRef.current,
+    );
+    return loadTraktShowPlays(
+      windowState.startAt || null,
+      windowState.endBefore || null,
+    ).catch(() => {});
+  }, [resolveRewatchWindow, loadTraktShowPlays]);
 
   const toggleEpisodeRewatch = useCallback(
     async (seasonNumber, episodeNumber, options = {}) => {
@@ -1260,6 +1301,7 @@ export function useTraktEpisodesWatched({
     // carga / reconciliación
     loadTraktShowWatched,
     loadTraktShowPlays,
+    refreshShowPlays,
     reconcileAfterClose,
     // acciones de episodios / serie
     toggleEpisodeWatched,

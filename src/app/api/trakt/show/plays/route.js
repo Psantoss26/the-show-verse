@@ -199,6 +199,17 @@ async function fetchAllShowHistory(token, traktId, { startAtIso } = {}) {
  * minPlays = mínimo conteo de plays por episodio
  * showPlays = timestamps (watched_at) en los que se completó cada run (más recientes primero)
  */
+// Momentos de todos los plays de episodios válidos: el cliente quita con ellos
+// los rewatches que se han quedado sin ninguno (pruneEmptyRewatchRuns).
+function episodePlayTimes(historyItems, episodeKeySet) {
+  const times = new Set();
+  for (const it of Array.isArray(historyItems) ? historyItems : []) {
+    const key = buildEpisodeKey(Number(it?.episode?.season), Number(it?.episode?.number));
+    if (it?.watched_at && episodeKeySet.has(key)) times.add(it.watched_at);
+  }
+  return [...times].sort();
+}
+
 function computeShowCompletions(historyItems, episodeKeySet) {
   const keys = Array.from(episodeKeySet);
   const total = keys.length;
@@ -444,6 +455,7 @@ export async function GET(request) {
         showPlays,
         plays: showPlays,
         rewatchRuns,
+        playTimes: episodePlayTimes(historyAll, episodeKeySet),
         watchedBySeasonSince: sinceData?.watchedBySeason || null,
         historyIdsByEpisodeSince: sinceData?.historyIdsByEpisode || {},
         historyIdsSince: sinceData?.historyIds || [],
@@ -523,6 +535,7 @@ export async function GET(request) {
       showPlays,
       plays: showPlays, // alias
       rewatchRuns,
+      playTimes: episodePlayTimes(historyAll, episodeKeySet),
       watchedBySeasonSince: sinceData?.watchedBySeason || null,
       historyIdsByEpisodeSince: sinceData?.historyIdsByEpisode || {},
       historyIdsSince: sinceData?.historyIds || [],

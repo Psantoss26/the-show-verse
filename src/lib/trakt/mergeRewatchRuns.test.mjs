@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { mergeRewatchRuns } from "./mergeRewatchRuns.js";
+import { mergeRewatchRuns, pruneEmptyRewatchRuns } from "./mergeRewatchRuns.js";
 
 const FIRST = "2025-06-12T18:00:00.000Z";
 const REWATCH = "2026-10-18T21:30:00.000Z";
@@ -69,4 +69,33 @@ test("el run manual absorbe solo uno; el rewatch siguiente aparece aparte", () =
 
   assert.deepEqual(merged.map((r) => r.id), [REWATCH, manual, FIRST]);
   assert.equal(merged[1].completed, true);
+});
+
+test("se quita el rewatch que se ha quedado sin plays, desde cualquier vista", () => {
+  const runs = [
+    { id: REWATCH, startedAt: REWATCH, progressCount: 3 },
+    { id: FIRST, startedAt: FIRST, progressCount: 62 },
+  ];
+  // Quedan los plays del primer visionado; los del rewatch se han borrado.
+  const kept = pruneEmptyRewatchRuns(runs, ["2025-06-12T18:00:00.000Z", "2025-06-20T18:00:00.000Z"]);
+  assert.deepEqual(kept.map((run) => run.id), [FIRST]);
+
+  // Sin ningún play: no queda ninguno.
+  assert.deepEqual(pruneEmptyRewatchRuns(runs, []), []);
+
+  // Sin lista de plays (respuesta antigua o error): no se toca nada.
+  assert.equal(pruneEmptyRewatchRuns(runs, undefined), runs);
+});
+
+test("un rewatch creado a mano que aún no ha tenido plays se conserva", () => {
+  const manual = { id: "2026-10-31T10:00:00.000Z", startedAt: "2026-10-31T10:00:00.000Z", progressCount: null };
+  const runs = [manual, { id: FIRST, startedAt: FIRST, progressCount: 62 }];
+  const out = pruneEmptyRewatchRuns(runs, [FIRST]);
+  assert.equal(out, runs);
+});
+
+test("los plays de la ventana de un rewatch lo mantienen aunque no empiecen en su inicio", () => {
+  const manual = { id: "2026-10-31T10:00:00.000Z", startedAt: "2026-10-31T10:00:00.000Z", progressCount: 1 };
+  const runs = [manual, { id: FIRST, startedAt: FIRST, progressCount: 62 }];
+  assert.equal(pruneEmptyRewatchRuns(runs, [FIRST, "2026-10-31T10:05:00.000Z"]), runs);
 });

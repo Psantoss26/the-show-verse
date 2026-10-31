@@ -472,6 +472,7 @@ export default function SeasonPeek({ item, origin, onClose, onOpenFull }) {
         rewatchStartAt={episodesWatched.rewatchStartAt}
         watchedBySeasonRewatch={episodesWatched.rewatchWatchedBySeason}
         onToggleEpisodeRewatch={episodesWatched.toggleEpisodeRewatch}
+        onRefreshPlays={episodesWatched.refreshShowPlays}
       />
     </DetailPeekLayout>
   );
