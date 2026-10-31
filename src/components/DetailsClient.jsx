@@ -385,6 +385,9 @@ import ListCountPills from "@/components/lists/ListCountPills";
 // CONSTANTES GLOBALES
 // ---------------------------------------------------------------------------
 
+// Tarjetas de la fila Recomendaciones (la vista lateral muestra todas).
+const RECOMMENDATIONS_ROW_LIMIT = 30;
+
 // Clave de API de TMDb inyectada como variable de entorno publica
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
@@ -11751,7 +11754,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8 !overflow-visible"
                       >
-                        {ladderRecommendations.slice(0, 15).map((rec, recIndex) => {
+                        {ladderRecommendations.slice(0, RECOMMENDATIONS_ROW_LIMIT).map((rec, recIndex) => {
                           const recTitle = rec.title || rec.name;
                           const recType =
                             rec.media_type === "movie" ||
@@ -11834,6 +11837,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       className={recImageClass}
                                     />
                                   )}
+                                  {/* Solo con ratón: es cristal
+                                      (backdrop-filter) y, aunque esté
+                                      invisible, cada tarjeta sería una capa
+                                      más que recomponer en cada fotograma del
+                                      deslizamiento táctil (tablet). */}
+                                  {enableHover && (
                                   <RecommendationHoverIndicator
                                     favorite={recIsFavorite}
                                     watchlist={recIsWatchlist}
@@ -11841,6 +11850,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     tmdbRating={rec.vote_average}
                                     imdbRating={recImdbRating}
                                   />
+                                  )}
                                 </div>
                               </Link>
                             </SwiperSlide>
@@ -11959,6 +11969,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </div>
                                   )}
 
+                                  {enableHover && (
                                   <RecommendationHoverIndicator
                                     favorite={colIsFavorite}
                                     watchlist={colIsWatchlist}
@@ -11966,6 +11977,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     tmdbRating={m.vote_average}
                                     imdbRating={colImdbRating}
                                   />
+                                  )}
                                 </div>
                               </Link>
                             </SwiperSlide>

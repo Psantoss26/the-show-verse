@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import MobilePosterPreload from "@/components/details/MobilePosterPreload";
 import { getDetails } from "@/lib/api/tmdb";
+import { fetchTitleRecommendations } from "@/lib/details/titleRecommendations.server";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 import { fetchCommunityArtwork } from "@/lib/community/server";
 export const revalidate = 600;
 
-const DETAILS_APPEND_TO_RESPONSE =
-  "external_ids,images,videos,credits,recommendations";
+// Las recomendaciones van aparte (`fetchTitleRecommendations`, en paralelo):
+// Trakt «relacionados» + dos páginas de TMDb, ordenadas con criterio propio.
+const DETAILS_APPEND_TO_RESPONSE = "external_ids,images,videos,credits";
 
 export async function generateMetadata({ params }) {
   const p = await params;
@@ -34,7 +36,7 @@ export default async function TvDetailsPage({ params }) {
   // que ofrece "reintentar" en lugar de un falso "página no encontrada".
   // En paralelo, las imágenes más votadas («Portadas y fondos»): son la
   // imagen por defecto del título y la portada tiene que nacer ya con ellas.
-  const [data, communityArtwork] = await Promise.all([
+  const [data, communityArtwork, recommendations] = await Promise.all([
     getDetails("tv", id, {
       appendToResponse: DETAILS_APPEND_TO_RESPONSE,
       language: "es-ES",
@@ -42,6 +44,7 @@ export default async function TvDetailsPage({ params }) {
       throwOnUnavailable: true,
     }),
     fetchCommunityArtwork({ type: "tv", id }).catch(() => null),
+    fetchTitleRecommendations("tv", id).catch(() => null),
   ]);
 
   if (!data) {
@@ -51,8 +54,8 @@ export default async function TvDetailsPage({ params }) {
   const initialCastData = Array.isArray(data?.credits?.cast)
     ? data.credits.cast
     : [];
-  const initialRecommendations = Array.isArray(data?.recommendations?.results)
-    ? data.recommendations.results
+  const initialRecommendations = Array.isArray(recommendations?.results)
+    ? recommendations.results
     : [];
 
   return (

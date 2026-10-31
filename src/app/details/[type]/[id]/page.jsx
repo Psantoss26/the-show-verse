@@ -2,13 +2,15 @@ import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import MobilePosterPreload from "@/components/details/MobilePosterPreload";
 import { getDetails } from "@/lib/api/tmdb";
+import { fetchTitleRecommendations } from "@/lib/details/titleRecommendations.server";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 import { fetchCommunitySummary } from "@/lib/community/server";
 import { readEmbeddedDetailsSeed } from "@/lib/navigation/embeddedDetails";
 export const revalidate = 600;
 
-const DETAILS_APPEND_TO_RESPONSE =
-  "external_ids,images,videos,credits,recommendations";
+// Las recomendaciones van aparte (`fetchTitleRecommendations`, en paralelo):
+// Trakt «relacionados» + dos páginas de TMDb, ordenadas con criterio propio.
+const DETAILS_APPEND_TO_RESPONSE = "external_ids,images,videos,credits";
 
 // Ficha embebida en el drawer móvil (`/embed/details/...`): el reparto y las
 // recomendaciones no son parte de lo crítico (póster, logo, botones de
@@ -62,7 +64,7 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
   // En paralelo con la comunidad (Trakt): no depende de `data`, así que
   // encadenarla DETRÁS solo sumaba su propia ida y vuelta al tiempo total de
   // respuesta sin necesidad.
-  const [data, community] = await Promise.all([
+  const [data, community, recommendations] = await Promise.all([
     getDetails(type, id, {
       appendToResponse: embedded
         ? DETAILS_APPEND_TO_RESPONSE_EMBEDDED
@@ -73,6 +75,7 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
     }),
     // Tolerant: a null/slow community summary must never break the page render.
     fetchCommunitySummary({ type, id }).catch(() => null),
+    embedded ? null : fetchTitleRecommendations(type, id).catch(() => null),
   ]);
 
   if (!data) {
@@ -82,8 +85,8 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
   const initialCastData = Array.isArray(data?.credits?.cast)
     ? data.credits.cast
     : [];
-  const initialRecommendations = Array.isArray(data?.recommendations?.results)
-    ? data.recommendations.results
+  const initialRecommendations = Array.isArray(recommendations?.results)
+    ? recommendations.results
     : [];
 
   return (

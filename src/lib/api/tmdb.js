@@ -15,6 +15,7 @@ import {
   isTmdbTransientStatus,
 } from "@/lib/api/tmdbRetry";
 import { normalizeImageLanguage, tmdbImageLanguages } from "@/lib/tmdb/imageLanguageLadder";
+import { rankRecommendations } from "@/lib/details/recommendationRanking";
 
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
@@ -552,9 +553,31 @@ export async function getVideos(
   };
 }
 
+// Recomendaciones de la ficha (Trakt «relacionados» + dos páginas de TMDb,
+// ordenadas con criterio propio): las calcula el servidor en
+// /api/tmdb/recommendations. Si la ruta falla, la página 1 de TMDb pasada por
+// el mismo filtro y orden.
 export async function getRecommendations(type, id) {
   if (!type || !id) return null;
-  return await tmdb(`/${type}/${id}/recommendations`);
+  if (!IS_SERVER) {
+    try {
+      const res = await fetch(
+        `/api/tmdb/recommendations?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`,
+      );
+      const data = res.ok ? await res.json() : null;
+      if (Array.isArray(data?.results)) return data;
+    } catch {
+      // Respaldo de abajo.
+    }
+  }
+  const data = await tmdb(`/${type}/${id}/recommendations`);
+  return {
+    results: rankRecommendations({
+      recommendationPages: [Array.isArray(data?.results) ? data.results : []],
+      type,
+      selfId: id,
+    }),
+  };
 }
 
 export async function getCredits(type, id) {
