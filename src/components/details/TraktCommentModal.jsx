@@ -243,7 +243,7 @@ export default function TraktCommentModal({
             {myComments && myComments.length > 0 && (
               <div className="border-t border-white/10 pt-6 space-y-4">
                 <h4 className="text-xs font-black text-zinc-400 tracking-wider uppercase">
-                  Mis comentarios anteriores ({myComments.length})
+                  Historial
                 </h4>
                 <div className="space-y-4">
                   {myComments.map((comment) => (
