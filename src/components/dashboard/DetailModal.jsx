@@ -352,6 +352,11 @@ function DetailModalActionsReveal({ children, className = "" }) {
 // lote) → el mejor con idioma (fetchBestBackdrop: en → otro idioma →
 // textless, compartido con el dashboard vía `movieBackdropCache`) → el del
 // item solo si lo anterior no da nada.
+//
+// El automático se pide A LA VEZ que se espera el votado, no después: en
+// serie, cada tarjeta sumaba la espera de la comunidad (hasta 1 s) y la del
+// lote de arte (~0,9 s medidos). Si al final hay votado, el automático no se
+// usa; la mayoría de títulos no tienen votos.
 function SimilarBackdrop({ rec, onOpen }) {
   const recMediaType = getMediaTypeForItem(rec);
   const recTitle = rec?.title || rec?.name || "";
@@ -373,7 +378,7 @@ function SimilarBackdrop({ rec, onOpen }) {
   const src = path ? buildImg(path, "w780") : null;
 
   useEffect(() => {
-    if (!cacheKey || cardBackdrop || cardBackdropPending) return undefined;
+    if (!cacheKey || cardBackdrop) return undefined;
     const cached = movieBackdropCache.get(cacheKey);
     if (cached !== undefined) {
       setAutoPath(cached);
@@ -398,7 +403,7 @@ function SimilarBackdrop({ rec, onOpen }) {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheKey, cardBackdrop, cardBackdropPending]);
+  }, [cacheKey, cardBackdrop]);
 
   return (
     <div
