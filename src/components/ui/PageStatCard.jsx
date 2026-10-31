@@ -29,6 +29,11 @@ const SWAP_PIECE_STAGGER = 0.035;
 // icono, la cifra y la etiqueta que cambian (`StatSwap`). `iconKey` identifica
 // el icono (y su color) para saber cuándo ha cambiado.
 //
+// `dense` (solo desde md) achica la tarjeta grande —menos relleno, icono y
+// cifra más pequeños, sin ancho mínimo— para cabeceras donde comparte fila con
+// el nombre y no cabe todo (el Perfil con el panel lateral abierto). La mini
+// tarjeta de móvil no cambia.
+//
 // `swapGroup` identifica la sección que se muestra (la pestaña de Listas, la
 // página de Historial o Continuar viendo…): al cambiar, se relevan TODAS las
 // piezas de todas las tarjetas, también las que coinciden («Películas»), para
@@ -54,6 +59,7 @@ export default function PageStatCard({
   iconKey,
   swapGroup = "",
   swapIndex = 0,
+  dense = false,
 }) {
   // Escalonado: por tarjeta y, dentro de ella, icono → cifra → etiqueta.
   const swap = (key, content, swapClassName, piece) =>
@@ -72,7 +78,10 @@ export default function PageStatCard({
   const interactive = href
     ? `transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 ${focusRingClass}`
     : "";
-  const classes = `relative overflow-hidden w-full h-full min-w-0 lg:min-w-[120px] rounded-2xl md:rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 ${glass ? "backdrop-blur-lg" : ""} shadow-lg px-2 py-2 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1.5 md:gap-1 text-center ${interactive} ${className}`;
+  const size = dense
+    ? "rounded-2xl md:rounded-[1.5rem] px-2 py-2 md:px-3 md:py-3"
+    : "lg:min-w-[120px] rounded-2xl md:rounded-[2rem] px-2 py-2 md:px-5 md:py-4";
+  const classes = `relative overflow-hidden w-full h-full min-w-0 ${size} bg-gradient-to-br from-white/10 to-white/5 ${glass ? "backdrop-blur-lg" : ""} shadow-lg flex flex-col items-center justify-center gap-1.5 md:gap-1 text-center ${interactive} ${className}`;
 
   const body = (
     <>
@@ -83,14 +92,14 @@ export default function PageStatCard({
           {swap(
             `${iconKey ?? label}|${colorClass}`,
             <Icon
-              className={`w-4 h-4 md:w-7 md:h-7 shrink-0 ${iconClassName}`}
+              className={`w-4 h-4 ${dense ? "md:w-5 md:h-5" : "md:w-7 md:h-7"} shrink-0 ${iconClassName}`}
               aria-hidden="true"
             />,
             "inline-flex",
             0,
           )}
         </span>
-        <span className="block text-base max-md:leading-none md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
+        <span className={`block text-base max-md:leading-none ${dense ? "md:text-xl lg:text-2xl" : "md:text-2xl lg:text-3xl"} font-black text-white tracking-tight drop-shadow-md`}>
           {swap(
             loading ? "loading" : `value:${value}`,
             loading ? (

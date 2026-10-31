@@ -173,7 +173,7 @@ function ProfileAvatar({ user, size = "h-22 w-22 @[640px]/detail-page:h-26 @[640
   );
 }
 
-function CountStat({ value, label, href, icon, iconClassName = "text-emerald-400", entranceDelay = null }) {
+function CountStat({ value, label, href, icon, iconClassName = "text-emerald-400", entranceDelay = null, dense = false }) {
   // La tarjeta compartida de las cabeceras (mini tarjeta en móvil). Sin
   // cristal, como ha sido siempre en el Perfil. Crece en su turno de la entrada
   // (`entranceDelay`, ms), como las de Favoritos.
@@ -189,6 +189,7 @@ function CountStat({ value, label, href, icon, iconClassName = "text-emerald-400
       icon={icon}
       colorClass={iconClassName}
       glass={false}
+      dense={dense}
       focusRingClass="focus-visible:ring-emerald-400/70"
     />
     </div>
@@ -816,6 +817,10 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   const enter = (className) => (isBackNav ? "" : ` ${className}`);
   const entranceStart = (cardIndex) => (isBackNav ? null : cardIndex);
   const profileSwipe = useRef(null);
+  // Rejilla de tarjetas de la cabecera: ProfileTitleRow la mide y, si con los
+  // botones recogidos el nombre sigue sin caber, pide achicarla (`denseStats`).
+  const statsRef = useRef(null);
+  const [denseStats, setDenseStats] = useState(false);
   // Al volver desde DetailsClient este montaje sólo existe en el cliente y ya
   // conocemos que es una navegación de historial. Sembrar la instantánea aquí
   // evita el frame vacío entre la restauración de scroll y el layout effect.
@@ -1182,6 +1187,8 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               isSelf={isSelf}
               syncing={syncing}
               onSync={() => setRefreshToken((value) => value + 1)}
+              statsRef={statsRef}
+              onDenseStatsChange={setDenseStats}
             />
             <div className="mt-1 flex min-w-0 items-center gap-2 @[640px]/detail-page:mt-1.5">
               <p className="min-w-0 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:text-sm">@{user.username}</p>
@@ -1195,8 +1202,12 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           </div>
 
           {/* Contadores */}
-          <div className={`order-3 grid w-full grid-cols-4 gap-2 @[640px]/detail-page:gap-3 @[1024px]/detail-page:order-none @[1024px]/detail-page:w-auto @[1024px]/detail-page:pl-4${enter("sv-section-stats-in")}`}>
+          <div
+            ref={statsRef}
+            data-dense={String(denseStats)}
+            className={`order-3 grid w-full grid-cols-4 gap-2 @[640px]/detail-page:gap-3 @[1024px]/detail-page:order-none @[1024px]/detail-page:w-auto @[1024px]/detail-page:pl-4${enter("sv-section-stats-in")}`}>
             <CountStat
+              dense={denseStats}
               value={counts.films}
               label="Películas"
               icon={Film}
@@ -1204,6 +1215,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[0]}
             />
             <CountStat
+              dense={denseStats}
               value={stats.completedShows}
               label="Series"
               icon={CheckCircle2}
@@ -1211,6 +1223,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[1]}
             />
             <CountStat
+              dense={denseStats}
               value={counts.following}
               label="Siguiendo"
               icon={UserRoundCheck}
@@ -1219,6 +1232,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[2]}
             />
             <CountStat
+              dense={denseStats}
               value={counts.followers}
               label="Seguidores"
               icon={Users}
