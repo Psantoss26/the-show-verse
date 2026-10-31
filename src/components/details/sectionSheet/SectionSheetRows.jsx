@@ -11,6 +11,8 @@ import Avatar from "@/components/ui/Avatar";
 import { getSoundtrackSourceBadge } from "@/lib/details/soundtrackSource";
 import { videoThumbUrl, videoTypeLabel } from "@/lib/details/videos";
 import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
+import { formatRuntime } from "@/lib/tmdb/titleMeta";
+import { useTitleMeta } from "@/lib/tmdb/titleMetaBatch";
 
 const ROW_BASE = "flex items-center rounded-2xl bg-black/15 transition-colors";
 const ROW = `${ROW_BASE} gap-3.5 p-2.5`;
@@ -75,7 +77,7 @@ export function PersonRow({ person, role, episodes = null, badge = null, title =
   );
 }
 
-/** Película o serie (recomendaciones, colección, listas): póster, título, año, tipo y nota. */
+/** Película o serie (recomendaciones, colección, listas): póster, título, año, duración, tipo, géneros y nota. */
 export function TitleRow({
   item,
   mediaType,
@@ -95,6 +97,9 @@ export function TitleRow({
   action = null,
   // Línea extra bajo año y tipo (p. ej. el papel de un actor: «como Walter White»).
   detail = null,
+  // Duración junto al año y dos géneros debajo (vista de lista de listas y
+  // colecciones, vistas laterales de recomendaciones y de personas).
+  showTitleMeta = false,
   className = "",
 }) {
   const type = item?.media_type === "tv" || mediaType === "tv" ? "tv" : "movie";
@@ -113,6 +118,11 @@ export function TitleRow({
   const shouldShowImdb = hasImdbScore || (showImdb && imdbLoading);
 
   const targetHref = href || (item?.id ? `/details/${type}/${item.id}` : "#");
+  const { meta: titleMeta, pending: titleMetaPending } = useTitleMeta(type, item?.id, {
+    enabled: showTitleMeta,
+  });
+  const runtime = formatRuntime(titleMeta?.runtime);
+  const genres = titleMeta?.genres?.length ? titleMeta.genres.join(" · ") : "";
 
   // Portada elegida en la ficha o, sin ella, la más votada (la de las
   // tarjetas). Mientras no se sabe si hay votada no se pinta la automática.
@@ -165,8 +175,17 @@ export function TitleRow({
           {title}
         </span>
         <span className="mt-1 block text-xs font-bold text-zinc-400 min-[1920px]:text-sm">
-          {[year, type === "tv" ? "Serie" : "Película"].filter(Boolean).join(" · ")}
+          {/* Con géneros y duración ya no se indica si es película o serie. */}
+          {[year, runtime, showTitleMeta ? null : type === "tv" ? "Serie" : "Película"]
+            .filter(Boolean)
+            .join(" · ")}
         </span>
+        {genres || titleMetaPending ? (
+          // Mientras llegan, la línea se reserva vacía para que la fila no salte.
+          <span className="mt-0.5 block truncate text-xs text-zinc-500 min-[1920px]:text-sm">
+            {genres || " "}
+          </span>
+        ) : null}
         {detail ? (
           <span className="mt-1 block line-clamp-2 text-xs text-zinc-400 min-[1920px]:text-sm">{detail}</span>
         ) : null}

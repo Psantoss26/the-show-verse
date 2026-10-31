@@ -184,6 +184,7 @@ function TitleList({
               showImdb
               imdbRating={imdbScores.get(scoreKey)}
               imdbLoading={pending && !imdbScores.has(scoreKey)}
+              showTitleMeta
             />
           </li>
         );

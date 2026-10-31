@@ -267,6 +267,7 @@ function RecommendationsSheet({ meta, data, onClose, query, setQuery }) {
                 imdbRating={imdbScores.get(getScoreItemKey(item))}
                 imdbLoading={imdbLoading && !imdbScores.has(getScoreItemKey(item))}
                 posterLoading={Boolean(item._englishPosterPending)}
+                showTitleMeta
               />
             </li>
           ))}
@@ -332,6 +333,7 @@ function CollectionSheet({ meta, data, onClose }) {
                 imdbRating={imdbScores.get(getScoreItemKey(item))}
                 imdbLoading={imdbLoading && !imdbScores.has(getScoreItemKey(item))}
                 posterLoading={Boolean(item._englishPosterPending)}
+                showTitleMeta
               />
             </li>
           ))}
