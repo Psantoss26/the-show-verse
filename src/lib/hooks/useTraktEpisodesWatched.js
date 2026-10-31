@@ -516,6 +516,7 @@ export function useTraktEpisodesWatched({
           setRewatchWatchedBySeason(null);
           setRewatchHistoryByEpisode({});
         }
+        return r;
       } catch (e) {
         if (requestId !== showPlaysRequestIdRef.current) return;
         if (startAtIso) {
@@ -836,12 +837,42 @@ export function useTraktEpisodesWatched({
           });
         }
 
-        await loadTraktShowPlays(targetStartAt, windowState.endBefore || null);
+        const windowData = await loadTraktShowPlays(
+          targetStartAt,
+          windowState.endBefore || null,
+        );
 
         const fresh = await traktGetShowWatched({ tmdbId: id });
         applyWatchedBySeasonState(fresh?.watchedBySeason || {}, {
           loaded: true,
         });
+
+        // Desmarcado el último episodio del rewatch: no queda nada suyo en el
+        // historial, así que el rewatch se quita de la lista y se vuelve a la
+        // vista Global (si no, quedaba vacío en «Historial de visionados»).
+        // Solo al desmarcar: un rewatch recién creado también está vacío.
+        const emptyRun =
+          !next &&
+          Array.isArray(windowData?.historyIdsSince) &&
+          windowData.historyIdsSince.length === 0 &&
+          (rewatchRunsRef.current || []).some((r) => r?.id === targetViewId);
+        if (emptyRun) {
+          setRewatchRuns((prev) => {
+            const nextRuns = (Array.isArray(prev) ? prev : []).filter(
+              (r) => r?.id !== targetViewId,
+            );
+            persistRuns(nextRuns);
+            return nextRuns;
+          });
+          if (activeEpisodesViewRef.current === targetViewId) {
+            setActiveEpisodesView("global");
+            try {
+              window.localStorage.setItem(episodesViewStorageKey, "global");
+            } catch {}
+            setRewatchStartAt(null);
+            await loadTraktShowPlays(null);
+          }
+        }
       } catch (e) {
         let rollbackWatchedBySeason = null;
         setRewatchWatchedBySeason((prev) => {
@@ -877,6 +908,8 @@ export function useTraktEpisodesWatched({
       resolveRewatchWindow,
       cacheRewatchViewState,
       applyWatchedBySeasonState,
+      persistRuns,
+      episodesViewStorageKey,
     ],
   );
 
