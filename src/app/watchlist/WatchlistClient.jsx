@@ -17,6 +17,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { TitleRow } from "@/components/details/sectionSheet/SectionSheetRows";
 import LoginRequiredScreen from "@/components/auth/LoginRequiredScreen";
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "framer-motion";
 import useStickyGroup from "@/lib/hooks/useStickyGroup";
@@ -1680,33 +1681,33 @@ const WatchlistCard = memo(function WatchlistCard({
 
   if (viewMode === "list") {
     return (
-      <div ref={shellRef} data-flip-key={flipKey} data-watchlist-card="">
-        <Link
+      <div
+        ref={shellRef}
+        className={shellClassName}
+        data-flip-key={flipKey}
+        data-watchlist-card=""
+      >
+        {/* La misma fila que la vista de lista de listas y colecciones
+            (TitleRow), con el backdrop 16:9 en lugar del póster, a su tamaño de
+            siempre (180 px; 280 px desde sm). */}
+        <TitleRow
+          item={item}
+          mediaType={type}
           href={href}
           prefetch={false}
           onClick={onPreviewClick}
-          className="relative block bg-zinc-900/40 rounded-xl hover:bg-zinc-900/65 transition-colors duration-300 group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(59,130,246,0.95)]"
-        >
-          <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
-              <SmartPoster
-                item={item}
-                title={title}
-                mode={effectiveImageMode}
-              />
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
-              <div className="flex items-center gap-2">
-                <h4 className="text-white font-bold text-base leading-tight truncate transition-colors group-hover:text-blue-300">
-                  {title}
-                </h4>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium leading-tight tracking-[0.08em] text-zinc-400 tabular-nums">
-                {year && <span>{year}</span>}
-              </div>
-            </div>
-          </div>
-        </Link>
+          title={title}
+          year={year}
+          showImdb
+          imdbRating={imdbScore}
+          showTitleMeta
+          media={
+            <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+          }
+          // El tamaño de backdrop de siempre de estas páginas.
+          mediaClassName="aspect-video w-[180px] sm:w-[280px] rounded-lg shadow-md"
+          className="relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(59,130,246,0.95)]"
+        />
       </div>
     );
   }
@@ -1947,7 +1948,9 @@ export default function WatchlistClient() {
     pruneOldImageChoiceCaches();
   }, []);
 
+  // La vista de lista enseña la nota de IMDb en cada fila (TitleRow).
   const needsImdbScores =
+    viewMode === "list" ||
     groupBy === "imdb_rating" ||
     subGroupBy === "imdb_rating" ||
     sortBy === "rating-asc" ||

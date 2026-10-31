@@ -19,6 +19,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { TitleRow } from "@/components/details/sectionSheet/SectionSheetRows";
 import LoginRequiredScreen from "@/components/auth/LoginRequiredScreen";
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "framer-motion";
 import useStickyGroup from "@/lib/hooks/useStickyGroup";
@@ -1885,6 +1886,7 @@ const FavoriteCard = memo(function FavoriteCard({
   imageMode = "poster",
   watched = false,
   watchCount = 0,
+  imdbScore = null,
 }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const title = item.title || item.name || "Sin título";
@@ -1952,32 +1954,27 @@ const FavoriteCard = memo(function FavoriteCard({
         data-flip-key={flipKey}
         data-favorite-card=""
       >
-        <Link
+        {/* La misma fila que la vista de lista de listas y colecciones
+            (TitleRow), con el backdrop 16:9 en lugar del póster, a su tamaño de
+            siempre (180 px; 280 px desde sm). */}
+        <TitleRow
+          item={item}
+          mediaType={type}
           href={href}
           prefetch={false}
           onClick={onPreviewClick}
-          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]"
-        >
-          <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
-              <SmartPoster
-                item={item}
-                title={title}
-                mode={effectiveImageMode}
-              />
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
-              <div className="flex items-center gap-2">
-                <h4 className="text-white font-bold text-base leading-tight truncate transition-colors group-hover:text-red-300">
-                  {title}
-                </h4>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium leading-tight tracking-[0.08em] text-zinc-400 tabular-nums">
-                {year && <span>{year}</span>}
-              </div>
-            </div>
-          </div>
-        </Link>
+          title={title}
+          year={year}
+          showImdb
+          imdbRating={imdbScore}
+          showTitleMeta
+          media={
+            <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+          }
+          // El tamaño de backdrop de siempre de estas páginas.
+          mediaClassName="aspect-video w-[180px] sm:w-[280px] rounded-lg shadow-md"
+          className="relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]"
+        />
       </div>
     );
   }
@@ -2056,7 +2053,8 @@ function areFavoriteCardPropsEqual(prev, next) {
     prev.viewMode === next.viewMode &&
     prev.imageMode === next.imageMode &&
     prev.watched === next.watched &&
-    prev.watchCount === next.watchCount
+    prev.watchCount === next.watchCount &&
+    prev.imdbScore === next.imdbScore
   );
 }
 
@@ -2264,7 +2262,9 @@ export default function FavoritesClient() {
     pruneOldImageChoiceCaches();
   }, []);
 
+  // La vista de lista enseña la nota de IMDb en cada fila (TitleRow).
   const needsImdbScores =
+    viewMode === "list" ||
     groupBy === "imdb_rating" ||
     subGroupBy === "imdb_rating" ||
     sortBy === "rating-asc" ||
@@ -3927,6 +3927,7 @@ export default function FavoritesClient() {
                               return (
                                 <FavoriteCard
                                   key={getMediaKey(item)}
+                                  imdbScore={viewMode === "list" ? imdbScores.get(getScoreItemKey(item)) : null}
                                   item={item}
                                   index={currentGlobalIdx}
                                   totalItems={sorted.length}
@@ -3958,6 +3959,7 @@ export default function FavoritesClient() {
                         return (
                           <FavoriteCard
                             key={getMediaKey(item)}
+                            imdbScore={viewMode === "list" ? imdbScores.get(getScoreItemKey(item)) : null}
                             item={item}
                             index={currentGlobalIdx}
                             totalItems={sorted.length}
@@ -3990,6 +3992,7 @@ export default function FavoritesClient() {
             {renderedSorted.map((item, idx) => (
               <FavoriteCard
                 key={getMediaKey(item)}
+                imdbScore={viewMode === "list" ? imdbScores.get(getScoreItemKey(item)) : null}
                 item={item}
                 index={idx}
                 totalItems={sorted.length}

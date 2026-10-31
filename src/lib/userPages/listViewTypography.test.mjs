@@ -4,22 +4,6 @@ import test from "node:test";
 
 const listBranches = [
   {
-    name: "Favoritos",
-    source: new URL("../../app/favorites/FavoritesClient.jsx", import.meta.url),
-    start: 'if (viewMode === "list")',
-    end: 'if (viewMode === "compact")',
-    metadataPattern:
-      /text-xs font-medium leading-tight tracking-\[0\.08em\] text-zinc-400 tabular-nums/,
-  },
-  {
-    name: "Pendientes",
-    source: new URL("../../app/watchlist/WatchlistClient.jsx", import.meta.url),
-    start: 'if (viewMode === "list")',
-    end: 'if (viewMode === "compact")',
-    metadataPattern:
-      /text-xs font-medium leading-tight tracking-\[0\.08em\] text-zinc-400 tabular-nums/,
-  },
-  {
     name: "Historial",
     source: new URL("../../app/history/HistoryClient.jsx", import.meta.url),
     start: "const HistoryItemCard = memo",
@@ -38,6 +22,7 @@ function extractBranch(source, { start, end, name }) {
   return source.slice(startIndex, endIndex);
 }
 
+// Favoritos y Pendientes usan la fila de listas (ver listViewRatingVisibility).
 test("las vistas lista comparten la jerarquía tipográfica de En progreso", async () => {
   for (const config of listBranches) {
     const source = await readFile(config.source, "utf8");

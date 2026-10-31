@@ -21,6 +21,8 @@ const ROW_LINK = `${ROW} ${LINK_STATES}`;
 // Personas y títulos: compacto hasta Full HD; más amplio en monitores grandes.
 const ROW_LINK_LARGE = `${ROW_BASE} gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 ${LINK_STATES}`;
 const LARGE_POSTER = "aspect-[2/3] w-16 min-[1920px]:w-20 rounded-xl";
+// Backdrop en lugar del póster: más ancho, con el alto de la fila de póster.
+const BACKDROP_MEDIA = "aspect-video w-[132px] sm:w-[180px] min-[1920px]:w-[220px] rounded-xl";
 
 function tmdbImage(path, size) {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
@@ -102,6 +104,11 @@ export function TitleRow({
   // Duración junto al año y dos géneros debajo (vista de lista de listas y
   // colecciones, vistas laterales de recomendaciones y de personas).
   showTitleMeta = false,
+  // Imagen propia en lugar del póster (Favoritos y Pendientes: su backdrop 16:9).
+  media = null,
+  // Caja de `media` (por defecto, backdrop algo más ancho que el póster).
+  mediaClassName = BACKDROP_MEDIA,
+  prefetch,
   className = "",
 }) {
   const type = item?.media_type === "tv" || mediaType === "tv" ? "tv" : "movie";
@@ -131,7 +138,11 @@ export function TitleRow({
 
   // Portada elegida en la ficha o, sin ella, la más votada (la de las
   // tarjetas). Mientras no se sabe si hay votada no se pinta la automática.
-  const { path: ownPoster, pending: ownPosterPending } = useCardArtworkState(type, itemId, "poster");
+  const { path: ownPoster, pending: ownPosterPending } = useCardArtworkState(
+    type,
+    media ? null : itemId,
+    "poster",
+  );
   const resolvedPosterPath =
     ownPoster ||
     (posterPath !== null && posterPath !== undefined
@@ -146,6 +157,7 @@ export function TitleRow({
   const rowLink = (
     <Link
       href={targetHref}
+      prefetch={prefetch}
       onClick={(event) => {
         if (onClick) {
           onClick(event);
@@ -168,13 +180,17 @@ export function TitleRow({
       }}
       className={`${ROW_LINK_LARGE} ${action ? "pr-14" : ""} ${className}`}
     >
-      <Poster
-        src={posterSrc}
-        alt=""
-        className={LARGE_POSTER}
-        loading={(posterLoading || ownPosterPending) && !ownPoster}
-        onError={onPosterError}
-      />
+      {media ? (
+        <span className={`relative shrink-0 overflow-hidden bg-zinc-900 ${mediaClassName}`}>{media}</span>
+      ) : (
+        <Poster
+          src={posterSrc}
+          alt=""
+          className={LARGE_POSTER}
+          loading={(posterLoading || ownPosterPending) && !ownPoster}
+          onError={onPosterError}
+        />
+      )}
       <span className="min-w-0 flex-1">
         <span className="block line-clamp-2 text-sm font-bold leading-tight text-white min-[1920px]:text-base">
           {title}

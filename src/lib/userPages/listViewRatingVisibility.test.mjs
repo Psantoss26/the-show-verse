@@ -14,14 +14,17 @@ function listViewSource(source) {
   return source.slice(start, end);
 }
 
-test("Favoritos y Pendientes no muestran puntuación en la vista de lista", async () => {
+test("Favoritos y Pendientes usan en la vista de lista la fila de listas con backdrop", async () => {
   const sources = await Promise.all(
     pageSources.map((source) => readFile(source, "utf8")),
   );
 
   sources.map(listViewSource).forEach((listSource) => {
-    assert.doesNotMatch(listSource, /<Star\b/);
-    assert.doesNotMatch(listSource, /\{rating\}/);
-    assert.match(listSource, /\{year && <span>\{year\}<\/span>\}/);
+    // La misma fila que listas y colecciones (TitleRow): año, duración,
+    // géneros y notas de TMDb e IMDb, con el backdrop en lugar del póster.
+    assert.match(listSource, /<TitleRow\b/);
+    assert.match(listSource, /showTitleMeta/);
+    assert.match(listSource, /imdbRating=\{imdbScore\}/);
+    assert.match(listSource, /media=\{\s*<SmartPoster[^>]*mode=\{effectiveImageMode\}/);
   });
 });

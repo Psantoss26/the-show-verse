@@ -51,9 +51,13 @@ El backend entrega la baraja ya filtrada (sin descartados, pendientes ni favorit
 
 Páginas «Ver todos» de *Tendencias*, *Populares*, *Recomendados* y *Más esperadas* (`src/lib/dashboard/sectionItems.js`). La lista llega ya en el RSC, sin esqueletos, y es la misma (mismo orden) que la fila de Inicio. Tienen botón de recargar junto al de volver. Backend: `/v1/dashboard/sections/{key}`. Sin portada propia ni votada, el póster de cada tarjeta sigue la misma escalera de idioma que Favoritos (inglés → español → original → sin idioma, `poster` del lote `/api/tmdb/artwork`), no el es-ES que trae el motor, que solo se usa si la escalera no encuentra ninguno. Las 24 primeras llegan elegidas en el RSC (`lib/dashboard/sectionArtwork.js`, póster y backdrop con el mismo criterio que el lote); el resto, por el lote en tandas de 16, sin pintar el póster del motor mientras se resuelve. Ver [[dashboards-implementation]].
 
+## Vista de lista de Favoritos y Pendientes
+
+Cada título es la misma fila que la vista de lista de listas y colecciones (`TitleRow`, `components/details/sectionSheet/SectionSheetRows.jsx`): título, «año · duración», dos géneros y las notas de TMDb e IMDb, con el **backdrop** 16:9 de la tarjeta (`SmartPoster` en modo backdrop, prop `media`) en lugar del póster, al tamaño de siempre de estas páginas (180 px de ancho; 280 px desde `sm`, prop `mediaClassName`). Se mantienen las dos columnas desde `xl` y el anillo de color de la página al pasar el cursor. Con la vista de lista activa se cargan las notas de IMDb aunque no se ordene ni agrupe por ellas.
+
 ## Entrada de Favoritos y Pendientes
 
-Las dos páginas montan sus tarjetas por tandas para que entrar sea barato. La primera tanda cubre toda la pantalla: `estimateUserPageEntranceCount` (`lib/ui/entranceFill.js`) calcula, con las columnas y la proporción de la vista activa (lista, cuadrícula o compacta; póster o backdrop), las tarjetas que caben más dos filas de margen. Ese mismo número decide cuántas se animan (`animateWithin`), así que todo lo visible entra animado a la vez, nunca menos de 24. El resto se añade en tandas de 36 cuando acaba la entrada, por debajo de la pantalla y sin animar. Al volver atrás se pinta todo de golpe y sin animación, como antes.
+Las dos páginas montan sus tarjetas por tandas para que entrar sea barato. La primera tanda cubre toda la pantalla: `estimateUserPageEntranceCount` (`lib/ui/entranceFill.js`) calcula, con las columnas y la proporción de la vista activa (cuadrícula o compacta; póster o backdrop) o, en la de lista, con un alto mínimo de fila de 100 px, las tarjetas que caben más dos filas de margen. Ese mismo número decide cuántas se animan (`animateWithin`), así que todo lo visible entra animado a la vez, nunca menos de 24. El resto se añade en tandas de 36 cuando acaba la entrada, por debajo de la pantalla y sin animar. Al volver atrás se pinta todo de golpe y sin animación, como antes.
 
 ## Portada de las tarjetas
 

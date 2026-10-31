@@ -36,6 +36,9 @@ export function estimateVisibleCards({ columns, aspect = 1.5, cap = 200 } = {}) 
   return Math.min(cap, Math.max(columns * 2, rows * columns));
 }
 
+// Alto mínimo de una fila de la vista de lista (con su hueco).
+const LIST_ROW_MIN_HEIGHT = 100;
+
 // Favoritos y Pendientes: columnas de cada vista (las mismas que sus rejillas).
 function userPageColumns(viewMode, imageMode) {
   if (viewMode === "list") return { base: 1, xl: 2 };
@@ -61,6 +64,14 @@ export function estimateUserPageColumns({ viewMode, imageMode } = {}) {
 // la vista compacta de escritorio), el resto llegaba tras la espera de la
 // siguiente tanda y aparecía de golpe, sin animar.
 export function estimateUserPageEntranceCount({ viewMode, imageMode } = {}) {
+  if (viewMode === "list") {
+    // Filas de alto fijo (TitleRow con backdrop: ~95-150 px), no proporcionales
+    // al ancho de la columna: se cuenta por lo bajo para sobreestimar.
+    const columns = pickResponsiveColumns(userPageColumns(viewMode, imageMode));
+    if (typeof window === "undefined") return 30;
+    const rows = Math.ceil(window.innerHeight / LIST_ROW_MIN_HEIGHT) + 2;
+    return Math.min(200, rows * columns);
+  }
   return estimateVisibleCards({
     columns: pickResponsiveColumns(userPageColumns(viewMode, imageMode)),
     aspect: viewMode === "list" || imageMode === "backdrop" ? 0.5625 : 1.5,
