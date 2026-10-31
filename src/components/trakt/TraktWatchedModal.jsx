@@ -5,6 +5,7 @@ import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGl
 import { useEffect, useMemo, useState } from "react";
 import useModalGuard from "@/hooks/useModalGuard";
 import CalendarPickerModal from "@/components/trakt/CalendarPickerModal";
+import ListToggleConfirmModal from "@/components/details/ListToggleConfirmModal";
 import {
   completeLocalProgress,
   dismissLocalProgress,
@@ -278,6 +279,7 @@ export default function TraktWatchedModal({
   const [editDate, setEditDate] = useState(todayYmd());
   const [calOpen, setCalOpen] = useState(false);
   const [calTarget, setCalTarget] = useState("new"); // 'new' | 'edit'
+  const [confirmRemove, setConfirmRemove] = useState(null); // { id, date } del visionado a eliminar
 
   // Bloqueo de scroll de fondo + cierre con Escape
   useModalGuard({ open, onClose });
@@ -289,6 +291,7 @@ export default function TraktWatchedModal({
     setEditDate(todayYmd());
     setCalOpen(false);
     setCalTarget("new");
+    setConfirmRemove(null);
   }, [open]);
 
   if (!open) return null;
@@ -326,7 +329,11 @@ export default function TraktWatchedModal({
     await onUpdatePlay?.(editingId, editDate);
     stopEdit();
   };
-  const doRemove = async (id) => {
+  // La papelera abre la MISMA confirmación que quitar un título de favoritos
+  // (ListToggleConfirmModal); el borrado ocurre al confirmar.
+  const doRemove = async () => {
+    const id = confirmRemove?.id;
+    setConfirmRemove(null);
     if (!id || isBusy || !serverOnline) return;
     await onRemovePlay?.(id);
     if (editingId === id) stopEdit();
@@ -517,7 +524,7 @@ export default function TraktWatchedModal({
                             </button>
                             <button data-online-only="true"
                               type="button"
-                              onClick={() => doRemove(it.id)}
+                              onClick={() => setConfirmRemove({ id: it.id, date })}
                               disabled={isBusy || !serverOnline}
                               className="rounded-full p-2 text-white/45 transition hover:bg-red-500/15 hover:text-red-300"
                               aria-label="Eliminar"
@@ -579,6 +586,16 @@ export default function TraktWatchedModal({
         onSelect={onPickCalendar}
         onClose={() => setCalOpen(false)}
         title={calTarget === "edit" ? "Cambiar fecha" : "Fecha de visionado"}
+      />
+
+      <ListToggleConfirmModal
+        open={Boolean(confirmRemove)}
+        kind="play"
+        active
+        itemTitle={confirmRemove?.date || ""}
+        subject="este visionado"
+        onConfirm={doRemove}
+        onClose={() => setConfirmRemove(null)}
       />
     </div>
   );

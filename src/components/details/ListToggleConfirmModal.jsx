@@ -8,8 +8,9 @@ import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGl
 
 // Textos y colores por tipo. El color es el del botón de la fila de acciones:
 // rojo para favoritos y azul para pendientes (`activeColor` de LiquidButton).
-// `comment` es el borrado de un comentario propio (TraktCommentModal): solo
-// existe la variante `active` y el botón dice «Eliminar».
+// `comment` es el borrado de un comentario propio (TraktCommentModal) y `play`
+// el de un visionado (TraktWatchedModal): solo existe la variante `active` y el
+// botón dice «Eliminar».
 const KINDS = {
   favorite: {
     addTitle: "Añadir a favoritos",
@@ -42,6 +43,15 @@ const KINDS = {
     confirmClass:
       "bg-red-500/85 bg-gradient-to-b from-red-400/90 to-red-600/90 shadow-[0_0_18px_rgba(239,68,68,0.35),inset_0_1px_1px_rgba(255,255,255,0.25)] hover:from-red-400 hover:to-red-500 focus-visible:outline-red-300",
   },
+  play: {
+    removeTitle: "Eliminar visionado",
+    removeText: (subject) => `¿Quieres eliminar ${subject} de tu historial? No se puede deshacer.`,
+    removeLabel: "Eliminar",
+    RemoveIcon: Trash2,
+    iconClass: "bg-red-500/15 text-red-300",
+    confirmClass:
+      "bg-red-500/85 bg-gradient-to-b from-red-400/90 to-red-600/90 shadow-[0_0_18px_rgba(239,68,68,0.35),inset_0_1px_1px_rgba(255,255,255,0.25)] hover:from-red-400 hover:to-red-500 focus-visible:outline-red-300",
+  },
 };
 
 /**
@@ -51,9 +61,10 @@ const KINDS = {
  * (ExternalLinksModal, AddToListModal…): velo oscurecido y desenfocado, panel de
  * cristal líquido `rounded-[2rem]` y cabecera de cristal.
  *
- * También confirma el borrado de un comentario propio (`kind="comment"`).
+ * También confirma el borrado de un comentario propio (`kind="comment"`) y el
+ * de un visionado del historial (`kind="play"`).
  *
- * `kind`: "favorite" | "watchlist" | "comment". `active`: el título YA está en la lista, así
+ * `kind`: "favorite" | "watchlist" | "comment" | "play". `active`: el título YA está en la lista, así
  * que confirmar lo quita. `itemTitle` (opcional) va bajo el encabezado y
  * `subject` nombra lo que se marca en el texto («este título», «esta lista»…).
  */

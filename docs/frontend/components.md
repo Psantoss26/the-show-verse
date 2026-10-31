@@ -109,7 +109,7 @@ Integración de UI con Trakt (auth, estado de visto, modales de historial).
 | `TraktConnectModal.jsx` | Modal compacto que muestra el código de activación y espera autorización. |
 | `TraktActions.jsx` | Acciones rápidas sobre un título (marcar visto, puntuar) usando el token válido de `useTraktAuth`. |
 | `TraktWatchedControl.jsx` | Control visual (ojo abierto/cerrado + badge de plays) para marcar visto/no visto. |
-| `TraktWatchedModal.jsx` | Modal de gestión de reproducciones (fechas, notas) de un título. Con `progressTarget` muestra también su entrada de «Continuar viendo» para marcarla como vista o quitarla (`onProgressChange`). |
+| `TraktWatchedModal.jsx` | Modal de gestión de reproducciones (fechas, notas) de un título. Con `progressTarget` muestra también su entrada de «Continuar viendo» para marcarla como vista o quitarla (`onProgressChange`). Eliminar un visionado (papelera) pide confirmación con `ListToggleConfirmModal` (tipo `play`), el mismo modal que quitar un título de Favoritos. |
 | `TraktEpisodesWatchedModal.jsx` | Modal de progreso de episodios vistos de una serie/temporada. En móvil, el botón junto al buscador abre `MobileOptionsSheet` (vista Global/rewatch, lista o tabla, todos o no vistos y las acciones Historial, Añadir / Rewatch y Marcar serie) por encima del modal. En un rewatch, al marcar un episodio como visto se abre un diálogo propio de ese episodio (Hoy / Otra fecha con el calendario; no admite fechas anteriores al inicio del rewatch). |
 | `TraktContinueWatching.jsx` | Variante ligera de "continuar viendo" basada solo en Trakt. |
 
