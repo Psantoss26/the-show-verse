@@ -102,6 +102,9 @@ export default function SeasonCard({
   // desde `sm`. En el móvil es igual que la de la sección: con el póster de
   // 96px los datos no cabían y la barra de progreso quedaba por debajo.
   compact = false,
+  // Vista ancha de DetailModal: sin enlace a IMDb ni número de fondo, y póster
+  // y relleno algo menores para que los datos quepan en columnas estrechas.
+  modal = false,
   // Sin efectos al pasar el ratón (vista de teléfono del modal lateral): el
   // diseño que se replica es el táctil, como el resto de secciones.
   enableHover = true,
@@ -142,7 +145,7 @@ export default function SeasonCard({
       {...titlePeekSeasonAttrs(showId, seasonNumber)}
       // Cristal de TARJETA compartido: van en rejilla, así que sin sombra propia
       // (varias sombras juntas forman una banda oscura detrás del grupo).
-      className={`group relative isolate flex w-full transform-gpu gap-4 overflow-hidden rounded-2xl p-3 text-left ${LIQUID_GLASS_CARD} transition-all ${
+      className={`group relative isolate flex w-full transform-gpu overflow-hidden rounded-2xl text-left ${modal ? "gap-3.5 p-3" : "gap-4 p-3"} ${LIQUID_GLASS_CARD} transition-all ${
         hoverLift && enableHover ? "hover:-translate-y-1 hover:brightness-110" : ""
       }`}
       aria-label={`Ver ${title}${subtitle ? `: ${subtitle}` : ""}`}
@@ -151,6 +154,7 @@ export default function SeasonCard({
       {/* Número de la temporada en grande, al fondo, como en las tarjetas de
           antes: sale por el borde derecho y el borde lo recorta, pero centrado
           en vertical en vez de en la esquina superior. */}
+      {modal ? null : (
       <span
         aria-hidden="true"
         className={`pointer-events-none absolute -right-4 top-1/2 z-0 -translate-y-1/2 select-none font-black leading-none text-white/5 transition-colors ${enableHover ? "group-hover:text-white/10" : ""} ${
@@ -159,12 +163,13 @@ export default function SeasonCard({
       >
         {seasonNumber}
       </span>
+      )}
 
       <span
         // `self-start`: si la columna de datos es más alta, el flex estiraría
         // el póster y rompería su 2:3.
         className={`relative z-10 aspect-[2/3] shrink-0 self-start overflow-hidden rounded-xl bg-white/[0.04] shadow-lg shadow-black/40 ${
-          compact ? "w-32 sm:w-28" : "w-32 sm:w-36 lg:w-40"
+          modal ? "w-32" : compact ? "w-32 sm:w-28" : "w-32 sm:w-36 lg:w-40"
         }`}
       >
         {poster ? (
@@ -175,7 +180,7 @@ export default function SeasonCard({
             srcSet={tmdbSrcSet(poster)}
             // Póster de 128–160px (128px y 112px desde `sm` en compacto): se
             // pide ~1,5× para que se vea nítido.
-            sizes={compact ? "(min-width: 640px) 170px, 192px" : "(min-width: 1024px) 240px, (min-width: 640px) 216px, 192px"}
+            sizes={modal ? "192px" : compact ? "(min-width: 640px) 170px, 192px" : "(min-width: 1024px) 240px, (min-width: 640px) 216px, 192px"}
             alt=""
             className={`h-full w-full object-cover ${posterClass}`}
             {...imageLoading}
@@ -190,14 +195,14 @@ export default function SeasonCard({
       <span className="relative z-10 flex min-w-0 flex-1 flex-col py-1 pr-1">
         <span className="flex items-start justify-between gap-2">
           <span className="min-w-0">
-            <span className={`block font-bold leading-tight text-white ${compact ? "text-lg sm:text-base" : "text-lg"}`}>{title}</span>
+            <span className={`block font-bold leading-tight text-white ${modal ? "text-base" : compact ? "text-lg sm:text-base" : "text-lg"}`}>{title}</span>
             {subtitle ? (
               <span className="mt-0.5 block truncate text-xs font-bold text-zinc-400">{subtitle}</span>
             ) : null}
           </span>
 
           {/* Enlace externo a IMDb (no navega a la ficha de la temporada). */}
-          {imdbUrl ? (
+          {imdbUrl && !modal ? (
             <a
               href={imdbUrl}
               target="_blank"
@@ -216,7 +221,7 @@ export default function SeasonCard({
         </span>
 
         {/* Una fila por dato: año, episodios y notas. */}
-        <span className={`flex flex-col gap-1.5 text-xs font-bold text-zinc-400 ${compact ? "mt-2.5 sm:mt-2" : "mt-2.5"}`}>
+        <span className={`flex flex-col gap-1.5 text-xs font-bold text-zinc-400 ${modal ? "mt-2" : compact ? "mt-2.5 sm:mt-2" : "mt-2.5"}`}>
           {year ? (
             <span className="flex items-center gap-1.5">
               <CalendarDays className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden="true" />

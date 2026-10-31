@@ -27,7 +27,6 @@ import {
 } from "@/lib/details/omdbCache";
 import {
   buildCastDataForUI,
-  buildCreativeCreditsForCast,
   getMovieDirectorsFromCrew,
   mergeEpisodeCast,
   normalizeCastFromTmdb,
@@ -943,19 +942,15 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
         });
         const movieDirectors =
           mediaType === "movie" ? getMovieDirectorsFromCrew(credits?.crew) : [];
-        const creativeCredits = buildCreativeCreditsForCast({
-          type: mediaType,
-          movieDirectors,
-          tvCreators: Array.isArray(details?.created_by)
-            ? details.created_by
-            : [],
-        });
+        // Reparto: SOLO los intérpretes, en el orden de TMDb, igual que el
+        // Reparto Principal de DetailsClient. El director o los creadores no
+        // van delante de los actores (siguen en «Dirección» / «Creación»).
         const cast = buildCastDataForUI({
           baseCast:
             Array.isArray(modalTmdbCast) && modalTmdbCast.length
               ? modalTmdbCast
               : fallbackCast,
-          creativeCredits,
+          creativeCredits: [],
         });
         const recommendations = Array.isArray(recs?.results)
           ? recs.results

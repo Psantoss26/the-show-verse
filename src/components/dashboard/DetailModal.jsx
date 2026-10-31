@@ -14,7 +14,6 @@ import { openSavedRoute } from "@/lib/offline/navigation";
 import {
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -60,9 +59,6 @@ import {
   Info,
   Users,
   ListPlus,
-  ImageOff,
-  ChevronDown,
-  Check,
   Calendar,
   Clock,
   Star,
@@ -146,7 +142,6 @@ import {
 } from "@/lib/details/ratingLinks";
 import {
   formatCountShort,
-  formatDateEs,
   slugifyForSeriesGraph,
 } from "@/lib/details/formatters";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
@@ -170,6 +165,9 @@ import {
 // Carrusel horizontal con flechas (Swiper) COMPARTIDO con DetailsClient: mismo
 // desplazamiento, tamaños y organización de tarjetas. Con breakpointsBase
 // "container", el nº de tarjetas se adapta al ancho disponible del modal.
+import SeasonsSection from "@/components/details/SeasonsSection";
+import { detailsRowImageLoading } from "@/lib/tmdb/imageSrcSet";
+import useSeasonCardItems from "@/components/details/useSeasonCardItems";
 import DetailsArrowCarousel, {
   SwiperSlide,
 } from "@/components/details/DetailsArrowCarousel";
@@ -237,28 +235,6 @@ async function fetchResolvedExternalLink(url, { signal } = {}) {
   return json?.url || null;
 }
 
-const modalSeasonCache = new Map();
-
-async function fetchModalSeasonEpisodes({ showId, seasonNumber, signal }) {
-  const cacheKey = `${showId}:${seasonNumber}`;
-  if (modalSeasonCache.has(cacheKey)) {
-    return modalSeasonCache.get(cacheKey);
-  }
-
-  const response = await fetch(
-    `/api/tmdb/tv/${encodeURIComponent(showId)}/season/${encodeURIComponent(
-      seasonNumber,
-    )}`,
-    { signal, cache: "no-store" },
-  );
-  const json = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(json?.error || `Request failed: ${response.status}`);
-  }
-  modalSeasonCache.set(cacheKey, json);
-  return json;
-}
-
 // Imágenes de la portada de un episodio en la vista previa: las mismas bandas
 // que su ficha móvil (ver EpisodeStillStack). `item` nulo = no hace falta.
 const peekEpisodeStillsCache = new Map();
@@ -298,11 +274,6 @@ function usePeekEpisodeStills(item) {
   }, [key]);
   const resolved = !!key && state?.key === key;
   return { resolved, paths: resolved ? state.paths : [] };
-}
-
-function normalizeSeasonNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
 }
 
 // ---- Redimensionado del drawer derecho -------------------------------------
@@ -436,111 +407,6 @@ function SimilarBackdrop({ rec, onOpen }) {
         </div>
       )}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-    </div>
-  );
-}
-
-/* ======================== SELECTOR DE TEMPORADA =========================== */
-// Desplegable personalizado (glassy) que sustituye al <select> nativo: botón con
-// la temporada activa + nº de episodios, y menú animado con todas las temporadas
-// (marca la activa). Cierra al hacer click fuera o con Escape.
-function SeasonDropdown({ seasons, value, onChange, labelId }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const current = seasons.find((s) => s.season_number === value) || null;
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDocClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    const onKey = (e) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative w-full sm:w-[230px]">
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-labelledby={labelId}
-        onClick={() => setOpen((o) => !o)}
-        className={`group flex h-11 w-full items-center justify-between rounded-xl border-0 px-4 text-left text-sm font-bold transition-all duration-300 select-none outline-none focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-yellow-400/70 active:outline-none ${
-          open
-            ? "bg-white/[0.08] text-white shadow-[0_0_15px_rgba(234,179,8,0.1)]"
-            : "bg-white/[0.03] text-zinc-300 hover:bg-white/[0.06] hover:text-white"
-        }`}
-      >
-        <span className="truncate">
-          Temporada {current?.season_number ?? "—"}
-        </span>
-        <ChevronDown
-          className={`h-4 w-4 shrink-0 transition-all duration-300 ${
-            open ? "rotate-180 text-yellow-400" : "text-zinc-400 group-hover:text-zinc-200"
-          }`}
-          aria-hidden="true"
-        />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <motion.ul
-            role="listbox"
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute right-0 z-50 mt-2 max-h-72 w-full min-w-[200px] overflow-y-auto rounded-xl border-0 bg-zinc-950/95 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl soundtrack-scrollbar outline-none focus:outline-none"
-          >
-            {seasons.map((season) => {
-              const active = season.season_number === value;
-              return (
-                <li key={season.season_number} className="list-none">
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    onClick={() => {
-                      onChange(season.season_number);
-                      setOpen(false);
-                    }}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-all duration-200 select-none outline-none focus:outline-none focus:ring-0 active:outline-none ${
-                      active
-                        ? "bg-yellow-500/10 text-yellow-400 font-bold shadow-[inset_0_1px_1px_rgba(254,240,138,0.05)]"
-                        : "text-zinc-400 hover:bg-white/[0.05] hover:text-white"
-                    }`}
-                  >
-                    <span className="flex-1 truncate">
-                      Temporada {season.season_number}
-                    </span>
-                    {season.episode_count ? (
-                      <span className={`shrink-0 text-xs font-medium transition-colors ${
-                        active ? "text-yellow-500/80" : "text-zinc-500 group-hover:text-zinc-400"
-                      }`}>
-                        {season.episode_count} ep.
-                      </span>
-                    ) : null}
-                    {active && (
-                      <Check
-                        className="h-4 w-4 shrink-0 text-yellow-400"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </motion.ul>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -785,37 +651,6 @@ export default function DetailModal({
   const hasHeroArt = mobileDetails
     ? !!mobileHeroSrc
     : !!(desktopHeroSrc || mobileHeroSrc);
-  const seasonSelectId = useId();
-  const availableSeasons = useMemo(() => {
-    const source = Array.isArray(data.seasons) ? data.seasons : [];
-    return source
-      .map((season) => ({
-        ...season,
-        season_number: normalizeSeasonNumber(season?.season_number),
-        episode_count: Number(season?.episode_count || 0),
-      }))
-      .filter(
-        (season) =>
-          season.season_number != null &&
-          season.season_number > 0 &&
-          season.episode_count > 0,
-      )
-      .sort((a, b) => a.season_number - b.season_number);
-  }, [data.seasons]);
-  const availableSeasonsKey = useMemo(
-    () => availableSeasons.map((season) => season.season_number).join(","),
-    [availableSeasons],
-  );
-  const preferredSeasonNumber = normalizeSeasonNumber(
-    item?.nextEpisode?.season ?? item?.seasonNumber,
-  );
-  const [selectedSeasonNumber, setSelectedSeasonNumber] = useState(null);
-  const [seasonPreview, setSeasonPreview] = useState({
-    loading: false,
-    error: "",
-    data: null,
-  });
-
   /* --------------------------- favorito / pendientes --------------------------- */
   const [favorite, setFavorite] = useState(false);
   const [watchlist, setWatchlist] = useState(false);
@@ -1439,71 +1274,6 @@ export default function DetailModal({
       cancel = true;
     };
   }, [item, session, account, mediaType]);
-
-  useEffect(() => {
-    if (mediaType !== "tv" || availableSeasons.length === 0) {
-      setSelectedSeasonNumber(null);
-      return;
-    }
-
-    const preferred =
-      preferredSeasonNumber != null &&
-      availableSeasons.some(
-        (season) => season.season_number === preferredSeasonNumber,
-      )
-        ? preferredSeasonNumber
-        : availableSeasons[0].season_number;
-
-    setSelectedSeasonNumber((current) =>
-      availableSeasons.some((season) => season.season_number === current)
-        ? current
-        : preferred,
-    );
-  }, [
-    mediaType,
-    availableSeasons,
-    availableSeasonsKey,
-    preferredSeasonNumber,
-    item?.id,
-  ]);
-
-  useEffect(() => {
-    if (mediaType !== "tv" || !item?.id || selectedSeasonNumber == null) {
-      setSeasonPreview({ loading: false, error: "", data: null });
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    const showId = Number(item.id);
-    const cacheKey = `${showId}:${selectedSeasonNumber}`;
-    const cached = modalSeasonCache.get(cacheKey);
-    if (cached) {
-      setSeasonPreview({ loading: false, error: "", data: cached });
-      return undefined;
-    }
-
-    setSeasonPreview({ loading: true, error: "", data: null });
-    fetchModalSeasonEpisodes({
-      showId,
-      seasonNumber: selectedSeasonNumber,
-      signal: controller.signal,
-    })
-      .then((seasonData) => {
-        if (!controller.signal.aborted) {
-          setSeasonPreview({ loading: false, error: "", data: seasonData });
-        }
-      })
-      .catch((err) => {
-        if (err?.name === "AbortError" || controller.signal.aborted) return;
-        setSeasonPreview({
-          loading: false,
-          error: "No se pudieron cargar los episodios.",
-          data: null,
-        });
-      });
-
-    return () => controller.abort();
-  }, [mediaType, item?.id, selectedSeasonNumber]);
 
   const requireLogin = () => {
     if (!session || !account?.id) {
@@ -2411,6 +2181,23 @@ export default function DetailModal({
     episodesModalOpen: traktEpisodesOpen,
     onStatusShouldRefresh: () => refreshTraktStatus(true),
   });
+  const seasonDetailsHref = (seasonNumber) =>
+    `/details/tv/${item?.id}/season/${seasonNumber}`;
+  // Tarjetas de la fila «Temporadas» de la vista ancha. En la ficha de
+  // teléfono las calcula PhoneDetailsSections: aquí no se pide nada.
+  const { seasonCardItems } = useSeasonCardItems({
+    type: mediaType === "tv" && !isEpisode && !mobileDetails ? "tv" : null,
+    item,
+    data,
+    imdbId: data.imdbId,
+    episodesWatched,
+    // La temporada abre su ficha COMPLETA (SeasonDetails), con la misma
+    // transición que «Ver ficha completa», y no su panel lateral.
+    onOpenSeason: (seasonNumber) =>
+      goToDetailsRoute(seasonDetailsHref(seasonNumber)),
+    onPrefetchSeason: (seasonNumber) =>
+      router.prefetch(seasonDetailsHref(seasonNumber)),
+  });
 
   const applyTraktStatus = (st) => {
     const rating =
@@ -3149,24 +2936,8 @@ export default function DetailModal({
   const sentiment = data.sentiment || { pros: [], cons: [] };
   const hasSentiment =
     (sentiment.pros?.length || 0) > 0 || (sentiment.cons?.length || 0) > 0;
-  const selectedSeasonEpisodes = useMemo(() => {
-    const episodes = Array.isArray(seasonPreview.data?.episodes)
-      ? seasonPreview.data.episodes
-      : [];
-    return episodes
-      .filter((episode) => Number.isFinite(Number(episode?.episode_number)))
-      .sort((a, b) => Number(a.episode_number) - Number(b.episode_number));
-  }, [seasonPreview.data]);
   const showSeasonsSection =
-    mediaType === "tv" && availableSeasons.length > 0 && item?.id;
-  const prefetchEpisodeDetails = (episodeNumber) => {
-    if (!item?.id || selectedSeasonNumber == null || !episodeNumber) return;
-    const href = `/details/tv/${item.id}/season/${selectedSeasonNumber}/episode/${episodeNumber}`;
-    router.prefetch(href);
-    if (typeof window !== "undefined") {
-      fetch(href, { priority: "low" }).catch(() => {});
-    }
-  };
+    mediaType === "tv" && !isEpisode && seasonCardItems.length > 0;
   const stopNestedModalEvent = (event) => {
     event.stopPropagation();
     event.nativeEvent?.stopImmediatePropagation?.();
@@ -4833,7 +4604,7 @@ export default function DetailModal({
                   }}
                   className="!overflow-visible pb-1"
                 >
-                  {data.cast.slice(0, 20).map((person) => {
+                  {data.cast.slice(0, 20).map((person, personIndex) => {
                     const photo = person?.profile_path
                       ? buildImg(person.profile_path, "w342")
                       : null;
@@ -4848,6 +4619,7 @@ export default function DetailModal({
                               <OptimizedImage
                                 src={photo}
                                 alt={person?.name || ""}
+                                {...detailsRowImageLoading(personIndex)}
                                 className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
                               />
                             ) : (
@@ -4987,178 +4759,19 @@ export default function DetailModal({
               </motion.section>
             )}
 
+            {/* Temporadas: la misma fila que la ficha completa, con su vista
+                por defecto según el número de temporadas (ver
+                `computeDefaultSeasonsView`). Cada temporada abre su panel. */}
             {showSeasonsSection && (
-              <motion.section
+              <motion.div
                 initial={restoredFromHistory ? false : { opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-5 pb-4"
+                className="sv-drawer-section pb-4"
               >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                    <Layers className="h-4 w-4" aria-hidden="true" />
-                    Temporadas y episodios
-                  </h3>
-
-                  <span id={seasonSelectId} className="sr-only">
-                    Seleccionar temporada
-                  </span>
-                  <SeasonDropdown
-                    seasons={availableSeasons}
-                    value={selectedSeasonNumber}
-                    onChange={setSelectedSeasonNumber}
-                    labelId={seasonSelectId}
-                  />
-                </div>
-
-                {seasonPreview.loading ? (
-                  <div className="flex gap-3 overflow-hidden pb-2">
-                    {Array.from({ length: 4 }).map((_, index) => (
-                      <div
-                        key={index}
-                        className="w-[78%] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] sm:w-[46%] lg:w-[32%]"
-                      >
-                        <SkeletonBar className="aspect-video h-auto rounded-none" />
-                        <div className="space-y-2 p-3">
-                          <SkeletonBar className="h-3 w-1/3 rounded-full" />
-                          <SkeletonBar className="h-3 w-4/5 rounded-full" />
-                          <SkeletonBar className="h-3 w-2/3 rounded-full" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : seasonPreview.error ? (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
-                    {seasonPreview.error}
-                  </div>
-                ) : selectedSeasonEpisodes.length === 0 ? (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-400">
-                    No hay episodios disponibles para esta temporada.
-                  </div>
-                ) : (
-                  <DetailsArrowCarousel
-                    {...MODAL_ARROW_PROPS}
-                    spaceBetween={12}
-                    slidesPerView={1.25}
-                    breakpointsBase="container"
-                    breakpoints={{
-                      560: { slidesPerView: 2, spaceBetween: 12 },
-                      840: { slidesPerView: 3, spaceBetween: 14 },
-                    }}
-                    className="!overflow-visible pb-2"
-                  >
-                    {selectedSeasonEpisodes.map((episode) => {
-                      const episodeNumber = Number(episode?.episode_number);
-                      const episodeTitle =
-                        episode?.name || `Episodio ${episodeNumber}`;
-                      const episodeAirDate = episode?.air_date
-                        ? formatDateEs(episode.air_date)
-                        : null;
-                      const episodeRuntime =
-                        Number(episode?.runtime || 0) || null;
-                      const episodeStill = episode?.still_path
-                        ? buildImg(episode.still_path, "w780")
-                        : null;
-                      const episodeHref = `/details/tv/${item.id}/season/${selectedSeasonNumber}/episode/${episodeNumber}`;
-
-                      return (
-                        <SwiperSlide
-                          key={`${selectedSeasonNumber}-${episodeNumber}`}
-                          className="h-auto"
-                        >
-                        <Link
-                          href={episodeHref}
-                          prefetch={false}
-                          onClick={(e) => {
-                            if (
-                              e.metaKey ||
-                              e.ctrlKey ||
-                              e.shiftKey ||
-                              e.altKey ||
-                              e.button === 1 ||
-                              !openDetailModal
-                            ) {
-                              return;
-                            }
-                            // Apila la preview del episodio sobre la actual
-                            // (Atrás vuelve a la serie).
-                            e.preventDefault();
-                            openDetailModal(
-                              {
-                                media_type: "episode",
-                                id: item.id,
-                                showId: item.id,
-                                seasonNumber: selectedSeasonNumber,
-                                episodeNumber,
-                                name: episodeTitle,
-                                still_path: episode?.still_path || null,
-                                showName: isEpisode
-                                  ? episodeMeta?.showName
-                                  : title,
-                              },
-                              { drill: true },
-                            );
-                          }}
-                          onMouseEnter={() =>
-                            prefetchEpisodeDetails(episodeNumber)
-                          }
-                          onFocus={() => prefetchEpisodeDetails(episodeNumber)}
-                          onTouchStart={() =>
-                            prefetchEpisodeDetails(episodeNumber)
-                          }
-                          className="group relative flex h-full w-full flex-col overflow-hidden rounded-xl bg-white/[0.03] text-left transition hover:bg-white/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/40"
-                          title={episodeTitle}
-                        >
-                          <div className="relative aspect-video overflow-hidden bg-white/[0.04]">
-                            {episodeStill ? (
-                              <NextImage
-                                src={episodeStill}
-                                alt={episodeTitle}
-                                fill
-                                sizes="(min-width:1024px) 300px, (min-width:640px) 46vw, 78vw"
-                                className="object-cover transition duration-500 group-hover:scale-[1.03]"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
-                                <ImageOff className="h-7 w-7" />
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-                            <div className="absolute inset-x-0 bottom-0 p-2.5">
-                              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">
-                                Episodio {episodeNumber}
-                              </div>
-                              <div className="mt-0.5 line-clamp-1 text-[13px] font-bold leading-snug text-white">
-                                {episodeTitle}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-1 flex-col gap-1.5 p-3">
-                            {episodeAirDate || episodeRuntime ? (
-                              <div className="flex items-center gap-2 text-[11px] font-medium text-zinc-500">
-                                {episodeAirDate ? <span>{episodeAirDate}</span> : null}
-                                {episodeAirDate && episodeRuntime ? (
-                                  <span aria-hidden="true">·</span>
-                                ) : null}
-                                {episodeRuntime ? (
-                                  <span>{episodeRuntime} min</span>
-                                ) : null}
-                              </div>
-                            ) : null}
-                            <p className="line-clamp-2 text-xs leading-relaxed text-zinc-400">
-                              {episode?.overview?.trim() || "Sin descripción."}
-                            </p>
-                          </div>
-                        </Link>
-                        </SwiperSlide>
-                      );
-                    })}
-                  </DetailsArrowCarousel>
-                )}
-              </motion.section>
+                <SeasonsSection items={seasonCardItems} modalLayout />
+              </motion.div>
             )}
             </>
             )}

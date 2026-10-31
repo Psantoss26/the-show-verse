@@ -1,6 +1,8 @@
 "use client";
 
-// Sección «Temporadas» de la ficha completa (DetailsClient), con dos vistas:
+// Sección «Temporadas» de la ficha completa (DetailsClient), y también de la
+// vista de teléfono (`phoneLayout`) y la vista ancha (`modalLayout`) de
+// DetailModal, con dos vistas:
 //   - Tarjetas: las tarjetas completas (SeasonCard) en rejilla, como máximo
 //     dos filas (6 temporadas) y un botón para ver el resto.
 //   - Pósters: solo el póster de cada temporada en fila horizontal, como los
@@ -91,6 +93,10 @@ export default function SeasonsSection({
   loading = false,
   onOpenAll,
   phoneLayout = false,
+  // Vista ancha de DetailModal: cabecera pequeña como el resto de secciones
+  // del modal, y columnas y carrusel según el ancho del PANEL (que cambia con
+  // el tirador del drawer), no el de la ventana.
+  modalLayout = false,
   isMobile: isMobileProp,
 }) {
   const isMobileViewport = useSyncExternalStore(
@@ -252,18 +258,25 @@ export default function SeasonsSection({
   const visibleCards = expanded ? items : items.slice(0, COLLAPSED_CARDS);
 
   return (
-    <section className={`${phoneLayout ? "" : "mb-12"} group/section`}>
-      <div className={`flex w-full items-start justify-between gap-3 ${phoneLayout ? "flex-wrap" : ""}`}>
-        <SectionTitle
-          title="Temporadas"
-          icon={Layers}
-          onOpen={onOpenAll}
-          className={`!mb-5 sm:!mb-8 !w-auto flex-1 min-w-0 pr-4 sm:pr-6 ${phoneLayout ? "basis-64 [&>div:last-child]:overflow-hidden" : ""}`}
-        />
+    <section className={`${phoneLayout ? "" : modalLayout ? "@container" : "mb-12"} group/section`}>
+      <div className={`flex w-full justify-between gap-3 ${modalLayout ? "mb-4 items-center" : "items-start"} ${phoneLayout ? "flex-wrap" : ""}`}>
+        {modalLayout ? (
+          <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+            <Layers className="h-4 w-4" aria-hidden="true" />
+            Temporadas
+          </h3>
+        ) : (
+          <SectionTitle
+            title="Temporadas"
+            icon={Layers}
+            onOpen={onOpenAll}
+            className={`!mb-5 sm:!mb-8 !w-auto flex-1 min-w-0 pr-4 sm:pr-6 ${phoneLayout ? "basis-64 [&>div:last-child]:overflow-hidden" : ""}`}
+          />
+        )}
         <div
           role="group"
           aria-label="Vista de las temporadas"
-          className={`relative isolate flex shrink-0 items-center gap-1 self-start overflow-hidden rounded-full p-1 ${LIQUID_GLASS_BAR}`}
+          className={`relative isolate flex shrink-0 items-center gap-1 overflow-hidden rounded-full p-1 ${modalLayout ? "" : "self-start"} ${LIQUID_GLASS_BAR}`}
         >
           {/* Mismo selector solo de iconos que el de episodios de SeasonDetails. */}
           <LiquidGlassOpticalLayers />
@@ -305,16 +318,22 @@ export default function SeasonsSection({
         <DetailsArrowCarousel
           spaceBetween={12}
           slidesPerView={3}
-          breakpointsBase={phoneLayout ? "container" : "window"}
-          showArrows={!phoneLayout}
+          breakpointsBase={phoneLayout || modalLayout ? "container" : "window"}
+          // En el modal, sin flechas como el resto de sus carruseles: quedan
+          // apretadas contra los bordes del panel.
+          showArrows={!phoneLayout && !modalLayout}
           observeParents={!phoneLayout}
-          breakpoints={phoneLayout ? { 480: { slidesPerView: 3, spaceBetween: 14 } } : {
+          breakpoints={phoneLayout ? { 480: { slidesPerView: 3, spaceBetween: 14 } } : modalLayout ? {
+            460: { slidesPerView: 4, spaceBetween: 12 },
+            640: { slidesPerView: 5, spaceBetween: 14 },
+            840: { slidesPerView: 6, spaceBetween: 16 },
+          } : {
             500: { slidesPerView: 3, spaceBetween: 14 },
             768: { slidesPerView: 4, spaceBetween: 16 },
             1024: { slidesPerView: 5, spaceBetween: 18 },
             1280: { slidesPerView: 6, spaceBetween: 20 },
           }}
-          className={phoneLayout ? "pb-2" : "pb-8 !overflow-visible"}
+          className={phoneLayout ? "pb-2" : modalLayout ? "pb-2 !overflow-visible" : "pb-8 !overflow-visible"}
         >
           {items.map(({ key, ...season }, index) => (
             <SwiperSlide key={key}>
@@ -332,11 +351,12 @@ export default function SeasonsSection({
         </DetailsArrowCarousel>
       ) : (
         <>
-          <div className={`grid grid-cols-1 gap-4 ${phoneLayout ? "" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
+          <div className={`grid grid-cols-1 gap-4 ${phoneLayout ? "" : modalLayout ? "@lg:grid-cols-2 @3xl:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
             {visibleCards.map(({ key, ...season }, index) => (
               <div key={key} data-season-item>
                 <SeasonCard
                   {...season}
+                  modal={modalLayout}
                   enableHover={!phoneLayout}
                   imageLoading={detailsRowImageLoading(index)}
                 />

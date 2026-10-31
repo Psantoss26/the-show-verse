@@ -26,5 +26,6 @@ test("las secciones de DetailModal conservan una separación vertical legible", 
     3,
     "Reparto, títulos similares y sentimientos deben separar su encabezado del contenido",
   );
-  assert.match(modal, /className="space-y-5 pb-4"/);
+  // Temporadas: la separación de su cabecera la pone SeasonsSection (`mb-4`).
+  assert.match(modal, /className="sv-drawer-section pb-4"/);
 });

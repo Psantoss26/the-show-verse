@@ -56,24 +56,6 @@ export function normalizeCastFromTmdb(raw = [], { isAggregate = false } = {}) {
   return unique;
 }
 
-export function buildCreativeCreditsForCast({
-  type,
-  movieDirectors,
-  tvCreators,
-}) {
-  const source =
-    type === "movie" ? movieDirectors : type === "tv" ? tvCreators : [];
-  const role = type === "movie" ? "Director" : "Creador";
-
-  return (Array.isArray(source) ? source : [])
-    .filter((person) => person?.id && person?.name)
-    .map((person, idx) => ({
-      ...person,
-      character: person?.job || role,
-      order: -1000 + idx,
-    }));
-}
-
 export function buildCastDataForUI({ baseCast, creativeCredits }) {
   const base = Array.isArray(baseCast) ? baseCast : [];
   const creative = Array.isArray(creativeCredits) ? creativeCredits : [];

@@ -140,7 +140,6 @@ test("las tarjetas del modal rápido conservan respuesta al hover", async () => 
   for (const señal of [
     /group-hover:scale-105/, // Títulos similares: la imagen crece
     /group-hover:grayscale-0/, // Reparto: la foto recupera color
-    /hover:bg-white\/\[0\.05\]/, // Temporadas: la tarjeta se aclara
   ]) {
     assert.match(modal, señal, `falta la respuesta al hover ${señal}`);
   }
@@ -150,7 +149,7 @@ test("los títulos similares no superponen un icono al pasar por encima", async 
   const modal = await leer("dashboard/DetailModal");
   const similar = modal.slice(
     modal.indexOf("function SimilarBackdrop"),
-    modal.indexOf("/* ======================== SELECTOR DE TEMPORADA"),
+    modal.indexOf("const MODAL_ARROW_PROPS"),
   );
 
   assert.doesNotMatch(
@@ -158,18 +157,6 @@ test("los títulos similares no superponen un icono al pasar por encima", async 
     /<PlayCircle\b/,
     "las tarjetas de títulos similares no deben cubrir su imagen con un icono de hover",
   );
-});
-
-test("el selector de temporadas no dibuja contornos en el modal", async () => {
-  const modal = await leer("dashboard/DetailModal");
-  const selector = modal.slice(
-    modal.indexOf("function SeasonDropdown"),
-    modal.indexOf("const MODAL_ARROW_PROPS"),
-  );
-
-  assert.doesNotMatch(selector, /(?:hover:)?border-(?:white|yellow)-/);
-  assert.match(selector, /border-0/);
-  assert.match(selector, /focus-visible:ring-2/);
 });
 
 test("la edición de una fecha no contornea el registro del historial", async () => {
