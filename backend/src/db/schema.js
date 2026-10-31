@@ -117,6 +117,11 @@ export const watchHistory = pgTable('watch_history', {
   // Detección de streaming que creó este visionado (ver streaming_detections).
   // Permite deshacer o mover lo guardado si el usuario corrige la detección.
   detectionId: uuid('detection_id').references(() => streamingDetections.id, { onDelete: 'set null' }),
+  // Plataforma que lo sincronizó ('netflix', 'primevideo'…) cuando llega por el
+  // token del dispositivo (/auth/netflix/*); null si se marcó a mano o se
+  // importó. El aviso «sincronizado desde…» (/import/netflix/poll) solo sale
+  // para estas filas.
+  source: text('source'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   userIdIdx: index('idx_watch_history_user_id').on(t.userId),

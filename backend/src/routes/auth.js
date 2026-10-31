@@ -1331,6 +1331,7 @@ export default async function authRoutes(fastify) {
           posterPath: posterPath || null,
           confidence: confidence || 'high',
           detectionId: redirect.detectionId,
+          source: parsed.data.platform || 'netflix',
         })
         .returning();
     }
@@ -1559,6 +1560,7 @@ export default async function authRoutes(fastify) {
                 // La que traiga el cliente; 'high' solo si no la manda (clientes viejos).
                 confidence: confidence || 'high',
                 detectionId,
+                source: platform || 'netflix',
               })
               .returning();
           }
@@ -1674,6 +1676,7 @@ export default async function authRoutes(fastify) {
         watchedAt,
         title: item.title || null,
         posterPath: item.posterPath || null,
+        source: 'netflix',
       });
     }
 

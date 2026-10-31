@@ -35,7 +35,7 @@ Layout global, dashboards y páginas de detalle "grandes".
 | `FavoriteWatchlistButtons.jsx` | Botones de favorito/watchlist reutilizables sobre TMDb account states. |
 | `StarRating.jsx` | Selector de valoración por estrellas (usado en fichas y modales de Trakt). |
 | `LiquidButton.jsx` | Botón con efecto "líquido/cristal" (demo en `/demo/liquid-buttons`); ver [[LIQUID_BUTTONS]]. |
-| `NetflixSyncListener.jsx` | Escucha en segundo plano la sincronización de Netflix (extensión/móvil) y muestra toasts de "detectado X". |
+| `NetflixSyncListener.jsx` | Escucha en segundo plano la sincronización de Netflix (extensión/móvil) y muestra el aviso «S01E02 sincronizado desde <plataforma>» con la plataforma de `source`. El sondeo (`/v1/import/netflix/poll`) solo devuelve lo sincronizado, así que marcar episodios a mano no lo dispara. |
 
 ## `auth/`
 

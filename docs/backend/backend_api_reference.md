@@ -372,7 +372,7 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 | `POST` | `/v1/import/letterboxd/extension-sync` | Sincronizacion enviada por la extension |
 | `POST` | `/v1/import/netflix/data/chunk` | Importa un lote del historial de Netflix |
 | `GET` | `/v1/import/netflix/status` | Estado de importacion Netflix |
-| `GET` | `/v1/import/netflix/poll` | Sondeo de visionados nuevos (sincronizacion) |
+| `GET` | `/v1/import/netflix/poll` | Sondeo de visionados nuevos sincronizados: solo filas de `watch_history` con `source` (plataforma que las sincronizó por el token del dispositivo); lo marcado a mano no sale |
 | `POST` | `/v1/import/netflix/simulate` | Simula un visionado (pruebas) |
 
 ## Estadisticas

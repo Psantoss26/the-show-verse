@@ -1,7 +1,7 @@
 // src/routes/import.js
 // Importacion puntual desde Trakt.tv hacia la base de datos propia.
 
-import { eq, and, desc, gt, inArray } from 'drizzle-orm';
+import { eq, and, desc, gt, inArray, isNotNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import {
   favorites,
@@ -1208,6 +1208,7 @@ export default async function importRoutes(fastify) {
         watchedAt,
         title: item.title,
         posterPath: item.posterPath,
+        source: 'netflix',
       })
       .returning();
 
@@ -1244,7 +1245,9 @@ export default async function importRoutes(fastify) {
       .where(
         and(
           eq(watchHistory.userId, req.user.id),
-          gt(watchHistory.watchedAt, sinceDate)
+          gt(watchHistory.watchedAt, sinceDate),
+          // Solo lo sincronizado: lo marcado a mano no es «desde Netflix».
+          isNotNull(watchHistory.source)
         )
       )
       .orderBy(desc(watchHistory.watchedAt));

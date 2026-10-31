@@ -3,15 +3,23 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { rememberLocalActivity, showToast } from "@/lib/notifications/actionFeedbackClient";
+import { platformLabel } from "@/lib/notifications/alerts";
 
 // Sondeo de lo que sincroniza la extensión de Netflix: refresca las páginas que
 // dependen del historial y avisa con la ventana emergente común de la app
-// (InAppNotifications), con el mismo cristal que el resto de avisos.
+// (InAppNotifications), con el mismo cristal que el resto de avisos. El sondeo
+// solo devuelve lo sincronizado (`source`: la plataforma); lo marcado a mano ya
+// tiene su propio aviso.
+function syncedPlatform(item) {
+  return platformLabel(item.source) || "Netflix";
+}
+
 function syncedText(item) {
-  if (item.mediaType !== "tv") return "Película sincronizada desde Netflix";
-  if (item.season == null || item.episode == null) return "Serie sincronizada desde Netflix";
+  const platform = syncedPlatform(item);
+  if (item.mediaType !== "tv") return `Película sincronizada desde ${platform}`;
+  if (item.season == null || item.episode == null) return `Serie sincronizada desde ${platform}`;
   const pad = (n) => String(n).padStart(2, "0");
-  return `S${pad(item.season)}E${pad(item.episode)} sincronizado desde Netflix`;
+  return `S${pad(item.season)}E${pad(item.episode)} sincronizado desde ${platform}`;
 }
 
 export default function NetflixSyncListener() {
@@ -85,7 +93,7 @@ export default function NetflixSyncListener() {
           rememberLocalActivity("watched", item.mediaType === "tv" ? "tv" : "movie", tmdbId);
           showToast({
             icon: "progress",
-            label: "Netflix",
+            label: syncedPlatform(item),
             title: item.title || null,
             text: syncedText(item),
             posterPath: typeof item.posterPath === "string" && item.posterPath.startsWith("/") ? item.posterPath : null,
