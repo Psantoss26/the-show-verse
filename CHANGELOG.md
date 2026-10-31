@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Notificaciones: terminar una temporada ya no avisa de «Has completado la serie» cuando la serie tiene más temporadas (pasaba con series como Marshals: Una historia de Yellowstone, cuya ficha guardada era de antes de anunciarse la temporada 2). Ahora se consulta la ficha actualizada de la serie y una temporada anunciada sin episodios también cuenta como pendiente. → [notificaciones](docs/push-notifications.md)
 - Temporadas: ahora se pueden puntuar de 0,5 en 0,5 (por ejemplo, 8,5), como las películas y las series, tanto en la ficha de la temporada como en su vista previa del móvil. Antes solo admitían notas enteras. → [componentes](docs/frontend/components.md)
 - Notificaciones: al terminar una temporada de una serie llega un aviso «Has completado la temporada N» (en la campana, como ventana emergente con la app abierta y como notificación del dispositivo) que, si aún no la has puntuado, te pide puntuarla y lleva a la ficha de la temporada. Si marcas varias temporadas de golpe solo se avisa de la última, y la temporada que completa la serie sigue avisando como «Has completado la serie». → [notificaciones](docs/push-notifications.md)
 - Modal de escribir un comentario: la sección con tus comentarios anteriores del título se llama ahora «Historial» y ya no muestra cuántos hay. Antes era «Mis comentarios anteriores (3)». → [componentes](docs/frontend/components.md), [comunidad](docs/features/comunidad.md)

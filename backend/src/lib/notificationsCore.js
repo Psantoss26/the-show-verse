@@ -101,6 +101,24 @@ export function completionMarks(rowsAsc, seasonEpisodeCounts, isShowComplete) {
 }
 
 /**
+ * Episodios de cada temporada (sin especiales) según la ficha de TMDb.
+ * `hasEmptySeasons`: hay alguna temporada anunciada que aún no tiene
+ * episodios; mientras la haya, la serie no está terminada.
+ */
+export function seasonEpisodeCountsFromMetadata(meta) {
+  const seasonEpisodeCounts = {};
+  let hasEmptySeasons = false;
+  for (const season of Array.isArray(meta?.seasons) ? meta.seasons : []) {
+    const number = Number(season?.season_number);
+    if (!Number.isInteger(number) || number <= 0) continue;
+    const count = Number(season?.episode_count || 0);
+    if (count > 0) seasonEpisodeCounts[number] = count;
+    else hasEmptySeasons = true;
+  }
+  return { seasonEpisodeCounts, hasEmptySeasons };
+}
+
+/**
  * Novedades "Has completado la temporada N" a partir de las marcas de
  * `completionMarks` de UNA serie. Solo las terminadas dentro de la ventana y:
  *   - una por momento: marcar varias temporadas de golpe avisa solo de la

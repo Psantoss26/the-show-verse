@@ -47,6 +47,12 @@ Todas las ventanas emergentes usan el mismo diseño liquid glass
    temporadas de golpe avisa solo de la última del lote, y la temporada que
    cierra la serie no se avisa aparte: la cubre *"Has completado la serie"*
    (`seasonCompletionEvents` en `lib/notificationsCore.js`).
+
+   Para saber qué temporadas tiene la serie se usa su ficha de TMDb con
+   menos de 12 horas (`getMediaMetadataMap(..., { maxAgeMs })`): con una
+   copia vieja de antes de anunciarse la temporada 2, terminar la 1 pasaba
+   por terminar la serie. Una temporada anunciada sin episodios todavía
+   también cuenta como pendiente.
 4. Se envía a cada dispositivo de `push_subscriptions`. Los destinos que el
    servicio da por muertos (404/410, `UNREGISTERED`) se borran.
 5. En el dispositivo:

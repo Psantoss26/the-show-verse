@@ -32,6 +32,7 @@ import {
   parseEntityKey,
   ratingTargetKey,
   seasonCompletionEvents,
+  seasonEpisodeCountsFromMetadata,
   reviewTargetKey,
   splitAutoCompleted,
   watchEventAt,
@@ -41,6 +42,7 @@ const WINDOW_DAYS = 14;
 const ACTIONS_LIMIT = 15;
 const REMINDERS_LIMIT = 10;
 const EVENTS_LIMIT = 20;
+const SHOW_METADATA_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 async function getAutoCompleted(db, userId, since) {
   const rows = await db
@@ -172,24 +174,24 @@ async function getShowCompletions(db, userId, watched, since) {
       ))
       .orderBy(asc(watchHistory.watchedAt), asc(watchHistory.season), asc(watchHistory.episode))
       .limit(5000),
-    getMediaMetadataMap(showIds.map((tmdbId) => ({ mediaType: 'tv', tmdbId }))).catch(() => new Map()),
+    // Las temporadas de una serie cambian (anuncios, estrenos): con una copia
+    // vieja, terminar la última temporada conocida pasaba por terminar la serie.
+    getMediaMetadataMap(showIds.map((tmdbId) => ({ mediaType: 'tv', tmdbId })), { maxAgeMs: SHOW_METADATA_MAX_AGE_MS })
+      .catch(() => new Map()),
   ]);
 
   const eventAtById = new Map(watched.map((row) => [String(row.id), row.createdAt]));
   for (const tmdbId of showIds) {
-    const meta = metadataFor(metadata, 'tv', tmdbId) || {};
-    const seasonEpisodeCounts = {};
-    for (const season of Array.isArray(meta.seasons) ? meta.seasons : []) {
-      const number = Number(season?.season_number);
-      const count = Number(season?.episode_count || 0);
-      if (number > 0 && count > 0) seasonEpisodeCounts[number] = count;
-    }
+    const { seasonEpisodeCounts, hasEmptySeasons } = seasonEpisodeCountsFromMetadata(
+      metadataFor(metadata, 'tv', tmdbId),
+    );
     if (!Object.keys(seasonEpisodeCounts).length) continue;
     const showRows = rows.filter((row) => Number(row.tmdbId) === tmdbId);
     const marks = completionMarks(
       showRows,
       seasonEpisodeCounts,
-      (playCounts) => computeShowProgress(playCounts, seasonEpisodeCounts).baseComplete,
+      // Una temporada anunciada sin episodios aún también falta por ver.
+      (playCounts) => !hasEmptySeasons && computeShowProgress(playCounts, seasonEpisodeCounts).baseComplete,
     );
     completions.set(tmdbId, marks);
 

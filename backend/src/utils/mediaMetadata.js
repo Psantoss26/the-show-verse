@@ -24,10 +24,20 @@ function cacheKeyToCanonical(cacheKey) {
   return String(cacheKey || '').replace(/^(tmdb|bare):/, '');
 }
 
+/**
+ * Metadatos de TMDb de cada fila, de la caché `tmdb_cache` y, si faltan, de
+ * TMDb (se guardan como `bare:`).
+ *
+ * `maxAgeMs`: la caché no caduca sola al leerla; con esta opción, las entradas
+ * más antiguas se vuelven a pedir a TMDb (si falla, se usa la copia vieja).
+ * Hace falta cuando el dato cambia con el tiempo, como las temporadas de una
+ * serie en emisión. Sin ella, cualquier copia vale, por antigua que sea.
+ */
 export async function getMediaMetadataMap(rows = [], options = {}) {
   const getMediaType = options.getMediaType || ((row) => row.mediaType);
   const getTmdbId = options.getTmdbId || ((row) => row.tmdbId);
   const fetchMissing = options.fetchMissing !== false;
+  const maxAgeMs = Number(options.maxAgeMs) > 0 ? Number(options.maxAgeMs) : null;
   const keys = [
     ...new Set(rows.flatMap((row) => cacheKeys(getMediaType(row), getTmdbId(row)))),
   ];
@@ -35,21 +45,34 @@ export async function getMediaMetadataMap(rows = [], options = {}) {
   if (!keys.length) return new Map();
 
   const hits = await db
-    .select({ cacheKey: tmdbCache.cacheKey, data: tmdbCache.data })
+    .select({ cacheKey: tmdbCache.cacheKey, data: tmdbCache.data, fetchedAt: tmdbCache.fetchedAt })
     .from(tmdbCache)
     .where(inArray(tmdbCache.cacheKey, keys));
 
+  // Una misma ficha puede estar bajo varias claves (`bare:`, `tmdb:`, sin
+  // prefijo): gana la copia más reciente.
   const map = new Map();
+  const fetchedAtByKey = new Map();
   for (const hit of hits) {
-    map.set(cacheKeyToCanonical(hit.cacheKey), hit.data || {});
+    const key = cacheKeyToCanonical(hit.cacheKey);
+    const fetchedAt = new Date(hit.fetchedAt).getTime() || 0;
+    if (map.has(key) && fetchedAtByKey.get(key) >= fetchedAt) continue;
+    map.set(key, hit.data || {});
+    fetchedAtByKey.set(key, fetchedAt);
   }
 
-  // Find cache misses and fetch them on the fly
+  // Find cache misses (and, with maxAgeMs, stale entries) and fetch them on the fly
+  const staleBefore = maxAgeMs ? Date.now() - maxAgeMs : null;
   const missing = [];
+  const queued = new Set();
   for (const row of rows) {
     const type = normalizedType(getMediaType(row));
     const id = getTmdbId(row);
-    if (type && id && !map.has(`${type}:${id}`)) {
+    const key = `${type}:${id}`;
+    if (!type || !id || queued.has(key)) continue;
+    const stale = staleBefore != null && map.has(key) && fetchedAtByKey.get(key) < staleBefore;
+    if (!map.has(key) || stale) {
+      queued.add(key);
       missing.push({ type, id });
     }
   }

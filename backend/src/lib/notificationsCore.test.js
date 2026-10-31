@@ -124,6 +124,7 @@ import {
   detectContinueWatchingAdds,
   nextInCollection,
   seasonCompletionEvents,
+  seasonEpisodeCountsFromMetadata,
 } from './notificationsCore.js';
 
 test('Continuar viendo: primer recibo en curso o tras terminar; no los latidos', () => {
@@ -188,4 +189,43 @@ test('temporada completada: una por momento, solo en la ventana y no al completa
   assert.deepEqual(withShow.map((e) => e.season), [2, 4]);
   const sameBatch = seasonCompletionEvents(1399, { ...marks, showRowId: 'd' }, (id) => times[id], since);
   assert.deepEqual(sameBatch.map((e) => e.season), [2, 5]);
+});
+
+test('temporadas de la ficha: sin especiales y con las anunciadas sin episodios aparte', () => {
+  assert.deepEqual(
+    seasonEpisodeCountsFromMetadata({ seasons: [
+      { season_number: 0, episode_count: 4 },
+      { season_number: 1, episode_count: 13 },
+      { season_number: 2, episode_count: 6 },
+    ] }),
+    { seasonEpisodeCounts: { 1: 13, 2: 6 }, hasEmptySeasons: false },
+  );
+  assert.deepEqual(
+    seasonEpisodeCountsFromMetadata({ seasons: [{ season_number: 1, episode_count: 13 }, { season_number: 2, episode_count: 0 }] }),
+    { seasonEpisodeCounts: { 1: 13 }, hasEmptySeasons: true },
+  );
+  assert.deepEqual(seasonEpisodeCountsFromMetadata(null), { seasonEpisodeCounts: {}, hasEmptySeasons: false });
+});
+
+test('terminar la temporada 1 de una serie con temporada 2 avisa de la temporada, no de la serie', async () => {
+  const { computeShowProgress } = await import('./showProgress.js');
+  const rows = Array.from({ length: 13 }, (_, i) => ({ id: `e${i + 1}`, season: 1, episode: i + 1 }));
+  const marksFor = (meta) => {
+    const { seasonEpisodeCounts, hasEmptySeasons } = seasonEpisodeCountsFromMetadata(meta);
+    return completionMarks(rows, seasonEpisodeCounts,
+      (plays) => !hasEmptySeasons && computeShowProgress(plays, seasonEpisodeCounts).baseComplete);
+  };
+
+  const withSeason2 = marksFor({ seasons: [{ season_number: 1, episode_count: 13 }, { season_number: 2, episode_count: 6 }] });
+  assert.equal(withSeason2.showRowId, null);
+  assert.deepEqual([...withSeason2.seasons], [['e13', 1]]);
+  const events = seasonCompletionEvents(290856, withSeason2, () => at(10), new Date(at(5)));
+  assert.deepEqual(events.map((e) => [e.type, e.season]), [['season_completed', 1]]);
+
+  // Temporada 2 anunciada, aún sin episodios: tampoco es la serie completa.
+  const announced = marksFor({ seasons: [{ season_number: 1, episode_count: 13 }, { season_number: 2, episode_count: 0 }] });
+  assert.equal(announced.showRowId, null);
+
+  // Solo una temporada: ahí sí se completa la serie.
+  assert.equal(marksFor({ seasons: [{ season_number: 1, episode_count: 13 }] }).showRowId, 'e13');
 });
