@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha, modal «Añadir a una lista»: el buscador ya no es un bloque negro opaco. Tiene el mismo fondo translúcido y las mismas esquinas que las tarjetas de lista, se aclara al pasar el ratón y, al escribir, muestra un anillo amarillo como el campo de nombre de una lista nueva. El campo de descripción de una lista nueva también marca ahora el foco. → [componentes](docs/frontend/components.md)
 - Perfil, «Actividad reciente»: muestra los 10 últimos títulos vistos en dos filas, en vez de 5 en una. En el móvil la fila se sigue deslizando de lado, ahora con dos pósters por columna. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Dashboard, tarjeta grande destacada: al pasar el ratón, la imagen se amplía suavemente en vez de saltar de golpe. → [componentes](docs/frontend/components.md)
 - Temporadas (ficha rápida y ficha completa): al pasar el ratón por una temporada, el póster se amplía suavemente desde el primer momento. Antes, con los pósters recién cargados, el zoom saltaba de golpe y solo iba suave tras cambiar de vista y volver. → [componentes](docs/frontend/components.md)

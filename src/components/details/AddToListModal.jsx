@@ -200,7 +200,7 @@ export default function AddToListModal(props) {
                     onChange={(e) => setNewDesc?.(e.target.value)}
                     placeholder="Descripción (opcional)"
                     maxLength={120}
-                    className="w-full rounded-xl bg-black/40 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:focus:bg-black/60 transition"
+                    className="w-full rounded-xl bg-black/40 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:ring-2 focus:ring-yellow-500/50 focus:bg-black/60 transition"
                   />
 
                   <button data-online-only="true"
@@ -234,7 +234,7 @@ export default function AddToListModal(props) {
                 value={query ?? ""}
                 onChange={(e) => setQuery?.(e.target.value)}
                 placeholder="Buscar en tus listas..."
-                className="w-full rounded-xl bg-black/40 pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:focus:bg-black/60 transition"
+                className="w-full rounded-2xl bg-white/[0.03] pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-500 outline-none ring-inset hover:bg-white/[0.05] focus:bg-white/[0.06] focus:ring-2 focus:ring-yellow-500/40 transition"
               />
             </div>
 
