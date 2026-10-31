@@ -173,10 +173,15 @@ function ProfileAvatar({ user, size = "h-22 w-22 @[640px]/detail-page:h-26 @[640
   );
 }
 
-function CountStat({ value, label, href, icon, iconClassName = "text-emerald-400" }) {
+function CountStat({ value, label, href, icon, iconClassName = "text-emerald-400", entranceDelay = null }) {
   // La tarjeta compartida de las cabeceras (mini tarjeta en móvil). Sin
-  // cristal, como ha sido siempre en el Perfil.
+  // cristal, como ha sido siempre en el Perfil. Crece en su turno de la entrada
+  // (`entranceDelay`, ms), como las de Favoritos.
   return (
+    <div
+      className={`min-w-0${entranceDelay == null ? "" : " sv-section-stat-in"}`}
+      style={entranceDelay == null ? undefined : { "--sv-enter-delay": `${entranceDelay}ms` }}
+    >
     <PageStatCard
       value={value ?? 0}
       label={label}
@@ -186,6 +191,7 @@ function CountStat({ value, label, href, icon, iconClassName = "text-emerald-400
       glass={false}
       focusRingClass="focus-visible:ring-emerald-400/70"
     />
+    </div>
   );
 }
 
@@ -222,6 +228,9 @@ function ProfilePosterGrid({
   prioritizeHorizontalScroll = false,
   fixedIndicator = false,
   showFixedIndicator = true,
+  // Índice de la primera tarjeta en la cascada de entrada del resumen (las tres
+  // filas forman una sola cascada); `null` = sin entrada (al volver atrás).
+  entranceStart = null,
 }) {
   return (
     <div
@@ -235,10 +244,13 @@ function ProfilePosterGrid({
       aria-label={label}
       className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden @[640px]/detail-page:grid @[640px]/detail-page:grid-cols-5 @[640px]/detail-page:overflow-visible @[640px]/detail-page:pb-0"
     >
-      {items.map((item) => (
+      {items.map((item, index) => (
         <div
           key={`${item.mediaType}:${item.tmdbId}`}
-          className="w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start @[640px]/detail-page:w-auto"
+          className={`w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start @[640px]/detail-page:w-auto${
+            entranceStart == null ? "" : " sv-section-card-grow"
+          }`}
+          style={entranceStart == null ? undefined : profileEntranceDelay(entranceStart + index)}
         >
           <PosterTile
             item={item}
@@ -254,9 +266,38 @@ function ProfilePosterGrid({
   );
 }
 
-function SectionHeader({ label, action, onClick }) {
+// Entrada del resumen del Perfil: la MISMA que el resto de páginas de usuario
+// (Favoritos, secciones del dashboard): nombre que baja, tarjetas de
+// información que suben y crecen una tras otra, pestañas que se funden y suben,
+// pósters en cascada (30 ms entre tarjetas) y el lateral desde la derecha. Con
+// las clases `sv-section-*` de globals.css, que arrancan en el primer pintado.
+const PROFILE_CARD_STAGGER_MS = 30;
+const PROFILE_STAT_DELAYS_MS = [500, 600, 700, 800];
+
+function profileEntranceDelay(cardIndex) {
+  return { "--sv-enter-delay": `${cardIndex * PROFILE_CARD_STAGGER_MS}ms` };
+}
+
+// Aviso de fila vacía del resumen: aparece con la etiqueta de su sección.
+function ProfileEmptyNote({ entranceIndex = null, children }) {
   return (
-    <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
+    <p
+      className={`text-sm text-zinc-600${entranceIndex == null ? "" : " sv-section-label-in"}`}
+      style={entranceIndex == null ? undefined : profileEntranceDelay(entranceIndex)}
+    >
+      {children}
+    </p>
+  );
+}
+
+function SectionHeader({ label, action, onClick, entranceIndex = null }) {
+  return (
+    <div
+      className={`mb-3 flex items-center justify-between border-b border-white/10 pb-2${
+        entranceIndex == null ? "" : " sv-section-label-in"
+      }`}
+      style={entranceIndex == null ? undefined : profileEntranceDelay(entranceIndex)}
+    >
       <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
         {onClick ? (
           <button
@@ -763,6 +804,10 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   // `sv-profile-entry` arrancaba igual desde opacidad 0 y el contenido
   // parpadeaba ~0,4 s (en ordenador y en móvil, con cualquier gesto atrás).
   const entry = isBackNav ? "" : "sv-profile-entry";
+  // Cabecera, pestañas y resumen entran como el resto de páginas de usuario
+  // (`profileEntranceDelay`); al volver atrás, nada.
+  const enter = (className) => (isBackNav ? "" : ` ${className}`);
+  const entranceStart = (cardIndex) => (isBackNav ? null : cardIndex);
   const profileSwipe = useRef(null);
   // Al volver desde DetailsClient este montaje sólo existe en el cliente y ya
   // conocemos que es una navegación de historial. Sembrar la instantánea aquí
@@ -1122,9 +1167,9 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               escalado al pasar el ratón que no deben cortarse. Solo recorta
               plegada o mientras se anima. */}
           <div className={`min-h-0 ${compactHeader || headerAnimating ? "overflow-hidden" : ""}`}>
-        <header className={`${entry} sv-profile-entry--header flex flex-wrap items-center gap-3 @[1024px]/detail-page:flex-nowrap @[1024px]/detail-page:justify-between @[1024px]/detail-page:gap-6`}>
-          <ProfileAvatar user={user} size="h-16 w-16 shrink-0 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26" />
-          <div className="min-w-0 flex-1 text-left">
+        <header className="flex flex-wrap items-center gap-3 @[1024px]/detail-page:flex-nowrap @[1024px]/detail-page:justify-between @[1024px]/detail-page:gap-6">
+          <ProfileAvatar user={user} size={`h-16 w-16 shrink-0 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26${enter("sv-section-header-in")}`} />
+          <div className={`min-w-0 flex-1 text-left${enter("sv-section-header-in")}`}>
             <ProfileTitleRow
               profile={profile}
               isSelf={isSelf}
@@ -1143,15 +1188,28 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           </div>
 
           {/* Contadores */}
-          <div className="order-3 grid w-full grid-cols-4 gap-2 @[640px]/detail-page:gap-3 @[1024px]/detail-page:order-none @[1024px]/detail-page:w-auto @[1024px]/detail-page:pl-4">
-            <CountStat value={counts.films} label="Películas" icon={Film} iconClassName="text-sky-400" />
-            <CountStat value={stats.completedShows} label="Series" icon={CheckCircle2} iconClassName="text-violet-400" />
+          <div className={`order-3 grid w-full grid-cols-4 gap-2 @[640px]/detail-page:gap-3 @[1024px]/detail-page:order-none @[1024px]/detail-page:w-auto @[1024px]/detail-page:pl-4${enter("sv-section-stats-in")}`}>
+            <CountStat
+              value={counts.films}
+              label="Películas"
+              icon={Film}
+              iconClassName="text-sky-400"
+              entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[0]}
+            />
+            <CountStat
+              value={stats.completedShows}
+              label="Series"
+              icon={CheckCircle2}
+              iconClassName="text-violet-400"
+              entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[1]}
+            />
             <CountStat
               value={counts.following}
               label="Siguiendo"
               icon={UserRoundCheck}
               iconClassName="text-emerald-400"
               href={`/u/${user.username}/following`}
+              entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[2]}
             />
             <CountStat
               value={counts.followers}
@@ -1159,6 +1217,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               icon={Users}
               iconClassName="text-amber-400"
               href={`/u/${user.username}/followers`}
+              entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[3]}
             />
           </div>
         </header>
@@ -1166,7 +1225,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
         </div>
 
         {/* ── BARRA DE PESTAÑAS ── */}
-        <div className={`${entry} sv-profile-entry--tabs`}>
+        <div className={enter("sv-section-toolbar-in")}>
           <ProfileTabs
             tab={tab}
             username={user.username}
@@ -1222,51 +1281,54 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
         ) : (
         <div className="mt-8 grid grid-cols-1 gap-8 @[1280px]/detail-page:grid-cols-[minmax(0,1fr)_360px] @[1536px]/detail-page:grid-cols-[minmax(0,1fr)_400px]">
           {/* ── COLUMNA PRINCIPAL ── */}
-          <div className={`${entry} sv-profile-entry--content space-y-10`}>
-            {/* Favoritos curados, separados por tipo para mostrar cinco de cada uno. */}
+          <div className="space-y-10">
+            {/* Favoritos curados, separados por tipo para mostrar cinco de cada uno.
+                Las tres filas forman UNA cascada: 0-4, 5-9 y 10-14. */}
             <section>
-              <SectionHeader label="Películas favoritas" />
+              <SectionHeader label="Películas favoritas" entranceIndex={entranceStart(0)} />
               {profileFavoriteMovies.length ? (
                 <ProfilePosterGrid
                   items={profileFavoriteMovies}
                   viewerTitleStates={viewerTitleStates}
                   label="Películas favoritas"
                   prioritizeHorizontalScroll
+                  entranceStart={entranceStart(0)}
                   fixedIndicator="favorite"
                   showFixedIndicator={!isSelf}
                 />
               ) : (
-                <p className="text-sm text-zinc-600">
+                <ProfileEmptyNote entranceIndex={entranceStart(0)}>
                   {isSelf
                     ? "Aún no has elegido películas favoritas. Edítalas en Ajustes."
                     : "Este miembro todavía no ha destacado películas favoritas."}
-                </p>
+                </ProfileEmptyNote>
               )}
             </section>
 
             <section>
-              <SectionHeader label="Series favoritas" />
+              <SectionHeader label="Series favoritas" entranceIndex={entranceStart(5)} />
               {profileFavoriteSeries.length ? (
                 <ProfilePosterGrid
                   items={profileFavoriteSeries}
                   viewerTitleStates={viewerTitleStates}
                   label="Series favoritas"
                   prioritizeHorizontalScroll
+                  entranceStart={entranceStart(5)}
                   fixedIndicator="favorite"
                   showFixedIndicator={!isSelf}
                 />
               ) : (
-                <p className="text-sm text-zinc-600">
+                <ProfileEmptyNote entranceIndex={entranceStart(5)}>
                   {isSelf
                     ? "Aún no has elegido series favoritas. Edítalas en Ajustes."
                     : "Este miembro todavía no ha destacado series favoritas."}
-                </p>
+                </ProfileEmptyNote>
               )}
             </section>
 
             {/* Actividad reciente */}
             <section>
-              <SectionHeader label="Actividad reciente" />
+              <SectionHeader label="Actividad reciente" entranceIndex={entranceStart(10)} />
               {recentWatched?.length ? (
                 <ProfilePosterGrid
                   items={recentWatched}
@@ -1274,15 +1336,16 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   viewerTitleStates={viewerTitleStates}
                   label="Actividad reciente"
                   prioritizeHorizontalScroll
+                  entranceStart={entranceStart(10)}
                 />
               ) : (
-                <p className="text-sm text-zinc-600">Sin actividad reciente.</p>
+                <ProfileEmptyNote entranceIndex={entranceStart(10)}>Sin actividad reciente.</ProfileEmptyNote>
               )}
             </section>
           </div>
 
           {/* ── COLUMNA LATERAL ── */}
-          <aside className={`${entry} sv-profile-entry--aside space-y-8 @[1280px]/detail-page:sticky @[1280px]/detail-page:top-24 @[1280px]/detail-page:self-start`}>
+          <aside className={`space-y-8${enter("sv-section-aside-in")} @[1280px]/detail-page:sticky @[1280px]/detail-page:top-24 @[1280px]/detail-page:self-start`}>
             {/* Nivel y experiencia: encabeza el lateral, antes del resumen del mes */}
             <ProfileLevelSidebar
               level={profile.level}

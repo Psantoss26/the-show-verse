@@ -749,20 +749,11 @@ html:not([data-avatar-boot]) .alerts-boot {
   animation: sv-profile-entry 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.sv-profile-entry--header {
-  animation-delay: 20ms;
-}
-
-.sv-profile-entry--tabs {
-  animation-delay: 80ms;
-}
-
+/* Las pestañas de sección del Perfil (Nivel, Estadísticas, Favoritos…). La
+   cabecera, las pestañas y el resumen usan la entrada de las páginas de
+   usuario (`.sv-section-*`). */
 .sv-profile-entry--content {
   animation-delay: 130ms;
-}
-
-.sv-profile-entry--aside {
-  animation-delay: 180ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1454,6 +1445,14 @@ body {
     var(--sv-enter-delay, 0ms) backwards;
 }
 
+/* Etiqueta (o aviso de fila vacía) de una fila de tarjetas: se funde con la
+   primera tarjeta de su fila (mismo `--sv-enter-delay`). Sin escala: en una
+   línea a todo el ancho se notaría. */
+.sv-section-label-in {
+  animation: sv-section-fade-in 250ms ease-out var(--sv-enter-delay, 0ms)
+    backwards;
+}
+
 /* Panel lateral del Calendario (escritorio ancho): entra desde la derecha
    detrás de la barra. */
 @keyframes sv-section-aside-in {
@@ -1474,6 +1473,7 @@ body {
   .sv-section-toolbar-in,
   .sv-section-card-rise,
   .sv-section-card-grow,
+  .sv-section-label-in,
   .sv-section-aside-in {
     animation: none;
   }
@@ -3547,6 +3547,7 @@ html[data-details-sequence-transition] .sv-topbar {
   .sv-section-toolbar-in,
   .sv-section-card-rise,
   .sv-section-card-grow,
+  .sv-section-label-in,
   .sv-section-aside-in,
   .sv-phone-actions-reveal > * > *,
   .sv-mobile-poster-reveal,
