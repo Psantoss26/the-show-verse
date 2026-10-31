@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import DetailsClient from "@/components/DetailsClient";
+import { SeasonPosterSeedsProvider } from "@/lib/details/seasonPosterSeeds";
 import {
   restoredValue,
   useDetailsSnapshot,
@@ -39,6 +40,8 @@ export default function DetailsPageLoader(props) {
     initialComments = null,
     initialLists = null,
     initialCommunityArtwork = null,
+    // Pósters de «Temporadas» resueltos en el SSR (seasonPosterSeeds.server).
+    seasonPosterSeeds = null,
   } = props;
 
   // Al volver atrás a esta ficha, lo diferido ya cargado se recupera tal cual
@@ -178,33 +181,35 @@ export default function DetailsPageLoader(props) {
   ], deferredSettled.priority && deferredSettled.secondary);
 
   return (
-    <DetailsClient
-      type={type}
-      id={id}
-      data={data}
-      castData={
-        deferredData.castData !== EMPTY_ARRAY
-          ? deferredData.castData
-          : initialCastData
-      }
-      initialTraktStatus={initialTraktStatus}
-      initialShowWatched={initialShowWatched}
-      initialCommunityArtwork={initialCommunityArtwork}
-      initialScoreboard={deferredData.initialScoreboard ?? initialScoreboard}
-      providers={
-        deferredData.providers !== EMPTY_ARRAY
-          ? deferredData.providers
-          : initialProviders
-      }
-      watchLink={deferredData.watchLink ?? initialWatchLink}
-      recommendations={
-        deferredData.recommendations !== EMPTY_ARRAY
-          ? deferredData.recommendations
-          : initialRecommendations
-      }
-      initialSentiment={initialSentiment}
-      initialComments={initialComments}
-      initialLists={initialLists}
-    />
+    <SeasonPosterSeedsProvider value={seasonPosterSeeds}>
+      <DetailsClient
+        type={type}
+        id={id}
+        data={data}
+        castData={
+          deferredData.castData !== EMPTY_ARRAY
+            ? deferredData.castData
+            : initialCastData
+        }
+        initialTraktStatus={initialTraktStatus}
+        initialShowWatched={initialShowWatched}
+        initialCommunityArtwork={initialCommunityArtwork}
+        initialScoreboard={deferredData.initialScoreboard ?? initialScoreboard}
+        providers={
+          deferredData.providers !== EMPTY_ARRAY
+            ? deferredData.providers
+            : initialProviders
+        }
+        watchLink={deferredData.watchLink ?? initialWatchLink}
+        recommendations={
+          deferredData.recommendations !== EMPTY_ARRAY
+            ? deferredData.recommendations
+            : initialRecommendations
+        }
+        initialSentiment={initialSentiment}
+        initialComments={initialComments}
+        initialLists={initialLists}
+      />
+    </SeasonPosterSeedsProvider>
   );
 }

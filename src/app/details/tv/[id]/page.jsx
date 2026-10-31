@@ -5,6 +5,7 @@ import { getDetails } from "@/lib/api/tmdb";
 import { fetchTitleRecommendations } from "@/lib/details/titleRecommendations.server";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 import { fetchCommunityArtwork } from "@/lib/community/server";
+import { fetchSeasonPosterSeeds } from "@/lib/details/seasonPosterSeeds.server";
 export const revalidate = 600;
 
 // Las recomendaciones van aparte (`fetchTitleRecommendations`, en paralelo):
@@ -51,6 +52,10 @@ export default async function TvDetailsPage({ params }) {
     notFound();
   }
 
+  // Pósters de «Temporadas» ya elegidos, con presupuesto corto (ver
+  // seasonPosterSeeds.server.js): salen en el HTML en vez de esperar al navegador.
+  const seasonPosterSeeds = await fetchSeasonPosterSeeds("tv", data).catch(() => null);
+
   const initialCastData = Array.isArray(data?.credits?.cast)
     ? data.credits.cast
     : [];
@@ -70,6 +75,7 @@ export default async function TvDetailsPage({ params }) {
         initialCastData={initialCastData}
         initialRecommendations={initialRecommendations}
         initialCommunityArtwork={communityArtwork}
+        seasonPosterSeeds={seasonPosterSeeds}
       />
     </>
   );

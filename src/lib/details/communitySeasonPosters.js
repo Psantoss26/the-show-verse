@@ -12,6 +12,7 @@
 // un valor (el del SSR) lo conserve.
 
 import { useEffect, useState } from "react";
+import { useSeededCommunityPoster } from "@/lib/details/seasonPosterSeeds";
 
 const BATCH_WINDOW_MS = 16;
 const MAX_PER_REQUEST = 100;
@@ -141,11 +142,15 @@ export function forgetCommunitySeasonPoster(seasonId) {
 export function useCommunitySeasonPoster(seasonId) {
   const id = normalizeId(seasonId);
   const [result, setResult] = useState({ id: null, poster: undefined });
-  const peeked = id ? peekCommunitySeasonPoster(id) : undefined;
+  // Sembrado por el SSR de la ficha (seasonPosterSeeds): sin petición. Lo
+  // recordado aquí (p. ej. tras votar) es más reciente y va primero.
+  const seeded = useSeededCommunityPoster(id);
+  const known = id ? peekCommunitySeasonPoster(id) : undefined;
+  const peeked = known !== undefined ? known : seeded;
   const settled = result.id === id;
 
   useEffect(() => {
-    if (!id || peekCommunitySeasonPoster(id) !== undefined) return undefined;
+    if (!id || seeded !== undefined || peekCommunitySeasonPoster(id) !== undefined) return undefined;
     let cancelled = false;
     void requestCommunitySeasonPoster(id).then((poster) => {
       if (!cancelled) setResult({ id, poster });
@@ -153,7 +158,7 @@ export function useCommunitySeasonPoster(seasonId) {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, seeded]);
 
   useEffect(() => {
     if (!id) return undefined;

@@ -5,6 +5,7 @@ import { getDetails } from "@/lib/api/tmdb";
 import { fetchTitleRecommendations } from "@/lib/details/titleRecommendations.server";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 import { fetchCommunitySummary } from "@/lib/community/server";
+import { fetchSeasonPosterSeeds } from "@/lib/details/seasonPosterSeeds.server";
 import { readEmbeddedDetailsSeed } from "@/lib/navigation/embeddedDetails";
 export const revalidate = 600;
 
@@ -82,6 +83,11 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
     notFound();
   }
 
+  // Pósters de «Temporadas» ya elegidos (escalera de idioma + más votado), con
+  // un presupuesto corto: las tarjetas salen con su póster en el HTML en vez de
+  // esperar a dos peticiones del navegador. Ver seasonPosterSeeds.server.js.
+  const seasonPosterSeeds = await fetchSeasonPosterSeeds(type, data).catch(() => null);
+
   const initialCastData = Array.isArray(data?.credits?.cast)
     ? data.credits.cast
     : [];
@@ -105,6 +111,7 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
         initialLists={community?.lists?.items || null}
         initialCommunityArtwork={community ? community.artwork || {} : null}
         initialTraktStatus={initialTraktStatus}
+        seasonPosterSeeds={seasonPosterSeeds}
       />
     </>
   );
