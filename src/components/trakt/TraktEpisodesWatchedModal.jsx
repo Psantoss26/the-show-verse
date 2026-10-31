@@ -52,6 +52,7 @@ import {
 import FadePresence from "@/components/ui/FadePresence";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 import StarRating from "@/components/StarRating";
+import ListToggleConfirmModal from "@/components/details/ListToggleConfirmModal";
 import {
   Check,
   Eye,
@@ -292,6 +293,8 @@ export default function TraktEpisodesWatchedModal({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(60);
   const [deleteRunBusyId, setDeleteRunBusyId] = useState("");
+  // Rewatch del historial pendiente de confirmar su borrado: { id, startedAt }.
+  const [confirmDeleteRun, setConfirmDeleteRun] = useState(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
 
@@ -986,8 +989,6 @@ export default function TraktEpisodesWatchedModal({
       }
 
       if (!runId) return;
-      const ok = window.confirm("¿Borrar este rewatch de la lista?");
-      if (!ok) return;
 
       setDeleteRunBusyId(runId);
       try {
@@ -2462,7 +2463,7 @@ export default function TraktEpisodesWatchedModal({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleDeleteRewatch(item.id, item.startedAt)
+                                  setConfirmDeleteRun({ id: item.id, startedAt: item.startedAt })
                                 }
                                 disabled={deleteRunBusyId === item.id || !serverOnline}
                                 className="px-2.5 py-2 rounded-xl text-xs font-black bg-red-500/10 text-red-300 hover:bg-red-500/15 transition disabled:opacity-60"
@@ -2496,6 +2497,23 @@ export default function TraktEpisodesWatchedModal({
             </motion.div>
           )}
         </AnimatePresence>
+        {/* Borrar un rewatch del historial: la misma confirmación que borrar un
+            visionado de una película (TraktWatchedModal), por encima de este
+            modal (z-[99999]). */}
+        <ListToggleConfirmModal
+          open={Boolean(confirmDeleteRun)}
+          kind="play"
+          active
+          itemTitle={confirmDeleteRun?.startedAt ? formatDate(confirmDeleteRun.startedAt) : ""}
+          subject="este rewatch"
+          layerClassName="z-[100000]"
+          onConfirm={() => {
+            const run = confirmDeleteRun;
+            setConfirmDeleteRun(null);
+            if (run) handleDeleteRewatch(run.id, run.startedAt);
+          }}
+          onClose={() => setConfirmDeleteRun(null)}
+        />
         {/* Fecha al marcar un episodio visto en un rewatch: hoy u otra,
             episodio a episodio. Mismo diálogo que la confirmación de abajo. */}
         <FadePresence

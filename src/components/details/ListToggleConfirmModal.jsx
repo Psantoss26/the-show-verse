@@ -67,6 +67,8 @@ const KINDS = {
  * `kind`: "favorite" | "watchlist" | "comment" | "play". `active`: el título YA está en la lista, así
  * que confirmar lo quita. `itemTitle` (opcional) va bajo el encabezado y
  * `subject` nombra lo que se marca en el texto («este título», «esta lista»…).
+ * `layerClassName`: capa (z-index) del velo; hace falta subirla cuando se abre
+ * sobre un modal que está por encima de la por defecto.
  */
 export default function ListToggleConfirmModal({
   open,
@@ -74,6 +76,7 @@ export default function ListToggleConfirmModal({
   active = false,
   itemTitle = "",
   subject = "este título",
+  layerClassName = "z-[10060]",
   onConfirm,
   onClose,
 }) {
@@ -96,7 +99,7 @@ export default function ListToggleConfirmModal({
     // hasta la tarjeta o la ficha que contiene el botón.
     <div
       data-detail-modal-layer=""
-      className="fixed inset-0 z-[10060] flex items-center justify-center p-4"
+      className={`fixed inset-0 ${layerClassName} flex items-center justify-center p-4`}
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >
