@@ -173,25 +173,11 @@ function hasActivityPoster(item) {
   return typeof item?.posterPath === "string" && item.posterPath.trim().length > 0;
 }
 
-// Miniatura 16:9 de esa vista: mayor que el cartel de la lista con póster para
-// que el backdrop se lea. El mismo tamaño que en Social.
-const ACTIVITY_BACKDROP_CLASS = "aspect-video w-[8.5rem] rounded-lg @[640px]/detail-page:w-56";
-
-// Cartel 2:3 de la vista con póster: crece con el ancho de la página (en
-// escritorio iguala el alto de la miniatura del backdrop y en monitores 2K
-// llega a 96×144 px). Los mismos tamaños que en Social, con container queries
-// porque el perfil también se pinta en el panel lateral.
-const ACTIVITY_POSTER_CLASS =
-  "h-[4.25rem] w-[2.85rem] rounded-lg @[640px]/detail-page:h-24 @[640px]/detail-page:w-16 @[1280px]/detail-page:h-[7.875rem] @[1280px]/detail-page:w-[5.25rem] @[1536px]/detail-page:h-36 @[1536px]/detail-page:w-24";
-// Cartel de una reseña en esa vista (más grande que el de la fila).
-const ACTIVITY_REVIEW_POSTER_CLASS =
-  "h-32 w-[5.4rem] rounded-lg @[1280px]/detail-page:h-40 @[1280px]/detail-page:w-[6.75rem] @[1536px]/detail-page:h-48 @[1536px]/detail-page:w-32";
-
 // Vista lista de Diario, Favoritos, Pendientes y Puntuaciones: el cartel 2:3
 // parte del tamaño de móvil (57×80 px) y crece con el ancho de la página hasta
 // 75×112 px; con un cartel fijo, en un monitor 2K la fila se quedaba en una
-// tira diminuta. Tamaño intermedio a propósito: el de la lista con póster de
-// Actividad (96×144) resultaba demasiado grande para estas filas.
+// tira diminuta. Tamaño intermedio a propósito: 96×144 resultaba demasiado
+// grande para estas filas.
 const PROFILE_LIST_POSTER_CLASS =
   "h-20 w-[3.55rem] @[1280px]/detail-page:h-24 @[1280px]/detail-page:w-16 @[1536px]/detail-page:h-28 @[1536px]/detail-page:w-[4.67rem]";
 // Fila y textos que acompañan al cartel al crecer.
@@ -204,6 +190,16 @@ const PROFILE_LIST_META_CLASS =
 // Cartel de la tarjeta de Reseñas: igual criterio, de 64×96 a 85×128 px.
 const PROFILE_REVIEW_POSTER_CLASS =
   "h-24 w-16 @[1280px]/detail-page:h-28 @[1280px]/detail-page:w-[4.67rem] @[1536px]/detail-page:h-32 @[1536px]/detail-page:w-[5.33rem]";
+
+// Actividad, vistas con póster y con backdrop: el mismo criterio y tamaño que
+// las listas de las secciones. El cartel es el de esas filas, la reseña el de
+// Reseñas y la miniatura 16:9 tiene el alto del cartel (142×80, 171×96 desde
+// 1280 px y 199×112 desde 1536). Los mismos tamaños que en Social, con
+// container queries porque el perfil también se pinta en el panel lateral.
+const ACTIVITY_BACKDROP_CLASS =
+  "aspect-video w-[8.9rem] rounded-lg @[1280px]/detail-page:w-[10.67rem] @[1536px]/detail-page:w-[12.45rem]";
+const ACTIVITY_POSTER_CLASS = `${PROFILE_LIST_POSTER_CLASS} rounded-lg`;
+const ACTIVITY_REVIEW_POSTER_CLASS = `${PROFILE_REVIEW_POSTER_CLASS} rounded-lg`;
 
 // Los eventos de Perfil pueden representar un episodio sin cambiar el tipo
 // público de la serie (`tv`). Conservamos la serie como ficha padre, pero la
@@ -1291,7 +1287,7 @@ function ProfileMediaListItem({ item, showStars, viewerState, compact = false, s
         </span>
         {showStars && hasRating ? <span className="mt-1.5 block"><Stars rating={Number(rating)} /></span> : null}
         {showStatusRow ? (
-          <span className={`mt-1.5 flex items-center gap-2 ${PROFILE_LIST_META_CLASS}`}>
+          <span className={`mt-2.5 flex items-center gap-2 ${PROFILE_LIST_META_CLASS}`}>
             {watched ? (
               <span className="flex items-center text-emerald-400" title="Visto">
                 <Eye className="h-4 w-4" aria-hidden="true" />

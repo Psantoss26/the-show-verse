@@ -458,20 +458,16 @@ function EventoResena({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
   );
 }
 
-// Miniatura 16:9 de la vista «Lista con backdrop»: mayor que el cartel de la
-// lista con póster para que el backdrop se lea (136 px en móvil, 224 px desde
-// `sm`). El mismo tamaño que en la Actividad del perfil.
-const BACKDROP_FILA = "aspect-video w-[8.5rem] rounded-lg sm:w-56";
-
-// Cartel 2:3 de la vista «Lista con póster». Crece con la pantalla: en
-// escritorio (desde `xl`) iguala el alto de la miniatura del backdrop y en
-// monitores grandes (2K, desde `2xl`) llega a 96×144 px, donde el tamaño de
-// móvil se quedaba diminuto en filas de 1600 px. El mismo que en la Actividad
-// del perfil.
-const POSTER_FILA =
-  "h-[4.25rem] w-[2.85rem] rounded-lg sm:h-24 sm:w-16 xl:h-[7.875rem] xl:w-[5.25rem] 2xl:h-36 2xl:w-24";
-// Cartel de una reseña en esa vista (más grande que el de la fila).
-const POSTER_RESENA = "h-32 w-[5.4rem] rounded-lg xl:h-40 xl:w-[6.75rem] 2xl:h-48 2xl:w-32";
+// Vistas «Lista con backdrop» y «Lista con póster»: el mismo criterio y tamaño
+// que la Actividad y las listas de las secciones del perfil. Crecen con la
+// pantalla (en monitores 2K, con tamaño de móvil, se quedaban diminutos) hasta
+// un tamaño intermedio. Cartel 2:3: 57×80 px, 64×96 desde `xl` y 75×112 desde
+// `2xl`; la miniatura 16:9 tiene su alto (142×80, 171×96 y 199×112).
+const BACKDROP_FILA = "aspect-video w-[8.9rem] rounded-lg xl:w-[10.67rem] 2xl:w-[12.45rem]";
+const POSTER_FILA = "h-20 w-[3.55rem] rounded-lg xl:h-24 xl:w-16 2xl:h-28 2xl:w-[4.67rem]";
+// Cartel de una reseña en esa vista (el de Reseñas del perfil): de 64×96 a
+// 85×128 px.
+const POSTER_RESENA = "h-24 w-16 rounded-lg xl:h-28 xl:w-[4.67rem] 2xl:h-32 2xl:w-[5.33rem]";
 
 // Un bloque de eventos con la vista elegida, como `ActivityFeed` del perfil.
 // Lo usan los dos caminos de pintado (con grupos y sin ellos) para que no
