@@ -121,6 +121,9 @@ import {
   getMediaTypeForItem,
   getBestTrailerCached,
   fetchBestBackdrop,
+  getBackdropCacheKey,
+  getPreviewBackdropFallback,
+  movieBackdropCache,
 } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 
@@ -214,7 +217,7 @@ import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 import { statusRetryDelay } from "@/lib/trakt/statusRetry";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
-import { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
+import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 import { PEEK_OVER_PAGE_Z } from "@/lib/ui/pageModal";
 
 function normalizeUrl(url) {
@@ -341,42 +344,61 @@ function DetailModalActionsReveal({ children, className = "" }) {
 
 /* =========================== TARJETA "SIMILAR" ============================= */
 // Tarjeta de "Títulos similares": muestra SOLO el backdrop (con el título
-// rotulado en inglés cuando existe). Arranca con el backdrop por defecto del
-// item y, al montar, resuelve el mejor backdrop EN INGLÉS (fetchBestBackdrop
-// prioriza en → otro idioma → textless) y lo intercambia con un fundido.
+// rotulado en inglés cuando existe). Solo se pinta la imagen DEFINITIVA:
+// mientras se resuelve, la tarjeta queda vacía. Antes arrancaba con el
+// `backdrop_path` por defecto del item (a menudo sin texto o en otro idioma) y
+// lo cambiaba al llegar el elegido o el automático, que es el salto visible.
+// Orden: el elegido en la ficha o el más votado (`cardBackdrop`, esperando su
+// lote) → el mejor con idioma (fetchBestBackdrop: en → otro idioma →
+// textless, compartido con el dashboard vía `movieBackdropCache`) → el del
+// item solo si lo anterior no da nada.
 function SimilarBackdrop({ rec, onOpen }) {
   const recMediaType = getMediaTypeForItem(rec);
   const recTitle = rec?.title || rec?.name || "";
-  // Backdrop elegido en la ficha (pestaña «Backdrop») o, sin él, el más
-  // votado: manda y no se pide el automático.
-  const cardBackdrop = useOwnCardBackdrop(recMediaType, rec?.id);
-  const fallback = rec?.backdrop_path
-    ? buildImg(rec.backdrop_path, "w780")
-    : rec?.poster_path
-      ? buildImg(rec.poster_path, "w780")
-      : null;
-  const [autoSrc, setSrc] = useState(fallback);
-  const src = cardBackdrop ? buildImg(cardBackdrop, "w780") : autoSrc;
+  const cacheKey = rec?.id ? getBackdropCacheKey(rec, recMediaType) : null;
+  const { path: cardBackdrop, pending: cardBackdropPending } = useCardArtworkState(
+    recMediaType,
+    rec?.id,
+    "cardBackdrop",
+  );
+  const [autoPath, setAutoPath] = useState(() =>
+    cacheKey ? movieBackdropCache.get(cacheKey) : undefined,
+  );
+  // `undefined` = aún sin decidir (no se pinta nada); `null` = sin imagen.
+  const path = cardBackdrop
+    ? cardBackdrop
+    : cardBackdropPending
+      ? undefined
+      : autoPath;
+  const src = path ? buildImg(path, "w780") : null;
 
   useEffect(() => {
+    if (!cacheKey || cardBackdrop || cardBackdropPending) return undefined;
+    const cached = movieBackdropCache.get(cacheKey);
+    if (cached !== undefined) {
+      setAutoPath(cached);
+      return undefined;
+    }
     let alive = true;
-    setSrc(fallback);
-    if (cardBackdrop) return undefined;
+    setAutoPath(undefined);
     (async () => {
+      let chosen;
       try {
-        const path = await fetchBestBackdrop(rec.id, recMediaType, {
+        chosen = await fetchBestBackdrop(rec.id, recMediaType, {
           originalLanguage: rec.original_language,
         });
-        if (alive && path) setSrc(buildImg(path, "w780"));
       } catch {
-        // silencio: conservamos el backdrop por defecto
+        chosen = null;
       }
+      chosen = chosen || getPreviewBackdropFallback(rec);
+      movieBackdropCache.set(cacheKey, chosen);
+      if (alive) setAutoPath(chosen);
     })();
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rec?.id, recMediaType, cardBackdrop]);
+  }, [cacheKey, cardBackdrop, cardBackdropPending]);
 
   return (
     <div
@@ -401,11 +423,11 @@ function SimilarBackdrop({ rec, onOpen }) {
           className="object-cover transition duration-500 group-hover:scale-105"
           loading="lazy"
         />
-      ) : (
+      ) : path === null ? (
         <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs font-bold text-zinc-500">
           {recTitle}
         </div>
-      )}
+      ) : null}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
     </div>
   );

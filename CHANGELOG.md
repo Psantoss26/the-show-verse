@@ -8,6 +8,9 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Notificaciones: al terminar una temporada de una serie llega un aviso «Has completado la temporada N» (en la campana, como ventana emergente con la app abierta y como notificación del dispositivo) que, si aún no la has puntuado, te pide puntuarla y lleva a la ficha de la temporada. Si marcas varias temporadas de golpe solo se avisa de la última, y la temporada que completa la serie sigue avisando como «Has completado la serie». → [notificaciones](docs/push-notifications.md)
+- Modal de escribir un comentario: la sección con tus comentarios anteriores del título se llama ahora «Historial» y ya no muestra cuántos hay. Antes era «Mis comentarios anteriores (3)». → [componentes](docs/frontend/components.md), [comunidad](docs/features/comunidad.md)
+- Ficha rápida, «Títulos similares»: cada tarjeta muestra directamente su imagen definitiva (la que elegiste, la más votada o la mejor con el título rotulado). Antes enseñaba primero otra imagen del título y la cambiaba al cabo de un momento. → [componentes](docs/frontend/components.md)
 - Ficha, modal «Añadir a una lista»: el buscador ya no es un bloque negro opaco. Tiene el mismo fondo translúcido y las mismas esquinas que las tarjetas de lista, se aclara al pasar el ratón y, al escribir, muestra un anillo amarillo como el campo de nombre de una lista nueva. El campo de descripción de una lista nueva también marca ahora el foco. → [componentes](docs/frontend/components.md)
 - Perfil, «Actividad reciente»: muestra los 10 últimos títulos vistos en dos filas, en vez de 5 en una. En el móvil la fila se sigue deslizando de lado, ahora con dos pósters por columna. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Dashboard, tarjeta grande destacada: al pasar el ratón, la imagen se amplía suavemente en vez de saltar de golpe. → [componentes](docs/frontend/components.md)
