@@ -21,7 +21,7 @@
 // recojan o se desplieguen por debajo.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { LogOut, MoreHorizontal, RotateCcw, Settings, Share2, UserCheck, UserPlus } from "lucide-react";
 
@@ -119,19 +119,37 @@ function useCollapsedActions({ rowRef, nameRef, actionsRef, statsRef, levels, wa
     // entonces `data-dense` dice el anterior y su ancho no es de este nivel.
     const statsMatch = (stats, target) => stats?.dataset.dense === String(target === ACTIONS_DENSE_STATS);
 
-    const widthOf = (target) => {
+    // Ancho de los botones de un nivel: el guardado al verlo o, si aún no se
+    // ha visto, una estimación en botones redondos (Configuración + tres
+    // puntos = dos; solo tres puntos = uno). `null` = no se sabe.
+    const actionsWidthOf = (target) => {
       if (widths.current[target]) return widths.current[target];
-      if (target !== ACTIONS_SETTINGS) return 0;
       const button = actions.querySelector("button");
+      if (!button) return null;
+      const size = button.getBoundingClientRect().width;
       const gap = Number.parseFloat(getComputedStyle(actions).columnGap) || 0;
-      return button ? button.getBoundingClientRect().width * 2 + gap : 0;
+      if (target === ACTIONS_MENU) return size;
+      if (target === ACTIONS_SETTINGS) return size * 2 + gap;
+      // Tarjetas compactas: los botones del nivel anterior.
+      if (target === ACTIONS_DENSE_STATS) {
+        return levels.includes(ACTIONS_SETTINGS)
+          ? widths.current[ACTIONS_SETTINGS] || size * 2 + gap
+          : widths.current[ACTIONS_EXPANDED] || null;
+      }
+      return null;
     };
 
     // Una medida que llega tarde (la tipografía) con el nivel anterior leería
     // los botones del nuevo y guardaría un ancho falso: entonces se desplegaba
     // y recogía sin fin.
     let active = true;
-    const check = () => {
+    // Decide el nivel FINAL de una vez, no un paso por pasada: al acoplar o
+    // retirar el panel lateral la página cambia de ancho de golpe y, paso a
+    // paso, se veían varios fotogramas intermedios (tarjetas grandes con el
+    // nombre cortado, tarjetas compactas debajo del nombre…). Con `sync` (el
+    // aviso del ResizeObserver, que llega tras el reflujo y ANTES de pintar)
+    // el nuevo nivel se aplica con `flushSync` en ese mismo fotograma.
+    const check = (sync = false) => {
       if (!active) return;
       // Oculta (pantalla guardada al navegar): nada que medir.
       if (!row.getBoundingClientRect().width) return;
@@ -142,40 +160,72 @@ function useCollapsedActions({ rowRef, nameRef, actionsRef, statsRef, levels, wa
       // debajo achicarlas no sirve y se recoge todo en el menú, como en móvil.
       const usable = levels.filter((value) =>
         inline ? value !== ACTIONS_MENU : value !== ACTIONS_DENSE_STATS);
-      if (!usable.includes(level)) {
-        setLevel(usable[usable.length - 1]);
-        return;
-      }
       const index = usable.indexOf(level);
-      widths.current[level] = actions.getBoundingClientRect().width;
-      if (inline && statsMatch(stats, level)) statsWidths.current[level] = stats.getBoundingClientRect().width;
-      if (nameWidth() > name.getBoundingClientRect().width + 0.5) {
-        if (index < usable.length - 1) setLevel(usable[index + 1]);
-        return;
+      if (index >= 0) widths.current[level] = actions.getBoundingClientRect().width;
+      // Con las tarjetas compactas los botones son los del nivel anterior.
+      if (index >= 0 && level === ACTIONS_DENSE_STATS) {
+        widths.current[levels.includes(ACTIONS_SETTINGS) ? ACTIONS_SETTINGS : ACTIONS_EXPANDED] = widths.current[level];
       }
-      if (index <= 0) return;
-      const target = usable[index - 1];
-      const needed = widthOf(target);
-      // Lo que crecerían las tarjetas (y encogería la fila) al desplegarlas.
-      let statsGrowth = 0;
-      if (inline && (level === ACTIONS_DENSE_STATS) !== (target === ACTIONS_DENSE_STATS)) {
-        const from = statsWidths.current[level];
-        const to = statsWidths.current[target];
-        if (!from || !to) return;
-        statsGrowth = to - from;
+      // Las tarjetas solo tienen dos tamaños: se guarda el ancho de cada uno.
+      if (inline && statsMatch(stats, level)) {
+        statsWidths.current[level === ACTIONS_DENSE_STATS] = stats.getBoundingClientRect().width;
       }
+
+      const full = nameWidth();
+      const rowWidth = row.getBoundingClientRect().width;
       const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0;
-      const room = row.getBoundingClientRect().width - statsGrowth - needed - gap;
-      if (needed && nameWidth() <= room - 0.5) setLevel(target);
+      const currentActions = actions.getBoundingClientRect().width;
+      // ¿Cabría el nombre con los botones y las tarjetas de `target`? `null`
+      // si falta alguna medida. La fila crece o encoge lo que encojan o crezcan
+      // las tarjetas (la columna del nombre ocupa el resto).
+      const fits = (target) => {
+        const needed = target === level ? currentActions : actionsWidthOf(target);
+        if (!needed) return null;
+        let statsGrowth = 0;
+        if (inline && (level === ACTIONS_DENSE_STATS) !== (target === ACTIONS_DENSE_STATS)) {
+          const from = statsWidths.current[level === ACTIONS_DENSE_STATS];
+          const to = statsWidths.current[target === ACTIONS_DENSE_STATS];
+          if (!from || !to) return null;
+          statsGrowth = to - from;
+        }
+        return full <= rowWidth - statsGrowth - needed - gap - 0.5;
+      };
+
+      let next = level;
+      const truncated = full > name.getBoundingClientRect().width + 0.5;
+      if (index < 0 || truncated) {
+        // Recoger: el primer nivel (más allá del actual) que no se sabe que
+        // no quepa; si ninguno, el último.
+        const from = index < 0 ? 0 : index + 1;
+        next = usable[usable.length - 1];
+        for (let i = from; i < usable.length; i += 1) {
+          if (fits(usable[i]) !== false) {
+            next = usable[i];
+            break;
+          }
+        }
+      } else {
+        // Desplegar: el nivel más desplegado en el que SEGURO cabe (con
+        // medidas, nunca con estimaciones: así no oscila).
+        for (let i = 0; i < index; i += 1) {
+          if (widths.current[usable[i]] && fits(usable[i]) === true) {
+            next = usable[i];
+            break;
+          }
+        }
+      }
+      if (next === level) return;
+      if (sync) flushSync(() => setLevel(next));
+      else setLevel(next);
     };
 
-    const observer = new ResizeObserver(check);
+    const observer = new ResizeObserver(() => check(true));
     check();
     observer.observe(row);
     observer.observe(name);
     observer.observe(actions);
     // La tipografía puede llegar después del primer pintado y cambia el ancho.
-    document.fonts?.ready.then(check).catch(() => {});
+    document.fonts?.ready.then(() => check()).catch(() => {});
     return () => {
       active = false;
       observer.disconnect();
