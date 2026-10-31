@@ -50,6 +50,8 @@ import {
 // Arte sin texto de los primeros títulos de la lista para el FONDO móvil (ver
 // MobileCollageBackground). Mismo lote y misma caché que la portada; sin
 // precarga: es un fondo difuminado que aparece con el scroll.
+const BACKGROUND_ART_WAIT_CAP_MS = 1200
+
 function useBackgroundCoverArt(items, enabled) {
     const targets = useMemo(
         () => (enabled ? buildBackgroundCollageTargets(items, MAX_BACKGROUND_TILE_COUNT) : []),
@@ -61,11 +63,27 @@ function useBackgroundCoverArt(items, enabled) {
     useEffect(() => {
         if (!targets.length) return undefined
         let cancelled = false
+        let settled = false
+        const settle = (paths) => {
+            if (cancelled || settled) return
+            settled = true
+            setState({ key: targetKey, paths })
+        }
         void Promise.all(targets.map((target) => resolveCoverArt(target, 'normal'))).then((paths) => {
-            if (!cancelled) setState({ key: targetKey, paths: paths.filter(Boolean) })
+            settle(paths.filter(Boolean))
         })
+        // TOPE DE ESPERA: con muchos títulos (hasta 40) y el lote lento o
+        // fallando, cada uno acaba en su /images y el fondo tardaba segundos en
+        // salir. Mientras, la página era #101010 liso y la barra superior y la
+        // lateral se veían sobre negro. Pasado el tope, el mosaico sale con lo
+        // ya resuelto (como mínimo, las imágenes de la portada) y se queda así:
+        // lo que llegue después no cambia las celdas.
+        const timer = window.setTimeout(() => {
+            settle(targets.map((target) => peekCoverArt(target.key)).filter((value) => typeof value === 'string'))
+        }, BACKGROUND_ART_WAIT_CAP_MS)
         return () => {
             cancelled = true
+            window.clearTimeout(timer)
         }
         // `targetKey` identifica la lista de títulos.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -772,11 +790,18 @@ export default function UnifiedListDetailsLayout({
                                         animate={!isBackNav}
                                     />
                                 ) : desktopCollageMaybe ? null : backdropImage ? (
+                                    // Lista sin mosaico (0-1 títulos con arte):
+                                    // el backdrop del título. En escritorio,
+                                    // entero y nítido como el fondo de la ficha
+                                    // (DetailsClient), para que la barra superior
+                                    // transparente y la lateral lo tengan detrás
+                                    // y no un velo casi negro; en el móvil sigue
+                                    // tenue y desenfocado bajo la cabecera.
                                     <OptimizedImage
                                         src={backdropImage}
                                         alt=""
                                         fetchPriority="low"
-                                        className="h-full w-full scale-105 object-cover opacity-40 blur-sm"
+                                        className="h-full w-full object-cover max-sm:scale-105 max-sm:opacity-40 max-sm:blur-sm sm:object-top"
                                     />
                                 ) : null}
                                 <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_20%,rgba(16,16,16,0.75)_70%,#101010_100%)]" />
