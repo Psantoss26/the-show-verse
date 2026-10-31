@@ -2363,7 +2363,11 @@ function NavbarContent() {
   // En escritorio, las fichas comparten la entrada transparente de los
   // dashboards: el glass se reserva para cuando el usuario ya ha empezado a
   // desplazarse. En móvil se mantiene la composición específica de la ficha.
-  const desktopDetailsNavMode = isImmersiveRoute && !isScrolled;
+  // Los detalles de listas y colecciones NO: en escritorio llevan siempre el
+  // cristal, como las páginas de usuario. Transparente, arriba del todo la
+  // barra dejaba ver el fondo oscuro de la página (#101010, o la imagen al 40%)
+  // y se leía como una franja negra hasta empezar a desplazarse.
+  const desktopDetailsNavMode = isImmersiveRoute && !isListDetailsRoute && !isScrolled;
 
   const activePath = pendingHref || pathname;
   const isActive = (href) =>
