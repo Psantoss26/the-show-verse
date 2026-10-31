@@ -12,7 +12,7 @@
 // tiene, el de la serie.
 
 import { useLayoutEffect, useState } from "react";
-import { CalendarDays, ExternalLink, Tv } from "lucide-react";
+import { CalendarDays, Tv } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { useAuth } from "@/context/AuthContext";
@@ -98,7 +98,6 @@ export default function SeasonCard({
   imdbRating = null,
   totalEpisodes = null,
   watchedEpisodes = 0,
-  imdbUrl = null,
   onClick,
   onPrefetch,
   // Ficha completa con ratón: la tarjeta se eleva al pasar por encima.
@@ -107,7 +106,7 @@ export default function SeasonCard({
   // desde `sm`. En el móvil es igual que la de la sección: con el póster de
   // 96px los datos no cabían y la barra de progreso quedaba por debajo.
   compact = false,
-  // Vista ancha de DetailModal: sin enlace a IMDb ni número de fondo, y póster
+  // Vista ancha de DetailModal: sin número de fondo, y póster
   // y relleno algo menores para que los datos quepan en columnas estrechas.
   modal = false,
   // Sin efectos al pasar el ratón (vista de teléfono del modal lateral): el
@@ -198,30 +197,12 @@ export default function SeasonCard({
       </span>
 
       <span className="relative z-10 flex min-w-0 flex-1 flex-col py-1 pr-1">
-        <span className="flex items-start justify-between gap-2">
-          <span className="min-w-0">
-            <span className={`block font-bold leading-tight text-white ${modal ? "text-base" : compact ? "text-lg sm:text-base" : "text-lg"}`}>{title}</span>
-            {subtitle ? (
-              <span className="mt-0.5 block truncate text-xs font-bold text-zinc-400">{subtitle}</span>
-            ) : null}
-          </span>
-
-          {/* Enlace externo a IMDb (no navega a la ficha de la temporada). */}
-          {imdbUrl && !modal ? (
-            <a
-              href={imdbUrl}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                window.open(imdbUrl, "_blank", "noopener,noreferrer");
-              }}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition ${enableHover ? "hover:bg-white hover:text-black" : ""}`}
-              aria-label="Ver temporada en IMDb"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </a>
+        {/* Sin enlace a IMDb en la esquina: la tarjeta entera abre la ficha de
+            la temporada. El nombre propio ocupa hasta dos líneas. */}
+        <span className="min-w-0">
+          <span className={`block font-bold leading-tight text-white ${modal ? "text-base" : compact ? "text-lg sm:text-base" : "text-lg"}`}>{title}</span>
+          {subtitle ? (
+            <span className="mt-0.5 line-clamp-2 text-xs font-bold leading-snug text-zinc-400">{subtitle}</span>
           ) : null}
         </span>
 

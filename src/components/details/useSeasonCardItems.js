@@ -188,7 +188,6 @@ export default function useSeasonCardItems({
       imdbRating: seasonStructuresMismatch ? graphRating : (imdbRating ?? graphRating),
       totalEpisodes: totalEp,
       watchedEpisodes: getWatchedEpisodeCountForSeason(episodesWatched?.watchedBySeason, sn, totalEp || 0),
-      imdbUrl: imdbId ? `https://www.imdb.com/title/${imdbId}/episodes/?season=${sn}` : null,
       onClick: () => onOpenSeason?.(sn),
       // Su panel (iframe) se precarga al apuntar a la tarjeta (subroutePrefetch).
       onPrefetch: () => prefetchSeason(sn),
@@ -222,9 +221,6 @@ export default function useSeasonCardItems({
               0,
               Number(specialSeason.episode_count || 0) || 0,
             ),
-            imdbUrl: imdbId
-              ? `https://www.imdb.com/title/${imdbId}/episodes/?season=0`
-              : null,
             onClick: () => onOpenSeason?.(0),
             onPrefetch: () => prefetchSeason(0),
           },

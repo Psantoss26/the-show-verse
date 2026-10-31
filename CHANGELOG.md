@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Temporadas en vista de tarjetas (ficha y su vista lateral): ya no aparece el botón de IMDb en la esquina superior derecha. El nombre de la temporada, como «Los destructores inmortales, Hidan y Kakuzu», se ve en hasta dos líneas en vez de cortarse en una. → [componentes](docs/frontend/components.md)
 - Episodios vistos: la columna de temporadas ya no muestra la barra de desplazamiento vertical. Se sigue desplazando con la rueda o el panel táctil, como la fila de temporadas en el móvil. → [componentes](docs/frontend/components.md)
 - Avisos: marcar episodios como vistos a mano ya no muestra además «sincronizado desde Netflix». Ese aviso sale solo para lo que sincroniza la extensión o la app de Android, y nombra la plataforma real (por ejemplo, Prime Video). Para distinguirlo, el historial guarda de qué plataforma llega cada visionado sincronizado (columna `source` de `watch_history`, migración `0030`). → [componentes](docs/frontend/components.md), [API](docs/backend/backend_api_reference.md)
 - Episodios vistos: el «Historial de visionados» ya no conserva un visionado (rewatch) cuyos episodios se han desmarcado todos, aunque se desmarquen desde la vista Global o desde otra pantalla. Al quedarse sin ningún episodio visto desaparece de la lista y del selector de vista, y si estaba abierto se vuelve a Global. Los rewatches creados a mano que aún no tienen episodios se siguen conservando. → [componentes](docs/frontend/components.md)
