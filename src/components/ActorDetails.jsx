@@ -89,6 +89,7 @@ import {
   useMobileDetailsHero,
 } from "@/components/details/MobileDetailsHero";
 import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
+import useCardPoster from "@/lib/hooks/useCardPoster";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import useActorLike from "@/hooks/useActorLike";
 import ListLikeButton from "@/components/community/ListLikeButton";
@@ -1338,9 +1339,12 @@ function PosterCard({
   onPrefetchHover,
 }) {
   const title = item?.title || item?.name || "Sin título";
-  const poster = tmdbImg(item?.poster_path || item?.profile_path, "w500");
   const mediaType =
     item?.media_type === "tv" || item?.kind === "tv" ? "tv" : "movie";
+  // Criterio de las páginas de usuario: propia, más votada o escalera de
+  // idioma. Mientras se decide, el hueco queda vacío (sin icono).
+  const { path: posterPath, pending: posterPending } = useCardPoster(item, mediaType);
+  const poster = tmdbImg(posterPath || item?.profile_path, "w500");
   const href =
     mediaType === "movie"
       ? `/details/movie/${item?.id}`
@@ -1391,6 +1395,8 @@ function PosterCard({
             decoding="async"
             onError={() => setErr(true)}
           />
+        ) : posterPending ? (
+          <div className="h-full w-full bg-zinc-900" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-zinc-600">
             {mediaType === "movie" ? (

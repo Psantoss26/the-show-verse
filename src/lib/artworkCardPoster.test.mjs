@@ -8,6 +8,7 @@ import {
   getOwnCardPoster,
   retractOwnArtworkVotes,
   notifyPersistedArtworkOverridesChanged,
+  resolveCardArtwork,
   subscribeOwnCardPosters
 } from './artworkApi.js'
 
@@ -184,4 +185,43 @@ test('tarjetas: la votada que lee la ficha pasa a la copia por lotes', async () 
   assert.equal(calls, 1)
   unsubscribe()
   delete globalThis.fetch
+})
+
+test('compartir: espera a la más votada y la propia gana', async () => {
+  installWindow(
+    memoryStorage({
+      [ARTWORK_PREFERENCES_CACHE_KEY]: snapshot({ 'movie:9701': { poster: '/propia.jpg' } })
+    })
+  )
+  const requests = []
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async (url) => {
+    requests.push(String(url))
+    return {
+      ok: true,
+      json: async () => ({ artwork: { 9702: { poster: '/votada.jpg' }, 9801: { poster: '/serie.jpg' } } })
+    }
+  }
+  try {
+    const resolved = await resolveCardArtwork(
+      [
+        { id: 9701, mediaType: 'movie' },
+        { id: 9702, mediaType: 'movie' },
+        { id: 9703, mediaType: 'movie' },
+        { id: 9801, mediaType: 'tv' }
+      ],
+      'poster'
+    )
+    assert.equal(resolved.get('movie:9701'), '/propia.jpg')
+    assert.equal(resolved.get('movie:9702'), '/votada.jpg')
+    assert.equal(resolved.get('movie:9703'), null)
+    assert.equal(resolved.get('tv:9801'), '/serie.jpg')
+    // Un lote por tipo y sin pedir la que ya tiene elección propia.
+    assert.deepEqual(requests.sort(), [
+      '/api/community/artwork?type=movie&ids=9702,9703',
+      '/api/community/artwork?type=tv&ids=9801'
+    ])
+  } finally {
+    globalThis.fetch = previousFetch
+  }
 })

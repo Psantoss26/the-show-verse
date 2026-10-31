@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Briefcase, Check, Film, ImageOff, Layers3, RotateCcw, SlidersHorizontal, Tv as TvIcon } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
+import useCardPoster from "@/lib/hooks/useCardPoster";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import SectionSheet, { SHEET_CONTROL, SectionSheetEmpty } from "./SectionSheet";
 import { buildFilmography, filmographyRoleLabel } from "@/lib/actor/filmography";
@@ -32,7 +33,9 @@ function FilmographyRow({ item, department, watched, onNavigate }) {
   const isTv = item.media_type === "tv";
   const role = filmographyRoleLabel(item, department);
   const MediaIcon = isTv ? TvIcon : Film;
-  const poster = item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : null;
+  // Criterio de las páginas de usuario: propia, más votada o escalera de idioma.
+  const { path: posterPath, pending: posterPending } = useCardPoster(item, item.media_type);
+  const poster = posterPath ? `https://image.tmdb.org/t/p/w185${posterPath}` : null;
   return (
     <Link
       href={`/details/${item.media_type}/${item.id}`}
@@ -49,7 +52,7 @@ function FilmographyRow({ item, department, watched, onNavigate }) {
             loading="lazy"
             decoding="async"
           />
-        ) : (
+        ) : posterPending ? null : (
           <ImageOff className="h-4 w-4 text-zinc-600" aria-hidden="true" />
         )}
       </span>

@@ -46,6 +46,7 @@ import { shareCardFileName } from "@/lib/details/shareCard";
 import { buildShareStoryPayload, sanitizeShareStory, storySceneIds } from "@/lib/details/shareStory";
 import { listStorySceneIds, sanitizeListShareStory } from "@/lib/lists/shareList";
 import { prepareListShare } from "@/lib/lists/shareListPosters";
+import { prepareProfileShare } from "@/lib/profile/shareProfilePosters";
 import { getLocalInProgress } from "@/lib/api/progressClient";
 import { createStoryVideo, detectStoryVideoFormat } from "@/lib/share/storyVideo";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
@@ -64,12 +65,15 @@ const SHARE_KINDS = {
     storyEndpoint: "/api/share/list-story",
     buildStory: (story) => sanitizeListShareStory(story),
     sceneIds: listStorySceneIds,
-    // Antes de pedir nada: los pósters de las tarjetas de la página.
+    // Antes de pedir nada: los pósters de las tarjetas de la página (propio,
+    // más votado o escalera de idioma).
     prepare: prepareListShare,
   },
   // Perfiles: solo imagen (lib/profile/shareProfile), sin vídeo.
   profile: {
     cardEndpoint: "/api/share/profile-card",
+    // Antes de pedir nada: las portadas propias o más votadas de los favoritos.
+    prepare: prepareProfileShare,
   },
 };
 

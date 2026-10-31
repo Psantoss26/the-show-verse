@@ -61,9 +61,18 @@ export function avatarSource(value) {
   return avatarDataUrl(value) || avatarHttpsUrl(value);
 }
 
+function tmdbId(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
+}
+
 function favorites(items) {
   return (Array.isArray(items) ? items : [])
     .map((item) => ({
+      // Identidad del título, para resolver en el cliente su portada propia o
+      // más votada (ver shareProfilePosters). El servidor la ignora.
+      id: tmdbId(item?.tmdbId ?? item?.tmdb_id ?? item?.id),
+      mediaType: (item?.mediaType ?? item?.media_type) === "tv" ? "tv" : "movie",
       title: text(item?.title ?? item?.name, 80),
       posterPath: tmdbImagePath(item?.posterPath ?? item?.poster_path),
     }))

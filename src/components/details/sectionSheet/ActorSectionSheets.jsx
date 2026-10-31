@@ -26,6 +26,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import MobileOptionsSheet, { SheetAction, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import SectionSheet, { SHEET_CONTROL, SectionSheetEmpty } from "./SectionSheet";
 import { TitleRow } from "./SectionSheetRows";
+import useCardPoster from "@/lib/hooks/useCardPoster";
 import FilmographySheet from "./FilmographySheet";
 import { AwardRow } from "@/components/details/AwardCard";
 import {
@@ -176,7 +177,7 @@ function TitleList({
             key={`${item.media_type || "movie"}-${item.id}-${item.credit_id || index}`}
             ref={index === triggerIndex ? triggerRef : undefined}
           >
-            <TitleRow
+            <ActorTitleRow
               item={item}
               mediaType={item.media_type}
               detail={creditRole(item)}
@@ -189,6 +190,14 @@ function TitleList({
       })}
     </ul>
   );
+}
+
+// Fila con el póster de las páginas de usuario: `TitleRow` ya pone la portada
+// propia o la más votada; sin ninguna, aquí va la de la escalera de idioma en
+// vez de la que trae TMDb.
+function ActorTitleRow({ item, mediaType, ...props }) {
+  const { path, pending } = useCardPoster(item, mediaType);
+  return <TitleRow item={item} mediaType={mediaType} posterPath={path} posterLoading={pending} {...props} />;
 }
 
 // ─── Conocido por / Títulos vistos ────────────────────────────────────────

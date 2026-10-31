@@ -569,7 +569,7 @@ const COMMUNITY_CARD_TYPES = new Set(['movie', 'tv'])
 
 let communityCardEntries = null // `${type}:${id}` -> { artwork, at }
 const communityCardQueue = new Set()
-const communityCardInFlight = new Set()
+const communityCardInFlight = new Map() // `${type}:${id}` -> promesa de su lote
 const communityCardFailedAt = new Map()
 let communityCardTimer = 0
 let communityCardPersistTimer = 0
@@ -609,9 +609,14 @@ function persistCommunityCardEntries() {
     }, 500)
 }
 
-async function sendCommunityCardBatch(type, ids) {
+function sendCommunityCardBatch(type, ids) {
     const keys = ids.map((id) => `${type}:${id}`)
-    keys.forEach((key) => communityCardInFlight.add(key))
+    const request = requestCommunityCardBatch(type, ids, keys)
+    keys.forEach((key) => communityCardInFlight.set(key, request))
+    return request
+}
+
+async function requestCommunityCardBatch(type, ids, keys) {
     try {
         const response = await fetch(`/api/community/artwork?type=${type}&ids=${ids.join(',')}`, {
             cache: 'no-store'
@@ -678,6 +683,51 @@ export function getCommunityCardArtwork(type, id, kind) {
     const entry = loadCommunityCardEntries().get(key)
     if (!entry || Date.now() - entry.at > COMMUNITY_CARD_FRESH_MS) queueCommunityCardRequest(key)
     return entry?.artwork?.[kind] || null
+}
+
+// Imagen de tarjeta (propia o más votada) de varios títulos (`{ id, mediaType }`),
+// ESPERANDO al lote de los que aún no se saben o caducaron. Para quien pinta
+// una sola vez y no puede cambiarla al llegar la votada: las imágenes de
+// compartir. Devuelve `${type}:${id}` -> ruta, o `null` si no hay ninguna de
+// las dos (se usa el criterio automático).
+export async function resolveCardArtwork(refs, kind) {
+    if (typeof window === 'undefined' || !kind) return new Map()
+    const keys = [
+        ...new Set(
+            (Array.isArray(refs) ? refs : [])
+                .map((ref) => communityCardKey(ref?.mediaType ?? ref?.media_type ?? ref?.type, ref?.tmdbId ?? ref?.id))
+                .filter(Boolean)
+        )
+    ]
+    const entries = loadCommunityCardEntries()
+    const waits = []
+    const missing = new Map() // type -> ids
+    for (const key of keys) {
+        const [type, id] = key.split(':')
+        if (getOwnArtwork(type, id, kind)) continue
+        const entry = entries.get(key)
+        if (entry && Date.now() - entry.at <= COMMUNITY_CARD_FRESH_MS) continue
+        const inFlight = communityCardInFlight.get(key)
+        if (inFlight) {
+            waits.push(inFlight)
+            continue
+        }
+        communityCardQueue.delete(key)
+        if (!missing.has(type)) missing.set(type, [])
+        missing.get(type).push(Number(id))
+    }
+    for (const [type, ids] of missing) {
+        for (let start = 0; start < ids.length; start += COMMUNITY_CARD_MAX_IDS) {
+            waits.push(sendCommunityCardBatch(type, ids.slice(start, start + COMMUNITY_CARD_MAX_IDS)))
+        }
+    }
+    await Promise.all(waits)
+    return new Map(
+        keys.map((key) => {
+            const [type, id] = key.split(':')
+            return [key, getOwnArtwork(type, id, kind) || entries.get(key)?.artwork?.[kind] || null]
+        })
+    )
 }
 
 // Estado de la imagen de una tarjeta: su ruta (propia o más votada), `false`

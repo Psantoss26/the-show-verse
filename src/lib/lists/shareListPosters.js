@@ -1,8 +1,9 @@
 "use client";
 
-// Pósters de la imagen y el vídeo compartibles de una lista, con el MISMO
-// criterio que las tarjetas de la página (ListDetailsTools →
-// useEnglishPosterItems): el póster de la escalera de idioma (inglés →
+// Pósters de la imagen y el vídeo compartibles de una lista, una colección o
+// una persona, con el MISMO criterio que las tarjetas de las páginas de
+// usuario (`getCardArtwork`): la portada elegida en la ficha, si no la MÁS
+// VOTADA por todos y, sin ninguna, el póster de la escalera de idioma (inglés →
 // español → original → sin idioma), y ninguno si el título no tiene ninguno
 // (la tarjeta tampoco pinta entonces el póster guardado).
 //
@@ -15,6 +16,7 @@
 // piden otra vez.
 
 import { resolveCoverArt } from "@/components/lists/listCoverArt";
+import { resolveCardArtwork } from "@/lib/artworkApi";
 import { LIST_COLLAGE_EXTRA_MAX } from "@/lib/lists/shareList";
 import { buildPosterCollageTiles } from "@/lib/lists/posterCollage";
 import { englishPosterKey, resolveEnglishPosterPath } from "@/lib/tmdb/englishPosters";
@@ -48,6 +50,11 @@ export async function prepareListCollage(card) {
   return { collage, collageExtra };
 }
 
+function refOfKey(key) {
+  const [mediaType, id] = key.split(":");
+  return { id, mediaType };
+}
+
 export async function prepareListShare(card, story) {
   const collagePromise = prepareListCollage(card);
   const refs = [
@@ -56,14 +63,11 @@ export async function prepareListShare(card, story) {
     ...(story?.top || []),
   ];
   const keys = [...new Set(refs.map(englishPosterKey).filter(Boolean))];
-  const resolved = new Map(
-    await Promise.all(
-      keys.map(async (key) => {
-        const [mediaType, id] = key.split(":");
-        return [key, await resolveEnglishPosterPath({ id, mediaType }, { priority: "high" })];
-      }),
-    ),
-  );
+  const [voted, ...ladder] = await Promise.all([
+    resolveCardArtwork(keys.map(refOfKey), "poster"),
+    ...keys.map(async (key) => [key, await resolveEnglishPosterPath(refOfKey(key), { priority: "high" })]),
+  ]);
+  const resolved = new Map(ladder.map(([key, path]) => [key, voted.get(key) || path]));
   // Sin identidad (no debería pasar) se queda el póster que traía.
   const withPoster = (item) => {
     const key = englishPosterKey(item);
