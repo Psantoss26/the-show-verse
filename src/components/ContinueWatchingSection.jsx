@@ -254,12 +254,6 @@ const scaleIn = {
   },
 };
 
-const shimmer = {
-  animate: {
-    backgroundPosition: ["200% 0", "-200% 0"],
-    transition: { duration: 8, ease: "linear", repeat: Infinity },
-  },
-};
 
 /* =================== STYLE CONSTANTS =================== */
 const CONTINUE_WATCHING_BACKDROP_SIZE = "w1280";
@@ -522,12 +516,7 @@ function ContinueWatchingBaseCard({ show, mode = "continue" }) {
     <div className="relative h-full w-full overflow-hidden rounded-lg bg-neutral-900">
       {!imgReady && (
         <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-            variants={shimmer}
-            animate="animate"
-            style={{ backgroundSize: "200% 100%" }}
-          />
+          <div className="sv-skeleton-shimmer" aria-hidden="true" />
         </div>
       )}
 
@@ -1310,12 +1299,7 @@ function ContinueWatchingPreviewCard({
         <div data-preview-media-inner="" className="absolute inset-0">
           {!showTrailer && !ready && (
             <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-                variants={shimmer}
-                animate="animate"
-                style={{ backgroundSize: "200% 100%" }}
-              />
+              <div className="sv-skeleton-shimmer" aria-hidden="true" />
             </div>
           )}
 

@@ -322,7 +322,7 @@ export default function SeasonsSection({
           // En el modal, sin flechas como el resto de sus carruseles: quedan
           // apretadas contra los bordes del panel.
           showArrows={!phoneLayout && !modalLayout}
-          observeParents={!phoneLayout}
+          observeParents={!phoneLayout && !modalLayout}
           breakpoints={phoneLayout ? { 480: { slidesPerView: 3, spaceBetween: 14 } } : modalLayout ? {
             460: { slidesPerView: 4, spaceBetween: 12 },
             640: { slidesPerView: 5, spaceBetween: 14 },

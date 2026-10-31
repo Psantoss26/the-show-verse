@@ -414,8 +414,16 @@ function SimilarBackdrop({ rec, onOpen }) {
 // En el modal NO mostramos las flechas de navegación (quedan apretadas contra
 // los bordes del panel estrecho): el desplazamiento se hace por arrastre /
 // deslizamiento. En DetailsClient sí se muestran (valores por defecto).
+//
+// Sin `observeParents`, como en la vista teléfono (`PHONE_CAROUSEL`): con él,
+// Swiper vigila los atributos de CADA ancestro y se recalcula entero ante
+// cualquier cambio. Al desplazar el modal cambian solos (las secciones entran
+// con `whileInView` y el panel marca `data-drawer-scrolling`): ~50 recálculos
+// y ~1.700 escrituras de estilo en sus tarjetas en 8 s de scroll. Los cambios
+// de ancho del panel los sigue cubriendo su ResizeObserver.
 const MODAL_ARROW_PROPS = {
   showArrows: false,
+  observeParents: false,
 };
 
 /* ================================== MODAL ================================== */

@@ -32,8 +32,13 @@ const LAZY_IMAGE = { loading: "lazy" };
 // el cristal, no un bloque negro. Si viene de caché (volver a la ficha) sale
 // de golpe, sin fundido. `hoverScale`: el zoom del hover, que comparte
 // `transform` con la entrada.
+//
+// La entrada anima también `scale`: en Tailwind v4 `scale-*` es la propiedad
+// `scale`, no `transform`. Con `transition-[opacity,transform]` el zoom del
+// hover saltaba de golpe en los pósters recién cargados, y solo iba suave en
+// los que salían de caché (`transition-transform` sí incluye `scale`).
 function posterRevealClass({ ready, instant }, hoverScale) {
-  const motion = instant ? "transition-transform duration-500" : "transition-[opacity,transform] duration-500";
+  const motion = instant ? "transition-transform duration-500" : "transition-[opacity,transform,scale] duration-500";
   const state = ready ? `opacity-100 scale-100 ${hoverScale}` : "opacity-0 scale-[1.03]";
   return `${motion} ease-out ${state}`;
 }

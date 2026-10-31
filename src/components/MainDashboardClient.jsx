@@ -312,16 +312,6 @@ const scaleIn = {
   },
 };
 
-const shimmer = {
-  animate: {
-    backgroundPosition: ["200% 0", "-200% 0"],
-    transition: {
-      duration: 8,
-      ease: "linear",
-      repeat: Infinity,
-    },
-  },
-};
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
 const useIsMobileLayout = (breakpointPx = 768) => {
@@ -1336,12 +1326,7 @@ function InlinePreviewCard({
         <div data-preview-media-inner="" className="absolute inset-0">
           {!showTrailer && !backdropReady && (
             <div className="relative w-full h-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 overflow-hidden">
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-                variants={shimmer}
-                animate="animate"
-                style={{ backgroundSize: "200% 100%" }}
-              />
+              <div className="sv-skeleton-shimmer" aria-hidden="true" />
             </div>
           )}
 
@@ -3944,6 +3929,10 @@ function TopRatedHero({
                           // debe quedar en lazy.
                           loading={index < (isMobile ? 1 : 3) ? "eager" : "lazy"}
                         />
+                        {/* La transición incluye `scale`: en Tailwind v4
+                            `scale-105` es la propiedad `scale`, no
+                            `transform`, y sin ella el zoom del hover saltaba
+                            de golpe en vez de crecer en los 700 ms. */}
                         <NextImage
                           src={buildImg(heroBackdrop, "w1280")}
                           sizes="(min-width:1536px) 1100px, (min-width:1280px) 900px, (min-width:1024px) 800px, 95vw"
@@ -3951,7 +3940,7 @@ function TopRatedHero({
                           fill
                           className={`rounded-xl ${
                             isMobile ? "object-contain" : "object-cover"
-                          } transition-[opacity,transform] duration-700 ease-out group-hover/hero:scale-105 ${
+                          } transition-[opacity,transform,scale] duration-700 ease-out group-hover/hero:scale-105 ${
                             heroExtraBackdrop
                               ? "group-hover/hero:opacity-0"
                               : ""
@@ -3972,7 +3961,7 @@ function TopRatedHero({
                             fill
                             className={`rounded-xl ${
                               isMobile ? "object-contain" : "object-cover"
-                            } opacity-0 transition-[opacity,transform] duration-700 ease-out group-hover/hero:scale-105 group-hover/hero:opacity-100 motion-reduce:transition-none`}
+                            } opacity-0 transition-[opacity,transform,scale] duration-700 ease-out group-hover/hero:scale-105 group-hover/hero:opacity-100 motion-reduce:transition-none`}
                             loading={
                               index < (isMobile ? 1 : 3) ? "eager" : "lazy"
                             }

@@ -439,6 +439,51 @@ body {
   }
 }
 
+/* Brillo de los esqueletos de los dashboards (pósters, backdrops, Continuar
+   viendo, vistas previa). Antes era un `motion.div` de framer que escribía
+   `background-position` en CADA fotograma desde JavaScript: con cientos de
+   tarjetas aún sin cargar (las de fuera de pantalla son `lazy` y no llegan
+   nunca) el hilo principal no daba abasto y el scroll de DetailModal, que se
+   abre ENCIMA del dashboard, iba a tirones (276 esqueletos, ~90.000 escrituras
+   de estilo en 8 s con CPU ×4).
+   Ahora la franja se desplaza con `transform` (la mueve el compositor, sin JS)
+   y se PAUSA mientras hay un modal abierto: el dashboard está tapado y no hay
+   nada que animar. */
+.sv-skeleton-shimmer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sv-skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right,
+      transparent,
+      rgb(255 255 255 / 5%),
+      transparent);
+  transform: translateX(-100%);
+  animation: sv-skeleton-sweep 4s linear infinite;
+}
+
+@keyframes sv-skeleton-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+:root[data-sv-modal-open] .sv-skeleton-shimmer::after {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-skeleton-shimmer::after {
+    animation: none;
+  }
+}
+
 .animate-shimmer {
   animation: shimmer 2s infinite;
   background: linear-gradient(90deg,

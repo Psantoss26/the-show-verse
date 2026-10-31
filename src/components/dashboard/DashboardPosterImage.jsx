@@ -10,16 +10,6 @@ import NextImage from "next/image";
 import { buildImg, fetchBestPoster } from "@/lib/dashboard/media";
 import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
-const shimmer = {
-  animate: {
-    backgroundPosition: ["200% 0", "-200% 0"],
-    transition: {
-      duration: 8,
-      ease: "linear",
-      repeat: Infinity,
-    },
-  },
-};
 
 // Pósters ya pintados en esta sesión: al volver a montarse (volver atrás,
 // fila que se recrea) se muestran sin esqueleto ni animación de entrada.
@@ -127,12 +117,7 @@ export default function PosterImage({
     <div
       className={`absolute inset-0 rounded-lg overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900`}
     >
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-        variants={shimmer}
-        animate="animate"
-        style={{ backgroundSize: "200% 100%" }}
-      />
+      <div className="sv-skeleton-shimmer" aria-hidden="true" />
     </div>
   );
 

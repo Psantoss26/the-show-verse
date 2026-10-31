@@ -154,12 +154,6 @@ const scaleIn = {
   },
 };
 
-const shimmer = {
-  animate: {
-    backgroundPosition: ["200% 0", "-200% 0"],
-    transition: { duration: 8, ease: "linear", repeat: Infinity },
-  },
-};
 
 /* =================== HELPERS =================== */
 
@@ -309,12 +303,7 @@ function BackdropBaseCard({ item, backdropOverride, loadImage = true, eager = fa
     <div className="relative h-full w-full overflow-hidden rounded-lg bg-neutral-900">
       {!imgReady && (
         <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-            variants={shimmer}
-            animate="animate"
-            style={{ backgroundSize: "200% 100%" }}
-          />
+          <div className="sv-skeleton-shimmer" aria-hidden="true" />
         </div>
       )}
 
@@ -1046,12 +1035,7 @@ export function BackdropPreviewCard({
         <div data-preview-media-inner="" className="absolute inset-0">
           {!showTrailer && !bgSrc && (
             <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-                variants={shimmer}
-                animate="animate"
-                style={{ backgroundSize: "200% 100%" }}
-              />
+              <div className="sv-skeleton-shimmer" aria-hidden="true" />
             </div>
           )}
 
