@@ -62,7 +62,7 @@ export default function TodayClient({
   scope,
   day,
   group,
-  layout = "grid",
+  layout = "list",
   query = "",
   onScopeChange,
   onDayChange,

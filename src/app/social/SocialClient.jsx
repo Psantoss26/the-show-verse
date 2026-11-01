@@ -17,6 +17,7 @@
 // progreso), ámbar (Biblioteca) y morado (Listas).
 
 import {
+  startTransition,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -63,6 +64,7 @@ import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import EntranceItem, { estimateVisibleRows } from "@/components/ui/EntranceItem";
+import { useSlidingSectionIndicator } from "@/components/ui/useSlidingSectionIndicator";
 import { useSearchParams } from "next/navigation";
 import { defaultSocialLanding, todayHref } from "@/lib/today/params";
 import { dayTabLabel } from "@/components/today/todayUi";
@@ -161,8 +163,12 @@ const CLAVE_AGRUPADO = "showverse:social:groupBy";
 // a la lista.
 const VISTAS = new Set(["list", "poster-list", "backdrop-list"]);
 // Vistas de Hoy: rejilla de carteles (la de Trakt) o lista, que aprovecha el
-// alto. Se recuerda aparte de la vista de Siguiendo / Yo.
-const CLAVE_VISTA_HOY = "showverse:social:todayLayout";
+// alto. Por defecto, la lista. Se recuerda aparte de la vista de Siguiendo /
+// Yo. La clave lleva versión: con la de antes (`…:todayLayout`), quien había
+// pasado alguna vez por la cuadrícula se quedaba en ella y no veía el nuevo
+// valor por defecto.
+const CLAVE_VISTA_HOY = "showverse:social:todayLayout:v2";
+const VISTA_HOY_POR_DEFECTO = "list";
 const VISTAS_HOY = [
   ["grid", LayoutGrid, "Cuadrícula"],
   ["list", List, "Lista"],
@@ -503,6 +509,8 @@ function ListaEventos({ eventos, vista, mostrarAutor, yo, inicio = 0, total = ev
 // Valor de ?view= de cada opción del selector (la de «Hoy» no lo lleva).
 const VISTA_DE_ALCANCE = { following: "activity", me: "mine" };
 const ALCANCE_DE_VISTA = { activity: "following", mine: "me" };
+// Orden de los botones del selector (Actividad · Siguiendo · Yo).
+const ORDEN_ALCANCES = ["today", "following", "me"];
 
 export default function SocialClient({ initialView = "today", initialToday = {}, onTodaySummary }) {
   const { session, account, hydrated } = useAuth();
@@ -512,6 +520,20 @@ export default function SocialClient({ initialView = "today", initialToday = {},
   // Hoy y debajo se pinta TodayClient.
   const [scope, setScope] = useState(ALCANCE_DE_VISTA[initialView] || "today");
   const esHoy = scope === "today";
+  // CAMBIO DE SECCIÓN DESDE EL SELECTOR: la sección nueva se pinta en una
+  // transición (ver SelectorAlcance, que mueve su pastilla antes).
+  const elegirScope = useCallback((valor) => {
+    startTransition(() => setScope(valor));
+  }, []);
+  // Dirección de la entrada del contenido: llega desde el lado en que está su
+  // botón en el selector, como las pestañas de las fichas (`.sv-tab-panel`).
+  // Se calcula en el render; la sección inicial no se desliza.
+  const [seccionMotion, setSeccionMotion] = useState({ scope, dir: null });
+  if (seccionMotion.scope !== scope) {
+    const desde = ORDEN_ALCANCES.indexOf(seccionMotion.scope);
+    const hasta = ORDEN_ALCANCES.indexOf(scope);
+    setSeccionMotion({ scope, dir: hasta > desde ? "forward" : "back" });
+  }
   // Controles de Hoy, en la misma barra (Quién · Día · Agrupar).
   const [hoyQuien, setHoyQuien] = useState(initialToday.scope || "following");
   const [hoyDia, setHoyDia] = useState(initialToday.day || "today");
@@ -535,13 +557,13 @@ export default function SocialClient({ initialView = "today", initialToday = {},
   }, [hoyDias]);
   // Se lee tras montar (no en el estado inicial) para que el HTML del servidor y
   // el primer render del cliente coincidan.
-  const [hoyVista, setHoyVistaState] = useState("grid");
+  const [hoyVista, setHoyVistaState] = useState(VISTA_HOY_POR_DEFECTO);
   useEffect(() => {
     try {
       const guardada = window.localStorage.getItem(CLAVE_VISTA_HOY);
       if (VISTAS_HOY.some(([v]) => v === guardada)) setHoyVistaState(guardada);
     } catch {
-      // Sin almacenamiento: rejilla.
+      // Sin almacenamiento: la lista.
     }
   }, []);
   const setHoyVista = useCallback((modo) => {
@@ -762,6 +784,26 @@ export default function SocialClient({ initialView = "today", initialToday = {},
     }
   }, [actualCargado, scope, cargar]);
 
+  // Desde Actividad se precargan las dos listas en un hueco libre: si no,
+  // el primer cambio a Siguiendo o Yo entraba vacío y la lista aparecía de
+  // golpe al llegar la respuesta, sin la entrada de la sección.
+  useEffect(() => {
+    if (scope !== "today" || !session || !account?.id) return undefined;
+    const precargar = () => {
+      for (const alcance of ["following", "me"]) {
+        if (!feedsRef.current[alcance] && !peticionRef.current[alcance]) {
+          cargar({ scope: alcance, offset: 0 });
+        }
+      }
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(precargar, { timeout: 2500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(precargar, 1200);
+    return () => window.clearTimeout(id);
+  }, [scope, session, account?.id, cargar]);
+
 
   // Los cuatro valores del menú solo cambian pulsándolo, así que basta con
   // observarlos para saber que hay que reanclar.
@@ -914,7 +956,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                 está a un toque sin desplegar nada ni gastar ancho en rótulos. */}
             <SelectorAlcance
               scope={scope}
-              setScope={setScope}
+              setScope={elegirScope}
               controlGlass={controlGlass}
               activo={activo}
               soloIconos
@@ -997,7 +1039,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                 QUÉ se está viendo, así que va antes que los filtros. */}
             <SelectorAlcance
               scope={scope}
-              setScope={setScope}
+              setScope={elegirScope}
               controlGlass={controlGlass}
               activo={activo}
             />
@@ -1069,6 +1111,13 @@ export default function SocialClient({ initialView = "today", initialToday = {},
           </div>
         </motion.div>
 
+        {/* La `key` remonta la sección en cada cambio y su entrada CSS
+            (`.sv-section-switch`) vuelve a correr. */}
+        <div
+          key={scope}
+          className={seccionMotion.dir ? "sv-section-switch" : undefined}
+          data-tab-dir={seccionMotion.dir ?? undefined}
+        >
         {esHoy ? (
           <div ref={listaRef}>
             <TodayClient
@@ -1168,6 +1217,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
             ) : null}
           </>
         )}
+        </div>
       </div>
     </div>
   );
@@ -1182,12 +1232,33 @@ function SelectorAlcance({
   fill = false,
   soloIconos = false,
 }) {
+  // La pastilla de la activa se desliza de un botón a otro, como en En
+  // progreso · Completadas (WatchingSectionNav).
+  //
+  // El botón pulsado se marca AQUÍ, en un estado del selector, y la sección
+  // llega después en una transición (`setScope`): montar Actividad o una
+  // lista larga cuesta, y si el clic tuviera que volver a pintar toda la
+  // página antes de mover la pastilla, esta saldría con retraso o a tirones.
+  const [elegido, setElegido] = useState(null);
+  const activa = elegido ?? scope;
+  useEffect(() => {
+    setElegido(null);
+  }, [scope]);
+  const navRef = useRef(null);
+  const { ready, indicator } = useSlidingSectionIndicator({
+    navRef,
+    activeKey: activa,
+    groupId: soloIconos ? "social-scope-mobile" : "social-scope",
+    className: activo,
+  });
   return (
     <div
-      className={`flex h-11 items-center rounded-2xl p-1 ${
+      ref={navRef}
+      className={`relative flex h-11 items-center rounded-2xl p-1 ${
         fill ? "min-w-0 flex-1" : "shrink-0"
       } ${controlGlass}`}
     >
+      {indicator}
       {[
         ["today", "Actividad", Flame],
         ["following", "Siguiendo", Users],
@@ -1196,17 +1267,21 @@ function SelectorAlcance({
         <button
           key={valor}
           type="button"
-          onClick={() => setScope(valor)}
-          aria-pressed={scope === valor}
+          data-section-key={valor}
+          onClick={() => {
+            setElegido(valor);
+            setScope(valor);
+          }}
+          aria-pressed={activa === valor}
           // En la barra móvil va solo el icono: el rótulo se lo comería el
           // buscador. El nombre sigue estando para lectores de pantalla.
           aria-label={soloIconos ? etiqueta : undefined}
           title={soloIconos ? etiqueta : undefined}
-          className={`flex h-full items-center justify-center rounded-xl text-sm font-bold transition-all ${
+          className={`relative z-10 flex h-full items-center justify-center rounded-xl text-sm font-bold transition-colors ${
             soloIconos ? "w-9" : "flex-1 gap-2 px-3"
           } ${
-            scope === valor
-              ? activo
+            activa === valor
+              ? `text-white ${ready ? "" : activo}`
               : "text-zinc-400 hover:bg-white/10 hover:text-white"
           }`}
         >

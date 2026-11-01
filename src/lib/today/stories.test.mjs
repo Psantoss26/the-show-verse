@@ -6,6 +6,7 @@ import {
   isQuietDay,
   pickHeroStory,
   prepareActions,
+  storySummaryLines,
   summarize,
   summarizeActions,
   toFeedSections,
@@ -165,4 +166,42 @@ test("línea de cada título, como en Trakt", () => {
   assert.equal(summarizeActions([{ kind: "rating", rating: 8 }]), "Calificado");
   assert.equal(summarizeActions([{ kind: "comment" }, { kind: "rating" }]), "Calificado y reseñado");
   assert.equal(summarizeActions([ep], { people: 3 }), "3 personas");
+});
+
+test("resumen de una historia con varias personas: qué han hecho", () => {
+  const story = (actions) => toTitleStories(prepareActions(actions))[0];
+  // Las dos han visto la película y una la ha puntuado.
+  assert.deepEqual(
+    storySummaryLines(story([
+      action(ANA, MOVIE, "2026-10-24T20:00:00Z"),
+      action(LUIS, MOVIE, "2026-10-24T20:00:00Z"),
+      action(LUIS, MOVIE, "2026-10-24T20:05:00Z", { kind: "rating", rating: 6 }),
+    ])),
+    { headline: "2 personas la han visto", details: ["1 la ha puntuado"] },
+  );
+  // Las dos solo la han puntuado.
+  assert.deepEqual(
+    storySummaryLines(story([
+      action(ANA, MOVIE, "2026-10-24T20:00:00Z", { kind: "rating", rating: 6 }),
+      action(LUIS, MOVIE, "2026-10-24T20:00:00Z", { kind: "rating", rating: 6 }),
+    ])),
+    { headline: "2 personas la han puntuado", details: [] },
+  );
+  // Serie: episodios vistos por las dos y una reseña.
+  assert.deepEqual(
+    storySummaryLines(story([
+      action(ANA, SHOW, "2026-10-24T20:00:00Z", { season: 1, episode: 1 }),
+      action(LUIS, SHOW, "2026-10-24T20:00:00Z", { season: 1, episode: 2 }),
+      action(ANA, SHOW, "2026-10-24T21:00:00Z", { kind: "comment", target: "show", comment: { body: "x" } }),
+    ])),
+    { headline: "2 personas han visto episodios", details: ["1 la ha reseñado"] },
+  );
+  // Nada en común: el titular solo cuenta a la gente.
+  assert.deepEqual(
+    storySummaryLines(story([
+      action(ANA, MOVIE, "2026-10-24T20:00:00Z"),
+      action(LUIS, MOVIE, "2026-10-24T20:00:00Z", { kind: "comment", target: "movie", comment: { body: "x" } }),
+    ])),
+    { headline: "2 personas", details: ["1 la ha visto", "1 la ha reseñado"] },
+  );
 });

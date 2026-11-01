@@ -3801,6 +3801,70 @@ html[data-details-sequence-transition] .sv-topbar {
 @keyframes sv-tab-content-in {
   from { opacity: 0; }
 }
+
+/* Cambio de sección en Social (Actividad · Siguiendo · Yo, SocialClient). La
+   sección entra desde el lado de su botón en el selector, con fundido: aquí no
+   hay cristal en el contenido, así que la opacidad no apaga nada. Las filas
+   de las listas siguen con su cascada (`EntranceItem`) dentro. */
+.sv-section-switch {
+  animation: sv-section-switch-in 360ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.sv-section-switch[data-tab-dir="back"] {
+  animation-name: sv-section-switch-in-back;
+}
+@keyframes sv-section-switch-in {
+  from { opacity: 0; transform: translateX(2rem); }
+}
+@keyframes sv-section-switch-in-back {
+  from { opacity: 0; transform: translateX(-2rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-section-switch {
+    animation: none;
+  }
+}
+
+/* Paso entre historias (TodayStoryViewer). El cartel nuevo entra desde el
+   lado hacia el que se va, con un poco de escala y fundido; los fondos se
+   funden; el pie entra con un desplazamiento corto. Sin cristal en el visor,
+   así que la opacidad no apaga nada. */
+.sv-story-card {
+  animation: sv-story-card-in 380ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.sv-story-card[data-story-dir="back"] {
+  animation-name: sv-story-card-in-back;
+}
+.sv-story-fade {
+  animation: sv-story-fade-in 420ms ease-out backwards;
+}
+.sv-story-body {
+  animation: sv-story-body-in 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.sv-story-body[data-story-dir="back"] {
+  animation-name: sv-story-body-in-back;
+}
+@keyframes sv-story-card-in {
+  from { opacity: 0; transform: translateX(2.5rem) scale(0.96); }
+}
+@keyframes sv-story-card-in-back {
+  from { opacity: 0; transform: translateX(-2.5rem) scale(0.96); }
+}
+@keyframes sv-story-fade-in {
+  from { opacity: 0; }
+}
+@keyframes sv-story-body-in {
+  from { opacity: 0; transform: translateX(1rem); }
+}
+@keyframes sv-story-body-in-back {
+  from { opacity: 0; transform: translateX(-1rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-story-card,
+  .sv-story-fade,
+  .sv-story-body {
+    animation: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .sv-tab-panel,
   .sv-tab-panel :is(.sv-meta-icon, .sv-glass-content) {

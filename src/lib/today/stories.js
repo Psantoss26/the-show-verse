@@ -295,6 +295,57 @@ export function toStoryGroups(stories, forYou = []) {
   return groups;
 }
 
+// Qué ha hecho la gente con un título, por tipo de acción. Película y serie
+// son femeninas, de ahí el «la». Un visionado con nota cuenta también como
+// puntuación (mergeRatings pega la nota al visionado).
+const STORY_VERBS = [
+  {
+    kind: "watch",
+    matches: (a) => a.kind === "watch",
+    phrase: (acts, many) => {
+      const verb = many ? "han visto" : "ha visto";
+      return acts.every((a) => a.target === "episode") ? `${verb} episodios` : `la ${verb}`;
+    },
+  },
+  {
+    kind: "rating",
+    matches: (a) => a.kind === "rating" || (a.kind === "watch" && a.rating != null),
+    phrase: (acts, many) => {
+      const verb = many ? "han puntuado" : "ha puntuado";
+      if (acts.some((a) => a.target === "movie" || a.target === "show")) return `la ${verb}`;
+      return acts.every((a) => a.target === "season") ? `${verb} temporadas` : `${verb} episodios`;
+    },
+  },
+  {
+    kind: "comment",
+    matches: (a) => a.kind === "comment",
+    phrase: (_acts, many) => (many ? "la han reseñado" : "la ha reseñado"),
+  },
+];
+
+/**
+ * Pie del fotograma de resumen de una historia con varias personas: qué han
+ * hecho con el título, contado por persona. La acción que han hecho TODAS va
+ * en el titular («2 personas la han visto»); las demás, debajo
+ * («1 la ha puntuado»). Si ninguna la han hecho todas, el titular es solo
+ * «2 personas».
+ */
+export function storySummaryLines(story) {
+  const actions = Array.isArray(story?.actions) ? story.actions : [];
+  const total = story?.users?.length || new Set(actions.map((a) => a.user?.id)).size;
+  const verbs = STORY_VERBS.map((verb) => {
+    const acts = actions.filter(verb.matches);
+    const people = new Set(acts.map((a) => a.user?.id)).size;
+    return { ...verb, acts, people };
+  }).filter((verb) => verb.people > 0);
+  const lead = verbs.find((verb) => verb.people === total) || null;
+  const headline = lead ? `${total} personas ${lead.phrase(lead.acts, true)}` : `${total} personas`;
+  const details = verbs
+    .filter((verb) => verb !== lead)
+    .map((verb) => `${verb.people} ${verb.phrase(verb.acts, verb.people > 1)}`);
+  return { headline, details };
+}
+
 /**
  * Lo que dice la línea de debajo de un título (rejilla, destacada), como en
  * Trakt: «Visto T1 · E2», «Vistos 3 episodios», «Visto y calificado»,

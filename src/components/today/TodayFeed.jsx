@@ -222,7 +222,7 @@ function TimeSections({ sections, tz, onOpenStory, layout }) {
   );
 }
 
-export default function TodayFeed({ group, layout = "grid", stories, people, sections, tz, onOpenStory, onOpenPerson }) {
+export default function TodayFeed({ group, layout = "list", stories, people, sections, tz, onOpenStory, onOpenPerson }) {
   if (group === "person") {
     return <PersonSections people={people} tz={tz} layout={layout} onOpenStory={onOpenStory} onOpenPerson={onOpenPerson} />;
   }

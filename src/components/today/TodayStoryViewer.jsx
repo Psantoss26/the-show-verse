@@ -13,6 +13,10 @@
 //   - El cartel es solo la portada: ni el ratón ni el toque abren una vista
 //     previa; tocarlo cuenta como cualquier otro toque (atrás o adelante).
 //   - Cada fotograma mostrado se marca como visto (seenStories).
+//   - Al pasar a otra historia (toque, flechas, teclado, deslizar o el paso
+//     automático) lo nuevo entra desde el lado hacia el que se va: el cartel y
+//     los fondos si cambia el título, el pie si solo cambia el fotograma
+//     (`.sv-story-*` en globals.css). Al abrir no se anima.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -23,8 +27,70 @@ import OptimizedImage from "@/components/OptimizedImage";
 import useModalGuard from "@/hooks/useModalGuard";
 import { relativeTime } from "@/lib/notifications/alerts";
 import { firstUnseenIndex } from "@/lib/today/seenStories";
+import { storySummaryLines } from "@/lib/today/stories";
 import { AvatarStack, Poster, TitleLink, UserAvatar } from "./TodayParts";
 import { actionPhrase, displayName, episodeLabel, milestoneLabel, ratingTen, tmdbImage } from "./todayUi";
+
+// Pieza del visor que entra al pasar de historia. El sentido se fija AL
+// MONTAR: la pieza que ya estaba (el cartel cuando solo cambia el fotograma)
+// no debe recibir la clase después y repetir la entrada sin haber cambiado.
+function StoryEnter({ as: Tag = "div", dir, enterClass, className = "", ...props }) {
+  const [mountDir] = useState(dir);
+  return (
+    <Tag
+      className={`${className} ${mountDir ? enterClass : ""}`}
+      data-story-dir={mountDir ?? undefined}
+      {...props}
+    />
+  );
+}
+
+// CIERRE FIABLE EN TÁCTIL. El visor lleva `touch-action: none` (sus gestos
+// los lleva él) y algunos navegadores móviles (Firefox, Samsung Internet) no
+// generan `click` si el dedo se mueve unos píxeles al tocar: la X no hacía
+// nada. Por eso, con dedo o lápiz, la X cierra al LEVANTAR el dedo sobre ella
+// (pointerup, que siempre llega: el puntero táctil queda capturado por el
+// botón donde empezó) y no espera al clic.
+//
+// Al cerrar en pointerup el visor desaparece antes del clic, y ese clic (si el
+// navegador lo genera) caería en lo que queda debajo: la barra superior, con
+// la píldora «Hoy» que vuelve a abrir las historias. Se descarta el siguiente
+// clic durante un instante.
+const GHOST_CLICK_MS = 700;
+const TAP_SLOP_PX = 12;
+
+function swallowNextClick() {
+  const swallow = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    cleanup();
+  };
+  const cleanup = () => {
+    window.clearTimeout(timer);
+    document.removeEventListener("click", swallow, true);
+  };
+  const timer = window.setTimeout(cleanup, GHOST_CLICK_MS);
+  document.addEventListener("click", swallow, true);
+}
+
+function closeTapHandlers(onClose) {
+  return {
+    onPointerUp: (event) => {
+      if (event.pointerType === "mouse") return;
+      const r = event.currentTarget.getBoundingClientRect();
+      const inside =
+        event.clientX >= r.left - TAP_SLOP_PX &&
+        event.clientX <= r.right + TAP_SLOP_PX &&
+        event.clientY >= r.top - TAP_SLOP_PX &&
+        event.clientY <= r.bottom + TAP_SLOP_PX;
+      if (!inside) return;
+      swallowNextClick();
+      onClose();
+    },
+    // Ratón y teclado (Intro, espacio).
+    onClick: onClose,
+  };
+}
 
 export const STORY_MS = 5000;
 const HOLD_MS = 220;
@@ -63,17 +129,24 @@ function FrameBody({ frame }) {
 
   if (frame.type === "summary") {
     const { story } = frame;
+    // Qué han hecho con el título (storySummaryLines): lo de todas arriba y el
+    // resto, el hito y la media debajo, en una línea.
+    const { headline, details } = storySummaryLines(story);
+    const extra = [
+      ...details,
+      story.averageRating != null ? `Media ${ratingTen(story.averageRating)}/10` : null,
+    ].filter(Boolean);
     return (
       <div className="flex items-center gap-3">
         <span className="shrink-0">
           <AvatarStack users={story.users} max={3} size="h-11 w-11" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-white">{story.users.length} personas lo han tocado</p>
+          <p className="truncate text-sm font-bold text-white">{headline}</p>
           <p className="truncate text-sm text-zinc-300">
             {story.milestone ? <span className="font-bold text-pink-300">{milestoneLabel(story.milestone)}</span> : null}
-            {story.milestone && story.averageRating != null ? " · " : ""}
-            {story.averageRating != null ? `Media ${ratingTen(story.averageRating)}/10` : ""}
+            {story.milestone && extra.length ? " · " : ""}
+            {extra.join(" · ")}
           </p>
         </div>
       </div>
@@ -126,6 +199,16 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
   const [groupIndex, setGroupIndex] = useState(startIndex ?? 0);
   const [frameIndex, setFrameIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  // Sentido del último paso («forward» | «back»); null al abrir. Se reinicia
+  // en el render (no en un efecto): el visor sigue montado mientras está
+  // cerrado y, con el efecto, el primer cartel salía con el sentido de la
+  // vez anterior y hacía su entrada al abrir.
+  const [dir, setDir] = useState(null);
+  const [openedFor, setOpenedFor] = useState(startIndex);
+  if (openedFor !== startIndex) {
+    setOpenedFor(startIndex);
+    setDir(null);
+  }
   const barRef = useRef(null);
   const elapsedRef = useRef(0);
   const pointerRef = useRef(null);
@@ -157,6 +240,7 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
         onClose();
         return;
       }
+      setDir(delta > 0 ? "forward" : "back");
       setGroupIndex(next);
       setFrameIndex(delta > 0 ? firstUnseenIndex(groups[next], seen) : 0);
     },
@@ -169,7 +253,10 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
       const next = frameIndex + delta;
       if (next < 0) goGroup(-1);
       else if (next >= group.frames.length) goGroup(1);
-      else setFrameIndex(next);
+      else {
+        setDir(delta > 0 ? "forward" : "back");
+        setFrameIndex(next);
+      }
     },
     [frameIndex, goGroup, group],
   );
@@ -256,11 +343,22 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
   if (!open || !group || !frame || typeof document === "undefined") return null;
   const media = frame.media || group.media;
   const backdrop = tmdbImage(media?.backdropPath, "w1280") || tmdbImage(media?.posterPath, "w780");
+  // Clave del título que se ve: cambia con el grupo y, en «Para ti», con cada
+  // fotograma (cada uno es de un título distinto).
+  const mediaKey = `${group.key}|${media?.type || ""}:${media?.id ?? media?.title ?? ""}`;
 
   return createPortal(
     <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black" role="dialog" aria-modal="true" aria-label={`Historias: ${media?.title || ""}`}>
       {backdrop ? (
-        <OptimizedImage src={backdrop} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl brightness-[0.35]" />
+        <StoryEnter
+          as={OptimizedImage}
+          key={mediaKey}
+          dir={dir}
+          enterClass="sv-story-fade"
+          src={backdrop}
+          alt=""
+          className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl brightness-[0.35]"
+        />
       ) : null}
 
       {/* Las flechas van pegadas a la tarjeta, no en los bordes de la pantalla. */}
@@ -295,7 +393,15 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
         }}
       >
         {backdrop ? (
-          <OptimizedImage src={backdrop} alt="" className="absolute inset-0 h-full w-full object-cover brightness-[0.45]" />
+          <StoryEnter
+            as={OptimizedImage}
+            key={mediaKey}
+            dir={dir}
+            enterClass="sv-story-fade"
+            src={backdrop}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover brightness-[0.45]"
+          />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-transparent to-black/90" />
 
@@ -312,7 +418,10 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
           ))}
         </div>
 
-        <div className="relative z-10 flex items-center gap-3 px-3 pt-3">
+        {/* La cabecera entera es zona de controles: un toque que roza la X o
+            el resto de botones no cuenta como «siguiente historia» (antes
+            avanzaba y parecía que la X no respondía). */}
+        <div className="relative z-10 flex items-center gap-3 px-3 pt-3" data-story-control>
           <TitleLink media={media} className="flex min-w-0 flex-1 items-center gap-2.5" data-story-control onClick={onClose}>
             <Poster media={media} size="w92" className="h-10 w-7 rounded" />
             <span className="min-w-0">
@@ -344,7 +453,14 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
           >
             <LayoutGrid className="h-5 w-5" />
           </Link>
-          <button type="button" data-story-control onClick={onClose} className="rounded-full p-2 text-white hover:bg-white/10" aria-label="Cerrar">
+          {/* 44 px de diana, el mínimo cómodo para un dedo (antes 36). */}
+          <button
+            type="button"
+            data-story-control
+            {...closeTapHandlers(onClose)}
+            className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
+            aria-label="Cerrar"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -355,12 +471,19 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
               el ancho del hueco y dos tercios de su alto), así se ve entero y
               nunca recortado. */}
           <div className="flex min-h-0 flex-1 items-center justify-center [container-type:size]">
-          <div className="relative aspect-[2/3] w-[min(100cqw,66.6667cqh)] overflow-hidden rounded-2xl bg-zinc-900 shadow-2xl">
+          <StoryEnter
+            key={mediaKey}
+            dir={dir}
+            enterClass="sv-story-card"
+            className="relative aspect-[2/3] w-[min(100cqw,66.6667cqh)] overflow-hidden rounded-2xl bg-zinc-900 shadow-2xl"
+          >
             <Poster media={media} size="w500" className="absolute inset-0 h-full w-full" />
-          </div>
+          </StoryEnter>
           </div>
           <div className="h-[116px] shrink-0 overflow-hidden">
-            <FrameBody frame={frame} />
+            <StoryEnter key={frame.key} dir={dir} enterClass="sv-story-body">
+              <FrameBody frame={frame} />
+            </StoryEnter>
           </div>
         </div>
       </div>
