@@ -511,7 +511,7 @@ const ALCANCE_DE_VISTA = { activity: "following", mine: "me" };
 // Orden de los botones del selector (Actividad · Siguiendo · Yo).
 const ORDEN_ALCANCES = ["today", "following", "me"];
 
-export default function SocialClient({ initialView = "today", initialToday = {}, onTodaySummary }) {
+export default function SocialClient({ initialView = "today", initialToday = {}, onTodaySummary, onScopeChange }) {
   const { session, account, hydrated } = useAuth();
   const isBackNav = useIsHistoryNavigation();
 
@@ -533,6 +533,14 @@ export default function SocialClient({ initialView = "today", initialToday = {},
     const hasta = ORDEN_ALCANCES.indexOf(scope);
     setSeccionMotion({ scope, dir: hasta > desde ? "forward" : "back" });
   }
+  // La cabecera (SocialHub) releva sus tarjetas al CAMBIAR de sección; la de
+  // llegada no se avisa (ya entran con su animación de llegada).
+  const scopeAvisadoRef = useRef(scope);
+  useEffect(() => {
+    if (scopeAvisadoRef.current === scope) return;
+    scopeAvisadoRef.current = scope;
+    onScopeChange?.(scope);
+  }, [scope, onScopeChange]);
   // Controles de Hoy, en la misma barra (Quién · Día · Agrupar).
   const [hoyQuien, setHoyQuien] = useState(initialToday.scope || "following");
   const [hoyDia, setHoyDia] = useState(initialToday.day || "today");

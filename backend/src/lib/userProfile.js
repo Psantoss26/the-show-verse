@@ -25,6 +25,7 @@ import {
   communityListItems,
 } from '../db/schema.js';
 import { getTitlePoster } from './tmdbPoster.js';
+import { summarizeFollowingWindow, summarizeOwnWindow } from './socialSummaryCore.js';
 import { pickByLanguageLadder } from './imageLanguageLadder.js';
 import { getTmdbCollection } from './tmdbCollection.js';
 import { getTmdbPerson } from './tmdbPerson.js';
@@ -1763,17 +1764,23 @@ function duplicatedFollowerEvent(item, viewerId, seguidos) {
 export const SOCIAL_ACTIVE_WINDOW_DAYS = 7;
 
 /**
- * Resumen de la cabecera de /social: seguidores, seguidos y cuántas de las
- * cuentas que sigo han hecho algo en la última semana.
+ * Resumen de la cabecera de /social: seguidores, seguidos, cuántas de las
+ * cuentas que sigo han hecho algo en la última semana y las cifras de cada
+ * sección de la barra (`sections`), que cambian al pasar de una a otra:
+ *  - `following` (Siguiendo): actividades de las cuentas que sigo en la
+ *    ventana, cuántas sigo y cuántas se han movido.
+ *  - `me` (Yo): mis actividades en la ventana, títulos distintos que he tocado
+ *    y días (en mi zona horaria) con algo hecho.
+ * Los recuentos están en `socialSummaryCore.js`.
  *
  * Seguidores y seguidos se cuentan EXACTAMENTE igual que en el perfil
  * (`buildUserProfile`), sin filtros añadidos, para que las dos páginas nunca
  * muestren cifras distintas de lo mismo.
  *
- * "Activos" no se deduce del feed ya cargado: el feed está paginado, así que un
+ * Nada se deduce del feed ya cargado: el feed está paginado, así que un
  * recuento sacado de él dependería de cuánto hubiera bajado el usuario. Se
  * consulta una vez por tabla de actividad —siete consultas en total, no siete
- * por cuenta— filtrando por fecha, y se unen los ids en memoria.
+ * por cuenta— filtrando por fecha, para mis cuentas seguidas y para mí a la vez.
  */
 export async function getSocialSummary(db, viewerId) {
   const vacio = {
@@ -1781,10 +1788,14 @@ export async function getSocialSummary(db, viewerId) {
     following: 0,
     activeWeek: 0,
     windowDays: SOCIAL_ACTIVE_WINDOW_DAYS,
+    sections: {
+      following: { actions: 0, people: 0, active: 0 },
+      me: { actions: 0, titles: 0, days: 0 },
+    },
   };
   if (!viewerId) return vacio;
 
-  const [followersRows, followingRows, seguidasActivas] = await Promise.all([
+  const [followersRows, followingRows, seguidasActivas, viewerRows] = await Promise.all([
     db.select({ n: count() }).from(follows).where(eq(follows.followingId, viewerId)),
     db.select({ n: count() }).from(follows).where(eq(follows.followerId, viewerId)),
     db
@@ -1793,6 +1804,7 @@ export async function getSocialSummary(db, viewerId) {
       .innerJoin(users, eq(users.id, follows.followingId))
       .where(and(eq(follows.followerId, viewerId), eq(users.isActive, true)))
       .limit(FEED_FOLLOWING_MAX),
+    db.select({ timezone: users.timezone }).from(users).where(eq(users.id, viewerId)).limit(1),
   ]);
 
   const resumen = {
@@ -1802,41 +1814,68 @@ export async function getSocialSummary(db, viewerId) {
   };
 
   const ids = seguidasActivas.map((row) => row.id);
-  if (!ids.length) return resumen;
+  const cuentas = [...ids, viewerId];
 
   const desde = new Date(Date.now() - SOCIAL_ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-  const recientes = (tabla, userCol, fechaCol, extra) =>
+  // Una fila por evento: quién, qué título (si lo hay), el grupo de episodios
+  // vistos juntos y cuándo.
+  const recientes = (tabla, userCol, fechaCol, { tmdbId, mediaType, activityGroup, extra } = {}) =>
     db
-      .select({ userId: userCol })
+      .select({
+        userId: userCol,
+        tmdbId: tmdbId ?? sql`null`,
+        mediaType: mediaType ?? sql`null`,
+        activityGroup: activityGroup ?? sql`null`,
+        at: fechaCol,
+      })
       .from(tabla)
-      .where(and(inArray(userCol, ids), gte(fechaCol, desde), extra))
-      .groupBy(userCol);
+      .where(and(inArray(userCol, cuentas), gte(fechaCol, desde), extra));
 
   const porTabla = await Promise.all([
-    recientes(titleComments, titleComments.userId, titleComments.createdAt, eq(titleComments.source, 'native')),
-    recientes(watchHistory, watchHistory.userId, watchHistory.watchedAt),
-    recientes(watchlist, watchlist.userId, watchlist.addedAt),
-    recientes(favorites, favorites.userId, favorites.addedAt),
-    recientes(userRatings, userRatings.userId, userRatings.ratedAt),
-    recientes(userLists, userLists.userId, userLists.createdAt, eq(userLists.isPublic, true)),
+    recientes(titleComments, titleComments.userId, titleComments.createdAt, {
+      tmdbId: titleComments.tmdbId,
+      mediaType: titleComments.mediaType,
+      extra: eq(titleComments.source, 'native'),
+    }),
+    recientes(watchHistory, watchHistory.userId, watchHistory.watchedAt, {
+      tmdbId: watchHistory.tmdbId,
+      mediaType: watchHistory.mediaType,
+      activityGroup: watchHistory.activityGroup,
+    }),
+    recientes(watchlist, watchlist.userId, watchlist.addedAt, { tmdbId: watchlist.tmdbId, mediaType: watchlist.mediaType }),
+    recientes(favorites, favorites.userId, favorites.addedAt, { tmdbId: favorites.tmdbId, mediaType: favorites.mediaType }),
+    recientes(userRatings, userRatings.userId, userRatings.ratedAt, {
+      tmdbId: userRatings.tmdbId,
+      mediaType: userRatings.mediaType,
+    }),
+    recientes(userLists, userLists.userId, userLists.createdAt, { extra: eq(userLists.isPublic, true) }),
     // Los elementos de lista cuelgan de la lista, así que el autor sale del join.
     db
-      .select({ userId: userLists.userId })
+      .select({
+        userId: userLists.userId,
+        tmdbId: userListItems.tmdbId,
+        mediaType: userListItems.mediaType,
+        activityGroup: sql`null`,
+        at: userListItems.addedAt,
+      })
       .from(userListItems)
       .innerJoin(userLists, eq(userLists.id, userListItems.listId))
       .where(and(
-        inArray(userLists.userId, ids),
+        inArray(userLists.userId, cuentas),
         eq(userLists.isPublic, true),
         gte(userListItems.addedAt, desde),
-      ))
-      .groupBy(userLists.userId),
+      )),
   ]);
 
-  const activos = new Set();
-  for (const filas of porTabla) {
-    for (const fila of filas) if (fila.userId) activos.add(fila.userId);
-  }
-  resumen.activeWeek = activos.size;
+  const filas = porTabla.flat().filter((fila) => fila.userId);
+  const seguidas = filas.filter((fila) => fila.userId !== viewerId);
+  const mias = filas.filter((fila) => fila.userId === viewerId);
+  const siguiendo = summarizeFollowingWindow(seguidas, resumen.following);
+  resumen.activeWeek = siguiendo.active;
+  resumen.sections = {
+    following: siguiendo,
+    me: summarizeOwnWindow(mias, viewerRows[0]?.timezone),
+  };
   return resumen;
 }
 

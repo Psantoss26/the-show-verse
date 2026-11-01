@@ -230,7 +230,7 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 | --- | --- | --- | --- |
 | `GET` | `/v1/users/search` | Si | Busca miembros |
 | `GET` | `/v1/users/feed?scope=following\|me` | Si | Feed de la seccion Social |
-| `GET` | `/v1/users/feed/summary` | Si | Cifras de la cabecera de Social |
+| `GET` | `/v1/users/feed/summary` | Si | Cifras de la cabecera de Social: seguidores, seguidos, `activeWeek` y `sections` (`following`: actions/people/active; `me`: actions/titles/days, en 7 días) |
 | `GET` | `/v1/users/today?scope=following\|community&day=today\|yesterday\|week\|YYYY-MM-DD` | Si | Pagina Hoy: vistos, notas y resenas de la ventana (zona horaria del usuario, sin fechas de importacion), recuentos por dia (`days`), `forYou` y, en Comunidad, `viewerFollows`. 400 si `day` no es valido. Ver [hoy](../features/hoy.md) |
 | `GET` | `/v1/users/me/profile-favorites` | Si | 5 peliculas y 5 series destacadas del perfil |
 | `PUT` | `/v1/users/me/profile-favorites` | Si | Guarda los destacados |

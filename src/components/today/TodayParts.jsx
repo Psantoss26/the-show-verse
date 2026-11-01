@@ -132,17 +132,16 @@ export function StoryRail({ groups, seen, onOpen }) {
       <ol className="flex gap-3 overflow-x-auto px-4 pb-2 pt-1 [scrollbar-width:none] sm:px-0">
         {groups.map((group, index) => {
           const unseen = hasUnseenFrames(group, seen);
-          const people = group.story?.users || [];
           return (
             <li key={group.key} className="shrink-0">
               <button
                 type="button"
                 onClick={() => onOpen(index)}
-                className="group flex w-[76px] flex-col items-center gap-1.5 focus-visible:outline-none"
+                className="group block focus-visible:outline-none"
                 aria-label={`Ver historia de ${group.kind === "for-you" ? "Para ti" : group.media?.title}`}
               >
                 <span
-                  className={`rounded-[14px] p-[2.5px] transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-pink-400 ${
+                  className={`block rounded-[14px] p-[2.5px] transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-pink-400 ${
                     unseen ? "bg-gradient-to-tr from-amber-400 via-pink-500 to-fuchsia-600" : "bg-zinc-700"
                   }`}
                 >
@@ -150,12 +149,6 @@ export function StoryRail({ groups, seen, onOpen }) {
                     <Poster media={group.media} size="w154" className="h-[96px] w-[64px] rounded-[10px]" />
                   </span>
                 </span>
-                <span className="w-full truncate text-center text-xs text-zinc-300">
-                  {group.kind === "for-you" ? "Para ti" : group.media?.title}
-                </span>
-                {people.length > 1 ? (
-                  <span className="-mt-1 text-xs text-zinc-500">{people.length} personas</span>
-                ) : null}
               </button>
             </li>
           );

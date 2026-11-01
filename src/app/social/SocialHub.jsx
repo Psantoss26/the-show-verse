@@ -9,39 +9,146 @@
 
 import { useCallback, useEffect, useState } from "react";
 import LoginRequiredScreen from "@/components/auth/LoginRequiredScreen";
-import { Activity, Flame, Users } from "lucide-react";
+import { Activity, CalendarDays, Clapperboard, Flame, Users } from "lucide-react";
+import { motion } from "framer-motion";
 
 import { useAuth } from "@/context/AuthContext";
 import PageStatCard from "@/components/ui/PageStatCard";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { summarize } from "@/lib/today/stories";
 import { fetchTodayFeed } from "@/lib/today/todayFeedClient";
 import SocialClient from "./SocialClient";
 
 // Tarjeta de cifra de la cabecera: la compartida de todas las cabeceras
 // (`PageStatCard`, mini tarjeta en móvil), como `CountStat` en Perfil, con el
-// mismo enlace a las listas de seguidores/seguidos.
-function TarjetaCifra({ value, label, href, title, icon, iconClassName = "text-pink-400" }) {
+// mismo enlace a las listas de seguidores/seguidos. Como en Listas, se queda
+// montada al cambiar de sección y solo se relevan, animados, sus piezas
+// (`animateChanges`, `swapGroup` = la sección).
+function TarjetaCifra({ value, label, shortLabel, href, title, icon, iconClassName = "text-pink-400", seccion, index }) {
   // Mientras no ha llegado el resumen se muestra un guion, no un 0: un cero
   // es una cifra real y sería mentira.
   return (
     <PageStatCard
       value={typeof value === "number" ? value : "—"}
       label={label}
+      shortLabel={shortLabel}
       href={href}
       prefetch={false}
       title={title}
       icon={icon}
       colorClass={iconClassName}
       focusRingClass="focus-visible:ring-pink-400/70"
+      animateChanges
+      iconKey={label}
+      swapGroup={seccion}
+      swapIndex={index}
     />
   );
+}
+
+// Sección de la barra según ?view= (como ALCANCE_DE_VISTA en SocialClient).
+const SECCION_DE_VISTA = { activity: "following", mine: "me" };
+
+// Las tres tarjetas de cada sección: no se cuenta lo mismo en Actividad, en
+// Siguiendo y en Yo.
+//  - Actividad: actividades y personas de la ventana elegida en Quién y Día
+//    (las manda TodayClient) y cuántas cuentas que sigues se han movido esta
+//    semana (dice si va a haber algo nuevo que enseñar).
+//  - Siguiendo: lo que han hecho las cuentas que sigues en la semana, cuántas
+//    sigues y cuántas se han movido.
+//  - Yo: lo que has hecho en la semana, en cuántos títulos y cuántos días.
+// Siguiendo y Yo salen de /api/users/feed/summary (`sections`), no del feed
+// cargado, que va paginado.
+function tarjetasDeSeccion(seccion, { todaySummary, summary }) {
+  const dias = summary?.windowDays || 7;
+  const activos = {
+    value: summary?.activeWeek,
+    label: "Activos",
+    icon: Activity,
+    iconClassName: "text-rose-400",
+    title: `Cuentas que sigues con actividad en los últimos ${dias} días`,
+  };
+  if (seccion === "following") {
+    const datos = summary?.sections?.following;
+    return [
+      {
+        value: datos?.actions,
+        label: "Actividades",
+        icon: Flame,
+        iconClassName: "text-pink-400",
+        title: `Lo que han hecho las cuentas que sigues en los últimos ${dias} días`,
+      },
+      {
+        value: datos?.people,
+        label: "Personas",
+        icon: Users,
+        iconClassName: "text-fuchsia-400",
+        title: "Cuentas que sigues",
+      },
+      { ...activos, value: datos?.active },
+    ];
+  }
+  if (seccion === "me") {
+    const datos = summary?.sections?.me;
+    return [
+      {
+        value: datos?.actions,
+        label: "Actividades",
+        icon: Flame,
+        iconClassName: "text-pink-400",
+        title: `Lo que has hecho en los últimos ${dias} días`,
+      },
+      {
+        value: datos?.titles,
+        label: "Títulos",
+        icon: Clapperboard,
+        iconClassName: "text-fuchsia-400",
+        title: `Títulos distintos con actividad tuya en los últimos ${dias} días`,
+      },
+      {
+        value: datos?.days,
+        label: "Días activos",
+        shortLabel: "Días",
+        icon: CalendarDays,
+        iconClassName: "text-rose-400",
+        title: `Días con actividad tuya de los últimos ${dias}`,
+      },
+    ];
+  }
+  return [
+    {
+      value: todaySummary?.actions,
+      label: "Actividades",
+      icon: Flame,
+      iconClassName: "text-pink-400",
+      title: "Actividades en Actividad, con lo elegido en Quién y Día",
+    },
+    {
+      value: todaySummary?.people,
+      label: "Personas",
+      icon: Users,
+      iconClassName: "text-fuchsia-400",
+      title: "Personas que salen en Actividad, con lo elegido en Quién y Día",
+    },
+    activos,
+  ];
 }
 
 export default function SocialHub({ initialView, initialToday }) {
   const { session, account, hydrated } = useAuth();
 
-  // Cifras de la cabecera: no cambian al pasar de vista, así que se piden una
-  // sola vez.
+  // Entrada de las tarjetas igual que en Listas (bloque que sube y tarjetas
+  // escalonadas), solo al llegar a la página, con cualquier sección. Al volver
+  // atrás se quedan quietas.
+  const isBackNav = useIsHistoryNavigation();
+  const [statsEntry] = useState(() => !isBackNav);
+  // Sección elegida en la barra (Actividad · Siguiendo · Yo): elige las
+  // cifras y el relevo. Empieza en la de llegada (la misma cuenta que hace
+  // SocialClient) y SocialClient solo avisa al CAMBIAR.
+  const [seccion, setSeccion] = useState(() => SECCION_DE_VISTA[initialView] || "today");
+
+  // Cifras de Siguiendo y Yo (y «Activos» de Actividad): se piden una sola
+  // vez y traen las de las dos secciones.
   const [summary, setSummary] = useState(null);
   useEffect(() => {
     if (!session || !account?.id) return undefined;
@@ -123,38 +230,30 @@ export default function SocialHub({ initialView, initialToday }) {
               </p>
             </div>
 
-            <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:w-auto">
-              {/* Las tres cifras de Hoy: cuántas actividades y de cuántas
-                  personas (en la ventana y el ámbito elegidos en la barra), y
-                  cuántas cuentas que sigues se han movido esta semana. */}
-              <TarjetaCifra
-                value={todaySummary?.actions}
-                label="Actividades"
-                icon={Flame}
-                iconClassName="text-pink-400"
-                title="Actividades en Actividad, con lo elegido en Quién y Día"
-              />
-              <TarjetaCifra
-                value={todaySummary?.people}
-                label="Personas"
-                icon={Users}
-                iconClassName="text-fuchsia-400"
-                title="Personas que salen en Actividad, con lo elegido en Quién y Día"
-              />
-              {/* De toda la gente a la que sigues, cuánta se ha movido esta
-                  semana: dice si va a haber algo nuevo que enseñar. */}
-              <TarjetaCifra
-                value={summary?.activeWeek}
-                label="Activos"
-                icon={Activity}
-                iconClassName="text-rose-400"
-                title={`Cuentas que sigues con actividad en los últimos ${summary?.windowDays || 7} días`}
-              />
-            </div>
+            <motion.div
+              className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:w-auto"
+              initial={statsEntry ? { opacity: 0, y: 20 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              {/* Tres cifras por sección (`tarjetasDeSeccion`). La clave es
+                  la posición: al cambiar de sección no se remontan, se relevan. */}
+              {tarjetasDeSeccion(seccion, { todaySummary, summary }).map((card, index) => (
+                <motion.div
+                  key={index}
+                  className="flex min-w-0"
+                  initial={statsEntry ? { opacity: 0, scale: 0.9 } : false}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.5 + index * 0.1 }}
+                >
+                  <TarjetaCifra {...card} seccion={seccion} index={index} />
+                </motion.div>
+              ))}
+            </motion.div>
           </div>
         </header>
 
-        <SocialClient initialView={initialView} initialToday={initialToday} onTodaySummary={handleTodaySummary} />
+        <SocialClient initialView={initialView} initialToday={initialToday} onTodaySummary={handleTodaySummary} onScopeChange={setSeccion} />
       </div>
     </div>
   );
