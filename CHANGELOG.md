@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Inicio, fila Calendario: las tarjetas ya no llevan texto encima. La fecha («Mañana», «Dentro de 3 días»), la etiqueta Estreno y el episodio se ven solo en la vista previa al pasar el ratón; en el móvil, el póster va también limpio. → [componentes](docs/frontend/components.md)
 - Películas y Series en el móvil: el título destacado de arriba ya no muestra la fila de premios y nominaciones; quedan solo las puntuaciones de TMDb e IMDb. En el ordenador no cambia. → [componentes](docs/frontend/components.md)
 - Fichas, plataformas disponibles: ya no aparece «No hay plataformas disponibles» en títulos que sí las tienen (sobre todo los cines en el móvil). Pasaba cuando el servidor no respondía un momento, por ejemplo durante una actualización de la web: la app usaba una copia guardada vieja o vacía y la ficha la daba por buena durante horas, aunque reintentaras. Ahora vuelve a preguntar y solo guarda la respuesta real. → [JustWatch](docs/guides/JUSTWATCH_INTEGRATION.md)
 - Inicio: «Tendencias ahora mismo» y el Calendario intercambian su sitio. Tras «Recomendaciones de hoy para ti» van ahora «Tendencias ahora mismo», «Más esperadas», el Calendario y «En cines». → [dashboards](docs/architecture/dashboards-implementation.md)

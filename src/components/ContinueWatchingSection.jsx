@@ -443,9 +443,10 @@ function useShowPoster(show) {
 
 /* ====================================================================
  * Tarjeta MÓVIL: el mismo póster (2:3) que el resto de filas del dashboard
- * (DashboardPosterImage). En Calendario lleva encima la fecha y el episodio.
+ * (DashboardPosterImage), limpio también en Calendario: la fecha y el
+ * episodio solo se muestran en la vista previa.
  * ==================================================================== */
-function ContinueWatchingMobilePosterCard({ show, mode = "continue" }) {
+function ContinueWatchingMobilePosterCard({ show }) {
   const movie = useMemo(
     () => ({
       id: show?.id,
@@ -458,39 +459,18 @@ function ContinueWatchingMobilePosterCard({ show, mode = "continue" }) {
     }),
     [show],
   );
-  const ep = show?.nextEpisode;
-  const calendar = mode === "calendar" ? show?.calendar || null : null;
 
   return (
     <div className="relative w-full">
       <PosterImage movie={movie} isMobile posterOverride={null} eager />
-      {calendar ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 overflow-hidden rounded-b-lg bg-gradient-to-t from-black/90 via-black/55 to-transparent px-2 pb-1.5 pt-6">
-          {calendar.isPremiere && (
-            <span className="mb-1 inline-block rounded bg-white px-1 py-px text-[8px] font-black uppercase tracking-wide text-black">
-              Estreno
-            </span>
-          )}
-          {calendar.countdown ? (
-            <div className="truncate text-[10px] font-semibold text-white drop-shadow">
-              {calendar.countdown}
-            </div>
-          ) : null}
-          {ep ? (
-            <div className="truncate text-[10px] font-semibold text-white/80">
-              T{ep.season}·E{ep.number}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   );
 }
 
 /* ====================================================================
- * Tarjeta base (sin hover): backdrop + overlay de progreso
+ * Tarjeta base (sin hover): solo el backdrop, sin texto encima
  * ==================================================================== */
-function ContinueWatchingBaseCard({ show, mode = "continue" }) {
+function ContinueWatchingBaseCard({ show }) {
   const { backdropPath } = useShowBackdrop(show);
   const bgSrc = backdropPath
     ? buildImg(backdropPath, CONTINUE_WATCHING_BACKDROP_SIZE)
@@ -507,10 +487,6 @@ function ContinueWatchingBaseCard({ show, mode = "continue" }) {
     if (bgSrc) loadedContinueWatchingBackdropSrcs.add(bgSrc);
     setImgReady(true);
   };
-  const pct = clampPct(show?.pct);
-  const ep = show?.nextEpisode;
-  const isCalendar = mode === "calendar";
-  const calendar = show?.calendar || null;
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-lg bg-neutral-900">
@@ -536,54 +512,9 @@ function ContinueWatchingBaseCard({ show, mode = "continue" }) {
         />
       )}
 
-      {/* Overlay inferior, SOLO en Calendario (fecha de emisión + episodio).
-          En Continuar viendo la tarjeta va limpia: la barra de progreso se pinta
-          DEBAJO y fuera de ella, sin texto, en todos los tamaños; el texto del
-          progreso solo aparece en la vista previa al pasar el ratón. */}
-      <div className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-8 ${isCalendar ? "" : "hidden"}`}>
-        {isCalendar && calendar?.countdown ? (
-          // Primera línea: solo la fecha («Mañana»), sin icono.
-          <div className="mb-1 flex items-center gap-1.5 truncate text-[11px] font-semibold text-white drop-shadow">
-            <span>{calendar.countdown}</span>
-            {calendar.isPremiere && (
-              <span className="rounded bg-white px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-black">
-                Estreno
-              </span>
-            )}
-          </div>
-        ) : ep ? (
-          <div className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold text-white drop-shadow">
-            <Play className="h-3 w-3 fill-current text-white shrink-0" aria-hidden="true" />
-            <span>
-              T{ep.season}·E{ep.number}
-              {show?.remainingLabel ? ` · ${show.remainingLabel}` : ""}
-            </span>
-          </div>
-        ) : show?.remainingLabel ? (
-          <div className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold text-white drop-shadow">
-            <Play className="h-3 w-3 fill-current text-white shrink-0" aria-hidden="true" />
-            <span>{show.remainingLabel}</span>
-          </div>
-        ) : null}
-        {isCalendar ? (
-          <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-white">
-            {ep && <span className="shrink-0 text-white">T{ep.season}·E{ep.number}</span>}
-            {ep?.title && (
-              <>
-                <span className="text-white/35" aria-hidden="true">•</span>
-                <span className="truncate">{ep.title}</span>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="h-1 w-full overflow-hidden rounded-full bg-white/25">
-            <div
-              className="h-full rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-        )}
-      </div>
+      {/* Sin texto encima en ninguna fila: en Continuar viendo la barra de
+          progreso va DEBAJO de la tarjeta y en Calendario la fecha y el
+          episodio solo aparecen en la vista previa al pasar el ratón. */}
     </div>
   );
 }
@@ -2263,9 +2194,9 @@ function ContinueWatchingSection({
                       {...titlePeekCardAttrs(show, mode)}
                     >
                       {isMobile ? (
-                        <ContinueWatchingMobilePosterCard show={show} mode={mode} />
+                        <ContinueWatchingMobilePosterCard show={show} />
                       ) : (
-                        <ContinueWatchingBaseCard show={show} mode={mode} />
+                        <ContinueWatchingBaseCard show={show} />
                       )}
                     </div>
                     <AnimatePresence
