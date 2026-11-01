@@ -371,7 +371,16 @@ valoradas y Aclamadas); y luego el resto de genéricas con las personalizadas
 secundarias intercaladas, una cada 2 filas como mucho («Más de tus géneros
 favoritos» primero y luego los «Porque te gustó…»), nunca dos seguidas salvo que
 no queden filas genéricas. En Inicio el cliente sigue colocando Calendario, Más
-esperadas y Tendencias justo tras la fila de recomendaciones.
+esperadas y Tendencias justo tras la fila de recomendaciones, y después
+**«En cines»**, que no sale del motor: la carga `src/app/page.jsx` en el servidor
+con `fetchNowInCinemas` (`src/lib/streaming/cinemaListings.js`). Son las
+películas con sesiones en España según JustWatch (ofertas `CINEMA`, por
+popularidad), sin preventas: se quita cualquiera cuyo estreno en cines en España
+(TMDb `release_dates`, tipo 3 o 2) sea posterior a hoy. Las reposiciones (un
+clásico en un ciclo) sí cuentan, porque hoy se pueden ver en un cine. Hasta 40
+títulos; JustWatch y las fichas de TMDb se cachean 3 h y la página se regenera
+cada hora. Etiqueta «CARTELERA» (`sectionLabel.js`). Si JustWatch falla, la
+fila no se pinta.
 
 ---
 

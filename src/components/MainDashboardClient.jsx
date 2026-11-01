@@ -4160,6 +4160,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
       "trending",
       "awarded",
       "dramaTV",
+      "nowInCinemas",
       // Nuevas secciones Trakt
       "traktTrending",
       "traktPopular",
@@ -4312,7 +4313,8 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
               y se coloca ARRIBA, justo tras la 1ª fila ("Recomendaciones de hoy para
               ti"), para dar prioridad a los próximos episodios y estrenos.
               "Tendencias ahora mismo" (key `trending`) va JUSTO DESPUÉS de "Más
-              esperadas", también fuera de su sitio natural. */}
+              esperadas", también fuera de su sitio natural, y tras ella "En
+              cines" (cartelera de España, no viene de la engine). */}
           {(() => {
             // Fila destacada "Más esperadas" (key `anticipated`) buscada en TODAS las
             // filas (no solo las reveladas) para poder mostrarla siempre en el bloque.
@@ -4359,6 +4361,22 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                 Array.isArray(row.items) &&
                 row.items.length > 0,
             );
+
+            // "En cines": la carga el servidor (lib/streaming/cinemaListings),
+            // ya sin preventas. Va tras "Tendencias ahora mismo".
+            const cinemaRow =
+              Array.isArray(dashboardData.nowInCinemas) &&
+              dashboardData.nowInCinemas.length > 0
+                ? {
+                    key: "now_in_cinemas",
+                    title: "En cines",
+                    items: dashboardData.nowInCinemas,
+                  }
+                : null;
+            const trendingAndCinema = () => [
+              ...(trendingRow ? [renderGenericRow(trendingRow)] : []),
+              ...(cinemaRow ? [renderGenericRow(cinemaRow)] : []),
+            ];
 
             const nodes = [];
             let blockInserted = false;
@@ -4421,19 +4439,17 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                 );
               }
               // Justo tras la 1ª fila (Recomendaciones de hoy para ti) va el
-              // bloque, seguido de "Tendencias ahora mismo".
+              // bloque, seguido de "Tendencias ahora mismo" y "En cines".
               if (!blockInserted) {
                 nodes.push(...calendarBlock);
-                if (trendingRow) nodes.push(renderGenericRow(trendingRow));
+                nodes.push(...trendingAndCinema());
                 blockInserted = true;
               }
             }
-            // Sin filas todavía: el bloque (y Tendencias) abren la lista.
+            // Sin filas todavía: el bloque (y Tendencias y En cines) abren
+            // la lista.
             if (!blockInserted) {
-              nodes.unshift(
-                ...calendarBlock,
-                ...(trendingRow ? [renderGenericRow(trendingRow)] : []),
-              );
+              nodes.unshift(...calendarBlock, ...trendingAndCinema());
             }
             return nodes;
           })()}

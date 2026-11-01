@@ -10,6 +10,7 @@ import {
   resolveCinemaStatus,
   todayInMadrid,
 } from "./cinema.js";
+import { selectNowInCinemas } from "./cinemaListings.js";
 
 const offer = (packageId, clearName, standardWebURL, monetizationType = "CINEMA") => ({
   monetizationType,
@@ -91,4 +92,23 @@ test("describes pre-sales with the Spanish release date", () => {
   assert.deepEqual(describeCinemaStatus(now), { label: "En cines", detail: "Cinesa" });
   assert.deepEqual(createCinemaPlatformItems(now).map((i) => i.title), ["Cinesa", "Entradas"]);
   assert.equal(describeCinemaStatus(null), null);
+});
+
+test("the cinema row keeps released films and re-releases, not pre-sales", () => {
+  const spain = (date) => ({ results: [{ iso_3166_1: "ES", release_dates: [{ type: 3, release_date: `${date}T00:00:00.000Z` }] }] });
+  const items = selectNowInCinemas(
+    [
+      { id: 1, title: "Clayface", poster_path: "/a.jpg", release_date: "2026-10-19", release_dates: spain("2026-10-23"), genres: [{ id: 27 }] },
+      { id: 2, title: "Doomsday", poster_path: "/b.jpg", release_date: "2026-12-16", release_dates: spain("2026-12-18") },
+      { id: 3, title: "El padrino", poster_path: "/c.jpg", release_date: "1972-03-14", release_dates: { results: [] } },
+      { id: 4, title: "Sin póster", poster_path: null, release_date: "2026-10-01" },
+      { id: 5, title: "Sin fecha", poster_path: "/e.jpg" },
+      null,
+    ],
+    "2026-11-01",
+  );
+  assert.deepEqual(items.map((i) => i.title), ["Clayface", "El padrino"]);
+  assert.equal(items[0].release_date, "2026-10-23");
+  assert.deepEqual(items[0].genre_ids, [27]);
+  assert.equal(items[0].media_type, "movie");
 });

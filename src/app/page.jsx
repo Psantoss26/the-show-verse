@@ -19,6 +19,7 @@ import {
   FEATURED_HERO_SIZE,
 } from "@/lib/dashboard/featured";
 import { fetchFeaturedSources } from "@/lib/dashboard/featuredSources";
+import { fetchNowInCinemas } from "@/lib/streaming/cinemaListings";
 import {
   combineTopRatedItems,
   TOP_RATED_MIN_VOTES,
@@ -93,6 +94,7 @@ async function getDashboardData() {
       popularMovies,
       popularTV,
       featuredSources,
+      nowInCinemas,
     ] = await Promise.all([
       fetchTopRatedMovies(TOP_RATED_MIN_VOTES),
       fetchTopRatedTV(TOP_RATED_MIN_VOTES),
@@ -115,6 +117,8 @@ async function getDashboardData() {
       // Fuentes del hero, compartidas con Películas y Series (que las usan
       // para no repetir los títulos de este hero).
       fetchFeaturedSources(),
+      // Fila «En cines»: cartelera de España (JustWatch) sin preventas.
+      fetchNowInCinemas(),
     ]);
 
     // Respaldo de «Mejor valoradas» si el motor no responde: el mismo ranking
@@ -149,6 +153,7 @@ async function getDashboardData() {
       }),
       trending: balanceSoftLimitedDashboardContent([...trendingMovies, ...trendingTV], "movie"),
       popular: balanceSoftLimitedDashboardContent([...popularMovies, ...popularTV], "movie"),
+      nowInCinemas,
 
       // Trakt se carga en el cliente para que Inicio no bloquee la navegación
       // validando cookies/tokens ni esperando endpoints externos.

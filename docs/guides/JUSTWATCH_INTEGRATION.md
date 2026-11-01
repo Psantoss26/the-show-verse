@@ -94,6 +94,10 @@ Con cines, la respuesta se cachea 6 h en lugar de 24 h.
 
 ## Cines (en cartelera / preventa)
 
+La fila «En cines» de Inicio usa la misma fuente, en lista: ver
+`src/lib/streaming/cinemaListings.js` y la sección de orden de filas de
+[[dashboards-implementation]].
+
 JustWatch publica ofertas `monetizationType: "CINEMA"` por cadena (Cinesa,
 Cine Yelmo, Kinepolis, Odeon Multicines…) con el enlace de compra de entradas,
 y Entradas.com (paquete 1970) como agregador. Esas ofertas aparecen **también

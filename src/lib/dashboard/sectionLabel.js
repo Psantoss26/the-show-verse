@@ -67,6 +67,7 @@ const EXACT_LABELS = {
   "Más esperadas": "ANTICIPADAS",
   Estrenos: "ESTRENOS",
   "Estrenos y novedades": "ESTRENOS",
+  "En cines": "CARTELERA",
 
   // Aclamadas / valoradas / premios
   "Aclamadas que merecen la pena": "ACLAMADAS",
