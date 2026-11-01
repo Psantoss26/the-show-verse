@@ -2400,6 +2400,34 @@ html[data-android-app] *::after {
   backdrop-filter: none !important;
 }
 
+/* MODO LIGERO (`data-sv-lite`): lo mismo que la app de Android, pero solo en
+   los navegadores de dispositivos que van a tirones con el cristal (o que lo
+   eligen en Ajustes). Lo pone un script del <head> y PerformanceModeManager,
+   que mide los fotogramas durante el scroll (src/lib/ui/performanceMode.js).
+   Un equipo que va fluido no lo recibe nunca y se ve exactamente igual. El
+   prefijo ANTES que la estándar (ver `data-sv-drawer-resizing`). */
+html[data-sv-lite] *,
+html[data-sv-lite] *::before,
+html[data-sv-lite] *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* Las barras que FLOTAN sobre el contenido (inferior del móvil, lateral de
+   escritorio, menú lateral) tienen un tinte mínimo porque el desenfoque hacía
+   el resto: sin él, las portadas se veían nítidas a través de los iconos. Aquí
+   llevan un tinte casi opaco; el degradado de luz de encima se queda. */
+html[data-sv-lite] .sv-navbar-bottom-shift,
+html[data-sv-lite] .sv-desktop-side-nav,
+html[data-sv-lite] #mobile-navigation-drawer {
+  background-color: rgb(12 12 14 / 0.86) !important;
+}
+/* La barra superior, igual: su capa de cristal conserva la máscara que la
+   funde por abajo, solo cambia el tinte (solo en modo ligero; en calidad
+   completa el cristal no se oscurece). */
+html[data-sv-lite] .sv-topbar-glass {
+  background-color: rgb(0 0 0 / 0.72) !important;
+}
+
 .sv-topbar {
   transition:
     background-color 300ms,
