@@ -41,6 +41,7 @@ import streamingDetectionsRoutes from './routes/streamingDetections.js';
 import billingRoutes from './routes/billing.js';
 import { refreshAllPools } from './dashboard/pools.js';
 import { syncAllLetterboxdAccounts } from './lib/letterboxdSync.js';
+import { runSocialBotsTick } from './lib/socialBots.js';
 
 import { closeRedis, getRedis } from './lib/redis.js';
 
@@ -375,6 +376,35 @@ const runLetterboxdSync = () => {
 if (Number.isFinite(LETTERBOXD_SYNC_INTERVAL_MS) && LETTERBOXD_SYNC_INTERVAL_MS > 0) {
   setTimeout(runLetterboxdSync, 2 * 60 * 1000).unref?.();
   setInterval(runLetterboxdSync, LETTERBOXD_SYNC_INTERVAL_MS).unref?.();
+}
+
+// ────────────────────────────────────────────
+// Usuarios automáticos de Social
+// Unas pocas cuentas ven estrenos y episodios nuevos a lo largo del día
+// (lib/socialBots). El tic solo calcula en memoria y toca la BD cuando a alguna
+// le toca actuar (~20 veces al día); los títulos salen de los pools cacheados.
+// Activo por defecto solo en producción. SOCIAL_BOTS_MS ajusta el tic (0 lo
+// desactiva; en local, ponerlo > 0 lo activa).
+// ────────────────────────────────────────────
+const SOCIAL_BOTS_INTERVAL_MS =
+  process.env.SOCIAL_BOTS_MS !== undefined
+    ? Number(process.env.SOCIAL_BOTS_MS)
+    : isDev ? 0 : 10 * 60 * 1000; // 10 min
+
+let socialBotsRunning = false;
+const runSocialBots = () => {
+  if (socialBotsRunning) return;
+  socialBotsRunning = true;
+  runSocialBotsTick({ log: fastify.log })
+    .catch((err) => fastify.log.warn({ err }, 'social bots tick failed'))
+    .finally(() => {
+      socialBotsRunning = false;
+    });
+};
+
+if (Number.isFinite(SOCIAL_BOTS_INTERVAL_MS) && SOCIAL_BOTS_INTERVAL_MS > 0) {
+  setTimeout(runSocialBots, 3 * 60 * 1000).unref?.();
+  setInterval(runSocialBots, SOCIAL_BOTS_INTERVAL_MS).unref?.();
 }
 
 // ────────────────────────────────────────────

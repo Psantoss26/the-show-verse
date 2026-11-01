@@ -138,6 +138,32 @@ Cada cuenta lleva una foto de perfil generada: un degradado con sus iniciales, e
 
 Con `--viewer`, esa cuenta sigue a Lucía, Marcos, Sara y Dani, y Dani la sigue a ella.
 
+## Usuarios automáticos
+
+Seis cuentas automáticas mantienen viva la Comunidad en producción: `nachocinefilo`, `martaseries`, `alexsofa`, `irene_maraton`, `pauvos` y `jorgecritico`. Se ven como cuentas normales (nombre, bio y foto de degradado con iniciales) y cualquiera puede seguirlas; ellas solo se siguen entre sí, para no mandar avisos de «te sigue» a nadie. No tienen contraseña y su correo es `bot+<cuenta>@theshowverse.invalid`, así que nadie puede iniciar sesión con ellas.
+
+**Qué hacen.** Cada una tiene entre 2 y 5 sesiones al día, a horas al azar entre las 9:30 y las 23:45 (hora de Madrid). En cada sesión hace una de estas cosas, según sus gustos (proporción cine/series, géneros preferidos, nota más dura o más generosa):
+
+- Ver una película estrenada en los últimos 60 días (con al menos 50 votos en TMDb).
+- Ver un episodio emitido hoy o en los dos días anteriores, a veces con uno o dos anteriores de la misma temporada seguidos (maratón).
+- Ver el 1x01 de una serie estrenada en los últimos 30 días (con al menos 20 votos).
+- Apuntar un próximo estreno en pendientes (y quitarlo de ahí cuando lo ve).
+
+Tras ver algo puede puntuarlo (la nota pública de TMDb ± su sesgo y algo de ruido, en medios puntos), reseñarlo con una frase corta acorde a la nota (películas y estrenos de serie, una sola vez por título) y, si le pone 9 o más, marcarlo como favorito. Nunca repite un título o episodio que ya tiene.
+
+**Coste.** Los títulos salen de los pools del dashboard ya cacheados (`new_releases`, `trending` y `calendar_episodes_v3`): ninguna llamada extra a TMDb. El servidor (`server.js`) lanza un tic cada 10 minutos que solo calcula en memoria; va a la BD únicamente cuando a alguna cuenta le toca actuar (unas 20 veces al día) y cada vez hace una sesión por cuenta como mucho. Escriben directamente en las tablas, sin pasar por las rutas, así que no disparan notificaciones push.
+
+**Cómo está hecho.** `backend/src/lib/socialBotsCore.js` (parte pura: cuentas, plan del día, elección de títulos, notas y reseñas) y `backend/src/lib/socialBots.js` (consultas y escritura). El plan de cada día es determinista (semilla = cuenta + día) y lo hecho hoy se cuenta en la BD dentro de un candado de Postgres (`pg_try_advisory_xact_lock`): un reinicio no duplica acciones y dos procesos contra la misma base no actúan a la vez. Tras un parón, se ponen al día de una en una por tic.
+
+**Configuración.** Activo por defecto solo con `NODE_ENV=production`. `SOCIAL_BOTS_MS` ajusta el tic (0 lo desactiva; en local, un valor mayor que 0 lo activa). Las cuentas se crean solas en el primer tic.
+
+```bash
+cd backend
+npm run bots:social               # crea las cuentas que falten y enseña el plan de hoy
+npm run bots:social -- --tick     # además pone al día ahora lo que ya tocaba
+npm run bots:social -- --remove   # borra las cuentas y toda su actividad
+```
+
 ## Endpoints
 
 `GET /v1/users/today`, en la sección *Social y perfiles* de [[backend_api_reference]]. Proxy de Next en `src/app/api/users/today/route.js`.
