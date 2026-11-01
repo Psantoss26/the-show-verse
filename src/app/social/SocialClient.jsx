@@ -62,6 +62,7 @@ import Avatar from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { writeSocialPrefsCookie } from "@/lib/today/socialPrefs";
 import EntranceItem, { estimateVisibleRows } from "@/components/ui/EntranceItem";
 import { useSlidingSectionIndicator } from "@/components/ui/useSlidingSectionIndicator";
 import { useSearchParams } from "next/navigation";
@@ -511,17 +512,23 @@ const ALCANCE_DE_VISTA = { activity: "following", mine: "me" };
 // Orden de los botones del selector (Actividad · Siguiendo · Yo).
 const ORDEN_ALCANCES = ["today", "following", "me"];
 
-export default function SocialClient({ initialView = "today", initialToday = {}, onTodaySummary, onScopeChange }) {
+export default function SocialClient({ initialView = "today", initialToday = {}, initialFeedPrefs = {}, onTodaySummary, onScopeChange }) {
   const { session, account, hydrated } = useAuth();
   const isBackNav = useIsHistoryNavigation();
 
   // «today» | «following» | «me». Con «today» la barra lleva los controles de
   // Hoy y debajo se pinta TodayClient.
   const [scope, setScope] = useState(ALCANCE_DE_VISTA[initialView] || "today");
+  // ¿Ha elegido el usuario algo del menú en esta visita? Solo entonces se
+  // guardan las preferencias (socialPrefs.js): los saltos automáticos de la
+  // llegada (Hoy vacío → Semana o Siguiendo) no son una elección y, guardados,
+  // impedirían ese salto en las visitas siguientes.
+  const eligioRef = useRef(false);
   const esHoy = scope === "today";
   // CAMBIO DE SECCIÓN DESDE EL SELECTOR: la sección nueva se pinta en una
   // transición (ver SelectorAlcance, que mueve su pastilla antes).
   const elegirScope = useCallback((valor) => {
+    eligioRef.current = true;
     startTransition(() => setScope(valor));
   }, []);
   // Dirección de la entrada del contenido: llega desde el lado en que está su
@@ -614,8 +621,38 @@ export default function SocialClient({ initialView = "today", initialToday = {},
 
 
   const [q, setQ] = useState("");
-  const [filtro, setFiltro] = useState("all");
-  const [orden, setOrden] = useState("recent");
+  // Filtro y orden de Siguiendo / Yo: los guardados (cookie, socialPrefs.js)
+  // si siguen existiendo.
+  const [filtro, setFiltro] = useState(() =>
+    FILTROS.some(([v]) => v === initialFeedPrefs.filter) ? initialFeedPrefs.filter : "all");
+  const [orden, setOrden] = useState(initialFeedPrefs.order === "oldest" ? "oldest" : "recent");
+  // Setters de los menús que marcan la elección del usuario.
+  const elegir = useMemo(() => {
+    const marcar = (set) => (valor) => {
+      eligioRef.current = true;
+      set(valor);
+    };
+    return {
+      quien: marcar(setHoyQuien),
+      dia: marcar(setHoyDia),
+      agrupar: marcar(setHoyAgrupar),
+      filtro: marcar(setFiltro),
+      orden: marcar(setOrden),
+    };
+  }, []);
+  // Lo elegido se mantiene al salir y volver a entrar: la cookie la lee el
+  // servidor (page.jsx) para abrir ya con ello.
+  useEffect(() => {
+    if (!eligioRef.current) return;
+    writeSocialPrefsCookie({
+      view: scope === "today" ? "today" : VISTA_DE_ALCANCE[scope],
+      scope: hoyQuien,
+      day: hoyDia,
+      group: hoyAgrupar,
+      filter: filtro,
+      order: orden,
+    });
+  }, [scope, hoyQuien, hoyDia, hoyAgrupar, filtro, orden]);
   // Las MISMAS dos vistas que la Actividad del perfil: lista con avatar y
   // lista con póster.
   const [vista, setVistaState] = useState(leerVistaGuardada);
@@ -883,13 +920,13 @@ export default function SocialClient({ initialView = "today", initialToday = {},
     ["time", "Por hora"],
   ];
   const selectorQuien = (props = {}) => (
-    <SelectorSimple icon={Globe2} label="Quién" opciones={OPCIONES_QUIEN} valor={hoyQuien} onChange={setHoyQuien} {...props} />
+    <SelectorSimple icon={Globe2} label="Quién" opciones={OPCIONES_QUIEN} valor={hoyQuien} onChange={elegir.quien} {...props} />
   );
   const selectorDia = (props = {}) => (
-    <SelectorSimple icon={CalendarDays} label="Día" opciones={opcionesDia} valor={diaValor} onChange={setHoyDia} {...props} />
+    <SelectorSimple icon={CalendarDays} label="Día" opciones={opcionesDia} valor={diaValor} onChange={elegir.dia} {...props} />
   );
   const selectorAgruparHoy = (props = {}) => (
-    <SelectorSimple icon={Layers3} label="Agrupar" opciones={OPCIONES_AGRUPAR_HOY} valor={hoyAgrupar} onChange={setHoyAgrupar} {...props} />
+    <SelectorSimple icon={Layers3} label="Agrupar" opciones={OPCIONES_AGRUPAR_HOY} valor={hoyAgrupar} onChange={elegir.agrupar} {...props} />
   );
   const placeholder = esHoy ? "Buscar en Hoy..." : "Buscar en la actividad...";
 
@@ -975,7 +1012,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                   label="Acción"
                   opciones={FILTROS}
                   valor={filtro}
-                  onChange={setFiltro}
+                  onChange={elegir.filtro}
                 />
                 <SelectorSimple
                   icon={ArrowUpDown}
@@ -985,7 +1022,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                     ["oldest", "Antiguo"],
                   ]}
                   valor={orden}
-                  onChange={setOrden}
+                  onChange={elegir.orden}
                 />
                 <SelectorSimple
                   icon={Layers3}
@@ -1047,7 +1084,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                   label="Acción"
                   opciones={FILTROS}
                   valor={filtro}
-                  onChange={setFiltro}
+                  onChange={elegir.filtro}
                 />
                 <SelectorSimple
                   icon={Layers3}
@@ -1064,7 +1101,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                     ["oldest", "Antiguo"],
                   ]}
                   valor={orden}
-                  onChange={setOrden}
+                  onChange={elegir.orden}
                 />
                 <SelectorVista
                   vista={vista}
@@ -1092,8 +1129,8 @@ export default function SocialClient({ initialView = "today", initialToday = {},
               group={hoyAgrupar}
               layout={hoyVista}
               query={q}
-              onScopeChange={setHoyQuien}
-              onDayChange={setHoyDia}
+              onScopeChange={elegir.quien}
+              onDayChange={elegir.dia}
               onDaysChange={setHoyDias}
               onSummaryChange={onTodaySummary}
               initialScope={initialToday.scope}

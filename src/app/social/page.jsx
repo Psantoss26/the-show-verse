@@ -12,6 +12,7 @@ import {
   normalizeSocialView,
   normalizeTodayParams,
 } from "@/lib/today/params";
+import { SOCIAL_PREFS_COOKIE, mergeSocialParams, readSocialPrefs } from "@/lib/today/socialPrefs";
 
 export const metadata = {
   title: "Social",
@@ -56,7 +57,11 @@ async function loadInitialToday({ scope, day, cookieStore, headerList }) {
 }
 
 export default async function SocialPage({ searchParams }) {
-  const [params, cookieStore, headerList] = await Promise.all([searchParams, cookies(), headers()]);
+  const [urlParams, cookieStore, headerList] = await Promise.all([searchParams, cookies(), headers()]);
+  // Lo elegido la última vez en el menú (socialPrefs.js) para lo que no diga
+  // la URL.
+  const prefs = readSocialPrefs(cookieStore.get(SOCIAL_PREFS_COOKIE)?.value);
+  const { params, saved } = mergeSocialParams(urlParams, prefs);
   let view = normalizeSocialView(params);
   let { scope, day, group } = normalizeTodayParams(params);
   // Los datos de «Hoy» van en el RSC solo si se abre en esa opción; Siguiendo y
@@ -65,10 +70,11 @@ export default async function SocialPage({ searchParams }) {
     ? await loadInitialToday({ scope, day, cookieStore, headerList })
     : null;
 
-  // Entrando sin elegir nada, un «Hoy» vacío salta a la Semana, y una semana
+  // Entrando sin elegir nada (ni en la URL ni guardado), un «Hoy» vacío salta a la Semana, y una semana
   // vacía a Siguiendo. Sin datos del servidor lo decide el cliente al llegar
   // los recuentos (autoLanding).
-  const implicit = implicitSocialEntry(params);
+  // Con preferencias guardadas no se salta: se respeta lo elegido.
+  const implicit = saved ? { day: false, view: false } : implicitSocialEntry(urlParams);
   let autoLanding = null;
   if (view === "today" && implicit.day) {
     const landing = data ? defaultSocialLanding(data.days) : null;
@@ -85,7 +91,11 @@ export default async function SocialPage({ searchParams }) {
 
   return (
     <DetailModalProvider placement="right">
-      <SocialHub initialView={view} initialToday={{ scope, day, group, data, autoLanding }} />
+      <SocialHub
+        initialView={view}
+        initialToday={{ scope, day, group, data, autoLanding }}
+        initialFeedPrefs={{ filter: prefs.filter, order: prefs.order }}
+      />
     </DetailModalProvider>
   );
 }

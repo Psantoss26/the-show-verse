@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Social: lo que eliges en el menú se mantiene al salir y volver a entrar, también al recargar: la sección (Actividad, Siguiendo o Yo), Quién, Día y Agrupar en Actividad, y Acción y Orden en Siguiendo y Yo. Antes volvía todo a lo de por defecto cada vez. → [Hoy](docs/features/hoy.md)
 - Social, Actividad en cuadrícula: la hora y el resto del texto de debajo de cada cartel se ven más definidos (gris más claro y, en pantallas grandes como un 2K, un punto más grandes). En el móvil la hora ya no se corta en las tarjetas con episodios y varias personas. → [Hoy](docs/features/hoy.md)
 - Social, Actividad en cuadrícula: debajo de cada cartel ya no van el título ni la frase («Visto y calificado», «2 personas»…), sino una fila de iconos nítidos, también en pantallas 2K: visto (verde), calificado (ámbar) y reseñado (naranja), con los colores de la Actividad del perfil, el episodio («T1·E2») o cuántos («3 ep.»), las personas si son varias y la hora. La vista lista no cambia. → [Hoy](docs/features/hoy.md)
 - Social: las cuentas automáticas de la comunidad eligen sobre todo títulos conocidos: películas y series en tendencias, populares, top en España y los estrenos más esperados, en vez de títulos minoritarios que casi nadie conoce. → [Hoy](docs/features/hoy.md#usuarios-automáticos)
