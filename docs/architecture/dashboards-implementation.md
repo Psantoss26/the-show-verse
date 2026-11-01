@@ -370,9 +370,9 @@ Tendencias, Estrenos, Populares en streaming en España, Populares, Las más
 valoradas y Aclamadas); y luego el resto de genéricas con las personalizadas
 secundarias intercaladas, una cada 2 filas como mucho («Más de tus géneros
 favoritos» primero y luego los «Porque te gustó…»), nunca dos seguidas salvo que
-no queden filas genéricas. En Inicio el cliente sigue colocando Calendario, Más
-esperadas y Tendencias justo tras la fila de recomendaciones, y después
-**«En cines»**, que no sale del motor: la carga `src/app/page.jsx` en el servidor
+no queden filas genéricas. En Inicio el cliente coloca justo tras la fila de
+recomendaciones un bloque fijo: Tendencias, Más esperadas, Calendario y
+**«En cines»**. Esta última no sale del motor: la carga `src/app/page.jsx` en el servidor
 con `fetchNowInCinemas` (`src/lib/streaming/cinemaListings.js`). Son las
 películas con sesiones en España según JustWatch (ofertas `CINEMA`, por
 popularidad), sin preventas: se quita cualquiera cuyo estreno en cines en España

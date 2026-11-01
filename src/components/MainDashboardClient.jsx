@@ -4309,12 +4309,10 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
               genérico rotativo, deduplicado por el backend (sin Trakt). Se usa el
               componente Row (con vista previa al hover y flechas de desplazamiento).
               Se omite "Mejor valoradas" porque ya se muestra arriba en TopRatedHero.
-              El bloque "Calendario" + "Más esperadas" se saca de su posición natural
-              y se coloca ARRIBA, justo tras la 1ª fila ("Recomendaciones de hoy para
-              ti"), para dar prioridad a los próximos episodios y estrenos.
-              "Tendencias ahora mismo" (key `trending`) va JUSTO DESPUÉS de "Más
-              esperadas", también fuera de su sitio natural, y tras ella "En
-              cines" (cartelera de España, no viene de la engine). */}
+              Justo tras la 1ª fila ("Recomendaciones de hoy para ti") va un bloque
+              sacado de su posición natural: "Tendencias ahora mismo" (key
+              `trending`), "Más esperadas", "Calendario" y "En cines" (cartelera
+              de España, no viene de la engine). */}
           {(() => {
             // Fila destacada "Más esperadas" (key `anticipated`) buscada en TODAS las
             // filas (no solo las reveladas) para poder mostrarla siempre en el bloque.
@@ -4325,36 +4323,33 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                 row.items.length > 0,
             );
 
-            // Bloque Calendario + Más esperadas que se inserta arriba.
-            const calendarBlock = [
+            const calendarSection = (
               <DashboardCalendarSection
                 key="__calendar__"
                 isMobile={isMobile}
                 hydrated={hydrated}
-              />,
-            ];
-            if (anticipatedRow) {
-              calendarBlock.push(
-                <Row
-                  key={anticipatedRow.key}
-                  title={anticipatedRow.title}
-                  items={anticipatedRow.items}
-                  isMobile={isMobile}
-                  hydrated={hydrated}
-                  posterCacheRef={posterCacheRef}
-                  posterOverrides={posterOverrides}
-                  backdropOverrides={backdropOverrides}
-                  overridesReady={overridesReady}
-                  spotlight={
-                    !!spotlightRowTitle &&
-                    anticipatedRow.title === spotlightRowTitle
-                  }
-                />,
-              );
-            }
+              />
+            );
+            const anticipatedNode = anticipatedRow ? (
+              <Row
+                key={anticipatedRow.key}
+                title={anticipatedRow.title}
+                items={anticipatedRow.items}
+                isMobile={isMobile}
+                hydrated={hydrated}
+                posterCacheRef={posterCacheRef}
+                posterOverrides={posterOverrides}
+                backdropOverrides={backdropOverrides}
+                overridesReady={overridesReady}
+                spotlight={
+                  !!spotlightRowTitle &&
+                  anticipatedRow.title === spotlightRowTitle
+                }
+              />
+            ) : null;
 
-            // "Tendencias ahora mismo", buscada también en TODAS las filas: va
-            // tras "Más esperadas" aunque su sitio natural no se haya revelado.
+            // "Tendencias ahora mismo", buscada también en TODAS las filas: abre
+            // el bloque aunque su sitio natural no se haya revelado.
             const trendingRow = renderableEngineRows.find(
               (row) =>
                 row.key === "trending" &&
@@ -4363,7 +4358,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
             );
 
             // "En cines": la carga el servidor (lib/streaming/cinemaListings),
-            // ya sin preventas. Va tras "Tendencias ahora mismo".
+            // ya sin preventas. Cierra el bloque, tras el Calendario.
             const cinemaRow =
               Array.isArray(dashboardData.nowInCinemas) &&
               dashboardData.nowInCinemas.length > 0
@@ -4373,8 +4368,13 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                     items: dashboardData.nowInCinemas,
                   }
                 : null;
-            const trendingAndCinema = () => [
+            // Bloque superior: Tendencias, Más esperadas, Calendario y En
+            // cines. Función porque `renderGenericRow` lleva la cuenta de la
+            // alternancia y debe llamarse en el orden en que se pinta.
+            const topBlock = () => [
               ...(trendingRow ? [renderGenericRow(trendingRow)] : []),
+              ...(anticipatedNode ? [anticipatedNode] : []),
+              calendarSection,
               ...(cinemaRow ? [renderGenericRow(cinemaRow)] : []),
             ];
 
@@ -4439,17 +4439,15 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                 );
               }
               // Justo tras la 1ª fila (Recomendaciones de hoy para ti) va el
-              // bloque, seguido de "Tendencias ahora mismo" y "En cines".
+              // bloque superior.
               if (!blockInserted) {
-                nodes.push(...calendarBlock);
-                nodes.push(...trendingAndCinema());
+                nodes.push(...topBlock());
                 blockInserted = true;
               }
             }
-            // Sin filas todavía: el bloque (y Tendencias y En cines) abren
-            // la lista.
+            // Sin filas todavía: el bloque superior abre la lista.
             if (!blockInserted) {
-              nodes.unshift(...calendarBlock, ...trendingAndCinema());
+              nodes.unshift(...topBlock());
             }
             return nodes;
           })()}
