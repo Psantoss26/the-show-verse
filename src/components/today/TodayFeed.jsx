@@ -43,7 +43,9 @@ function averageOf(actions) {
 // Iconos del pie: 16 px con un trazo de 2 px de pantalla (`absoluteStrokeWidth`,
 // que lo calcula con `size`). Medido a 1x en un 2K: a 14 px con el trazo
 // relativo (1,17 px) la mitad larga de cada línea quedaba a medio tono y se
-// veían borrosos; así casi todo el trazo cae en píxeles enteros.
+// veían borrosos; así casi todo el trazo cae en píxeles enteros. El texto va
+// en zinc-300 y, en 2xl (monitores 2K), a 13 px: en zinc-400 a 12 px los
+// trazos de las cifras de la hora quedaban a medio tono y se veía difusa.
 const BADGE_ICON = { size: 16, strokeWidth: 2, absoluteStrokeWidth: true };
 
 /**
@@ -56,18 +58,18 @@ const BADGE_ICON = { size: 16, strokeWidth: 2, absoluteStrokeWidth: true };
 function BadgeLine({ actions, people, latestAt, tz }) {
   const badges = actionBadges(actions);
   return (
-    <span className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-zinc-400" aria-hidden="true">
+    <span className="mt-1.5 flex min-w-0 items-center gap-1 text-xs text-zinc-300 sm:gap-1.5 2xl:text-[13px]" aria-hidden="true">
       {badges.watched ? <Eye {...BADGE_ICON} className="shrink-0 text-emerald-400" /> : null}
       {badges.rated ? <Star {...BADGE_ICON} className="shrink-0 text-amber-400" /> : null}
       {badges.reviewed ? <MessageSquare {...BADGE_ICON} className="shrink-0 text-orange-400" /> : null}
       {badges.episode ? (
-        <span className="shrink-0 tabular-nums text-zinc-300">T{badges.episode.season}·E{badges.episode.episode}</span>
+        <span className="shrink-0 tabular-nums">T{badges.episode.season}·E{badges.episode.episode}</span>
       ) : badges.episodes ? (
-        <span className="shrink-0 tabular-nums text-zinc-300">{badges.episodes} ep.</span>
+        <span className="shrink-0 tabular-nums">{badges.episodes} ep.</span>
       ) : null}
       {people > 1 ? (
         <span className="flex shrink-0 items-center gap-0.5 tabular-nums">
-          <Users {...BADGE_ICON} className="shrink-0" />
+          <Users {...BADGE_ICON} className="shrink-0 text-zinc-400" />
           {people}
         </span>
       ) : null}
