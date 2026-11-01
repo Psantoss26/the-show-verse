@@ -104,6 +104,17 @@ function Shine() {
   );
 }
 
+// Brillo del hover: una capa con el color de fondo, sin `filter` ni opacidad
+// sobre la píldora (ver `pillSurface`).
+function HoverSheen() {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 rounded-[inherit] bg-transparent transition-colors duration-200 group-hover:bg-white/[0.08]"
+    />
+  );
+}
+
 // Contador de historias sin ver: el rosa de la sección Social, con un aro fino
 // para que se despegue del cristal sin dibujar un contorno.
 function Badge({ count, className = "" }) {
@@ -160,7 +171,14 @@ export default function TodayNavbarEntry({ variant = "desktop" }) {
     : "Actividad: historias de la gente que sigues";
   // El cristal de la casa (LIQUID_GLASS_BAR + capas ópticas), el mismo de las
   // flechas y los menús de cristal: relieve sin contorno dibujado.
-  const pillSurface = `${LIQUID_GLASS_BAR} transition-[filter] hover:brightness-110`;
+  //
+  // HOVER SIN `filter`. Antes era `hover:brightness-110`: un filtro sobre un
+  // elemento con cristal dentro del navbar obligaba a recomponer sus capas, y
+  // en algunos equipos el borde difuminado que el cristal del navbar deja
+  // debajo de la barra (`.sv-topbar-glass-soft`) pasaba a desenfocar la parte
+  // de arriba de la barra fijada de Social. Ahora se ilumina con una capa
+  // propia (`HoverSheen`) que solo cambia su color de fondo.
+  const pillSurface = `group ${LIQUID_GLASS_BAR}`;
 
   if (variant === "mobile") {
     return (
@@ -171,6 +189,7 @@ export default function TodayNavbarEntry({ variant = "desktop" }) {
         className={`relative grid h-10 w-10 shrink-0 place-items-center rounded-full text-white ${pillSurface}`}
       >
         <LiquidGlassOpticalLayers />
+        <HoverSheen />
         {entry.unseen ? <Shine /> : null}
         {entry.posters.map((media, index) => (
           <span
@@ -201,6 +220,7 @@ export default function TodayNavbarEntry({ variant = "desktop" }) {
       } ${entry.unseen ? "pr-2.5" : "pr-3.5"} ${pillSurface}`}
     >
       <LiquidGlassOpticalLayers />
+      <HoverSheen />
       {entry.unseen ? <Shine /> : null}
       {entry.faces.length ? (
         <span className="relative">
