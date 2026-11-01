@@ -365,6 +365,26 @@ export function summarizeActions(actions, { people = 1 } = {}) {
   return extras ? `Visto y ${extras}` : "Visto";
 }
 
+/**
+ * Lo mismo que `summarizeActions`, en piezas para pintarlas como iconos (pie
+ * de los carteles de la rejilla): qué se hizo (visto, calificado, reseñado) y,
+ * si es UN episodio, cuál; si son varios, cuántos. Con varias personas se
+ * juntan las acciones de todas.
+ */
+export function actionBadges(actions) {
+  const list = Array.isArray(actions) ? actions : [];
+  const watches = list.filter((a) => a.kind === "watch");
+  const episodes = watches.reduce((sum, w) => sum + (w.episodeCount || (w.target === "episode" ? 1 : 0)), 0);
+  const single = episodes === 1 ? watches.find((w) => w.target === "episode") : null;
+  return {
+    watched: watches.length > 0,
+    rated: list.some((a) => a.kind === "rating" || (a.kind === "watch" && a.rating != null)),
+    reviewed: list.some((a) => a.kind === "comment"),
+    episode: single ? { season: single.season, episode: single.episode } : null,
+    episodes: episodes > 1 ? episodes : 0,
+  };
+}
+
 /** «N actividades de M personas» de la cabecera. */
 export function summarize(actions) {
   const list = Array.isArray(actions) ? actions : [];

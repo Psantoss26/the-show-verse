@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  actionBadges,
   dayPartOf,
   isQuietDay,
   pickHeroStory,
@@ -166,6 +167,16 @@ test("línea de cada título, como en Trakt", () => {
   assert.equal(summarizeActions([{ kind: "rating", rating: 8 }]), "Calificado");
   assert.equal(summarizeActions([{ kind: "comment" }, { kind: "rating" }]), "Calificado y reseñado");
   assert.equal(summarizeActions([ep], { people: 3 }), "3 personas");
+});
+
+test("pie de iconos de la rejilla: acciones, episodio o número de episodios", () => {
+  const ep = { kind: "watch", target: "episode", season: 1, episode: 2, episodeCount: 1 };
+  assert.deepEqual(actionBadges([ep]), { watched: true, rated: false, reviewed: false, episode: { season: 1, episode: 2 }, episodes: 0 });
+  assert.deepEqual(actionBadges([{ ...ep, episodeCount: 3 }, { kind: "comment" }]), { watched: true, rated: false, reviewed: true, episode: null, episodes: 3 });
+  // Dos personas con un episodio cada una: dos episodios, sin uno concreto.
+  assert.equal(actionBadges([ep, { ...ep, episode: 3 }]).episodes, 2);
+  assert.deepEqual(actionBadges([{ kind: "watch", target: "movie", rating: 8 }]), { watched: true, rated: true, reviewed: false, episode: null, episodes: 0 });
+  assert.deepEqual(actionBadges([{ kind: "rating", rating: 8 }]), { watched: false, rated: true, reviewed: false, episode: null, episodes: 0 });
 });
 
 test("resumen de una historia con varias personas: qué han hecho", () => {

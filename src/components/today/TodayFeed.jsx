@@ -2,13 +2,15 @@
 
 // src/components/today/TodayFeed.jsx
 // Columna central de Hoy, como la de Trakt: una rejilla de carteles con solo la
-// foto de quien lo vio arriba a la derecha y, debajo, el título con una línea
-// («Visto T1 · E2 · 22:03»). Al pulsar un cartel se abre su historia.
+// foto de quien lo vio arriba a la derecha y, debajo, una fila de iconos de lo
+// hecho con el episodio, las personas y la hora (`BadgeLine`). Al pulsar un
+// cartel se abre su historia.
 // La agrupación (título, persona o franja horaria) y la vista (rejilla o lista,
 // ListRow) se eligen en la barra de Social.
 
+import { Eye, MessageSquare, Star, Users } from "lucide-react";
 import EntranceItem, { estimateVisibleRows } from "@/components/ui/EntranceItem";
-import { mediaKey, summarizeActions } from "@/lib/today/stories";
+import { actionBadges, mediaKey, summarizeActions } from "@/lib/today/stories";
 import { AvatarStack, Poster, RatingBadge, UserAvatar } from "./TodayParts";
 import { CARD_SURFACE, dayHeading, displayName, milestoneLabel, whenLabel } from "./todayUi";
 
@@ -38,10 +40,47 @@ function averageOf(actions) {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
+// Iconos del pie: 16 px con un trazo de 2 px de pantalla (`absoluteStrokeWidth`,
+// que lo calcula con `size`). Medido a 1x en un 2K: a 14 px con el trazo
+// relativo (1,17 px) la mitad larga de cada línea quedaba a medio tono y se
+// veían borrosos; así casi todo el trazo cae en píxeles enteros.
+const BADGE_ICON = { size: 16, strokeWidth: 2, absoluteStrokeWidth: true };
+
+/**
+ * Pie de un cartel de la rejilla, sin frases: iconos de lo hecho (visto,
+ * calificado, reseñado, con el tono de cada acción en la Actividad del perfil
+ * y de Siguiendo / Yo: `ACCIONES` de SocialClient), el episodio («T1·E2») o cuántos («3 ep.»), las
+ * personas si son varias y la hora, a la derecha. Lo dicho en palabras va en
+ * la `aria-label` del cartel.
+ */
+function BadgeLine({ actions, people, latestAt, tz }) {
+  const badges = actionBadges(actions);
+  return (
+    <span className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-zinc-400" aria-hidden="true">
+      {badges.watched ? <Eye {...BADGE_ICON} className="shrink-0 text-emerald-400" /> : null}
+      {badges.rated ? <Star {...BADGE_ICON} className="shrink-0 text-amber-400" /> : null}
+      {badges.reviewed ? <MessageSquare {...BADGE_ICON} className="shrink-0 text-orange-400" /> : null}
+      {badges.episode ? (
+        <span className="shrink-0 tabular-nums text-zinc-300">T{badges.episode.season}·E{badges.episode.episode}</span>
+      ) : badges.episodes ? (
+        <span className="shrink-0 tabular-nums text-zinc-300">{badges.episodes} ep.</span>
+      ) : null}
+      {people > 1 ? (
+        <span className="flex shrink-0 items-center gap-0.5 tabular-nums">
+          <Users {...BADGE_ICON} className="shrink-0" />
+          {people}
+        </span>
+      ) : null}
+      <span className="ml-auto min-w-0 truncate tabular-nums">{whenLabel(latestAt, tz)}</span>
+    </span>
+  );
+}
+
 /**
  * Un cartel de la rejilla. Encima solo va la foto de quien lo vio (`users`):
  * la nota, el hito y el tipo se quedan para la lista y la historia, para no
- * llenar la portada de indicadores. `actions` resume la línea de debajo.
+ * llenar la portada de indicadores. Debajo no va el título (ya está en la
+ * portada) sino `BadgeLine`.
  */
 function PosterTile({ media, users, actions, latestAt, tz, onOpen, entrance }) {
   const line = summarizeActions(actions, { people: users.length });
@@ -50,7 +89,8 @@ function PosterTile({ media, users, actions, latestAt, tz, onOpen, entrance }) {
       <button
         type="button"
         onClick={onOpen}
-        aria-label={`${media.title}: ${line}`}
+        aria-label={`${media.title}: ${line}${line ? ", " : ""}${whenLabel(latestAt, tz)}`}
+        title={media.title}
         className="group block w-full text-left focus-visible:outline-none"
       >
         <span className="relative block overflow-hidden rounded-lg transition-transform duration-200 group-hover:-translate-y-0.5 group-focus-visible:ring-2 group-focus-visible:ring-pink-400">
@@ -59,12 +99,7 @@ function PosterTile({ media, users, actions, latestAt, tz, onOpen, entrance }) {
             <AvatarStack users={users} max={2} size="h-7 w-7" />
           </span>
         </span>
-        <span className="mt-2 block truncate text-sm text-white">{media.title}</span>
-        <span className="block truncate text-xs text-zinc-400">
-          {line}
-          {line ? " · " : ""}
-          <span className="tabular-nums">{whenLabel(latestAt, tz)}</span>
-        </span>
+        <BadgeLine actions={actions} people={users.length} latestAt={latestAt} tz={tz} />
       </button>
     </EntranceItem>
   );
