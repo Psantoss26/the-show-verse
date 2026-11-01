@@ -1630,23 +1630,7 @@ function FeaturedSlide({
 
             {isMobile ? (
               <>
-                {/* Fila 1: Premios y nominaciones */}
-                {extras.awards && (
-                  <div
-                    className="hero-reveal mb-2 flex min-h-[1.25rem] items-center justify-center"
-                    style={{ "--hero-delay": "140ms" }}
-                  >
-                    <span
-                      key={extras.awards}
-                      className="flex min-w-0 items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md"
-                    >
-                      <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      <span className="line-clamp-1">{extras.awards}</span>
-                    </span>
-                  </div>
-                )}
-
-                {/* Fila 2: Puntuaciones TMDb e IMDb */}
+                {/* Puntuaciones TMDb e IMDb (sin premios en móvil) */}
                 <div
                   className="hero-reveal mb-2 flex min-h-[1.25rem] items-center justify-center"
                   style={{ "--hero-delay": "155ms" }}
