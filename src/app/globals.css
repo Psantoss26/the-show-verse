@@ -3824,6 +3824,25 @@ html[data-details-sequence-transition] .sv-topbar {
   }
 }
 
+/* Llegada del contenido de Actividad en Social (TodayClient): al cargar o al
+   entrar en la sección, cada bloque (historias, destacada, feed, Más activos)
+   sube y aparece escalonado por `--sv-enter-index`, como la cascada de las
+   listas de Siguiendo y Yo (`EntranceItem`). Sin cristal dentro, así que la
+   opacidad no apaga nada; `backwards` para no dejar transform al acabar (Más
+   activos es sticky). */
+.sv-social-enter {
+  animation: sv-social-enter-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--sv-enter-index, 0) * 70ms);
+}
+@keyframes sv-social-enter-in {
+  from { opacity: 0; transform: translateY(0.75rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-social-enter {
+    animation: none;
+  }
+}
+
 /* Paso entre historias (TodayStoryViewer). El cartel nuevo entra desde el
    lado hacia el que se va, con un poco de escala y fundido; los fondos se
    funden; el pie entra con un desplazamiento corto. Sin cristal en el visor,

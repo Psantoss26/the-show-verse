@@ -21,6 +21,7 @@ import { useSearchParams } from "next/navigation";
 import { Coffee, Loader2, Play, RefreshCw, UserPlus } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import TodayFeed from "@/components/today/TodayFeed";
 import TodayPersonDrawer from "@/components/today/TodayPersonDrawer";
 import TodayStoryViewer from "@/components/today/TodayStoryViewer";
@@ -238,6 +239,15 @@ export default function TodayClient({
   const yesterdayKey = data?.days?.[1]?.key || null;
   const changeDay = (value) => onDayChange?.(value === "yesterday" ? yesterdayKey || "yesterday" : value);
 
+  // Entrada del contenido al llegar (o al entrar en la sección con él ya
+  // cargado): cada bloque sube y aparece escalonado (`.sv-social-enter`), como
+  // las listas de Siguiendo y Yo. Al volver atrás la página se restaura quieta.
+  const isBackNav = useIsHistoryNavigation();
+  const enter = (index, className = "") => ({
+    className: isBackNav ? className || undefined : `sv-social-enter ${className}`.trim(),
+    style: isBackNav ? undefined : { "--sv-enter-index": index },
+  });
+
   // Sin sesión lo resuelve SocialHub.
   if (!hydrated || !session || !account?.id) return null;
 
@@ -262,7 +272,7 @@ export default function TodayClient({
         ) : null}
 
         {error && !data ? (
-          <div className="flex flex-col items-center gap-3 py-24 text-center">
+          <div {...enter(0, "flex flex-col items-center gap-3 py-24 text-center")}>
             <p className="text-zinc-400">No se ha podido cargar la actividad.</p>
             <button
               type="button"
@@ -277,7 +287,7 @@ export default function TodayClient({
             <Loader2 className="h-6 w-6 animate-spin text-pink-400" />
           </div>
         ) : noFollowing ? (
-          <div className="flex flex-col items-center gap-3 py-20 text-center">
+          <div {...enter(0, "flex flex-col items-center gap-3 py-20 text-center")}>
             <UserPlus className="h-8 w-8 text-pink-400" aria-hidden="true" />
             <p className="max-w-sm text-zinc-300">Aún no sigues a nadie. Encuentra gente o mira lo que se mueve en la comunidad.</p>
             <div className="flex gap-2">
@@ -290,7 +300,7 @@ export default function TodayClient({
             </div>
           </div>
         ) : empty && text ? null : empty ? (
-          <div className="flex flex-col items-center gap-3 py-20 text-center">
+          <div {...enter(0, "flex flex-col items-center gap-3 py-20 text-center")}>
             <Coffee className="h-8 w-8 text-pink-400" aria-hidden="true" />
             <p className="max-w-sm text-zinc-300">
               {data.range?.day === "today" ? "Nadie ha hecho nada todavía hoy." : "No hubo actividad ese día."}
@@ -312,13 +322,13 @@ export default function TodayClient({
           <>
             {/* Historias en círculos solo en móvil; en escritorio, como en
                 Trakt, se abren desde la destacada o desde cada cartel. */}
-            <div className="lg:hidden">
+            <div {...enter(0, "lg:hidden")}>
               <StoryRail groups={derived.storyGroups} seen={seen} onOpen={setStoryStart} />
             </div>
 
             {/* Tres columnas con sus títulos alineados arriba (ColumnHeading). */}
             <div className="grid gap-x-8 gap-y-10 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)_300px]">
-              <section aria-labelledby="today-hero" className="min-w-0">
+              <section aria-labelledby="today-hero" {...enter(1, "min-w-0")}>
                 <ColumnHeading
                   id="today-hero"
                   action={
@@ -356,7 +366,7 @@ export default function TodayClient({
                 <TodayForYouRow items={data.forYou} />
               </section>
 
-              <section aria-labelledby="today-feed" className="min-w-0">
+              <section aria-labelledby="today-feed" {...enter(2, "min-w-0")}>
                 <ColumnHeading id="today-feed" count={derived.stories.length}>
                   {scope === "community" ? "De la comunidad" : "De la gente que sigues"}
                 </ColumnHeading>
@@ -376,7 +386,7 @@ export default function TodayClient({
               </section>
 
               {/* Más activos: tercera columna en pantallas anchas; debajo, en las medianas. */}
-              <aside aria-labelledby="today-most-active" className="min-w-0 lg:col-span-2 xl:col-span-1">
+              <aside aria-labelledby="today-most-active" {...enter(3, "min-w-0 lg:col-span-2 xl:col-span-1")}>
                 <div className="xl:sticky xl:top-40">
                   <ColumnHeading id="today-most-active">Más activos</ColumnHeading>
                   <TodayMostActive ranking={derived.ranking} onOpenPerson={setPerson} />
