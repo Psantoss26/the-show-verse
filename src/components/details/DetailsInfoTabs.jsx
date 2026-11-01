@@ -41,13 +41,16 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
 import { getStatusLabel } from "@/components/details/DetailsMetaGenresRow";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_SURFACE_CARD } from "@/lib/ui/liquidGlass";
 import useHorizontalSwipe from "@/hooks/useHorizontalSwipe";
 
+// Mismo cristal sin sombra que las tarjetas de Detalles y Producción: la
+// sombra exterior solo la llevaba la sinopsis, y al cambiar de pestaña el
+// `overflow: clip` de useTabPanelHeight la cortaba a mitad de la transición.
 function InfoGlassPanel({ children, className = "" }) {
   return (
     <div
-      className={`rounded-2xl ${LIQUID_GLASS_SURFACE} ${className}`}
+      className={`rounded-2xl ${LIQUID_GLASS_SURFACE_CARD} ${className}`}
     >
       <LiquidGlassOpticalLayers />
       <div className="sv-glass-content relative z-10">{children}</div>
