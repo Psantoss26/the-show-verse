@@ -61,7 +61,6 @@ import OptimizedImage from "@/components/OptimizedImage";
 import Avatar from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
-import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import EntranceItem, { estimateVisibleRows } from "@/components/ui/EntranceItem";
 import { useSlidingSectionIndicator } from "@/components/ui/useSlidingSectionIndicator";
@@ -300,7 +299,7 @@ function CartelEvento({ evento, className = "", backdrop = false, size = "w185" 
       href={href}
       prefetch={false}
       aria-label={`Ver ${evento.title || evento.name || "ficha"}`}
-      className={`${className} shrink-0 overflow-hidden ${fondo} sv-bar-lift transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70`}
+      className={`${className} shrink-0 overflow-hidden ${fondo} transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70`}
     >
       {imagen}
     </Link>
@@ -617,39 +616,10 @@ export default function SocialClient({ initialView = "today", initialToday = {},
   // pide.
   const [agrupar, setAgruparState] = useState(leerAgrupadoGuardado);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  // Compactado de la barra de escritorio midiendo lo que cabe (Favoritos).
-  const toolbarSearchFitRef = usePageToolbarSearchFit();
 
   const filtersRef = useRef(null);
   const listaRef = useRef(null);
   const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
-
-  // Tarjetas que se elevan al pasar el cursor (`.sv-bar-lift`) y quedan en
-  // parte DETRÁS de la barra fijada: su movimiento se ve a través del cristal,
-  // que lo desenfoca y lo satura, y al barrer con el cursor las tarjetas de
-  // justo debajo encendían y apagaban manchas de color sobre los controles.
-  // Al entrar en una de ellas se mira si la tapa la barra y, si es así, se
-  // marca con `data-sv-under-bar` para que no se mueva (regla en globals.css).
-  const liftBajoBarraRef = useRef(null);
-  const marcarLiftBajoBarra = useCallback((e) => {
-    const target = e.target instanceof Element ? e.target : null;
-    const lift = target?.closest(".sv-bar-lift") || target?.closest(".group")?.querySelector(".sv-bar-lift") || null;
-    if (liftBajoBarraRef.current && liftBajoBarraRef.current !== lift) {
-      liftBajoBarraRef.current.removeAttribute("data-sv-under-bar");
-      liftBajoBarraRef.current = null;
-    }
-    const barra = filtersRef.current;
-    if (!lift || !barra || barra.getAttribute("data-menu-pinned") !== "true") {
-      lift?.removeAttribute("data-sv-under-bar");
-      return;
-    }
-    if (lift.getBoundingClientRect().top < barra.getBoundingClientRect().bottom) {
-      lift.setAttribute("data-sv-under-bar", "");
-      liftBajoBarraRef.current = lift;
-    } else {
-      lift.removeAttribute("data-sv-under-bar");
-    }
-  }, []);
 
   const setVista = useCallback((modo) => {
     setVistaState(modo);
@@ -916,24 +886,26 @@ export default function SocialClient({ initialView = "today", initialToday = {},
   const placeholder = esHoy ? "Buscar en Hoy..." : "Buscar en la actividad...";
 
   return (
-    <div onPointerOver={marcarLiftBajoBarra}>
-      <div className="relative">
-
-        {/* BARRA DE FILTROS (sticky, con el cristal del navbar al fijarse) */}
+    <>
+        {/* BARRA DE FILTROS: la MISMA base que la de /lists (Mis listas ·
+            Comunidad · Colecciones): sticky bajo el navbar, sus superficies
+            toman el cristal del navbar al fijarse (`[data-menu-pinned]`), el
+            selector de secciones con la pastilla que se desliza, y en el
+            escritorio una fila simple sin compactado medido. */}
         <motion.div
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          // Como la de Favoritos e Historial: framer solo funde y la subida va
-          // en CSS (`.sv-toolbar-rise`, con `translate`). Animar `y` con framer
-          // bajo `transition-all` hacía que CSS persiguiera cada fotograma.
-          className={`${isBackNav ? "" : "sv-toolbar-rise "}relative sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] mb-6 space-y-1 ${isBackNav ? "transition-none" : "transition-all duration-300"} sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6`}
-          initial={isBackNav ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.3 }}
+          data-social-toolbar=""
+          className="relative sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[60] space-y-3 mb-6 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))]"
+          initial={isBackNav ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.5 }}
         >
-          {/* Móvil: buscador + desplegar filtros */}
+          {/* Móvil: barra y hoja de filtros en el mismo envoltorio, como en
+              /lists. */}
+          <div className="relative z-10 lg:hidden">
           <div className="relative z-10 flex gap-2 lg:hidden">
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-pink-500" />
               <input
                 value={q}
@@ -951,16 +923,9 @@ export default function SocialClient({ initialView = "today", initialToday = {},
                 </button>
               ) : null}
             </div>
-            {/* Alcance entre el buscador y el botón de filtros, SOLO iconos: es
-                el control que más se usa —decide qué feed estás viendo— y así
-                está a un toque sin desplegar nada ni gastar ancho en rótulos. */}
-            <SelectorAlcance
-              scope={scope}
-              setScope={elegirScope}
-              controlGlass={controlGlass}
-              activo={activo}
-              soloIconos
-            />
+            {/* Las secciones, entre el buscador y el botón de la hoja. */}
+            <div className="flex shrink-0 gap-2">
+            <SelectorAlcance scope={scope} setScope={elegirScope} />
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
@@ -973,6 +938,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
             >
               <SlidersHorizontal className="h-4 w-4" />
             </button>
+            </div>
           </div>
 
           {/* La MISMA hoja de filtros que las páginas de usuario. */}
@@ -1029,21 +995,13 @@ export default function SocialClient({ initialView = "today", initialToday = {},
               </>
             )}
           </MobileOptionsSheet>
+          </div>
 
-          {/* Escritorio: todo en una fila, la MISMA barra que Favoritos e
-              Historial (`.sv-page-toolbar`): al estrecharse, los desplegables
-              pierden rótulo y luego valor, y el buscador pasa a lupa midiendo
-              lo que cabe (usePageToolbarSearchFit). */}
-          <div ref={toolbarSearchFitRef} className="sv-page-toolbar relative z-10 hidden gap-3 lg:flex">
-            {/* El selector de alcance abre la barra: es el control que decide
-                QUÉ se está viendo, así que va antes que los filtros. */}
-            <SelectorAlcance
-              scope={scope}
-              setScope={elegirScope}
-              controlGlass={controlGlass}
-              activo={activo}
-            />
-            <div className="sv-page-toolbar-search relative flex-1">
+          {/* Escritorio: todo en una fila, como /lists. El selector de
+              secciones abre la barra: decide QUÉ se está viendo. */}
+          <div className="hidden lg:flex gap-3 relative z-10">
+            <SelectorAlcance scope={scope} setScope={elegirScope} />
+            <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-pink-500" />
               <input
                 value={q}
@@ -1218,27 +1176,26 @@ export default function SocialClient({ initialView = "today", initialToday = {},
           </>
         )}
         </div>
-      </div>
-    </div>
+    </>
   );
 }
 
-// Botón Hoy / Siguiendo / Yo: el control que pide la sección.
-function SelectorAlcance({
-  scope,
-  setScope,
-  controlGlass,
-  activo,
-  fill = false,
-  soloIconos = false,
-}) {
-  // La pastilla de la activa se desliza de un botón a otro, como en En
-  // progreso · Completadas (WatchingSectionNav).
-  //
-  // El botón pulsado se marca AQUÍ, en un estado del selector, y la sección
-  // llega después en una transición (`setScope`): montar Actividad o una
-  // lista larga cuesta, y si el clic tuviera que volver a pintar toda la
-  // página antes de mover la pastilla, esta saldría con retraso o a tirones.
+// Selector Actividad · Siguiendo · Yo: el MISMO que el de /lists
+// (ListsSourceSelector), con la pastilla de la sección activa que se desliza
+// entre botones (useSlidingSectionIndicator) y el rótulo solo en escritorio.
+//
+// El botón pulsado se marca AQUÍ, en un estado del selector, y la sección
+// llega después en una transición (`setScope`): montar Actividad o una lista
+// larga cuesta, y si el clic tuviera que volver a pintar toda la página antes
+// de mover la pastilla, esta saldría con retraso o a tirones.
+const SOCIAL_SCOPE_ACTIVE_PILL = "bg-gradient-to-br from-pink-500 to-fuchsia-600 shadow-lg shadow-pink-500/20";
+const SOCIAL_SCOPE_OPTIONS = [
+  { value: "today", label: "Actividad", Icon: Flame },
+  { value: "following", label: "Siguiendo", Icon: Users },
+  { value: "me", label: "Yo", Icon: User },
+];
+
+function SelectorAlcance({ scope, setScope, className = "" }) {
   const [elegido, setElegido] = useState(null);
   const activa = elegido ?? scope;
   useEffect(() => {
@@ -1248,48 +1205,43 @@ function SelectorAlcance({
   const { ready, indicator } = useSlidingSectionIndicator({
     navRef,
     activeKey: activa,
-    groupId: soloIconos ? "social-scope-mobile" : "social-scope",
-    className: activo,
+    groupId: "social-scope",
+    className: SOCIAL_SCOPE_ACTIVE_PILL,
   });
   return (
-    <div
+    <nav
       ref={navRef}
-      className={`relative flex h-11 items-center rounded-2xl p-1 ${
-        fill ? "min-w-0 flex-1" : "shrink-0"
-      } ${controlGlass}`}
+      aria-label="Sección de Social"
+      className={`relative inline-flex h-11 max-w-full shrink-0 gap-1 overflow-x-auto rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
       {indicator}
-      {[
-        ["today", "Actividad", Flame],
-        ["following", "Siguiendo", Users],
-        ["me", "Yo", User],
-      ].map(([valor, etiqueta, Icono]) => (
-        <button
-          key={valor}
-          type="button"
-          data-section-key={valor}
-          onClick={() => {
-            setElegido(valor);
-            setScope(valor);
-          }}
-          aria-pressed={activa === valor}
-          // En la barra móvil va solo el icono: el rótulo se lo comería el
-          // buscador. El nombre sigue estando para lectores de pantalla.
-          aria-label={soloIconos ? etiqueta : undefined}
-          title={soloIconos ? etiqueta : undefined}
-          className={`relative z-10 flex h-full items-center justify-center rounded-xl text-sm font-bold transition-colors ${
-            soloIconos ? "w-9" : "flex-1 gap-2 px-3"
-          } ${
-            activa === valor
-              ? `text-white ${ready ? "" : activo}`
-              : "text-zinc-400 hover:bg-white/10 hover:text-white"
-          }`}
-        >
-          <Icono className="h-4 w-4 shrink-0" />
-          {soloIconos ? null : <span className="truncate">{etiqueta}</span>}
-        </button>
-      ))}
-    </div>
+      {SOCIAL_SCOPE_OPTIONS.map(({ value, label, Icon }) => {
+        const active = activa === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            data-section-key={value}
+            onClick={() => {
+              setElegido(value);
+              setScope(value);
+            }}
+            aria-pressed={active}
+            aria-label={label}
+            title={label}
+            className={`relative z-10 flex h-full items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-bold transition-all lg:px-3.5 ${
+              active
+                ? `text-white ${ready ? "" : SOCIAL_SCOPE_ACTIVE_PILL}`
+                : "text-zinc-400 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            {/* En escritorio cada sección muestra su título, no solo la activa. */}
+            <span className="hidden lg:inline">{label}</span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -1308,14 +1260,7 @@ function InlineDropdown(props) {
   return <InlineDropdownMenu {...props} />;
 }
 
-function InlineDropdownMenu({
-  label,
-  valueLabel,
-  mobileValueLabel = null,
-  icon: Icon,
-  children,
-  compactMobile = false,
-}) {
+function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -1371,34 +1316,26 @@ function InlineDropdownMenu({
   }, [open, updateMenuPosition]);
 
   return (
-    <div ref={ref} className="relative w-full min-w-0 lg:w-auto lg:shrink">
-      {/* El botón de la barra de Favoritos: las clases `sv-page-toolbar-*`
-          dejan que la barra lo compacte (sin rótulo, luego solo icono). */}
+    <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
+      {/* El botón del desplegable de /lists. */}
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label={`${label}: ${valueLabel}`}
-        className="sv-page-toolbar-trigger inline-flex h-11 w-full min-w-0 items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 lg:w-auto lg:min-w-[140px] lg:max-w-none"
+        aria-expanded={open}
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
       >
         <div className="flex min-w-0 items-center gap-2">
-          {Icon ? <Icon className="h-4 w-4 shrink-0 text-pink-500" /> : null}
-          <span
-            className={`sv-page-toolbar-label text-xs font-bold uppercase tracking-wider text-zinc-500 ${
-              compactMobile ? "hidden sm:inline" : ""
-            }`}
-          >
+          {Icon ? <Icon className="w-4 h-4 shrink-0 text-pink-500" /> : null}
+          <span className="shrink-0 text-zinc-500 font-bold text-xs uppercase tracking-wider">
             {label}:
           </span>
-          <span className="sv-page-toolbar-value hidden min-w-0 truncate font-semibold text-white sm:inline lg:overflow-visible lg:whitespace-nowrap">
+          <span className="min-w-0 truncate font-semibold text-white">
             {valueLabel}
-          </span>
-          <span className="sv-page-toolbar-value min-w-0 truncate font-semibold text-white sm:hidden">
-            {mobileValueLabel || valueLabel}
           </span>
         </div>
         <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -1466,29 +1403,10 @@ function DropdownMenuItem({ active, onClick, children, count = null }) {
 }
 
 // Envoltorio: mismo desplegable con una lista simple de opciones.
-//
-// `etiquetasCortas` da una versión abreviada del valor para cuando el botón va
-// a media fila en el móvil ("Sin agr." en vez de "Sin agrupar"), igual que hace
-// el desplegable de agrupar de las páginas de usuario.
-function SelectorSimple({
-  icon,
-  label,
-  opciones,
-  valor,
-  onChange,
-  compactMobile = false,
-  etiquetasCortas = null,
-}) {
+function SelectorSimple({ icon, label, opciones, valor, onChange }) {
   const actual = opciones.find(([v]) => v === valor)?.[1] || opciones[0][1];
-  const corta = etiquetasCortas?.[valor];
   return (
-    <InlineDropdown
-      label={label}
-      valueLabel={actual}
-      mobileValueLabel={corta}
-      icon={icon}
-      compactMobile={compactMobile}
-    >
+    <InlineDropdown label={label} valueLabel={actual} icon={icon}>
       {({ close }) => (
         <>
           {opciones.map(([v, etiqueta, count]) => (
@@ -1541,7 +1459,8 @@ function GrupoDivisor({ titulo, cuenta, total, primero, isBackNav }) {
   );
 }
 
-function SelectorVista({ vista, setVista, controlGlass, activo, fill = false, opciones = VISTAS_FEED }) {
+// Grupo de vistas de /lists (Rejilla · Filas · Lista).
+function SelectorVista({ vista, setVista, controlGlass, activo, opciones = VISTAS_FEED }) {
   // En la hoja de filtros móvil, las vistas como píldoras con su nombre.
   if (useInOptionsSheet()) {
     return (
@@ -1556,7 +1475,7 @@ function SelectorVista({ vista, setVista, controlGlass, activo, fill = false, op
   }
   return (
     <div
-      className={`flex h-11 items-center rounded-2xl p-1 ${fill ? "min-w-0 flex-1" : "shrink-0"} ${controlGlass}`}
+      className={`flex rounded-2xl p-1 h-11 items-center shrink-0 ${controlGlass}`}
     >
       {opciones.map(([valor, Icono, etiqueta]) => (
         <button
@@ -1565,7 +1484,7 @@ function SelectorVista({ vista, setVista, controlGlass, activo, fill = false, op
           onClick={() => setVista(valor)}
           aria-label={`Vista ${etiqueta}`}
           title={etiqueta}
-          className={`flex h-full flex-1 items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all ${
+          className={`h-full px-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
             vista === valor
               ? activo
               : "text-zinc-400 hover:bg-white/10 hover:text-white"

@@ -53,7 +53,7 @@ function PosterTile({ media, users, actions, latestAt, tz, onOpen, entrance }) {
         aria-label={`${media.title}: ${line}`}
         className="group block w-full text-left focus-visible:outline-none"
       >
-        <span className="sv-bar-lift relative block overflow-hidden rounded-lg transition-transform duration-200 group-hover:-translate-y-0.5 group-focus-visible:ring-2 group-focus-visible:ring-pink-400">
+        <span className="relative block overflow-hidden rounded-lg transition-transform duration-200 group-hover:-translate-y-0.5 group-focus-visible:ring-2 group-focus-visible:ring-pink-400">
           <Poster media={media} size="w342" className="aspect-[2/3] w-full" />
           <span className="absolute right-1.5 top-1.5">
             <AvatarStack users={users} max={2} size="h-7 w-7" />

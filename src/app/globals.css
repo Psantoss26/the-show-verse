@@ -3293,13 +3293,15 @@ svg.recharts-surface *:focus {
   backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
 }
 
-/* Tarjetas de Social que se elevan al pasar el cursor y están tapadas en parte
-   por la barra fijada: no se mueven. Detrás del cristal (desenfoque con
-   saturate 190 %) su movimiento parpadeaba como manchas de color sobre los
-   controles. SocialClient pone `data-sv-under-bar` al entrar el cursor. */
-.sv-bar-lift[data-sv-under-bar] {
-  scale: none;
-  translate: none;
+/* Barra de Social EN REPOSO: sus controles sin `backdrop-filter`. Detrás solo
+   tienen el fondo de la página, ya desenfocado (manchas con blur 150px), así
+   que el desenfoque no cambiaba nada a la vista; pero en el equipo de Pablo
+   cada repintado del navbar (pasar el cursor o pulsar en él) recalculaba mal
+   ese cristal y los controles salían con el canto de arriba aclarado y el rosa
+   de la pastilla activa corrido hacia arriba. Fijada, la regla de arriba les
+   da el cristal del navbar como en /lists. */
+[data-social-toolbar][data-menu-pinned="false"] .backdrop-blur-lg {
+  backdrop-filter: none;
 }
 
 /* En móvil, conserva el mismo cristal en reposo que el buscador y escritorio.
