@@ -134,7 +134,7 @@ function tarjetasDeSeccion(seccion, { todaySummary, summary }) {
   ];
 }
 
-export default function SocialHub({ initialView, initialToday }) {
+export default function SocialHub({ initialView, initialToday, initialFeedPrefs }) {
   const { session, account, hydrated } = useAuth();
 
   // Entrada de las tarjetas igual que en Listas (bloque que sube y tarjetas
@@ -253,7 +253,7 @@ export default function SocialHub({ initialView, initialToday }) {
           </div>
         </header>
 
-        <SocialClient initialView={initialView} initialToday={initialToday} onTodaySummary={handleTodaySummary} onScopeChange={setSeccion} />
+        <SocialClient initialView={initialView} initialToday={initialToday} initialFeedPrefs={initialFeedPrefs} onTodaySummary={handleTodaySummary} onScopeChange={setSeccion} />
       </div>
     </div>
   );
