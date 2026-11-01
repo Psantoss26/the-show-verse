@@ -122,7 +122,7 @@ function PersonName({ user, onOpenPerson }) {
 }
 
 // ─────────────────────────────────────────────
-// Carril de historias (círculos estilo Instagram)
+// Carril de historias (estilo Instagram, con el cartel 2:3 en vez de círculo)
 // ─────────────────────────────────────────────
 
 export function StoryRail({ groups, seen, onOpen }) {
@@ -142,12 +142,12 @@ export function StoryRail({ groups, seen, onOpen }) {
                 aria-label={`Ver historia de ${group.kind === "for-you" ? "Para ti" : group.media?.title}`}
               >
                 <span
-                  className={`sv-bar-lift rounded-full p-[2.5px] transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-pink-400 ${
+                  className={`sv-bar-lift rounded-[14px] p-[2.5px] transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-pink-400 ${
                     unseen ? "bg-gradient-to-tr from-amber-400 via-pink-500 to-fuchsia-600" : "bg-zinc-700"
                   }`}
                 >
-                  <span className="block rounded-full bg-black p-[2px]">
-                    <Poster media={group.media} size="w154" className="h-[64px] w-[64px] rounded-full" />
+                  <span className="block rounded-xl bg-black p-[2px]">
+                    <Poster media={group.media} size="w154" className="h-[96px] w-[64px] rounded-[10px]" />
                   </span>
                 </span>
                 <span className="w-full truncate text-center text-xs text-zinc-300">

@@ -10,9 +10,8 @@
 //   - Toque en el tercio izquierdo: atrás; en el resto: adelante. Mantener
 //     pulsado pausa. Deslizar en horizontal cambia de título; hacia abajo cierra.
 //   - Teclado: ← → cambian de fotograma, espacio pausa, Esc cierra.
-//   - En ordenador, pasar el ratón por el cartel enseña la ficha del título
-//     (TodayStoryDetails) y pausa la historia mientras está encima; en táctil,
-//     tocar la portada la abre y otro toque la cierra.
+//   - El cartel es solo la portada: ni el ratón ni el toque abren una vista
+//     previa; tocarlo cuenta como cualquier otro toque (atrás o adelante).
 //   - Cada fotograma mostrado se marca como visto (seenStories).
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,7 +24,6 @@ import useModalGuard from "@/hooks/useModalGuard";
 import { relativeTime } from "@/lib/notifications/alerts";
 import { firstUnseenIndex } from "@/lib/today/seenStories";
 import { AvatarStack, Poster, TitleLink, UserAvatar } from "./TodayParts";
-import TodayStoryDetails from "./TodayStoryDetails";
 import { actionPhrase, displayName, episodeLabel, milestoneLabel, ratingTen, tmdbImage } from "./todayUi";
 
 export const STORY_MS = 5000;
@@ -128,75 +126,6 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
   const [groupIndex, setGroupIndex] = useState(startIndex ?? 0);
   const [frameIndex, setFrameIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  // Ratón encima del cartel (solo en dispositivos con ratón): enseña la ficha y
-  // pausa, sin tocar la pausa que elija el usuario con el botón o el espacio.
-  const [hovering, setHovering] = useState(false);
-  const [canHover, setCanHover] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return undefined;
-    const query = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const sync = () => setCanHover(query.matches);
-    sync();
-    query.addEventListener?.("change", sync);
-    return () => query.removeEventListener?.("change", sync);
-  }, []);
-  const stopped = paused || hovering;
-  const cardRef = useRef(null);
-
-  // HOVER ESTABLE. No se escucha mouseenter/mouseleave en la tarjeta: mientras
-  // gira, sus caras en 3D cambian de forma bajo el ratón y, cerca de los bordes,
-  // el puntero «salía» y «volvía a entrar» a mitad del giro (idas y vueltas que
-  // se veían mal). En su lugar se compara la posición del ratón con el
-  // rectángulo FIJO del hueco de la tarjeta (que no gira), y con un pequeño
-  // margen de tiempo: hay que quedarse un instante dentro para girar y salir
-  // un instante para volver.
-  useEffect(() => {
-    if (!open || !canHover) return undefined;
-    const ENTER_MS = 90;
-    const LEAVE_MS = 160;
-    let inside = false;
-    let timer = 0;
-    const settle = (next, delay) => {
-      if (next === inside) {
-        clearTimeout(timer);
-        timer = 0;
-        return;
-      }
-      if (timer) return;
-      timer = window.setTimeout(() => {
-        timer = 0;
-        inside = next;
-        setHovering(next);
-      }, delay);
-    };
-    const onMove = (event) => {
-      const node = cardRef.current;
-      if (!node) return;
-      const r = node.getBoundingClientRect();
-      const within = event.clientX >= r.left && event.clientX <= r.right && event.clientY >= r.top && event.clientY <= r.bottom;
-      settle(within, within ? ENTER_MS : LEAVE_MS);
-    };
-    const onLeaveWindow = () => settle(false, LEAVE_MS);
-    window.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerleave", onLeaveWindow);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerleave", onLeaveWindow);
-    };
-  }, [open, canHover]);
-  // La ficha del reverso ya tiene todo (ver TodayStoryDetails).
-  const [detailsReady, setDetailsReady] = useState(false);
-  const flipped = hovering && detailsReady;
-  // El clic del mismo toque que abre la ficha cae ya sobre ella: sin esto la
-  // cerraría en el acto.
-  const openedAtRef = useRef(0);
-  // En táctil la ficha se cierra al cambiar de fotograma (deslizar, botones).
-  const frameKey = open ? groups[groupIndex]?.frames[frameIndex]?.key : null;
-  useEffect(() => {
-    if (!canHover) setHovering(false);
-  }, [frameKey, canHover]);
-
   const barRef = useRef(null);
   const elapsedRef = useRef(0);
   const pointerRef = useRef(null);
@@ -209,7 +138,6 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
     setGroupIndex(startIndex);
     setFrameIndex(firstUnseenIndex(groups[startIndex], seen));
     setPaused(false);
-    setHovering(false);
     // Solo al abrir: `seen` cambia con cada fotograma visto.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startIndex]);
@@ -260,7 +188,7 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
   }, [frame]);
 
   useEffect(() => {
-    if (!frame || stopped) return undefined;
+    if (!frame || paused) return undefined;
     let raf = 0;
     let last = performance.now();
     const tick = (now) => {
@@ -276,7 +204,7 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [frame, stopped, goFrame]);
+  }, [frame, paused, goFrame]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -319,14 +247,6 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
     }
     if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy)) {
       goGroup(dx < 0 ? 1 : -1);
-      return;
-    }
-    // Táctil: tocar la portada abre la ficha del título (lo que en ordenador
-    // hace el ratón al pasar por encima). Fuera de la portada siguen las zonas
-    // de toque para ir atrás y adelante.
-    if (!canHover && cardRef.current?.contains(event.target)) {
-      openedAtRef.current = performance.now();
-      setHovering(true);
       return;
     }
     const rect = event.currentTarget.getBoundingClientRect();
@@ -430,49 +350,13 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
         </div>
 
         <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-5 px-4 pb-[max(1.5rem,var(--sv-safe-bottom,0px))] pt-4">
-          {/* CARTEL GRANDE. En ordenador, al pasar el ratón se convierte en la
-              ficha del título (TodayStoryDetails) y la historia se pausa, como
-              en Trakt; al salir vuelve el cartel y sigue. En táctil se abre al
-              tocar la portada y se cierra con otro toque. */}
           {/* El hueco del cartel mide lo que sobra entre la cabecera y el pie;
               el cartel se encaja en él SIEMPRE a 2:3 (el ancho es el menor entre
               el ancho del hueco y dos tercios de su alto), así se ve entero y
               nunca recortado. */}
           <div className="flex min-h-0 flex-1 items-center justify-center [container-type:size]">
-          <div
-            ref={cardRef}
-            className="relative aspect-[2/3] w-[min(100cqw,66.6667cqh)] [perspective:1800px]"
-          >
-            {/* La tarjeta DA LA VUELTA (rotateY) en 3D: delante el cartel,
-                detrás la ficha. La ficha se precarga entera mientras se ve el
-                cartel y solo se gira cuando está completa (`detailsReady`). */}
-            <div
-              className={`relative h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] [transform-style:preserve-3d] motion-reduce:transition-none ${
-                flipped ? "[transform:rotateY(180deg)]" : ""
-              }`}
-            >
-              <div className="absolute inset-0 overflow-hidden rounded-2xl bg-zinc-900 shadow-2xl [backface-visibility:hidden] [-webkit-backface-visibility:hidden]">
-                <Poster media={media} size="w500" className="absolute inset-0 h-full w-full" />
-              </div>
-              <div
-                className={`absolute inset-0 overflow-hidden rounded-2xl shadow-2xl [backface-visibility:hidden] [-webkit-backface-visibility:hidden] [transform:rotateY(180deg)] ${
-                  flipped ? "" : "pointer-events-none"
-                }`}
-                aria-hidden={!flipped}
-                data-story-control
-                // Táctil: otro toque en la ficha vuelve a la portada y sigue la
-                // historia (desplazar dentro no cuenta como toque).
-                onClick={
-                  canHover
-                    ? undefined
-                    : () => {
-                        if (performance.now() - openedAtRef.current > 350) setHovering(false);
-                      }
-                }
-              >
-                <TodayStoryDetails media={media} active onReadyChange={setDetailsReady} />
-              </div>
-            </div>
+          <div className="relative aspect-[2/3] w-[min(100cqw,66.6667cqh)] overflow-hidden rounded-2xl bg-zinc-900 shadow-2xl">
+            <Poster media={media} size="w500" className="absolute inset-0 h-full w-full" />
           </div>
           </div>
           <div className="h-[116px] shrink-0 overflow-hidden">
