@@ -247,18 +247,39 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
     [groupIndex, groups, onClose, seen],
   );
 
+  // De historia en historia (toques, teclado, flechas laterales y el paso
+  // automático), también dentro del mismo título y sin saltarse las vistas.
+  // Al retroceder desde la primera de un título se va a la ÚLTIMA del
+  // anterior, no a su primera.
   const goFrame = useCallback(
     (delta) => {
       if (!group) return;
       const next = frameIndex + delta;
-      if (next < 0) goGroup(-1);
-      else if (next >= group.frames.length) goGroup(1);
-      else {
+      if (next < 0) {
+        if (groupIndex <= 0) {
+          setFrameIndex(0);
+          elapsedRef.current = 0;
+          return;
+        }
+        setDir("back");
+        setGroupIndex(groupIndex - 1);
+        setFrameIndex(Math.max(0, groups[groupIndex - 1].frames.length - 1));
+      } else if (next >= group.frames.length) {
+        // Al título siguiente por su PRIMERA historia (goGroup salta a la
+        // primera sin ver y se comería las ya vistas).
+        if (groupIndex >= groups.length - 1) {
+          onClose();
+          return;
+        }
+        setDir("forward");
+        setGroupIndex(groupIndex + 1);
+        setFrameIndex(0);
+      } else {
         setDir(delta > 0 ? "forward" : "back");
         setFrameIndex(next);
       }
     },
-    [frameIndex, goGroup, group],
+    [frameIndex, group, groupIndex, groups, onClose],
   );
 
   // Visto en cuanto aparece.
@@ -366,19 +387,21 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
           1100 px) y el ancho justo para que el cartel 2:3 lo llene (alto menos
           ~244 px de barras, cabecera y pie, por 2/3, más el margen lateral). */}
       <div className="relative h-full w-full md:h-[min(96vh,1100px)] md:w-[calc((min(96vh,1100px)-244px)*2/3+32px)] md:max-w-[calc(100vw-180px)]">
+      {/* Flechas laterales: una historia cada vez, también dentro del mismo
+          título (antes saltaban de título). */}
       <button
         type="button"
-        onClick={() => goGroup(-1)}
+        onClick={() => goFrame(-1)}
         className="absolute -left-16 top-1/2 z-10 hidden -translate-y-1/2 rounded-full bg-white/10 p-3 text-white hover:bg-white/20 md:block"
-        aria-label="Título anterior"
+        aria-label="Historia anterior"
       >
         <ChevronLeft className="h-6 w-6" />
       </button>
       <button
         type="button"
-        onClick={() => goGroup(1)}
+        onClick={() => goFrame(1)}
         className="absolute -right-16 top-1/2 z-10 hidden -translate-y-1/2 rounded-full bg-white/10 p-3 text-white hover:bg-white/20 md:block"
-        aria-label="Título siguiente"
+        aria-label="Historia siguiente"
       >
         <ChevronRight className="h-6 w-6" />
       </button>

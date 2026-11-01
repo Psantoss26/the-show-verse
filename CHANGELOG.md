@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Social, historias en el ordenador: las flechas a los lados del visor pasan de una en una por cada historia, también las de un mismo título, en vez de saltar al título siguiente o anterior. Al volver atrás desde un título se entra por su última historia. → [Hoy](docs/features/hoy.md)
 - Social, Actividad: «De la gente que sigues» (y «De la comunidad») se ve por defecto en lista en vez de en cuadrícula de carteles. La cuadrícula sigue en el botón de vista y, si la eliges, se recuerda. → [Hoy](docs/features/hoy.md)
 - Social, historias: el resumen de un título con varias personas ya no dice «2 personas lo han tocado», sino lo que han hecho de verdad: «2 personas la han visto», «2 personas la han puntuado» o «2 personas han visto episodios», y debajo lo que solo han hecho algunas («1 la ha reseñado»), junto con la media de notas. → [Hoy](docs/features/hoy.md)
 - Social, historias en el móvil: la X vuelve a cerrar siempre. En algunos navegadores (Firefox, Samsung Internet), si el dedo se movía un poco al tocarla, no pasaba nada. Ahora cierra al levantar el dedo, el botón es más grande y tocar la cabecera ya no pasa a la siguiente historia. → [Hoy](docs/features/hoy.md)
