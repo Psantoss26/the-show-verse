@@ -202,8 +202,18 @@ export default function TodayClient({
   // ?story=<título> (la píldora «Hoy» del navbar) abre el reproductor en esa
   // historia; sin clave válida, en la primera con algo sin ver. Después se quita
   // de la URL para que recargar no la vuelva a abrir.
+  //
+  // UNA apertura por pulsación (`storyHandledRef`): el efecto vuelve a correr
+  // cuando llegan datos nuevos (la revalidación en segundo plano) y, si la
+  // clave seguía en los parámetros, reabría el visor justo después de cerrarlo
+  // con la X. Se rearma cuando la clave desaparece de la URL.
+  const storyHandledRef = useRef(null);
   useEffect(() => {
-    if (!storyParam || !data) return;
+    if (!storyParam) storyHandledRef.current = null;
+  }, [storyParam]);
+  useEffect(() => {
+    if (!storyParam || !data || storyHandledRef.current === storyParam) return;
+    storyHandledRef.current = storyParam;
     const groups = derived.storyGroups;
     if (groups.length) {
       const current = readSeenStories();
@@ -214,7 +224,13 @@ export default function TodayClient({
     }
     const url = new URL(window.location.href);
     url.searchParams.delete("story");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+    // Estado `null`, NO `window.history.state`: ese lleva la marca interna de
+    // Next (`__NA`) y, con ella, Next da la llamada por suya y no actualiza
+    // `useSearchParams`. La clave seguía viva para React: el visor se reabría
+    // al revalidar y volver a pulsar la píldora (misma URL para el router) no
+    // hacía nada. Sin la marca, Next copia su estado interno y sincroniza los
+    // parámetros sin volver a pedir el RSC.
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
     // Solo cuando llega una clave nueva o los datos para resolverla.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storyParam, data]);

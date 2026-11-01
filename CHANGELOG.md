@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Social, historias abiertas desde la píldora «Actividad» del navbar: la X vuelve a cerrarlas al momento (antes, a veces se reabrían solas y no se cerraban hasta acabar) y volver a pulsar la píldora las abre otra vez (antes no hacía nada). → [Hoy](docs/features/hoy.md)
 - Portadas y fondos: la imagen o el logo que elige la cuenta de Pablo pasa a ser la de por defecto para todo el mundo en ese título, por encima de la más votada y sin importar los votos que tenga otra. Cada usuario puede seguir eligiendo otra imagen, que solo cambia para él. Vale para portadas, fondos, vista previa, logos, tarjetas, temporadas y colecciones. → [páginas](docs/frontend/app-router-pages.md), [páginas de usuario](docs/features/paginas-de-usuario.md#portada-de-las-tarjetas)
 - Social, historias en el ordenador: las flechas a los lados del visor pasan de una en una por cada historia, también las de un mismo título, en vez de saltar al título siguiente o anterior. Al volver atrás desde un título se entra por su última historia. → [Hoy](docs/features/hoy.md)
 - Social, Actividad: «De la gente que sigues» (y «De la comunidad») se ve por defecto en lista en vez de en cuadrícula de carteles. La cuadrícula sigue en el botón de vista y, si la eliges, se recuerda. → [Hoy](docs/features/hoy.md)

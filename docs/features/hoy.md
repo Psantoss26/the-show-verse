@@ -44,7 +44,7 @@ Los valores por defecto (`following`, `today`, `title`) no se escriben en la URL
 - **Escritorio** (junto a Buscar): caras de hasta 3 personas con historias, «Actividad» y un contador de historias sin ver.
 - **Móvil** (junto a la campana): un círculo con dos carteles inclinados y el contador en la esquina.
 - **Brillo:** mientras queda algo sin ver, un destello cónico recorre el borde una vez por minuto (`.sv-today-shine` en `globals.css`; sin animación con reduced-motion).
-- **Destino:** `/social?story=<primera sin ver>`.
+- **Destino:** `/social?story=<primera sin ver>`. `TodayClient` abre el visor UNA vez por clave (`storyHandledRef`, se rearma cuando la clave sale de la URL) y la quita con `history.replaceState(null, …)`. El estado va a `null` a propósito: con `window.history.state` (que lleva la marca interna `__NA`), Next da la llamada por suya y no actualiza `useSearchParams`; la clave seguía viva para React, el visor se reabría al revalidar los datos (la X «no cerraba» hasta que acababan las historias) y volver a pulsar la píldora, misma URL para el router, no abría nada.
 - **Datos:** usa la misma petición que la vista (`src/lib/today/todayFeedClient.js`: petición en curso compartida y copia de 60 s). Se actualiza al navegar.
 - **Contador:** baja al momento al ver historias, porque `writeSeenStories` emite `today-seen-stories-change`.
 
