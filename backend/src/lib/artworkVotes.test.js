@@ -54,3 +54,26 @@ test('por título: la más votada de cada uno, sin mezclarlos', () => {
     { 1: { poster: '/b.jpg' }, 2: { poster: '/c.jpg' } },
   );
 });
+
+test('la elegida por una cuenta curadora gana aunque tenga menos votos', () => {
+  assert.deepEqual(
+    pickTopVotedArtwork([
+      { kind: 'logo', filePath: '/popular.png', votes: 12, lastVotedAt: '2026-10-30T00:00:00Z', curated: false },
+      { kind: 'logo', filePath: '/curada.png', votes: 1, lastVotedAt: '2026-01-01T00:00:00Z', curated: true },
+      { kind: 'poster', filePath: '/a.jpg', votes: 1, lastVotedAt: '2026-01-01T00:00:00Z', curated: false },
+      { kind: 'poster', filePath: '/b.jpg', votes: 4, lastVotedAt: '2026-01-01T00:00:00Z', curated: false },
+    ]),
+    { logo: '/curada.png', poster: '/b.jpg' },
+  );
+});
+
+test('por título: la curada manda en su título y no toca los demás', () => {
+  assert.deepEqual(
+    pickTopVotedArtworkByTitle([
+      { tmdbId: 1, kind: 'poster', filePath: '/curada.jpg', votes: 2, lastVotedAt: '2026-01-01T00:00:00Z', curated: true },
+      { tmdbId: 1, kind: 'poster', filePath: '/votada.jpg', votes: 9, lastVotedAt: '2026-10-01T00:00:00Z' },
+      { tmdbId: 2, kind: 'poster', filePath: '/votada.jpg', votes: 9, lastVotedAt: '2026-10-01T00:00:00Z' },
+    ]),
+    { 1: { poster: '/curada.jpg' }, 2: { poster: '/votada.jpg' } },
+  );
+});

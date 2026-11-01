@@ -5,12 +5,35 @@
 // Un usuario = un voto por título y tipo de imagen: la fila guarda su selección
 // ACTUAL, así que cambiar de imagen mueve el voto y restablecer lo retira. La
 // selección propia sigue mandando sobre la de la comunidad en el cliente.
+//
+// Excepción: la selección de una cuenta CURADORA (la de Pablo) es la imagen por
+// defecto de ese tipo sin importar los votos. Cada usuario puede seguir
+// eligiendo otra para él, pero eso no la desbanca para los demás.
 
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { artworkVotes } from '../db/schema.js';
+import { artworkVotes, users } from '../db/schema.js';
 
 export const ARTWORK_VOTE_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo', 'cardBackdrop'];
+
+// Cuentas curadoras, por username o email (la cuenta que entra con Google no
+// tiene por qué llamarse igual). Se pueden añadir más con ARTWORK_CURATORS
+// (separadas por comas).
+export const ARTWORK_CURATORS = [
+  ...new Set(
+    ['pablosantos', 'psantos26', 'pablosantoshernandez26@gmail.com', ...(process.env.ARTWORK_CURATORS || '').split(',')]
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  ),
+];
+
+// ¿Alguno de los votos agrupados es de una cuenta curadora? Va en el SELECT de
+// las consultas agrupadas por imagen.
+const curatedVote = sql`BOOL_OR(${artworkVotes.userId} IN (
+  SELECT ${users.id} FROM ${users}
+  WHERE LOWER(${users.username}) IN (${sql.join(ARTWORK_CURATORS.map((value) => sql`${value}`), sql`, `)})
+     OR LOWER(${users.email}) IN (${sql.join(ARTWORK_CURATORS.map((value) => sql`${value}`), sql`, `)})
+))`.mapWith(Boolean);
 
 // Refleja en `artwork_votes` los mismos cambios que se acaban de aplicar a
 // `artworkOverrides`. Va dentro de la transacción del guardado (`executor`),
@@ -47,26 +70,31 @@ export async function applyArtworkVoteChanges(executor, userId, changes) {
   }
 }
 
-// Filas ya agrupadas (kind, filePath, votes, lastVotedAt) → la ganadora de cada
-// tipo. Empate en votos: la elegida más recientemente, que es la que refleja
-// mejor lo que la gente prefiere ahora.
+// Filas ya agrupadas (kind, filePath, votes, lastVotedAt, curated) → la ganadora
+// de cada tipo. La elegida por una cuenta curadora gana siempre, tenga los votos
+// que tenga. Si no, la más votada; empate en votos: la elegida más
+// recientemente, que es la que refleja mejor lo que la gente prefiere ahora.
 export function pickTopVotedArtwork(rows) {
   const best = {};
   for (const row of rows || []) {
     if (!ARTWORK_VOTE_KINDS.includes(row?.kind) || !row.filePath) continue;
+    const curated = row.curated === true;
     const votes = Number(row.votes) || 0;
     const at = new Date(row.lastVotedAt || 0).getTime() || 0;
     const current = best[row.kind];
-    if (!current || votes > current.votes || (votes === current.votes && at > current.at)) {
-      best[row.kind] = { filePath: row.filePath, votes, at };
-    }
+    const wins = !current
+      || (curated && !current.curated)
+      || (curated === current.curated
+        && (votes > current.votes || (votes === current.votes && at > current.at)));
+    if (wins) best[row.kind] = { filePath: row.filePath, votes, at, curated };
   }
   return Object.fromEntries(
     Object.entries(best).map(([kind, entry]) => [kind, entry.filePath]),
   );
 }
 
-// { poster: '/x.jpg', mobilePoster: … } con la imagen más votada de cada tipo;
+// { poster: '/x.jpg', mobilePoster: … } con la imagen ganadora de cada tipo
+// (la curada o la más votada);
 // los tipos sin ningún voto no aparecen (el cliente usa su criterio automático).
 export async function getCommunityArtwork({ mediaType, tmdbId }, executor = db) {
   const rows = await executor
@@ -75,6 +103,7 @@ export async function getCommunityArtwork({ mediaType, tmdbId }, executor = db) 
       filePath: artworkVotes.filePath,
       votes: sql`COUNT(*)`.mapWith(Number),
       lastVotedAt: sql`MAX(${artworkVotes.updatedAt})`,
+      curated: curatedVote,
     })
     .from(artworkVotes)
     .where(and(eq(artworkVotes.mediaType, mediaType), eq(artworkVotes.tmdbId, Number(tmdbId))))
@@ -141,6 +170,7 @@ export async function getCommunitySeasonPosters(seasonIds, executor = db) {
       filePath: artworkVotes.filePath,
       votes: sql`COUNT(*)`.mapWith(Number),
       lastVotedAt: sql`MAX(${artworkVotes.updatedAt})`,
+      curated: curatedVote,
     })
     .from(artworkVotes)
     .where(and(
@@ -169,6 +199,7 @@ export async function getCommunityArtworkForTitles({ mediaType, tmdbIds, kinds }
       filePath: artworkVotes.filePath,
       votes: sql`COUNT(*)`.mapWith(Number),
       lastVotedAt: sql`MAX(${artworkVotes.updatedAt})`,
+      curated: curatedVote,
     })
     .from(artworkVotes)
     .where(and(
