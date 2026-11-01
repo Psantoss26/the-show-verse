@@ -92,6 +92,29 @@ resultado de la búsqueda. Si se manda `tmdbId` y JustWatch no tiene ese mismo
 id, `cinema` es `null`: un falso «en cines» por un homónimo es peor que nada.
 Con cines, la respuesta se cachea 6 h en lugar de 24 h.
 
+## Fallos de JustWatch y copias sin conexión
+
+Un fallo de JustWatch (error de red, estado no 2xx, errores de GraphQL o
+tiempo agotado: 8 s en la búsqueda y en los detalles) **no** es «sin
+plataformas». `getStreamingProviders` devuelve `degraded: true` y
+`/api/streaming` responde **503** `{ degraded: true }` con `no-store`. El
+service worker no guarda respuestas `degraded`, y la página de temporada lo
+trata como «sin resolver» (`null`), así que el cliente vuelve a pedirlas.
+
+En el navegador, la ficha completa y la ficha rápida consultan con
+`fetchStreamingAvailability` (`src/lib/streaming/streamingClient.js`):
+
+- reintenta una vez (a los 1,5 s) si la respuesta es `degraded`, un fallo de
+  red o una copia del service worker (`X-Showverse-Offline: 1`, la que sirve
+  cuando el servidor no responde, por ejemplo durante un despliegue);
+- devuelve `fresh: true` solo para la respuesta real del servidor. La ficha
+  completa solo guarda en `sessionStorage` (clave `streaming:v3:…`) lo que es
+  `fresh`: una copia sin conexión se pinta pero no se guarda.
+
+Antes, una copia vieja (de antes de `cinema`) o un fallo silencioso se
+guardaban 24 h con la clave `v2` y la ficha mostraba «No hay plataformas
+disponibles» en esa pestaña o sesión de la PWA hasta cerrarla.
+
 ## Cines (en cartelera / preventa)
 
 La fila «En cines» de Inicio usa la misma fuente, en lista: ver

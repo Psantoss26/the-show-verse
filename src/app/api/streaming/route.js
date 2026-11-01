@@ -72,6 +72,15 @@ export async function GET(request) {
       { tmdbId },
     );
 
+    // JustWatch no respondió: 503 sin caché. Con un 200 vacío, el service
+    // worker y la caché de la ficha lo guardaban como «sin plataformas».
+    if (result.degraded) {
+      return NextResponse.json(
+        { providers: [], justwatchUrl: null, cinema: null, degraded: true },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
     // El estado (en cines / preventa) lo calcula el cliente con la fecha de
     // hoy, para que no quede desfasado en cachés.
     const cinema =
@@ -100,8 +109,9 @@ export async function GET(request) {
         providers: [],
         justwatchUrl: null,
         cinema: null,
+        degraded: true,
       },
-      { status: 500 },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
 }

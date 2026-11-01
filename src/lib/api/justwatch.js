@@ -394,14 +394,11 @@ export async function getStreamingProviders(
   { tmdbId = null } = {},
 ) {
   try {
-    // 1. Buscar el título (el que coincide con el id de TMDb, no el primero)
-    let searchResult = null;
-    try {
-      const nodes = await searchTitles(title, type, year);
-      searchResult = selectJustWatchTitle(nodes, { tmdbId, title });
-    } catch (error) {
-      console.error("Error searching JustWatch:", error);
-    }
+    // 1. Buscar el título (el que coincide con el id de TMDb, no el primero).
+    // Un fallo de JustWatch NO es «sin plataformas»: lanza y acaba en
+    // `degraded` (abajo), para que nadie lo guarde como respuesta válida.
+    const nodes = await searchTitles(title, type, year);
+    const searchResult = selectJustWatchTitle(nodes, { tmdbId, title });
 
     if (!searchResult) {
       return {
@@ -411,15 +408,18 @@ export async function getStreamingProviders(
       };
     }
 
-    // 2. Obtener detalles completos con ofertas
-    const details = await getTitleDetails(searchResult.id);
+    // 2. Obtener detalles completos con ofertas (con tiempo máximo y errores
+    // de GraphQL comprobados, como la búsqueda)
+    const detailsData = await justWatchGraphql(TITLE_DETAILS_QUERY, {
+      nodeId: searchResult.id,
+      country: COUNTRY_CODE,
+      language: "es",
+      platform: "WEB",
+    });
+    const details = detailsData?.node;
 
     if (!details) {
-      return {
-        providers: [],
-        justwatchUrl: null,
-        cinemaChains: [],
-      };
+      throw new Error("JustWatch title details missing");
     }
 
     // 3. Construir URL de JustWatch
@@ -485,6 +485,7 @@ export async function getStreamingProviders(
       providers: [],
       justwatchUrl: null,
       cinemaChains: [],
+      degraded: true,
     };
   }
 }

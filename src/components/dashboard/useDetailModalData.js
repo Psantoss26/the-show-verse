@@ -32,6 +32,7 @@ import {
   normalizeCastFromTmdb,
 } from "@/lib/details/cast";
 import { formatDateEs } from "@/lib/details/formatters";
+import { fetchStreamingAvailability } from "@/lib/streaming/streamingClient";
 import { traktGetSentiments, traktGetScoreboard } from "@/lib/api/traktClient";
 import {
   yearOf,
@@ -770,8 +771,8 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
           if (imdbId) params.append("imdbId", imdbId);
 
           const [streamResult, plexResult] = await Promise.all([
-            fetch(`/api/streaming?${params.toString()}`)
-              .then((response) => (response.ok ? response.json() : null))
+            fetchStreamingAvailability(params)
+              .then((result) => result.data)
               .catch(() => null),
             fetch(`/api/plex?${params.toString()}`)
               .then((response) => (response.ok ? response.json() : null))
@@ -1477,9 +1478,10 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
         if (y) params.append("year", String(y));
         params.append("tmdbId", String(id));
 
-        const res = await fetch(`/api/streaming?${params.toString()}`);
-        if (!res.ok || cancelled) return;
-        const json = await res.json();
+        // Reintenta si JustWatch no respondió o el service worker sirvió una
+        // copia guardada (ver streamingClient).
+        const { data: json } = await fetchStreamingAvailability(params);
+        if (!json || cancelled) return;
         const providers = normalizeProviders(json?.providers, 10);
         const cinema = mediaType === "movie" ? json?.cinema || null : null;
         if (!cancelled && (providers.length || cinema)) {

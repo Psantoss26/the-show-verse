@@ -132,8 +132,12 @@ export default async function SeasonPage({ params }) {
       const year = Number(String(showJson?.first_air_date || "").slice(0, 4));
       return Promise.race([
         getStreamingProviders(title, "tv", year > 0 ? year : null).then(
+          // `degraded` (JustWatch no respondió) = sin resolver: el cliente
+          // las vuelve a pedir en vez de dar por hecho que no hay.
           (result) =>
-            Array.isArray(result?.providers) ? result.providers : null,
+            !result?.degraded && Array.isArray(result?.providers)
+              ? result.providers
+              : null,
         ),
         new Promise((resolve) =>
           setTimeout(() => resolve(null), PROVIDERS_SERVER_TIMEOUT_MS),

@@ -380,6 +380,7 @@ import {
   createCinemaPlatformItems,
   resolveCinemaStatus,
 } from "@/lib/streaming/cinema";
+import { fetchStreamingAvailability } from "@/lib/streaming/streamingClient";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import { useLadderListPreviews } from "@/lib/lists/useLadderListPreviews";
 import ListCountPills from "@/components/lists/ListCountPills";
@@ -8989,9 +8990,11 @@ export default function DetailsClient({
   useEffect(() => {
     if (!title || !id) return;
 
-    // v2: incluye `cinema`. Con cines la caché dura menos: la cartelera
-    // cambia cada semana.
-    const cacheKey = `streaming:v2:${endpointType}:${id}`;
+    // v3: solo guarda respuestas frescas del servidor (ver streamingClient).
+    // La v2 pudo guardar copias del service worker o fallos de JustWatch como
+    // «sin plataformas»; cambiar la clave las descarta. Con cines la caché
+    // dura menos: la cartelera cambia cada semana.
+    const cacheKey = `streaming:v3:${endpointType}:${id}`;
     const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
     const CINEMA_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 horas
 
@@ -9020,6 +9023,8 @@ export default function DetailsClient({
     // Si hay caché válido, usarlo y terminar
     if (loadFromCache()) return;
 
+    let cancelled = false;
+
     // Si no hay caché, hacer la petición
     const fetchProviders = async () => {
       setProvidersLoading(true);
@@ -9039,10 +9044,10 @@ export default function DetailsClient({
 
         params.append("tmdbId", id);
 
-        const response = await fetch(`/api/streaming?${params.toString()}`);
+        const { data: result, fresh } = await fetchStreamingAvailability(params);
+        if (cancelled) return;
 
-        if (response.ok) {
-          const result = await response.json();
+        if (result) {
           const providers = result.providers || [];
           const justwatchUrl = result.justwatchUrl || null;
           const cinema = result.cinema || null;
@@ -9051,29 +9056,35 @@ export default function DetailsClient({
           setJustwatchUrl(justwatchUrl);
           setCinemaInfo(cinema);
 
-          // Guardar en caché
-          try {
-            sessionStorage.setItem(
-              cacheKey,
-              JSON.stringify({
-                providers,
-                justwatchUrl,
-                cinema,
-                timestamp: Date.now(),
-              }),
-            );
-          } catch (error) {
-            console.error("Error saving providers to cache:", error);
+          // Guardar en caché, solo si es la respuesta real del servidor: una
+          // copia sin conexión se pinta pero no se guarda.
+          if (fresh) {
+            try {
+              sessionStorage.setItem(
+                cacheKey,
+                JSON.stringify({
+                  providers,
+                  justwatchUrl,
+                  cinema,
+                  timestamp: Date.now(),
+                }),
+              );
+            } catch (error) {
+              console.error("Error saving providers to cache:", error);
+            }
           }
         }
       } catch (error) {
         console.error("Error fetching streaming providers:", error);
       } finally {
-        setProvidersLoading(false);
+        if (!cancelled) setProvidersLoading(false);
       }
     };
 
     fetchProviders();
+    return () => {
+      cancelled = true;
+    };
   }, [title, id, endpointType, yearIso, data.imdb_id]);
 
   // ====== PLEX: Cargar disponibilidad desde servidor local ======
