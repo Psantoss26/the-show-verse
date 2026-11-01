@@ -361,6 +361,18 @@ En `home` el `mediaType` de estas filas es `mixed`; en `movies`/`series` es el
 `tv`, sus "Para ti" ya difieren entre sí; el desfase de semilla diferencia además
 el de Inicio.
 
+**Orden de las filas.** `orderSurfaceRows(personalSpecs, genericSpecs, surface)`
+decide el orden final (y, con él, qué fila se queda antes cada título al
+deduplicar): primero «Recomendaciones de hoy para ti»; después las filas
+principales de la superficie (`leadRowKeys`, en ese orden: en Inicio Tendencias,
+Populares, Mejor valoradas, Más esperadas y Aclamadas; en Películas y Series
+Tendencias, Estrenos, Populares en streaming en España, Populares, Las más
+valoradas y Aclamadas); y luego el resto de genéricas con las personalizadas
+secundarias intercaladas, una cada 2 filas como mucho («Más de tus géneros
+favoritos» primero y luego los «Porque te gustó…»), nunca dos seguidas salvo que
+no queden filas genéricas. En Inicio el cliente sigue colocando Calendario, Más
+esperadas y Tendencias justo tras la fila de recomendaciones.
+
 ---
 
 ## 6. Resolución de pools `mixed`
@@ -400,7 +412,8 @@ muestran el mismo set** entre Inicio/Películas/Series.
 
 `assembleRows({ rowSpecs, rotationSeed, perRow = 20, minItems = 15, seenIds })`:
 
-1. Recorre las filas en orden (**personalizadas primero**, luego genéricas).
+1. Recorre las filas en el orden de `orderSurfaceRows` (§5.3: recomendaciones,
+   filas principales y el resto con las personalizadas intercaladas).
 2. Para cada fila rotable, baraja con la semilla (de la superficie/día).
 3. Toma hasta `perRow` (20) tarjetas **saltando las ya usadas** (`used`) →
    **deduplicación entre filas**: un título no se repite en dos carruseles.

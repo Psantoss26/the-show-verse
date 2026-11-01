@@ -1,7 +1,7 @@
 // backend/src/dashboard/surfaces.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SURFACES, personalizedRowDefs } from './surfaces.js';
+import { SURFACES, orderSurfaceRows, personalizedRowDefs } from './surfaces.js';
 
 const rec = (id, mt, score, reasons = []) => ({
   tmdbId: id, mediaType: mt, title: `T${id}`, score, reasons, genreIds: [],
@@ -65,4 +65,33 @@ test('personalizedRowDefs drops a "Porque te gustó" group below 12 items', () =
     rec(100 + i, 'movie', 50 - i, [{ type: 'because', seedTmdbId: 99, seedTitle: 'Origen' }]));
   const rows = personalizedRowDefs({ movie: liked }, SURFACES.movies);
   assert.equal(rows.find((r) => r.key === 'because_movie_99'), undefined);
+});
+
+const spec = (key) => ({ key });
+const keys = (rows) => rows.map((row) => row.key);
+
+test('orderSurfaceRows keeps home lead rows first and spreads "Porque te gustó" rows', () => {
+  const personal = ['for_you', 'because_movie_1', 'because_tv_2', 'because_movie_3', 'genre_fill'].map(spec);
+  const generic = SURFACES.home.genericRows.map((row) => spec(row.key));
+  const ordered = keys(orderSurfaceRows(personal, generic, SURFACES.home));
+  assert.deepEqual(ordered.slice(0, 6), ['for_you', 'trending', 'popular', 'top_rated', 'anticipated', 'acclaimed']);
+  assert.equal(ordered.length, personal.length + generic.length);
+  // Nunca dos personalizadas secundarias seguidas, y la de géneros va primero.
+  const secondary = ordered.map((key, i) => [key, i]).filter(([key]) => key === 'genre_fill' || key.startsWith('because_'));
+  assert.equal(secondary[0][0], 'genre_fill');
+  for (let i = 1; i < secondary.length; i += 1) assert.ok(secondary[i][1] - secondary[i - 1][1] > 1);
+});
+
+test('orderSurfaceRows promotes trending and new releases on movies and appends leftover personal rows', () => {
+  const personal = ['for_you', 'because_movie_1', 'because_movie_2'].map(spec);
+  const generic = ['trending', 'region_top', 'popular', 'drama', 'new_releases'].map(spec);
+  assert.deepEqual(keys(orderSurfaceRows(personal, generic, SURFACES.movies)), [
+    'for_you', 'trending', 'new_releases', 'region_top', 'popular', 'drama', 'because_movie_1', 'because_movie_2',
+  ]);
+});
+
+test('orderSurfaceRows without personal rows keeps generic lead order', () => {
+  const generic = SURFACES.series.genericRows.map((row) => spec(row.key));
+  const ordered = keys(orderSurfaceRows([], generic, SURFACES.series));
+  assert.deepEqual(ordered.slice(0, 6), SURFACES.series.leadRowKeys);
 });

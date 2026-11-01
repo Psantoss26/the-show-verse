@@ -17,6 +17,9 @@
 export const SURFACES = {
   home: {
     mediaTypes: ['movie', 'tv'],
+    // Filas principales: van justo tras «Recomendaciones de hoy para ti», antes
+    // de cualquier «Porque te gustó…» (ver orderSurfaceRows).
+    leadRowKeys: ['trending', 'popular', 'top_rated', 'anticipated', 'acclaimed'],
     genericRows: [
       {
         key: 'trending',
@@ -85,6 +88,7 @@ export const SURFACES = {
 
   movies: {
     mediaTypes: ['movie'],
+    leadRowKeys: ['trending', 'new_releases', 'region_top', 'popular', 'top_rated', 'acclaimed'],
     genericRows: [
       {
         key: 'trending',
@@ -169,6 +173,7 @@ export const SURFACES = {
 
   series: {
     mediaTypes: ['tv'],
+    leadRowKeys: ['trending', 'new_releases', 'region_top', 'popular', 'top_rated', 'acclaimed'],
     genericRows: [
       {
         key: 'trending',
@@ -365,4 +370,45 @@ export function personalizedRowDefs(recsByType, surface) {
   }
 
   return rows;
+}
+
+// Filas normales entre dos filas personalizadas secundarias.
+const SECONDARY_ROW_SPACING = 2;
+
+/**
+ * Orden final de las filas de una superficie: «Recomendaciones de hoy para ti»,
+ * después las filas principales (`leadRowKeys`, en ese orden) y el resto de
+ * genéricas con las personalizadas secundarias intercaladas, una cada
+ * SECONDARY_ROW_SPACING filas como mucho («Más de tus géneros favoritos» primero y luego
+ * los «Porque te gustó…»), para que no vayan todas seguidas ni por delante de
+ * las filas importantes. Las que sobren cierran la lista.
+ */
+export function orderSurfaceRows(personalSpecs, genericSpecs, surface) {
+  const leadKeys = surface.leadRowKeys ?? [];
+  const forYou = personalSpecs.filter((row) => row.key === 'for_you');
+  const secondary = [
+    ...personalSpecs.filter((row) => row.key === 'genre_fill'),
+    ...personalSpecs.filter((row) => row.key !== 'for_you' && row.key !== 'genre_fill'),
+  ];
+  const lead = genericSpecs
+    .filter((row) => leadKeys.includes(row.key))
+    .sort((a, b) => leadKeys.indexOf(a.key) - leadKeys.indexOf(b.key));
+  const rest = genericSpecs.filter((row) => !leadKeys.includes(row.key));
+
+  // Con pocas filas normales el hueco se reduce (hasta alternar 1 a 1) para
+  // que las secundarias no acaben amontonadas al final.
+  const spacing = Math.max(1, Math.min(
+    SECONDARY_ROW_SPACING,
+    Math.floor(rest.length / Math.max(1, secondary.length)),
+  ));
+  const out = [...forYou, ...lead];
+  let nextSecondary = 0;
+  rest.forEach((row, index) => {
+    out.push(row);
+    if ((index + 1) % spacing === 0 && nextSecondary < secondary.length) {
+      out.push(secondary[nextSecondary++]);
+    }
+  });
+  out.push(...secondary.slice(nextSecondary));
+  return out;
 }

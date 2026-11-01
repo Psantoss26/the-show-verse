@@ -1,7 +1,7 @@
 // src/routes/dashboard.js
 // GET /v1/dashboard/:surface — assembles dashboard rows for home, movies, series surfaces.
 
-import { SURFACES, personalizedRowDefs } from '../dashboard/surfaces.js';
+import { SURFACES, orderSurfaceRows, personalizedRowDefs } from '../dashboard/surfaces.js';
 import { getPool, dedupeCards, TOP_RATED_RANKING_SIZE } from '../dashboard/pools.js';
 import { getUserRecommendations } from '../dashboard/recommendations.js';
 import { loadLibrary, libraryBasisHash, dislikedIds } from '../dashboard/library.js';
@@ -287,7 +287,8 @@ export default async function dashboardRoutes(fastify, options = {}) {
       for (const card of items) affinity.set(cardKey(card), Math.sqrt(Math.max(0, card.score || 0) / max));
     }
     // Rank before allocation; the assembler must not shuffle away relevance.
-    const specs = [...personalSpecs, ...genericSpecs].map((row) => ({
+    // El orden también decide quién se queda antes con cada título al deduplicar.
+    const specs = orderSurfaceRows(personalSpecs, genericSpecs, surface).map((row) => ({
       ...row, items: rankRowItems(row, { seed, recommendations: affinity, surface: surfaceKey, cohortSeed: dayNumber() + stableHash(userId || 'anonymous') }), rotate: false,
     }));
     // ── Filas de sección (solo Inicio) ────────────────────────────────────────
