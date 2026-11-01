@@ -51,6 +51,7 @@ import "swiper/swiper-bundle.css";
 // Carrusel con flechas COMPARTIDO (mismo componente que usa DetailModal).
 import DetailsArrowCarousel from "@/components/details/DetailsArrowCarousel";
 import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
+import CinemaAvailabilityTile from "@/components/details/CinemaAvailabilityTile";
 
 // -- Animaciones con Framer Motion --
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -376,6 +377,10 @@ import {
   createPlatformItem,
   dedupeStreamingProviders,
 } from "@/lib/streaming/providers";
+import {
+  createCinemaPlatformItems,
+  resolveCinemaStatus,
+} from "@/lib/streaming/cinema";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import { useLadderListPreviews } from "@/lib/lists/useLadderListPreviews";
 import ListCountPills from "@/components/lists/ListCountPills";
@@ -1580,6 +1585,7 @@ export default function DetailsClient({
   const [streamingProviders, setStreamingProviders] = useState(() => restoredValue(backSnapshot, "streamingProviders", [])); // Lista de servicios disponibles
   const [providersLoading, setProvidersLoading] = useState(() => restoredValue(backSnapshot, "providersLoading", true));
   const [justwatchUrl, setJustwatchUrl] = useState(() => restoredValue(backSnapshot, "justwatchUrl", null)); // URL directa a JustWatch
+  const [cinemaInfo, setCinemaInfo] = useState(() => restoredValue(backSnapshot, "cinemaInfo", null)); // Cines (JustWatch) + estreno en España
 
   // ====== INTEGRACION CON PLEX ======
   const [plexAvailable, setPlexAvailable] = useState(() => restoredValue(backSnapshot, "plexAvailable", false)); // Contenido disponible en Plex local
@@ -8787,6 +8793,7 @@ export default function DetailsClient({
     streamingProviders,
     providersLoading,
     justwatchUrl,
+    cinemaInfo,
     plexAvailable,
     plexUrl,
     plexLoading,
@@ -8983,20 +8990,24 @@ export default function DetailsClient({
   useEffect(() => {
     if (!title || !id) return;
 
-    const cacheKey = `streaming:${endpointType}:${id}`;
+    // v2: incluye `cinema`. Con cines la caché dura menos: la cartelera
+    // cambia cada semana.
+    const cacheKey = `streaming:v2:${endpointType}:${id}`;
     const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
+    const CINEMA_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 horas
 
     // Intentar cargar desde caché primero
     const loadFromCache = () => {
       try {
         const cached = sessionStorage.getItem(cacheKey);
         if (cached) {
-          const { providers, justwatchUrl, timestamp } = JSON.parse(cached);
+          const { providers, justwatchUrl, cinema, timestamp } = JSON.parse(cached);
           const age = Date.now() - timestamp;
 
-          if (age < CACHE_TTL) {
+          if (age < (cinema ? CINEMA_CACHE_TTL : CACHE_TTL)) {
             setStreamingProviders(providers || []);
             setJustwatchUrl(justwatchUrl || null);
+            setCinemaInfo(cinema || null);
             setProvidersLoading(false);
             return true;
           }
@@ -9035,9 +9046,11 @@ export default function DetailsClient({
           const result = await response.json();
           const providers = result.providers || [];
           const justwatchUrl = result.justwatchUrl || null;
+          const cinema = result.cinema || null;
 
           setStreamingProviders(providers);
           setJustwatchUrl(justwatchUrl);
+          setCinemaInfo(cinema);
 
           // Guardar en caché
           try {
@@ -9046,6 +9059,7 @@ export default function DetailsClient({
               JSON.stringify({
                 providers,
                 justwatchUrl,
+                cinema,
                 timestamp: Date.now(),
               }),
             );
@@ -9210,6 +9224,19 @@ export default function DetailsClient({
         )
         .filter((provider) => provider.icon),
     [limitedProviders, endpointType, justwatchUrl, title],
+  );
+
+  // Cines: el estado (en cartelera / preventa) se calcula aquí con la fecha de
+  // hoy, no en el servidor, para que la caché no lo deje desfasado.
+  const cinemaStatus = useMemo(
+    () => (type === "movie" ? resolveCinemaStatus(cinemaInfo) : null),
+    [type, cinemaInfo],
+  );
+
+  // Modal móvil: primero las cadenas de cine y después el streaming.
+  const platformModalItems = useMemo(
+    () => [...createCinemaPlatformItems(cinemaStatus), ...platformItems],
+    [cinemaStatus, platformItems],
   );
 
   // Plataforma principal del overlay de la portada, según orden de prioridad
@@ -10147,7 +10174,7 @@ export default function DetailsClient({
       <ExternalLinksModal
         open={platformsOpen}
         onClose={() => setPlatformsOpen(false)}
-        links={platformItems}
+        links={platformModalItems}
         mode="platforms"
       />
 
@@ -11102,7 +11129,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             >
               {/* Los enlaces aparecen dentro del espacio ya reservado. */}
               <div className="flex flex-row flex-nowrap items-center gap-2">
-                {platformItems.map((provider, index) => (
+                {/* «En cines» va primero. Ocupa lo que dos logos y medio: con
+                    ella caben tres plataformas en el ancho de la portada. */}
+                {cinemaStatus && (
+                  <CinemaAvailabilityTile
+                    status={cinemaStatus}
+                    className={detailsRestored ? "" : "animate-in fade-in zoom-in-95 duration-300"}
+                  />
+                )}
+                {(cinemaStatus ? platformItems.slice(0, 3) : platformItems).map((provider, index) => (
                   <motion.a
                     key={provider.key ?? `${provider.title}-${index}`}
                     href={provider.href}

@@ -79,9 +79,42 @@ Cambios realizados:
 ```javascript
 {
   providers: Provider[],    // Array de proveedores (max 10)
-  justwatchUrl: string     // URL de JustWatch para este título
+  justwatchUrl: string,    // URL de JustWatch para este título
+  cinema: null | {         // Solo películas, con `tmdbId` que coincide en JustWatch
+    chains: { id, name, url, icon, isAggregator }[],
+    releaseDate: string | null // Estreno en cines en España (TMDb), AAAA-MM-DD
+  }
 }
 ```
+
+El título se elige por `tmdbId` (`selectJustWatchTitle`) y no por el primer
+resultado de la búsqueda. Si se manda `tmdbId` y JustWatch no tiene ese mismo
+id, `cinema` es `null`: un falso «en cines» por un homónimo es peor que nada.
+Con cines, la respuesta se cachea 6 h en lugar de 24 h.
+
+## Cines (en cartelera / preventa)
+
+JustWatch publica ofertas `monetizationType: "CINEMA"` por cadena (Cinesa,
+Cine Yelmo, Kinepolis, Odeon Multicines…) con el enlace de compra de entradas,
+y Entradas.com (paquete 1970) como agregador. Esas ofertas aparecen **también
+para estrenos futuros** (preventa: Vengadores: Doomsday las tenía dos meses
+antes), así que por sí solas no significan «en cines».
+
+`src/lib/streaming/cinema.js` decide el estado:
+
+- `mapCinemaOffers`: una entrada por cadena, enlaces https (Yelmo publica http
+  y se sube), el agregador al final.
+- `pickSpainTheatricalDate`: estreno en España de TMDb (`/movie/{id}/release_dates`,
+  tipo 3; si falta, tipo 2 limitado). Lo pide la ruta `/api/streaming`.
+- `resolveCinemaStatus`: `upcoming` si esa fecha es posterior a hoy (hora de
+  Madrid), `now` en otro caso. Se calcula en el cliente con la fecha del día,
+  para que ninguna caché lo deje desfasado.
+
+En `DetailsClient` (escritorio) la fila de plataformas bajo la portada empieza
+por la píldora `CinemaAvailabilityTile`: ámbar «En cines» o contorno
+«Estreno 18 dic» en preventa; enlaza a Entradas.com (o a la primera cadena) y
+en el hover lista las cadenas. En el móvil, el modal «Plataformas disponibles»
+muestra primero una fila por cadena con su logo. Las series no se marcan.
 
 ## Plataformas Soportadas
 

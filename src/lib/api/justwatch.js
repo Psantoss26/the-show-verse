@@ -1,4 +1,6 @@
 // src/lib/api/justwatch.js
+import { mapCinemaOffers } from "../streaming/cinema.js";
+
 /**
  * JustWatch API Client (Unofficial)
  *
@@ -134,6 +136,7 @@ query GetTitleDetails(
           clearName
           shortName
           technicalName
+          icon(profile: S100, format: PNG)
         }
       }
     }
@@ -388,15 +391,23 @@ export async function getStreamingProviders(
   title,
   type = "movie",
   year = null,
+  { tmdbId = null } = {},
 ) {
   try {
-    // 1. Buscar el título
-    const searchResult = await searchTitle(title, type, year);
+    // 1. Buscar el título (el que coincide con el id de TMDb, no el primero)
+    let searchResult = null;
+    try {
+      const nodes = await searchTitles(title, type, year);
+      searchResult = selectJustWatchTitle(nodes, { tmdbId, title });
+    } catch (error) {
+      console.error("Error searching JustWatch:", error);
+    }
 
     if (!searchResult) {
       return {
         providers: [],
         justwatchUrl: null,
+        cinemaChains: [],
       };
     }
 
@@ -407,6 +418,7 @@ export async function getStreamingProviders(
       return {
         providers: [],
         justwatchUrl: null,
+        cinemaChains: [],
       };
     }
 
@@ -450,15 +462,29 @@ export async function getStreamingProviders(
       .filter((p) => p.monetization_type === "FLATRATE" && p.logo_path)
       .slice(0, 10); // Limitar a 10 proveedores
 
+    // 5. Cines: solo películas y solo si el título es con certeza el pedido.
+    // Un falso «en cines» por un homónimo es peor que no mostrar nada.
+    const matchedTmdbId = String(
+      details.content?.externalIds?.tmdbId ||
+        searchResult.content?.externalIds?.tmdbId ||
+        "",
+    );
+    const cinemaChains =
+      type === "movie" && tmdbId && matchedTmdbId === String(tmdbId)
+        ? mapCinemaOffers(offers)
+        : [];
+
     return {
       providers,
       justwatchUrl,
+      cinemaChains,
     };
   } catch (error) {
     console.error("Error getting streaming providers from JustWatch:", error);
     return {
       providers: [],
       justwatchUrl: null,
+      cinemaChains: [],
     };
   }
 }

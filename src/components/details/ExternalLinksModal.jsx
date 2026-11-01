@@ -149,7 +149,7 @@ export default function ExternalLinksModal({
                                                         {it.label || it.title || (isPlatformsMode ? 'Plataforma' : 'Enlace')}
                                                     </span>
                                                     <span className="mt-1 block truncate text-xs font-semibold text-zinc-400 transition-colors group-hover/link:text-zinc-300">
-                                                        {hostLabel(it.href)}
+                                                        {it.detail || hostLabel(it.href)}
                                                     </span>
                                                 </span>
 

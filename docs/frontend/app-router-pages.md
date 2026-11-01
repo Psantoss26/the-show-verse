@@ -113,7 +113,7 @@ Todas son *route handlers* (`route.js`) que actúan de BFF: normalizan/cachean r
 | `api/ai/**` | `watch-next`, `health` | Asistente "qué ver ahora" (`WatchNextAssistant`). |
 | `api/calendar/**` | `upcoming-episodes`, `episodes-range` | Próximos episodios para `/calendar` (rango de fechas) y `DashboardCalendarSection`; proxy de `/v1/calendar/episodes`. |
 | `api/streaming/detections`, `api/streaming/device` | — | Detecciones de streaming (web y app Android). |
-| `api/streaming/**` | `route`, `episode-links` | Enlaces de streaming/plataformas por título y episodio (JustWatch, ver [[JUSTWATCH_INTEGRATION]]). |
+| `api/streaming/**` | `route`, `episode-links` | Enlaces de streaming/plataformas por título y episodio (JustWatch, ver [[JUSTWATCH_INTEGRATION]]). `route` devuelve además `cinema` (cadenas de cine y estreno en España) para películas con `tmdbId`. |
 | `api/links/**` | `justwatch`, `letterboxd`, `ratings`, `wikipedia` | Resolución de enlaces externos por título. |
 | `api/imdb/**`, `api/omdb`, `api/filmaffinity/rating` | `ratings`, `top-rated`, `import` | Valoraciones externas (IMDb, OMDb, FilmAffinity). |
 | `api/seriesgraph/**` | `episode-ratings` | Valoraciones de episodios por temporada (gráfico de notas). |
