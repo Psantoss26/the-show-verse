@@ -110,11 +110,20 @@ antes), así que por sí solas no significan «en cines».
   Madrid), `now` en otro caso. Se calcula en el cliente con la fecha del día,
   para que ninguna caché lo deje desfasado.
 
-En `DetailsClient` (escritorio) la fila de plataformas bajo la portada empieza
-por la píldora `CinemaAvailabilityTile`: ámbar «En cines» o contorno
-«Estreno 18 dic» en preventa; enlaza a Entradas.com (o a la primera cadena) y
-en el hover lista las cadenas. En el móvil, el modal «Plataformas disponibles»
+`createCinemaPlatformItems` convierte cada cadena en un elemento de
+plataforma (logo de JustWatch, enlace de entradas y `detail`: «En cines ·
+comprar entradas» o «En cines el 18 dic» en preventa). En `DetailsClient`
+(escritorio) la fila de logos bajo la portada empieza por esas cadenas, con el
+mismo `StreamingProviderLogo` que el streaming y `título · detail` en el hover
+(máximo seis logos en total). En el móvil, el modal «Plataformas disponibles»
 muestra primero una fila por cadena con su logo. Las series no se marcan.
+
+`DetailModal` (ficha rápida, centrada o en panel lateral, también en su vista
+teléfono) hace lo mismo en su modal «Plataformas disponibles»:
+`useDetailModalData` guarda `data.cinema` tal cual llega de `/api/streaming` y
+el modal antepone `createCinemaPlatformItems(resolveCinemaStatus(data.cinema))`.
+Si la ficha se abre desde la URL (`?preview=movie-123`) la semilla solo trae el
+id, así que la consulta espera a los detalles de TMDb para tener título y año.
 
 ## Plataformas Soportadas
 

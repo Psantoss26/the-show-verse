@@ -51,7 +51,6 @@ import "swiper/swiper-bundle.css";
 // Carrusel con flechas COMPARTIDO (mismo componente que usa DetailModal).
 import DetailsArrowCarousel from "@/components/details/DetailsArrowCarousel";
 import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
-import CinemaAvailabilityTile from "@/components/details/CinemaAvailabilityTile";
 
 // -- Animaciones con Framer Motion --
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -9233,7 +9232,8 @@ export default function DetailsClient({
     [type, cinemaInfo],
   );
 
-  // Modal móvil: primero las cadenas de cine y después el streaming.
+  // Fila de escritorio y modal móvil: primero las cadenas de cine y después
+  // el streaming.
   const platformModalItems = useMemo(
     () => [...createCinemaPlatformItems(cinemaStatus), ...platformItems],
     [cinemaStatus, platformItems],
@@ -11129,15 +11129,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             >
               {/* Los enlaces aparecen dentro del espacio ya reservado. */}
               <div className="flex flex-row flex-nowrap items-center gap-2">
-                {/* «En cines» va primero. Ocupa lo que dos logos y medio: con
-                    ella caben tres plataformas en el ancho de la portada. */}
-                {cinemaStatus && (
-                  <CinemaAvailabilityTile
-                    status={cinemaStatus}
-                    className={detailsRestored ? "" : "animate-in fade-in zoom-in-95 duration-300"}
-                  />
-                )}
-                {(cinemaStatus ? platformItems.slice(0, 3) : platformItems).map((provider, index) => (
+                {/* Los cines van primero, con su logo como en el modal de
+                    plataformas; caben seis logos en el ancho de la portada. */}
+                {platformModalItems.slice(0, 6).map((provider, index) => (
                   <motion.a
                     key={provider.key ?? `${provider.title}-${index}`}
                     href={provider.href}
@@ -11162,7 +11156,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       }}
                     />
                     <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/provider:scale-100 group-hover/provider:opacity-100 group-hover/provider:delay-[2000ms]">
-                      {provider.subtitle || provider.title}
+                      {provider.detail
+                        ? `${provider.title} · ${provider.detail}`
+                        : provider.subtitle || provider.title}
                     </div>
                   </motion.a>
                 ))}

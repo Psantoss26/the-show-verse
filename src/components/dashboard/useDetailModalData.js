@@ -312,6 +312,10 @@ const EMPTY_DATA = {
   // lo que va debajo (premios, características, marcador y pestañas). Misma
   // convención que `scoreboardResolved` / `imdbRatingResolved`.
   providersResolved: false,
+  // Cines de la película (JustWatch + estreno en España), tal cual llega de
+  // /api/streaming. El estado (en cartelera / preventa) lo decide quien lo
+  // pinta con `resolveCinemaStatus`, como en DetailsClient.
+  cinema: null,
   seasons: [],
   showReleaseDate: null,
   // Saga a la que pertenece la película, si pertenece a alguna. La ficha de
@@ -1453,15 +1457,23 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
     // Plataformas de streaming disponibles (JustWatch vía /api/streaming). Se usa
     // el título/año semilla del item (equivalen a los de TMDb). Best-effort:
     // nunca lanza; si falla, providers se queda en [] y no se pinta la fila.
+    // Abierta desde la URL (`?preview=movie-123`) la semilla solo trae el id:
+    // entonces se esperan los detalles, como Plex. Sin esto no se pedían ni
+    // las plataformas ni los cines.
     const streamingTask = (async () => {
       try {
-        const streamTitle = (item.title || item.name || "").trim();
+        let seed = item;
+        if (!(item.title || item.name)) {
+          seed = (await detailsPromise.catch(() => null)) || item;
+          if (cancelled) return;
+        }
+        const streamTitle = (seed.title || seed.name || "").trim();
         if (!streamTitle) return;
         const params = new URLSearchParams({
           title: streamTitle,
           type: mediaType === "tv" ? "tv" : "movie",
         });
-        const y = yearOf(item);
+        const y = yearOf(seed);
         if (y) params.append("year", String(y));
         params.append("tmdbId", String(id));
 
@@ -1469,10 +1481,14 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
         if (!res.ok || cancelled) return;
         const json = await res.json();
         const providers = normalizeProviders(json?.providers, 10);
-        if (!cancelled && providers.length) {
+        const cinema = mediaType === "movie" ? json?.cinema || null : null;
+        if (!cancelled && (providers.length || cinema)) {
           setData((prev) => ({
             ...prev,
-            providers: mergeModalProviders(providers, prev.providers),
+            providers: providers.length
+              ? mergeModalProviders(providers, prev.providers)
+              : prev.providers,
+            cinema,
           }));
         }
       } catch {

@@ -195,6 +195,10 @@ import {
   createPlatformItem,
   dedupeStreamingProviders,
 } from "@/lib/streaming/providers";
+import {
+  createCinemaPlatformItems,
+  resolveCinemaStatus,
+} from "@/lib/streaming/cinema";
 import { useTraktAuth } from "@/lib/trakt/useTraktAuth";
 import {
   traktAddComment,
@@ -2516,6 +2520,15 @@ export default function DetailModal({
       .filter((provider) => provider.icon && provider.hasValidLink);
   }, [data.providers, mediaType, title]);
 
+  // Modal «Plataformas disponibles»: primero los cines (en cartelera o en
+  // preventa), una fila por cadena, y después el streaming. Igual que en
+  // DetailsClient; el estado se calcula aquí con la fecha de hoy.
+  const platformModalItems = useMemo(() => {
+    const cinemaStatus =
+      mediaType === "movie" ? resolveCinemaStatus(data.cinema) : null;
+    return [...createCinemaPlatformItems(cinemaStatus), ...streamingProviders];
+  }, [data.cinema, mediaType, streamingProviders]);
+
   const titleQuery = title.trim();
   const yearIso = data.year ? String(data.year).trim() : "";
   const isMovie = mediaType === "movie";
@@ -3322,7 +3335,7 @@ export default function DetailModal({
       <ExternalLinksModal
         open={platformsOpen}
         onClose={() => setPlatformsOpen(false)}
-        links={streamingProviders}
+        links={platformModalItems}
         mode="platforms"
         loading={!data.providersResolved}
       />
