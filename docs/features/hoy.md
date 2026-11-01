@@ -146,14 +146,16 @@ Seis cuentas automáticas mantienen viva la Comunidad en producción: `nachocine
 
 **Qué hacen.** Cada una tiene entre 2 y 5 sesiones al día, a horas al azar entre las 9:30 y las 23:45 (hora de Madrid). En cada sesión hace una de estas cosas, según sus gustos (proporción cine/series, géneros preferidos, nota más dura o más generosa):
 
-- Ver una película estrenada en los últimos 60 días (con al menos 50 votos en TMDb).
+- Ver una película estrenada en los últimos 60 días, o en los últimos 180 si sigue en tendencias (con al menos 50 votos en TMDb).
 - Ver un episodio emitido hoy o en los dos días anteriores, a veces con uno o dos anteriores de la misma temporada seguidos (maratón).
-- Ver el 1x01 de una serie estrenada en los últimos 30 días (con al menos 20 votos).
-- Apuntar un próximo estreno en pendientes (y quitarlo de ahí cuando lo ve).
+- Ver el 1x01 de una serie estrenada en los últimos 30 días.
+- Apuntar un próximo estreno en pendientes, sobre todo de los más esperados (y quitarlo de ahí cuando lo ve).
+
+**Títulos conocidos primero.** Cada título recibe una puntuación de fama según en qué listas está y lo arriba que aparece: Tendencias (Trakt + TMDb) es la que más pesa, luego tendencias semanales de TMDb, más esperados, top en España y populares. Los candidatos se ordenan por esa fama y solo entra en el sorteo la cabeza de cada lista (20 películas, 6 estrenos de serie, 10 episodios, 15 próximos estrenos), con mucho más peso para los primeros. Si hay al menos 4 títulos conocidos, los desconocidos ni se consideran; si no, se completa con los más populares de TMDb, pero nunca con series desconocidas de más de 60 episodios por temporada (culebrones diarios, anime largo) ni con estrenos de serie de menos de 50 votos.
 
 Tras ver algo puede puntuarlo (la nota pública de TMDb ± su sesgo y algo de ruido, en medios puntos), reseñarlo con una frase corta acorde a la nota (películas y estrenos de serie, una sola vez por título) y, si le pone 9 o más, marcarlo como favorito. Nunca repite un título o episodio que ya tiene.
 
-**Coste.** Los títulos salen de los pools del dashboard ya cacheados (`new_releases`, `trending` y `calendar_episodes_v3`): ninguna llamada extra a TMDb. El servidor (`server.js`) lanza un tic cada 10 minutos que solo calcula en memoria; va a la BD únicamente cuando a alguna cuenta le toca actuar (unas 20 veces al día) y cada vez hace una sesión por cuenta como mucho. Escriben directamente en las tablas, sin pasar por las rutas, así que no disparan notificaciones push.
+**Coste.** Los títulos salen de los pools del dashboard ya cacheados (`new_releases`, `trending`, `trending_section`, `popular`, `region_top`, `anticipated` y `calendar_episodes_v3`): ninguna llamada extra a TMDb. El servidor (`server.js`) lanza un tic cada 10 minutos que solo calcula en memoria; va a la BD únicamente cuando a alguna cuenta le toca actuar (unas 20 veces al día) y cada vez hace una sesión por cuenta como mucho. Escriben directamente en las tablas, sin pasar por las rutas, así que no disparan notificaciones push.
 
 **Cómo está hecho.** `backend/src/lib/socialBotsCore.js` (parte pura: cuentas, plan del día, elección de títulos, notas y reseñas) y `backend/src/lib/socialBots.js` (consultas y escritura). El plan de cada día es determinista (semilla = cuenta + día) y lo hecho hoy se cuenta en la BD dentro de un candado de Postgres (`pg_try_advisory_xact_lock`): un reinicio no duplica acciones y dos procesos contra la misma base no actúan a la vez. Tras un parón, se ponen al día de una en una por tic.
 

@@ -133,56 +133,153 @@ export const episodeKey = (tmdbId, season, episode) => `tv:${Number(tmdbId)}:${N
 
 const inRange = (date, from, to) => Boolean(date) && date >= from && date <= to;
 
-/**
- * Candidatos de una sesión a partir de los pools ya cacheados del dashboard
- * (ninguna llamada extra a TMDb):
- *   movies     → películas estrenadas hace menos de MOVIE_RECENT_DAYS
- *   premieres  → series estrenadas hace menos de SHOW_PREMIERE_DAYS (1x01)
- *   episodes   → episodios emitidos hoy o en los EPISODE_RECENT_DAYS anteriores
- *   upcoming   → próximos estrenos (para pendientes)
- */
-export function buildCandidates({ newMovies = [], newShows = [], trendingMovies = [], calendar = [] }, nowMs, tz = BOT_TZ) {
-  const today = dayKeyOffset(nowMs, 0, tz);
-  const movieFrom = dayKeyOffset(nowMs, -MOVIE_RECENT_DAYS, tz);
-  const showFrom = dayKeyOffset(nowMs, -SHOW_PREMIERE_DAYS, tz);
-  const episodeFrom = dayKeyOffset(nowMs, -EPISODE_RECENT_DAYS, tz);
-  const seen = new Set();
-  const unique = (card) => {
-    const key = titleKey(card.mediaType, card.tmdbId);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  };
-  const usable = (card) => card?.tmdbId && card.title && card.posterPath;
+// Peso de cada lista al medir lo conocido que es un título. Las tendencias
+// (Trakt + TMDb) mandan; lo popular y lo más visto en España suman algo menos.
+const FAME_SOURCES = {
+  trendingSection: 4,
+  trending: 3,
+  region: 2,
+  popular: 1.5,
+  anticipated: 3,
+};
+// Con al menos tantos títulos conocidos, los desconocidos ni se consideran.
+export const MIN_FAMOUS = 4;
+// Las películas en tendencia pueden llevar más tiempo en cartelera.
+export const TRENDING_MOVIE_DAYS = 180;
+// Episodio a partir del cual una serie desconocida se descarta (culebrones
+// diarios y anime de cientos de episodios).
+const MAX_EPISODE_UNKNOWN = 60;
+// Solo la cabeza de cada lista entra en el sorteo: la cola son títulos que
+// casi nadie conoce.
+export const CANDIDATE_LIMITS = { movies: 20, premieres: 6, episodes: 10, upcoming: 15 };
 
-  const movies = [...newMovies, ...trendingMovies]
-    .filter((card) => usable(card) && card.voteCount >= MOVIE_MIN_VOTES && inRange(card.releaseDate, movieFrom, today))
-    .filter(unique);
-  const premieres = newShows.filter((card) =>
-    usable(card) && card.voteCount >= PREMIERE_MIN_VOTES && inRange(card.releaseDate, showFrom, today));
-  const upcoming = [...newMovies, ...newShows].filter((card) => usable(card) && card.releaseDate > today);
-  const episodes = calendar
-    .filter((entry) => entry?.show?.tmdbId && entry.show.title && inRange(entry.episode?.airDate, episodeFrom, today))
-    .map((entry) => ({
-      tmdbId: Number(entry.show.tmdbId),
-      title: entry.show.title,
-      posterPath: entry.show.posterPath || null,
-      season: Number(entry.episode.season),
-      episode: Number(entry.episode.number),
-    }))
-    .filter((entry) => entry.season >= 1 && entry.episode >= 1);
-  return { movies, premieres, episodes, upcoming };
+/**
+ * Lo conocido que es cada título: suma, por cada lista en la que aparece, su
+ * peso por lo arriba que está (el primero vale el peso entero; el último, la
+ * mitad). 0 = no está en ninguna lista de tendencias ni populares.
+ */
+export function fameIndex(lists) {
+  const fame = new Map();
+  for (const [source, weight] of Object.entries(FAME_SOURCES)) {
+    const cards = lists[source] || [];
+    cards.forEach((card, rank) => {
+      if (!card?.tmdbId) return;
+      const key = titleKey(card.mediaType, card.tmdbId);
+      fame.set(key, (fame.get(key) || 0) + weight * (1 - (0.5 * rank) / Math.max(1, cards.length)));
+    });
+  }
+  return fame;
 }
 
 /**
- * Elige uno al azar, con más peso para los primeros (los pools vienen por
- * popularidad) y el doble para los géneros que le gustan a la cuenta.
+ * Ordena por fama (y por popularidad de TMDb a igualdad) y, si hay bastantes
+ * títulos conocidos, deja solo esos. Si no, completa con los desconocidos
+ * más populares que pasen `fallbackOk`.
+ */
+export function rankByFame(items, fame, keyOf, fallbackOk = () => true) {
+  const scored = items.map((item) => ({ item, fame: fame.get(keyOf(item)) || 0 }));
+  const byScore = (a, b) => b.fame - a.fame || (b.item.popularity || 0) - (a.item.popularity || 0);
+  const famous = scored.filter((entry) => entry.fame > 0).sort(byScore);
+  if (famous.length >= MIN_FAMOUS) return famous.map((entry) => entry.item);
+  const rest = scored.filter((entry) => entry.fame === 0 && fallbackOk(entry.item)).sort(byScore);
+  return [...famous, ...rest].map((entry) => entry.item);
+}
+
+/**
+ * Candidatos de una sesión a partir de los pools ya cacheados del dashboard
+ * (ninguna llamada extra a TMDb), de más a menos conocidos:
+ *   movies     → películas estrenadas hace menos de MOVIE_RECENT_DAYS (o
+ *                TRENDING_MOVIE_DAYS si están en tendencias)
+ *   premieres  → series estrenadas hace menos de SHOW_PREMIERE_DAYS (1x01)
+ *   episodes   → episodios emitidos hoy o en los EPISODE_RECENT_DAYS anteriores
+ *   upcoming   → próximos estrenos (para pendientes)
+ * `movies`/`shows` traen las listas de fama: { trendingSection, trending,
+ * region, popular, anticipated }.
+ */
+export function buildCandidates({ newMovies = [], newShows = [], movies: movieLists = {}, shows: showLists = {}, calendar = [] }, nowMs, tz = BOT_TZ) {
+  const today = dayKeyOffset(nowMs, 0, tz);
+  const movieFrom = dayKeyOffset(nowMs, -MOVIE_RECENT_DAYS, tz);
+  const trendingMovieFrom = dayKeyOffset(nowMs, -TRENDING_MOVIE_DAYS, tz);
+  const showFrom = dayKeyOffset(nowMs, -SHOW_PREMIERE_DAYS, tz);
+  const episodeFrom = dayKeyOffset(nowMs, -EPISODE_RECENT_DAYS, tz);
+  const fame = fameIndex({
+    trendingSection: [...(movieLists.trendingSection || []), ...(showLists.trendingSection || [])],
+    trending: [...(movieLists.trending || []), ...(showLists.trending || [])],
+    region: [...(movieLists.region || []), ...(showLists.region || [])],
+    popular: [...(movieLists.popular || []), ...(showLists.popular || [])],
+    anticipated: [...(movieLists.anticipated || []), ...(showLists.anticipated || [])],
+  });
+  const cardKey = (card) => titleKey(card.mediaType, card.tmdbId);
+  const usable = (card) => card?.tmdbId && card.title && card.posterPath;
+  const uniqueBy = (keyOf) => {
+    const seen = new Set();
+    return (item) => {
+      const key = keyOf(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    };
+  };
+  const allOf = (lists) => Object.values(lists).flat();
+
+  const movies = rankByFame(
+    [...newMovies, ...allOf(movieLists)]
+      .filter((card) => usable(card) && card.mediaType === 'movie' && card.voteCount >= MOVIE_MIN_VOTES)
+      .filter((card) => inRange(card.releaseDate, fame.has(cardKey(card)) ? trendingMovieFrom : movieFrom, today))
+      .filter(uniqueBy(cardKey)),
+    fame,
+    cardKey,
+  );
+  // Una serie nueva desconocida solo entra si ya tiene bastantes votos.
+  const premieres = rankByFame(
+    [...newShows, ...allOf(showLists)]
+      .filter((card) => usable(card) && card.mediaType === 'tv' && card.voteCount >= PREMIERE_MIN_VOTES)
+      .filter((card) => inRange(card.releaseDate, showFrom, today))
+      .filter(uniqueBy(cardKey)),
+    fame,
+    cardKey,
+    (card) => card.voteCount >= MOVIE_MIN_VOTES,
+  );
+  const upcoming = rankByFame(
+    [...allOf({ a: movieLists.anticipated || [], b: showLists.anticipated || [] }), ...newMovies, ...newShows]
+      .filter((card) => usable(card) && card.releaseDate > today)
+      .filter(uniqueBy(cardKey)),
+    fame,
+    cardKey,
+  );
+  const episodes = rankByFame(
+    calendar
+      .filter((entry) => entry?.show?.tmdbId && entry.show.title && inRange(entry.episode?.airDate, episodeFrom, today))
+      .map((entry) => ({
+        tmdbId: Number(entry.show.tmdbId),
+        title: entry.show.title,
+        posterPath: entry.show.posterPath || null,
+        season: Number(entry.episode.season),
+        episode: Number(entry.episode.number),
+      }))
+      .filter((entry) => entry.season >= 1 && entry.episode >= 1)
+      .filter(uniqueBy((entry) => episodeKey(entry.tmdbId, entry.season, entry.episode))),
+    fame,
+    (entry) => titleKey('tv', entry.tmdbId),
+    (entry) => entry.episode <= MAX_EPISODE_UNKNOWN,
+  );
+  return {
+    movies: movies.slice(0, CANDIDATE_LIMITS.movies),
+    premieres: premieres.slice(0, CANDIDATE_LIMITS.premieres),
+    episodes: episodes.slice(0, CANDIDATE_LIMITS.episodes),
+    upcoming: upcoming.slice(0, CANDIDATE_LIMITS.upcoming),
+  };
+}
+
+/**
+ * Elige uno al azar con mucho más peso para los primeros (vienen de más a
+ * menos conocidos) y algo más para los géneros que le gustan a la cuenta.
  */
 export function pickWeighted(rng, items, bot) {
   if (!items.length) return null;
   const weights = items.map((item, index) => {
-    const genreBoost = (item.genreIds || []).some((id) => bot.genres.includes(id)) ? 2 : 1;
-    return genreBoost / Math.sqrt(index + 1);
+    const genreBoost = (item.genreIds || []).some((id) => bot.genres.includes(id)) ? 1.5 : 1;
+    return genreBoost / (index + 1) ** 1.2;
   });
   const total = weights.reduce((sum, w) => sum + w, 0);
   let roll = rng() * total;

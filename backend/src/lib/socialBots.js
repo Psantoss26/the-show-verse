@@ -5,8 +5,9 @@
 //
 // Ligero a propósito:
 //   - Los títulos salen de los pools del dashboard que ya están cacheados en
-//     memoria/BD (new_releases, trending, calendar_episodes_v3): ninguna
-//     llamada extra a TMDb.
+//     memoria/BD (new_releases, trending, trending_section, popular, region_top,
+//     anticipated, calendar_episodes_v3): ninguna llamada extra a TMDb. Van
+//     primero los títulos en tendencias y populares (socialBotsCore.rankByFame).
 //   - El tic (server.js) solo calcula en memoria; toca la BD únicamente cuando
 //     a alguna cuenta le toca actuar según su plan del día (~20 veces al día).
 //   - Escriben directamente en las tablas, sin pasar por las rutas: no disparan
@@ -285,13 +286,25 @@ async function runSession(handle, account, session, rng, nowMs) {
 // ─── Tic ──────────────────────────────────────────────────────────────────────
 
 async function loadCandidates(nowMs) {
-  const [newMovies, newShows, trendingMovies, calendar] = await Promise.all([
-    getPool('new_releases', 'movie').catch(() => []),
-    getPool('new_releases', 'tv').catch(() => []),
-    getPool('trending', 'movie').catch(() => []),
-    getPool('calendar_episodes_v3', 'tv').catch(() => []),
+  const pool = (key, mediaType) => getPool(key, mediaType).catch(() => []);
+  const lists = async (mediaType) => {
+    const [trendingSection, trending, region, popular, anticipated] = await Promise.all([
+      pool('trending_section', mediaType),
+      pool('trending', mediaType),
+      pool('region_top', mediaType),
+      pool('popular', mediaType),
+      pool('anticipated', mediaType),
+    ]);
+    return { trendingSection, trending, region, popular, anticipated };
+  };
+  const [newMovies, newShows, movies, shows, calendar] = await Promise.all([
+    pool('new_releases', 'movie'),
+    pool('new_releases', 'tv'),
+    lists('movie'),
+    lists('tv'),
+    pool('calendar_episodes_v3', 'tv'),
   ]);
-  return buildCandidates({ newMovies, newShows, trendingMovies, calendar }, nowMs, BOT_TZ);
+  return buildCandidates({ newMovies, newShows, movies, shows, calendar }, nowMs, BOT_TZ);
 }
 
 /**

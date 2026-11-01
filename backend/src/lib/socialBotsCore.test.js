@@ -9,9 +9,11 @@ import {
   chooseSession,
   dueCount,
   episodeKey,
+  fameIndex,
   jitteredAgo,
   marathonEpisodes,
   planBotDay,
+  rankByFame,
   seededRandom,
   titleKey,
 } from './socialBotsCore.js';
@@ -47,17 +49,39 @@ test('candidatos: solo estrenos recientes, episodios recién emitidos y próximo
   const c = buildCandidates({
     newMovies: [card(1, 'movie', '2026-10-20'), card(2, 'movie', '2026-12-01'), card(3, 'movie', '2026-01-01')],
     newShows: [card(10, 'tv', '2026-10-10'), card(11, 'tv', '2027-01-01'), card(12, 'tv', '2026-10-12', 3)],
-    trendingMovies: [card(1, 'movie', '2026-10-20'), card(4, 'movie', '2026-09-30'), card(6, 'movie', '2026-10-02', 10), { ...card(5, 'movie', '2026-10-01'), posterPath: null }],
+    movies: { trending: [card(1, 'movie', '2026-10-20'), card(4, 'movie', '2026-07-30'), card(6, 'movie', '2026-10-02', 10), { ...card(5, 'movie', '2026-10-01'), posterPath: null }] },
     calendar: [
       { show: { tmdbId: 20, title: 'S', posterPath: '/s.jpg' }, episode: { season: 2, number: 3, airDate: '2026-10-23' } },
       { show: { tmdbId: 21, title: 'F', posterPath: '/f.jpg' }, episode: { season: 1, number: 1, airDate: '2026-10-28' } },
       { show: { tmdbId: 22, title: 'V', posterPath: '/v.jpg' }, episode: { season: 1, number: 1, airDate: '2026-10-10' } },
     ],
   }, NOW, TZ);
+  // La 4 lleva casi tres meses, pero está en tendencias.
   assert.deepEqual(c.movies.map((m) => m.tmdbId), [1, 4]);
   assert.deepEqual(c.premieres.map((m) => m.tmdbId), [10]);
-  assert.deepEqual(c.upcoming.map((m) => m.tmdbId), [2, 11]);
+  assert.deepEqual(c.upcoming.map((m) => m.tmdbId).sort(), [11, 2]);
   assert.deepEqual(c.episodes.map((e) => [e.tmdbId, e.season, e.episode]), [[20, 2, 3]]);
+});
+
+test('los títulos en tendencias van primero y, si hay bastantes, solo ellos', () => {
+  const card = (tmdbId, popularity = 10) => ({ tmdbId, mediaType: 'movie', title: `T${tmdbId}`, posterPath: '/p.jpg', releaseDate: '2026-10-20', voteCount: 500, popularity });
+  const unknown = [card(90, 999), card(91, 500)];
+  const fewFamous = buildCandidates({ newMovies: unknown, movies: { trending: [card(1)], popular: [card(2)] } }, NOW, TZ);
+  assert.deepEqual(fewFamous.movies.map((m) => m.tmdbId), [1, 2, 90, 91]);
+  const manyFamous = buildCandidates({
+    newMovies: unknown,
+    movies: { trendingSection: [card(3)], trending: [card(1), card(4)], popular: [card(2), card(3)], region: [card(5)] },
+  }, NOW, TZ);
+  assert.deepEqual(manyFamous.movies.map((m) => m.tmdbId), [3, 1, 4, 5, 2]);
+  const fame = fameIndex({ trending: [card(1), card(4)] });
+  assert.ok(fame.get('movie:1') > fame.get('movie:4'));
+  assert.deepEqual(rankByFame([card(7), card(1)], fame, (c) => `movie:${c.tmdbId}`).map((c) => c.tmdbId), [1, 7]);
+});
+
+test('episodios de series desconocidas: fuera los culebrones de cientos de capítulos', () => {
+  const entry = (tmdbId, number) => ({ show: { tmdbId, title: `S${tmdbId}`, posterPath: '/s.jpg' }, episode: { season: 1, number, airDate: '2026-10-24' } });
+  const c = buildCandidates({ calendar: [entry(30, 1218), entry(31, 5)], shows: { trending: [{ tmdbId: 32, mediaType: 'tv' }] } }, NOW, TZ);
+  assert.deepEqual(c.episodes.map((e) => e.tmdbId), [31]);
 });
 
 test('no repite lo que ya vio o ya tiene en pendientes', () => {
