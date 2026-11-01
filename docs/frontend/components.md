@@ -67,6 +67,7 @@ Subcomponentes y modales usados por `DetailsClient`/`SeasonDetailsClient`/`Episo
 | Componente | Propósito |
 |---|---|
 | `DetailAtoms.jsx` | Átomos visuales reutilizados en la ficha (`VisualMetaCard`, etc.). |
+| `DetailsInfoTabs.jsx` | Pestañas Detalles · Producción · Sinopsis (más Plataformas, Enlaces y Premios según la ficha), compartidas por la ficha, la ficha rápida, temporadas, episodios, listas y personas. Al cambiar de pestaña el panel nuevo entra deslizándose desde el lado en que está en el menú (`.sv-tab-panel` en `globals.css`, solo `transform` para no apagar el cristal de las tarjetas; se funde solo su contenido, `.sv-meta-icon` / `.sv-glass-content`) y el alto del área se interpola con WAAPI desde el que tenía antes del cambio (`useTabPanelHeight`, con `overflow: clip` mientras dura). Sin animación con `prefers-reduced-motion` ni en la pestaña inicial. |
 | `DetailHeaderBits.jsx` | Piezas del cabecero de la ficha (badges compactos, botón compartir...). `useShareAction` devuelve `warmProps`: al pasar el ratón, enfocar o tocar el botón empieza a generarse la imagen de compartir (`prefetchShare` de `DetailsShareSheet`), y la hoja reutiliza esa petición. |
 | `AnimatedSection.jsx` | Wrapper de `framer-motion` para animar secciones al entrar en viewport. |
 | `AnimatedPosterFrame.jsx` | Marco de póster con transición/estado de error de imagen. |

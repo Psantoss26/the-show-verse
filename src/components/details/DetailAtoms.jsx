@@ -60,7 +60,7 @@ export function VisualMetaCard({
 
       <motion.div
         initial={false}
-        className="relative z-10 flex min-w-0 flex-1 flex-col"
+        className="sv-glass-content relative z-10 flex min-w-0 flex-1 flex-col"
       >
         {/* `sv-meta-label` / `sv-meta-value` son asideros para que quien coloque
             estas tarjetas pueda decidir si su texto puede partirse en dos

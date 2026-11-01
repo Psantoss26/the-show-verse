@@ -3774,6 +3774,39 @@ html[data-details-sequence-transition] .sv-topbar {
 @keyframes sv-inline-menu-content-in {
   from { opacity: 0; }
 }
+
+/* Cambio de pestaña en las fichas (DetailsInfoTabs: Detalles · Producción ·
+   Sinopsis…). El panel entra desde el lado en que está la pestaña en el menú,
+   SOLO con `transform`: las tarjetas son cristal y una opacidad sobre el panel
+   (o sobre la propia tarjeta, que es la que contiene las capas ópticas) las
+   dejaría planas mientras dura (ver `.sv-details-entry`). Lo que se funde es
+   el contenido de cada pieza (`.sv-meta-icon`, `.sv-glass-content`), que no
+   lleva cristal. `backwards` y no `both`, por lo mismo que en
+   `.sv-details-entry`. El alto del área lo interpola `useTabPanelHeight`. */
+.sv-tab-panel {
+  animation: sv-tab-panel-in 340ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.sv-tab-panel[data-tab-dir="back"] {
+  animation-name: sv-tab-panel-in-back;
+}
+.sv-tab-panel :is(.sv-meta-icon, .sv-glass-content) {
+  animation: sv-tab-content-in 260ms ease-out 40ms backwards;
+}
+@keyframes sv-tab-panel-in {
+  from { transform: translateX(1.5rem); }
+}
+@keyframes sv-tab-panel-in-back {
+  from { transform: translateX(-1.5rem); }
+}
+@keyframes sv-tab-content-in {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-tab-panel,
+  .sv-tab-panel :is(.sv-meta-icon, .sv-glass-content) {
+    animation: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .sv-inline-menu,
   .sv-inline-menu > * {

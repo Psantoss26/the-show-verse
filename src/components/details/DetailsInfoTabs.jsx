@@ -5,7 +5,8 @@
 // rápida del dashboard (DetailModal) rendericen EXACTAMENTE las mismas tarjetas.
 //
 // Es dueña de su propio estado `activeTab` (por defecto "details") y pinta el
-// menú <DetailsTabsMenu> + los cuerpos de pestaña dentro de <AnimatePresence>.
+// menú <DetailsTabsMenu> + el cuerpo de la pestaña activa, que entra con
+// `.sv-tab-panel` (ver `useTabPanelHeight` para el alto).
 // TODOS los datos entran por props. `variant` reproduce la ÚNICA diferencia entre
 // los dos renders de DetailsClient (layout normal vs. `isBackdropPoster`):
 //   - "normal":   Presupuesto/Recaudación/Canal se muestran SIEMPRE (fallback "—")
@@ -13,8 +14,7 @@
 //   - "backdrop": Presupuesto/Recaudación/Canal se muestran SOLO si hay valor
 //                 y el tagline usa comillas rectas " ".
 
-import { useId, useMemo, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarIcon,
   FilmIcon,
@@ -50,9 +50,74 @@ function InfoGlassPanel({ children, className = "" }) {
       className={`rounded-2xl ${LIQUID_GLASS_SURFACE} ${className}`}
     >
       <LiquidGlassOpticalLayers />
-      <div className="relative z-10">{children}</div>
+      <div className="sv-glass-content relative z-10">{children}</div>
     </div>
   );
+}
+
+const TAB_HEIGHT_DURATION_MS = 340;
+
+// Alto del área de contenido al cambiar de pestaña.
+//
+// Cada pestaña mide distinto (la sinopsis suele doblar a Detalles), y sin esto
+// todo lo que hay debajo saltaba de golpe al cambiar. Se interpola el alto del
+// contenedor desde el que tenía JUSTO ANTES del cambio —leído en el clic, no en
+// un render anterior: la pestaña pudo crecer entre medias al llegar datos—
+// hasta el de la nueva pestaña.
+//
+// WAAPI y no un `style.height` por fotograma: una sola escritura, y el
+// navegador interpola solo. `overflow: clip` (y no `hidden`) mientras dura,
+// para que la pestaña que entra no se monte encima de la sección siguiente: no
+// crea backdrop root, así que el cristal de las tarjetas sigue vivo (ver
+// `.sv-tab-panel` en globals.css).
+function useTabPanelHeight(activeTab) {
+  const containerRef = useRef(null);
+  const heightBeforeRef = useRef(null);
+  const animationRef = useRef(null);
+
+  const captureHeight = () => {
+    const el = containerRef.current;
+    if (el) heightBeforeRef.current = el.getBoundingClientRect().height;
+  };
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    const from = heightBeforeRef.current;
+    heightBeforeRef.current = null;
+    // Un cambio encadenado parte del alto a mitad de la animación anterior
+    // (ya leído en `captureHeight`), así que la anterior se puede cortar.
+    animationRef.current?.cancel();
+    animationRef.current = null;
+    if (!el || from == null || typeof el.animate !== "function") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    const to = el.getBoundingClientRect().height;
+    if (Math.abs(to - from) < 1) return;
+
+    el.style.overflow = "clip";
+    el.style.overflowClipMargin = "0.75rem";
+    const animation = el.animate(
+      [{ height: `${from}px` }, { height: `${to}px` }],
+      {
+        duration: TAB_HEIGHT_DURATION_MS,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+    );
+    animationRef.current = animation;
+    const release = () => {
+      if (animationRef.current !== animation) return;
+      animationRef.current = null;
+      el.style.overflow = "";
+      el.style.overflowClipMargin = "";
+    };
+    animation.onfinish = release;
+    animation.oncancel = () => {
+      el.style.overflow = "";
+      el.style.overflowClipMargin = "";
+    };
+  }, [activeTab]);
+
+  return { containerRef, captureHeight };
 }
 
 // Clases de la FILA de tarjetas y de cada tarjeta.
@@ -269,11 +334,37 @@ export default function DetailsInfoTabs({
     ? selectedTab
     : tabs[0]?.id ?? selectedTab;
 
+  // Dirección de la entrada: la pestaña nueva llega desde el lado en que está
+  // en el menú, igual que el subrayado. Se calcula en el render (patrón de
+  // "estado del render anterior"), sin efecto ni segundo commit visible.
+  // Solo cuando el cambio lo pide el usuario: la pestaña inicial que llega
+  // al hidratar no debe deslizarse.
+  const [panelMotion, setPanelMotion] = useState({ tab: activeTab, dir: null });
+  if (panelMotion.tab !== activeTab) {
+    const from = tabs.findIndex((tab) => tab.id === panelMotion.tab);
+    const to = tabs.findIndex((tab) => tab.id === activeTab);
+    setPanelMotion({
+      tab: activeTab,
+      dir:
+        selectedTab === null || from < 0 || to < 0
+          ? null
+          : to > from
+            ? "forward"
+            : "back",
+    });
+  }
+
+  const { containerRef, captureHeight } = useTabPanelHeight(activeTab);
+  const changeTab = (next) => {
+    captureHeight();
+    setActiveTab(next);
+  };
+
   // En móvil se cambia de sección deslizando sobre el menú, sin tener que
   // apuntar a la etiqueta. Sin ciclo: en la primera y en la última el gesto no
   // hace nada, que es justo lo que está prometiendo la posición del subrayado.
   const goToAdjacentTab = (step) => {
-    setActiveTab((selected) => {
+    changeTab((selected) => {
       const current = tabs.some((tab) => tab.id === selected) ? selected : tabs[0]?.id;
       const index = tabs.findIndex((tab) => tab.id === current);
       if (index < 0) return current;
@@ -352,7 +443,7 @@ export default function DetailsInfoTabs({
         <DetailsTabsMenu
           tabs={tabs}
           activeTab={activeTab}
-          onChangeTab={setActiveTab}
+          onChangeTab={changeTab}
           layoutId={layoutId}
           swipeHandlers={swipeHandlers}
           phone={phoneMenu}
@@ -366,9 +457,17 @@ export default function DetailsInfoTabs({
           desplazamiento vertical de la página como comportamiento nativo. */}
       <div
         {...swipeHandlers}
+        ref={containerRef}
         className={`relative ${synopsisBelowTabs ? "" : "min-h-[100px]"} touch-pan-y sm:touch-auto`}
       >
-        <AnimatePresence mode="wait">
+        {/* La `key` remonta el panel en cada cambio y la entrada CSS vuelve a
+            correr. La saliente se retira al instante: con las dos montadas a
+            la vez el contenedor mediría la suma y el alto daría un tirón. */}
+        <div
+          key={activeTab}
+          className={panelMotion.dir ? "sv-tab-panel" : undefined}
+          data-tab-dir={panelMotion.dir ?? undefined}
+        >
           {/* ===== TAB: SINOPSIS ===== */}
           {!synopsisBelowTabs && activeTab === "synopsis" && (
             <div key="synopsis">
@@ -851,7 +950,7 @@ export default function DetailsInfoTabs({
               )}
             </div>
           )}
-        </AnimatePresence>
+        </div>
       </div>
       {synopsisBelowTabs && <div className="mt-3 lg:mt-1">{synopsisPanel}</div>}
     </div>
