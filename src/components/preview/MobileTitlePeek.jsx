@@ -55,6 +55,11 @@ import {
 
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { PEEK_OVER_PAGE_Z, isInsidePageOverlay } from "@/lib/ui/pageModal";
+import {
+  warmDetailsChunks,
+  warmDetailsChunksOnPress,
+} from "@/lib/navigation/detailsWarmup";
+import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 import useModalGuard from "@/hooks/useModalGuard";
 import {
   TITLE_PEEK_ATTR,
@@ -427,6 +432,14 @@ export default function MobileTitlePeek() {
         loadDetailModal();
         prewarmPeekPoster(resolved.item);
       }
+      // Un toque en un título suele acabar en su ficha: su JS, ya (ver
+      // detailsWarmup; normalmente ya está desde el reposo).
+      if (resolved.item.media_type !== "season") {
+        warmDetailsChunksOnPress(
+          resolved.target.getAttribute("href") ||
+            dashboardDetailHref(resolved.item, resolved.item.media_type),
+        );
+      }
       const touch = event.touches[0];
       const gesture = {
         ...resolved,
@@ -532,6 +545,13 @@ export default function MobileTitlePeek() {
       window.removeEventListener("scroll", onScroll, passive);
     };
   }, [canPeek, reduceMotion]);
+
+  // Los trozos de JS de la ficha, descargados y evaluados en reposo: tocar un
+  // título ya no espera a bajarlos (ver detailsWarmup).
+  useEffect(() => {
+    if (!canPeek) return undefined;
+    return warmDetailsChunks();
+  }, [canPeek]);
 
   // Si la pantalla deja de ser de móvil (girar una tablet, por ejemplo).
   useEffect(() => {

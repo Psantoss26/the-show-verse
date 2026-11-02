@@ -20,6 +20,7 @@ import AwardCard, {
 } from "@/components/details/AwardCard";
 import SectionTitle from "@/components/details/SectionTitle";
 import { createValueStore } from "@/lib/details/valueStore";
+import useDeferredBelowHero from "@/lib/details/useDeferredBelowHero";
 import {
   FollowingActivityAvatars,
   FollowingActivityModal,
@@ -2256,6 +2257,9 @@ export default function DetailsClient({
   useEffect(() => {
     setModalHostReady(true);
   }, []);
+  // Las secciones de debajo de la cabecera, tras su primer fotograma al
+  // llegar navegando en el móvil (ver useDeferredBelowHero).
+  const belowHeroReady = useDeferredBelowHero();
 
   // Selecciona automaticamente el mejor video (trailer oficial preferido)
   const preferredVideo = useMemo(() => pickPreferredVideo(videos), [videos]);
@@ -11690,6 +11694,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           {/* Todas las secciones se muestran en orden sin ocultarse */}
           {/* Cada sección se registra para el sistema de detección de scroll */}
           <div className="sv-trim-end mt-14 space-y-14">
+            {belowHeroReady && (
+            <>
             {/* =================================================================
             SECCIÓN: TEMPORADAS (solo para series)
            ================================================================= */}
@@ -13361,6 +13367,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Hueco de anuncio al final de la ficha (nada si el plan no los
                 lleva o no hay red configurada: ver AdSlot). */}
             <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_DETAILS} className="mt-12" />
+            </>
+            )}
           </div>
         </div>
       </div>

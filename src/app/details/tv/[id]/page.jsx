@@ -37,7 +37,12 @@ export default async function TvDetailsPage({ params }) {
   // que ofrece "reintentar" en lugar de un falso "página no encontrada".
   // En paralelo, las imágenes más votadas («Portadas y fondos»): son la
   // imagen por defecto del título y la portada tiene que nacer ya con ellas.
-  const [data, communityArtwork, recommendations] = await Promise.all([
+  // Recomendaciones y pósters de temporadas no se esperan: van como promesas
+  // (ver details/[type]/[id]/page.jsx).
+  const recommendationsPromise = fetchTitleRecommendations("tv", id)
+    .then((result) => (Array.isArray(result?.results) ? result.results : []))
+    .catch(() => []);
+  const [data, communityArtwork] = await Promise.all([
     getDetails("tv", id, {
       appendToResponse: DETAILS_APPEND_TO_RESPONSE,
       language: "es-ES",
@@ -45,7 +50,6 @@ export default async function TvDetailsPage({ params }) {
       throwOnUnavailable: true,
     }),
     fetchCommunityArtwork({ type: "tv", id }).catch(() => null),
-    fetchTitleRecommendations("tv", id).catch(() => null),
   ]);
 
   if (!data) {
@@ -53,14 +57,11 @@ export default async function TvDetailsPage({ params }) {
   }
 
   // Pósters de «Temporadas» ya elegidos, con presupuesto corto (ver
-  // seasonPosterSeeds.server.js): salen en el HTML en vez de esperar al navegador.
-  const seasonPosterSeeds = await fetchSeasonPosterSeeds("tv", data).catch(() => null);
+  // seasonPosterSeeds.server.js); llegan como promesa, la ficha no los espera.
+  const seasonPosterSeedsPromise = fetchSeasonPosterSeeds("tv", data).catch(() => null);
 
   const initialCastData = Array.isArray(data?.credits?.cast)
     ? data.credits.cast
-    : [];
-  const initialRecommendations = Array.isArray(recommendations?.results)
-    ? recommendations.results
     : [];
 
   return (
@@ -73,9 +74,9 @@ export default async function TvDetailsPage({ params }) {
         id={id}
         data={data}
         initialCastData={initialCastData}
-        initialRecommendations={initialRecommendations}
+        recommendationsPromise={recommendationsPromise}
         initialCommunityArtwork={communityArtwork}
-        seasonPosterSeeds={seasonPosterSeeds}
+        seasonPosterSeedsPromise={seasonPosterSeedsPromise}
       />
     </>
   );

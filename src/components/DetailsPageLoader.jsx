@@ -22,6 +22,7 @@ const EMPTY_DEFERRED = {
   providers: EMPTY_ARRAY,
   watchLink: null,
   initialScoreboard: null,
+  seasonPosterSeeds: null,
 };
 
 export default function DetailsPageLoader(props) {
@@ -42,6 +43,13 @@ export default function DetailsPageLoader(props) {
     initialCommunityArtwork = null,
     // Pósters de «Temporadas» resueltos en el SSR (seasonPosterSeeds.server).
     seasonPosterSeeds = null,
+    // Lo mismo que `initialRecommendations` / `seasonPosterSeeds`, pero como
+    // promesas que el servidor sigue resolviendo después de enviar la ficha:
+    // la página ya no espera a Trakt (hasta 2,5 s en frío) ni a los pósters de
+    // temporadas para pintar. Se aplican en la tanda prioritaria de abajo,
+    // como cuando el cliente los pedía por su cuenta.
+    recommendationsPromise = null,
+    seasonPosterSeedsPromise = null,
   } = props;
 
   // Al volver atrás a esta ficha, lo diferido ya cargado se recupera tal cual
@@ -86,13 +94,20 @@ export default function DetailsPageLoader(props) {
           Array.isArray(initialRecommendations) &&
           initialRecommendations.length > 0;
 
-        const [credits, recommendations] = await Promise.all([
+        const [credits, recommendations, seeds] = await Promise.all([
           skipCast
             ? Promise.resolve(null)
             : getCredits(type, id).catch(() => ({ cast: [] })),
           skipRecommendations
             ? Promise.resolve(null)
-            : getRecommendations(type, id).catch(() => ({ results: [] })),
+            : recommendationsPromise
+              ? Promise.resolve(recommendationsPromise)
+                  .then((results) => ({ results }))
+                  .catch(() => ({ results: [] }))
+              : getRecommendations(type, id).catch(() => ({ results: [] })),
+          seasonPosterSeeds || !seasonPosterSeedsPromise
+            ? Promise.resolve(null)
+            : Promise.resolve(seasonPosterSeedsPromise).catch(() => null),
         ]);
 
         if (cancelled) return;
@@ -113,6 +128,7 @@ export default function DetailsPageLoader(props) {
                   : EMPTY_ARRAY,
               }
             : {}),
+          ...(seeds != null ? { seasonPosterSeeds: seeds } : {}),
         }));
       } catch (error) {
         console.error("Error cargando datos prioritarios del detalle:", error);
@@ -178,10 +194,15 @@ export default function DetailsPageLoader(props) {
     initialCastData,
     initialProviders,
     initialRecommendations,
+    recommendationsPromise,
+    seasonPosterSeeds,
+    seasonPosterSeedsPromise,
   ], deferredSettled.priority && deferredSettled.secondary);
 
   return (
-    <SeasonPosterSeedsProvider value={seasonPosterSeeds}>
+    <SeasonPosterSeedsProvider
+      value={seasonPosterSeeds ?? deferredData.seasonPosterSeeds}
+    >
       <DetailsClient
         type={type}
         id={id}

@@ -65,7 +65,17 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
   // En paralelo con la comunidad (Trakt): no depende de `data`, así que
   // encadenarla DETRÁS solo sumaba su propia ida y vuelta al tiempo total de
   // respuesta sin necesidad.
-  const [data, community, recommendations] = await Promise.all([
+  //
+  // Las recomendaciones NO se esperan: Trakt + TMDb tardan hasta 2,5 s en frío
+  // (medido en producción: 0,65–1,4 s habituales) y mientras tanto el móvil
+  // enseñaba `details/loading.jsx` (pantalla negra). Van como promesa a
+  // DetailsPageLoader, que las aplica al llegar; la ficha se pinta antes.
+  const recommendationsPromise = embedded
+    ? null
+    : fetchTitleRecommendations(type, id)
+        .then((result) => (Array.isArray(result?.results) ? result.results : []))
+        .catch(() => []);
+  const [data, community] = await Promise.all([
     getDetails(type, id, {
       appendToResponse: embedded
         ? DETAILS_APPEND_TO_RESPONSE_EMBEDDED
@@ -76,7 +86,6 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
     }),
     // Tolerant: a null/slow community summary must never break the page render.
     fetchCommunitySummary({ type, id }).catch(() => null),
-    embedded ? null : fetchTitleRecommendations(type, id).catch(() => null),
   ]);
 
   if (!data) {
@@ -84,15 +93,13 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
   }
 
   // Pósters de «Temporadas» ya elegidos (escalera de idioma + más votado), con
-  // un presupuesto corto: las tarjetas salen con su póster en el HTML en vez de
-  // esperar a dos peticiones del navegador. Ver seasonPosterSeeds.server.js.
-  const seasonPosterSeeds = await fetchSeasonPosterSeeds(type, data).catch(() => null);
+  // un presupuesto corto. Tampoco se esperan (iban DETRÁS de `getDetails`,
+  // hasta 350 ms más): llegan como promesa antes de que la sección se vea.
+  // Ver seasonPosterSeeds.server.js.
+  const seasonPosterSeedsPromise = fetchSeasonPosterSeeds(type, data).catch(() => null);
 
   const initialCastData = Array.isArray(data?.credits?.cast)
     ? data.credits.cast
-    : [];
-  const initialRecommendations = Array.isArray(recommendations?.results)
-    ? recommendations.results
     : [];
 
   return (
@@ -105,13 +112,13 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
         id={id}
         data={data}
         initialCastData={initialCastData}
-        initialRecommendations={initialRecommendations}
+        recommendationsPromise={recommendationsPromise}
         initialSentiment={community?.sentiment || null}
         initialComments={community?.comments || null}
         initialLists={community?.lists?.items || null}
         initialCommunityArtwork={community ? community.artwork || {} : null}
         initialTraktStatus={initialTraktStatus}
-        seasonPosterSeeds={seasonPosterSeeds}
+        seasonPosterSeedsPromise={seasonPosterSeedsPromise}
       />
     </>
   );
