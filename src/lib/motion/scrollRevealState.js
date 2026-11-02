@@ -45,7 +45,10 @@ export function resolveTopResetRevealProps({
   if (reduceMotion) {
     return {
       initial: false,
-      animate: { opacity: hasScrolled && revealed ? 1 : 0, y: 0 },
+      animate: {
+        opacity: hasScrolled && revealed ? 1 : 0,
+        transform: "none",
+      },
       transition: { duration: 0 },
     };
   }

@@ -23,6 +23,7 @@ tags: [area/frontend, type/referencia, capa/lib]
 - `useAuth` (este módulo) es la puerta de entrada más común a la sesión en componentes que no necesitan todo el contexto.
 - `useTmdbLists`/`useTraktLists` alimentan las páginas/componentes de listas (`src/app/lists/**`, `src/components/lists/**`).
 - `useHasScrolled`/`useScrollRevealProps`/`useTopResetRevealProps` se usan en las secciones de `MainDashboardClient.jsx`, `SeriesPageClient.jsx`, `MoviesPageClient.jsx` y componentes de fila del dashboard para la animación de entrada.
+- Las variantes que acompañan a esas props (`fadeInUp` para la fila, `scaleIn` para su título, `staggerContainer`) viven en `src/lib/motion/revealVariants.js`, compartidas por los tres dashboards, `DashboardBackdropRow` y `ContinueWatchingSection`. Animan `transform` como cadena (`translateY(40px)` → `translateY(0px)`, `scale(0.95)` → `scale(1)`) y no `y`/`scale`: framer solo pasa a WAAPI (compositor) la opacidad y `transform`, y con `y` el movimiento iba en JS y se congelaba mientras se montaba la fila siguiente. `transitionEnd` deja `transform: none` al acabar (animar directamente hacia `none` deja `scale(0)`). El título de una fila es siempre un `motion.div` hijo, también en el marcador que reserva su altura antes de montar el Swiper: si naciera al montarse la fila, con el padre ya revelado se quedaría oculto.
 
 ### `src/hooks` (fuera de `lib`, mención)
 
