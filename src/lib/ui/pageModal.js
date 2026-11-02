@@ -12,8 +12,14 @@ export function isInsidePageModal(node) {
 // un modal o un desplegable (la vista lateral de Temporadas, el menú de
 // alertas y actividad del navbar, en z-[99999]…) se pone por encima de TODO:
 // por encima del navbar y de sus menús, no solo del z-[10000] de los modales.
+// También el desplegable de resultados de la búsqueda (`data-search-portal`,
+// z-[99999]): sin él, la vista previa se abría a z-9999 y quedaba detrás.
 export const PEEK_OVER_PAGE_Z = 100010;
 
 export function isInsidePageOverlay(node) {
-  return Boolean(node?.closest?.('[aria-modal="true"], [role="menu"]'));
+  return Boolean(
+    node?.closest?.(
+      '[aria-modal="true"], [role="menu"], [data-search-portal]',
+    ),
+  );
 }

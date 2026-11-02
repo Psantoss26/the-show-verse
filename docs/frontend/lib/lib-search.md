@@ -20,6 +20,8 @@ Dos utilidades independientes y puras (sin red) que soportan el buscador global:
 
 Ambos ficheros los consume únicamente `src/components/Navbar.jsx`: `fuzzySimilarity`/`tokenFuzzyMatches` para puntuar resultados de búsqueda tolerando erratas (p. ej. "intersteler nolan"), y las funciones de `history.js` para pintar/gestionar el desplegable de búsquedas recientes.
 
+En el desplegable de resultados del Navbar, al pasar de página con las flechas se precargan y decodifican las portadas de la página de destino (`preloadSearchPosters`, con un tope de 250 ms) y la lista entra deslizándose desde el lado de la flecha pulsada (WAAPI, solo `transform`/`opacity`); si el alto cambia, el panel lo anima siguiendo a la lista mientras dura el relevo. Los resultados sin portada pintan un hueco del mismo tamaño con el icono del tipo, así que todas las filas miden igual.
+
 ## Dependencias
 
 - Ninguna API externa ni de otros módulos de `lib`. Ambos ficheros son utilidades puras (o solo dependientes de `window.localStorage`).

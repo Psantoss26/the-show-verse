@@ -337,6 +337,17 @@ export default function MobileTitlePeek() {
       } catch {
         // Sin vibración (iOS, permisos): no pasa nada.
       }
+      // Desde los resultados de la búsqueda el campo sigue enfocado: el teclado
+      // taparía media vista previa. Se suelta el foco (el desplegable no se
+      // cierra con el blur y sigue ahí al cerrar la vista previa).
+      const focused = document.activeElement;
+      if (
+        focused instanceof HTMLElement &&
+        focused.matches("input, textarea") &&
+        gesture.target.closest("[data-search-portal]")
+      ) {
+        focused.blur();
+      }
       setPeek({
         key: `${gesture.item.media_type}:${gesture.item.id}:${Date.now()}`,
         item: gesture.item,

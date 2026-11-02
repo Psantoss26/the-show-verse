@@ -49,6 +49,7 @@ import {
   Check,
   SlidersHorizontal,
   UserRoundSearch,
+  UserRound,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -341,6 +342,34 @@ function dedupeSearchResults(results) {
  * búsqueda. Cada resultado lleva `_search_language` para el emparejado de
  * títulos, igual que en la búsqueda inicial.
  */
+// Portada de un resultado del desplegable (la misma URL que pinta la fila).
+// Sin portada no hay URL: la fila pinta un hueco del mismo tamaño (antes pedía
+// `/default-poster.png`, que no existe; la imagen rota medía 0 px y la fila
+// encogía al llegar el error).
+const searchPosterSrc = (item) => {
+  const path = item.poster_path || item.profile_path;
+  return path ? `https://image.tmdb.org/t/p/w92${path}` : null;
+};
+
+// Descarga y decodifica las portadas de una página de resultados antes de
+// enseñarla. Con tope: una portada lenta no retiene el cambio de página.
+const SEARCH_PAGE_PRELOAD_MAX_MS = 250;
+function preloadSearchPosters(items) {
+  const loads = items
+    .map((item) => (item.media_type === "user" ? null : searchPosterSrc(item)))
+    .filter(Boolean)
+    .map((src) => {
+      const img = new Image();
+      img.src = src;
+      return img.decode().catch(() => {});
+    });
+  if (loads.length === 0) return Promise.resolve();
+  return Promise.race([
+    Promise.all(loads),
+    new Promise((resolve) => setTimeout(resolve, SEARCH_PAGE_PRELOAD_MAX_MS)),
+  ]);
+}
+
 async function fetchTmdbSearchPage(path, query, page, signal) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   const payloads = await Promise.all(
@@ -416,6 +445,10 @@ function SearchBar({
   const [remoteHasMore, setRemoteHasMore] = useState(false);
   const resultsScrollRef = useRef(null);
   const resultsListRef = useRef(null);
+  // Cambio de página pedido con las flechas: sentido y alto del panel antes del
+  // cambio, para animar el relevo (ver el efecto de `resultsPage`).
+  const pageSwapRef = useRef(null);
+  const pageSwapTokenRef = useRef(0);
   // MÓVIL: tantos resultados por página como QUEPAN en pantalla, para que el
   // desplegable se vea entero —con el selector de página al pie— sin tener que
   // hacer scroll. En escritorio se mantienen 8 (ver `SEARCH_RESULTS_PAGE_SIZE`).
@@ -1194,10 +1227,73 @@ function SearchBar({
   const hasNextResultsPage =
     resultsPage + 1 < resultsPageCount || remoteHasMore;
 
-  const goToResultsPage = (nextPage) => {
+  // PASAR DE PÁGINA: antes la lista se cambiaba de golpe, con las portadas
+  // nuevas vacías unos fotogramas y el panel encogiendo de un salto en la
+  // última página. Ahora se precargan las portadas de la página de destino
+  // (con un tope corto para no frenar la pulsación) y el relevo se anima.
+  const goToResultsPage = async (nextPage) => {
+    const token = ++pageSwapTokenRef.current;
+    const pageItems = results.slice(
+      nextPage * resultsPageSize,
+      (nextPage + 1) * resultsPageSize,
+    );
+    await preloadSearchPosters(pageItems);
+    if (token !== pageSwapTokenRef.current) return;
+    pageSwapRef.current = {
+      direction: nextPage > resultsPage ? 1 : -1,
+      height: resultsScrollRef.current?.offsetHeight || 0,
+    };
     setResultsPage(nextPage);
     resultsScrollRef.current?.scrollTo({ top: 0 });
   };
+
+  useLayoutEffect(() => {
+    const swap = pageSwapRef.current;
+    pageSwapRef.current = null;
+    const scroller = resultsScrollRef.current;
+    const list = resultsListRef.current;
+    if (!swap || !scroller || !list) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    // WAAPI (solo transform/opacity en la lista): el panel de cristal no se
+    // toca, así que su desenfoque no se congela durante el relevo.
+    const easing = "cubic-bezier(0.22, 1, 0.36, 1)";
+    list.animate(
+      [
+        { opacity: 0, transform: `translateX(${swap.direction * 24}px)` },
+        { opacity: 1, transform: "none" },
+      ],
+      { duration: 260, easing },
+    );
+    // ALTO: la página nueva puede tener otro alto (menos filas en la última) y
+    // además se reajusta unos fotogramas después de pintarse; con un destino
+    // fijo, el panel saltaba al acabar. Mientras dura el relevo, cada cambio
+    // de alto de la lista relanza la animación desde el alto que se ve.
+    let heightAnimation = null;
+    const animateHeightFrom = (from) => {
+      heightAnimation?.cancel();
+      const to = scroller.offsetHeight;
+      if (!from || Math.abs(to - from) <= 1) return;
+      heightAnimation = scroller.animate(
+        [{ height: `${from}px` }, { height: `${to}px` }],
+        { duration: 260, easing },
+      );
+    };
+    animateHeightFrom(swap.height);
+    let lastListHeight = list.offsetHeight;
+    const observer = new ResizeObserver(() => {
+      const listHeight = list.offsetHeight;
+      if (listHeight === lastListHeight) return;
+      lastListHeight = listHeight;
+      animateHeightFrom(scroller.getBoundingClientRect().height);
+    });
+    observer.observe(list);
+    const stop = window.setTimeout(() => observer.disconnect(), 600);
+    return () => {
+      window.clearTimeout(stop);
+      observer.disconnect();
+    };
+  }, [resultsPage]);
 
   const handlePrevResultsPage = () => {
     if (hasPrevResultsPage) goToResultsPage(resultsPage - 1);
@@ -1763,13 +1859,19 @@ function SearchBar({
                                   height={48}
                                 />
                               </div>
+                            ) : !searchPosterSrc(item) ? (
+                              <div className="flex h-16 w-12 items-center justify-center rounded-lg border border-white/10 bg-neutral-900 text-white/25 shadow-lg transition-colors group-hover:border-white/20">
+                                {item.media_type === "person" ? (
+                                  <UserRound className="h-5 w-5" aria-hidden="true" />
+                                ) : item.media_type === "tv" ? (
+                                  <TvIcon className="h-5 w-5" aria-hidden="true" />
+                                ) : (
+                                  <FilmIcon className="h-5 w-5" aria-hidden="true" />
+                                )}
+                              </div>
                             ) : (
                               <OptimizedImage
-                                src={
-                                  item.poster_path || item.profile_path
-                                    ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
-                                    : "/default-poster.png"
-                                }
+                                src={searchPosterSrc(item)}
                                 alt={resultLabel}
                                 width={48}
                                 height={64}
@@ -3280,7 +3382,9 @@ function NavbarContent() {
               aria-controls="mobile-navigation-drawer"
               aria-expanded={mobileMenuOpen}
               aria-haspopup="dialog"
-              className="grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              // Mismo botón que búsqueda y alertas: sombra oscura bajo el icono
+              // para que se lea sobre portadas y fondos claros.
+              className="grid h-11 w-11 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-transform duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
             >
               <Menu className="sv-topbar-icon h-6 w-6" strokeWidth={2.2} aria-hidden="true" />
             </button>
