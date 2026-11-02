@@ -124,6 +124,45 @@ function detailsArtReady() {
   return true;
 }
 
+// ¿Está el teclado en pantalla? Lo dice el alto visible: el teclado encoge
+// `visualViewport`, no la ventana.
+const KEYBOARD_MIN_PX = 120;
+function isKeyboardOpen() {
+  const viewport = window.visualViewport;
+  return Boolean(viewport) && window.innerHeight - viewport.height > KEYBOARD_MIN_PX;
+}
+
+// Llama a `done` cuando el teclado ha bajado del todo (el alto visible deja de
+// cambiar con el teclado ya fuera), con un tope para no quedarse esperando si
+// el sistema no avisa. Devuelve la cancelación.
+const KEYBOARD_CLOSE_SETTLE_MS = 80;
+const KEYBOARD_CLOSE_MAX_MS = 700;
+function waitForKeyboardClose(done) {
+  const viewport = window.visualViewport;
+  let settleTimer = 0;
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    window.clearTimeout(settleTimer);
+    window.clearTimeout(maxTimer);
+    viewport?.removeEventListener("resize", onResize);
+    done();
+  };
+  const onResize = () => {
+    window.clearTimeout(settleTimer);
+    if (!isKeyboardOpen()) settleTimer = window.setTimeout(finish, KEYBOARD_CLOSE_SETTLE_MS);
+  };
+  const maxTimer = window.setTimeout(finish, KEYBOARD_CLOSE_MAX_MS);
+  viewport?.addEventListener("resize", onResize);
+  return () => {
+    finished = true;
+    window.clearTimeout(settleTimer);
+    window.clearTimeout(maxTimer);
+    viewport?.removeEventListener("resize", onResize);
+  };
+}
+
 function resolvePeekTarget(node) {
   const target = node?.closest?.(TITLE_PEEK_SELECTOR);
   if (!target || target.closest("[data-sv-no-peek]")) return null;
@@ -295,6 +334,8 @@ export default function MobileTitlePeek() {
 
   useEffect(() => {
     if (!canPeek) return undefined;
+    let disposed = false;
+    let pendingOpenCancel = null;
 
     const releasePress = (gesture) => {
       const animation = gesture?.pressAnimation;
@@ -328,7 +369,6 @@ export default function MobileTitlePeek() {
       if (!gesture || gesture.fired) return;
       window.clearTimeout(gesture.timer);
       gesture.fired = true;
-      const rect = gesture.target.getBoundingClientRect();
       releasePress(gesture);
       // Mientras el dedo siga apoyado no hay clic que dejar pasar.
       suppressClickUntilRef.current = Number.POSITIVE_INFINITY;
@@ -337,30 +377,44 @@ export default function MobileTitlePeek() {
       } catch {
         // Sin vibración (iOS, permisos): no pasa nada.
       }
-      // Desde los resultados de la búsqueda el campo sigue enfocado: el teclado
-      // taparía media vista previa. Se suelta el foco (el desplegable no se
-      // cierra con el blur y sigue ahí al cerrar la vista previa).
+      const { target, item } = gesture;
+      const open = () => {
+        if (disposed) return;
+        const rect = target.getBoundingClientRect();
+        setPeek({
+          key: `${item.media_type}:${item.id}:${Date.now()}`,
+          item,
+          origin: {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+          },
+          // Pulsada dentro de un modal o un desplegable (episodios agrupados,
+          // vista lateral de Temporadas, alertas del navbar, resultados de la
+          // búsqueda…): encima de todo.
+          overModal: isInsidePageOverlay(target),
+        });
+      };
+      // TECLADO ABIERTO (resultados de la búsqueda con el campo enfocado): la
+      // vista previa mide su tarjeta UNA vez, al abrirse, con el alto visible
+      // (`visualViewport`), que con el teclado es la mitad: salía compactada.
+      // Se baja el teclado y se abre cuando la pantalla ha recuperado su alto.
       const focused = document.activeElement;
       if (
         focused instanceof HTMLElement &&
-        focused.matches("input, textarea") &&
-        gesture.target.closest("[data-search-portal]")
+        focused.matches("input, textarea")
       ) {
         focused.blur();
+        if (isKeyboardOpen()) {
+          pendingOpenCancel = waitForKeyboardClose(() => {
+            pendingOpenCancel = null;
+            open();
+          });
+          return;
+        }
       }
-      setPeek({
-        key: `${gesture.item.media_type}:${gesture.item.id}:${Date.now()}`,
-        item: gesture.item,
-        origin: {
-          left: rect.left,
-          top: rect.top,
-          width: rect.width,
-          height: rect.height,
-        },
-        // Pulsada dentro de un modal o un desplegable (episodios agrupados,
-        // vista lateral de Temporadas, alertas del navbar…): encima de todo.
-        overModal: isInsidePageOverlay(gesture.target),
-      });
+      open();
     };
 
     const onTouchStart = (event) => {
@@ -465,6 +519,8 @@ export default function MobileTitlePeek() {
     document.addEventListener("dragstart", onDragStart, true);
     window.addEventListener("scroll", onScroll, passive);
     return () => {
+      disposed = true;
+      pendingOpenCancel?.();
       cancelGesture();
       document.removeEventListener("touchstart", onTouchStart, passive);
       document.removeEventListener("touchmove", onTouchMove, passive);

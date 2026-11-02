@@ -78,3 +78,28 @@ test("la vista previa móvil se abre por encima del desplegable de resultados", 
   assert.equal(isInsidePageOverlay(nodo("[role=\"menu\"]")), true);
   assert.equal(isInsidePageOverlay(nodo(".otra-cosa")), false);
 });
+
+test("tocar el fondo de la vista previa no cierra los resultados de búsqueda", async () => {
+  const navbar = await readFile(NAVBAR, "utf8");
+  // EL FALLO: en el móvil, el toque para cerrar la vista previa emite un
+  // `mousedown` de compatibilidad; el cierre "al pulsar fuera" de SearchBar lo
+  // tomaba por un toque fuera y se llevaba el desplegable.
+  const handler = navbar.slice(
+    navbar.indexOf('document.addEventListener("mousedown", handler)') - 900,
+    navbar.indexOf('document.addEventListener("mousedown", handler)'),
+  );
+  assert.match(handler, /\[data-detail-modal-layer\]/);
+});
+
+test("con el teclado abierto la vista previa espera a que baje para medirse", async () => {
+  const peek = await readFile(
+    new URL("../../components/preview/MobileTitlePeek.jsx", import.meta.url),
+    "utf8",
+  );
+  // EL FALLO: la tarjeta se mide una vez al abrir con `visualViewport`, que con
+  // el teclado es la mitad: salía compactada.
+  const fire = peek.slice(peek.indexOf("const fire = () => {"), peek.indexOf("const onTouchStart"));
+  assert.match(fire, /focused\.blur\(\)/);
+  assert.match(fire, /isKeyboardOpen\(\)/);
+  assert.match(fire, /waitForKeyboardClose\(/);
+});

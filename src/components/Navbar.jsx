@@ -521,7 +521,11 @@ function SearchBar({
         !dropdownRef.current?.contains(e.target) &&
         !filterMenuRef.current?.contains(e.target) &&
         // La hoja de filtros del móvil va en su propio portal.
-        !(e.target instanceof Element && e.target.closest("[data-mobile-options-sheet]"))
+        !(e.target instanceof Element && e.target.closest("[data-mobile-options-sheet]")) &&
+        // Ni la vista previa de pulsación larga (o un modal abierto desde
+        // ella): en el móvil, tocar su fondo para cerrarla emite un
+        // `mousedown` de compatibilidad que cerraba los resultados de detrás.
+        !(e.target instanceof Element && e.target.closest("[data-detail-modal-layer], [aria-modal=\"true\"]"))
       ) {
         setShowDropdown(false);
         setShowFilterMenu(false);
