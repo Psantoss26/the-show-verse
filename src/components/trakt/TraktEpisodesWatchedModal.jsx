@@ -39,7 +39,7 @@ function PanelGlass() {
 
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -52,6 +52,11 @@ import {
 import FadePresence from "@/components/ui/FadePresence";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 import StarRating from "@/components/StarRating";
+import {
+  playSeasonEntrance,
+  playSeasonExit,
+  prefersReducedMotion,
+} from "@/lib/trakt/episodesSeasonTransition";
 import ListToggleConfirmModal from "@/components/details/ListToggleConfirmModal";
 import {
   Check,
@@ -273,6 +278,14 @@ export default function TraktEpisodesWatchedModal({
   const [showError, setShowError] = useState("");
   const episodeListRef = useRef(null);
   const seasonSwipeStartRef = useRef(null);
+  // Relevo animado de temporada (ver `episodesSeasonTransition.js`). Mientras
+  // salen los episodios de la temporada actual, `seasonExitPending` retiene el
+  // cambio de `displaySeason`; `seasonSwapRef` guarda hacia dónde se va y un
+  // `token` para que un relevo interrumpido por otro no pise al nuevo.
+  const [seasonExitPending, setSeasonExitPending] = useState(false);
+  const seasonSwapRef = useRef({ token: 0, to: null, direction: 0 });
+  const shownSeasonRef = useRef(null);
+  const seasonCacheRef = useRef({});
 
   // local view fallback si el padre no controla activeView/onChangeView
   const [localView, setLocalView] = useState("global");
@@ -557,6 +570,9 @@ export default function TraktEpisodesWatchedModal({
       usableSeasons[0] ||
       null;
     const sn = first?.season_number ?? null;
+    // Un relevo que quedase a medias al cerrar no sigue al reabrir.
+    seasonSwapRef.current = { token: seasonSwapRef.current.token + 1, to: null, direction: 0 };
+    setSeasonExitPending(false);
     setActiveSeason(sn);
     setDisplaySeason(sn);
     setOnlyUnwatched(false);
@@ -615,14 +631,56 @@ export default function TraktEpisodesWatchedModal({
     (seasonNumber) => {
       if (seasonNumber == null) return;
 
-      episodeListRef.current?.scrollTo({ top: 0 });
       setActiveSeason(seasonNumber);
-      if (Array.isArray(seasonCache?.[seasonNumber]?.episodes)) {
-        setDisplaySeason(seasonNumber);
+      const swap = seasonSwapRef.current;
+      const shown = shownSeasonRef.current;
+      // Sentido respecto a la temporada hacia la que ya se iba (si se pulsa
+      // otra a mitad de un relevo) o, si no, respecto a la que se ve.
+      const from = swap.to ?? shown;
+      const indexOf = (sn) =>
+        usableSeasons.findIndex((season) => season?.season_number === sn);
+      const direction = Math.sign(indexOf(seasonNumber) - indexOf(from));
+      const token = ++swap.token;
+      swap.to = seasonNumber;
+      swap.direction = direction;
+
+      const list = episodeListRef.current;
+      if (seasonNumber === shown) {
+        // Vuelta a la que se estaba yendo: sus episodios siguen montados,
+        // solo hay que traerlos de vuelta.
+        setSeasonExitPending(false);
+        playSeasonEntrance(list, direction);
+        return;
       }
+      if (!list || prefersReducedMotion()) {
+        setSeasonExitPending(false);
+        return;
+      }
+      setSeasonExitPending(true);
+      playSeasonExit(list, direction).then(
+        () => {
+          if (seasonSwapRef.current.token !== token) return;
+          // Las filas ya no se ven: si la temporada aún carga, el indicador
+          // queda arriba y la nueva arranca desde el principio.
+          list.scrollTo({ top: 0, behavior: "instant" });
+          setSeasonExitPending(false);
+          // Ya cargada: se pinta en el mismo render (sin esperar al efecto,
+          // que costaría otro render del modal antes de la entrada).
+          if (Array.isArray(seasonCacheRef.current?.[seasonNumber]?.episodes)) {
+            setDisplaySeason(seasonNumber);
+          }
+        },
+        () => {
+          // Cancelada por otro relevo: ese decide.
+        },
+      );
     },
-    [seasonCache],
+    [usableSeasons],
   );
+
+  useLayoutEffect(() => {
+    seasonCacheRef.current = seasonCache;
+  }, [seasonCache]);
 
   // Auto-load season
   useEffect(() => {
@@ -632,9 +690,11 @@ export default function TraktEpisodesWatchedModal({
 
   useEffect(() => {
     if (!open || isMovie || viewMode !== "list" || activeSeason == null) return;
+    // Mientras sale la temporada anterior, el cambio espera a que acabe.
+    if (seasonExitPending) return;
     if (Array.isArray(seasonCache?.[activeSeason]?.episodes))
       setDisplaySeason(activeSeason);
-  }, [open, isMovie, viewMode, activeSeason, seasonCache]);
+  }, [open, isMovie, viewMode, activeSeason, seasonCache, seasonExitPending]);
 
   const initialSeasonNumber = usableSeasons[0]?.season_number ?? null;
   const selectedSeasonObj = useMemo(
@@ -651,6 +711,19 @@ export default function TraktEpisodesWatchedModal({
   // al color de seleccionado con `transition-all`, un cambio de color visible.
   const selectedSn = selectedSeasonObj?.season_number ?? initialSeasonNumber;
   const displaySn = displaySeason ?? activeSeason ?? initialSeasonNumber;
+
+  // Temporada nueva pintada: arriba del todo y entrada desde el lado hacia el
+  // que se va. En layout effect, antes de pintar, para que las filas nuevas
+  // no se vean un fotograma con la salida ya cancelada.
+  useLayoutEffect(() => {
+    const previous = shownSeasonRef.current;
+    shownSeasonRef.current = displaySn;
+    const list = episodeListRef.current;
+    if (previous == null || previous === displaySn || !list) return;
+    list.scrollTo({ top: 0, behavior: "instant" });
+    const swap = seasonSwapRef.current;
+    playSeasonEntrance(list, swap.to === displaySn ? swap.direction : 0);
+  }, [displaySn]);
 
   const handleEpisodeListTouchStart = useCallback((event) => {
     if (window.matchMedia("(min-width: 768px)").matches) return;
@@ -1902,6 +1975,14 @@ export default function TraktEpisodesWatchedModal({
                 }}
                 className="relative flex-1 overflow-y-auto scroll-smooth p-4 pb-20 touch-pan-y no-scrollbar sm:pb-4 md:touch-auto"
               >
+                {/* Temporada elegida aún cargando con la anterior ya fuera. */}
+                {!seasonExitPending &&
+                  displaySn !== selectedSn &&
+                  seasonCache?.[selectedSn]?.loading && (
+                    <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-16">
+                      <Loader2 className="h-6 w-6 animate-spin text-white/45" />
+                    </div>
+                  )}
                 <div className="space-y-3">
                   {filteredEpisodes.length === 0 && !loadingSeason ? (
                     <div className="text-center py-12 text-zinc-500 text-sm">
@@ -1922,6 +2003,7 @@ export default function TraktEpisodesWatchedModal({
                       return (
                         <div
                           key={en}
+                          data-season-episode-row
                           role="button"
                           tabIndex={0}
                           onClick={() => openEpisodeDetails(sn, en)}
