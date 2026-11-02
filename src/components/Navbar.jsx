@@ -71,6 +71,12 @@ import MobileOptionsSheet, {
 import { useAppPullToRefreshLock } from "@/lib/android/appBridge";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
 import {
+  isEmptySearchResult,
+  isWeakSearchResultSet,
+  searchReachScore,
+  withoutEmptySearchResults,
+} from "@/lib/search/ranking";
+import {
   addSearchHistory,
   clearSearchHistory,
   readSearchHistory,
@@ -151,10 +157,14 @@ const SEARCH_FALLBACK_MIN_LEN = 5;
 const SEARCH_RESULTS_PAGE_SIZE = 8;
 // Páginas de TMDb que la búsqueda inicial ya trae de cada endpoint; la carga
 // incremental continúa a partir de la siguiente.
+// Solo la primera página de cada tipo al escribir: TMDb ya ordena por
+// relevancia y popularidad, así que lo representativo llega en ella. Antes se
+// pedía también la 2 y `/search/multi` (16 peticiones por búsqueda, ahora 8);
+// el resto llega con «Más resultados».
 const SEARCH_INITIAL_TMDB_PAGES = {
-  "/search/movie": 2,
-  "/search/tv": 2,
-  "/search/person": 2,
+  "/search/movie": 1,
+  "/search/tv": 1,
+  "/search/person": 1,
   "/search/collection": 1,
 };
 // Endpoints que se siguen paginando para cada filtro. `/search/multi` no hace
@@ -254,6 +264,9 @@ function scoreSearchResult(item, normalizedQuery) {
     let titleScore = 0;
     if (title === normalizedQuery) titleScore += 10000;
     else if (title.startsWith(normalizedQuery)) titleScore += 7000;
+    // Palabra entera dentro del título («nolan» en «christopher nolan») vale
+    // casi como empezar por ella; un trozo suelto de palabra, menos.
+    else if (` ${title} `.includes(` ${normalizedQuery} `)) titleScore += 6500;
     else if (title.includes(normalizedQuery)) titleScore += 5000;
     else if (normalizedQuery.length >= FUZZY_MIN_QUERY_LEN) {
       // Sin coincidencia por substring: puntuación tolerante a erratas para que
@@ -275,13 +288,9 @@ function scoreSearchResult(item, normalizedQuery) {
     bestTitleScore = Math.max(bestTitleScore, titleScore);
   }
 
-  let score = bestTitleScore;
-  const popularity = Number(item?.popularity || 0);
-  const votes = Number(item?.vote_count || 0);
-  score += Math.min(popularity, 500) * 6;
-  score += Math.min(votes, 2500) * 0.2;
-
-  return score;
+  // Votos y popularidad (ver `searchReachScore`): sin ellos, la coincidencia
+  // exacta de un título vacío ganaba a uno conocido que empieza por la consulta.
+  return bestTitleScore + searchReachScore(item);
 }
 
 function normalizeSearchResult(item, fallbackMediaType = null) {
@@ -874,61 +883,38 @@ function SearchBar({
             );
           };
 
-          const [
-            multiRaw,
-            moviePage1Raw,
-            moviePage2Raw,
-            tvPage1Raw,
-            tvPage2Raw,
-            personPage1Raw,
-            personPage2Raw,
-            collRaw,
-          ] = await Promise.all([
-            activeFilter === "all"
-              ? fetchResults("/search/multi")
-              : Promise.resolve([]),
+          const [movieRaw, tvRaw, personRaw, collRaw] = await Promise.all([
             ["all", "movies"].includes(activeFilter)
               ? fetchResults("/search/movie")
-              : Promise.resolve([]),
-            ["all", "movies"].includes(activeFilter)
-              ? fetchResults("/search/movie", 2)
               : Promise.resolve([]),
             ["all", "series"].includes(activeFilter)
               ? fetchResults("/search/tv")
               : Promise.resolve([]),
-            ["all", "series"].includes(activeFilter)
-              ? fetchResults("/search/tv", 2)
-              : Promise.resolve([]),
             ["all", "people"].includes(activeFilter)
               ? fetchResults("/search/person")
-              : Promise.resolve([]),
-            ["all", "people"].includes(activeFilter)
-              ? fetchResults("/search/person", 2)
               : Promise.resolve([]),
             ["all", "collections"].includes(activeFilter)
               ? fetchResults("/search/collection")
               : Promise.resolve([]),
           ]);
 
-          const multiResults = multiRaw
-            .map((item) => normalizeSearchResult(item))
-            .filter(Boolean);
-          const movieResults = [...moviePage1Raw, ...moviePage2Raw]
+          const movieResults = movieRaw
             .map((item) => normalizeSearchResult(item, "movie"))
             .filter(Boolean);
-          const tvResults = [...tvPage1Raw, ...tvPage2Raw]
+          const tvResults = tvRaw
             .map((item) => normalizeSearchResult(item, "tv"))
             .filter(Boolean);
-          const personResults = [...personPage1Raw, ...personPage2Raw]
+          const personResults = personRaw
             .map((item) => normalizeSearchResult(item, "person"))
             .filter(Boolean);
 
-          const items = dedupeSearchResults([
-            ...multiResults,
-            ...movieResults,
-            ...tvResults,
-            ...personResults,
-          ]).sort(
+          const items = withoutEmptySearchResults(
+            dedupeSearchResults([
+              ...movieResults,
+              ...tvResults,
+              ...personResults,
+            ]),
+          ).sort(
             (a, b) =>
               scoreSearchResult(b, normalizedQuery) -
                 scoreSearchResult(a, normalizedQuery) ||
@@ -966,9 +952,15 @@ function SearchBar({
         // por prefijo. Reintentamos con un prefijo recortado (la errata suele ir al
         // final) y conservamos solo candidatos con relevancia fuzzy real respecto a
         // la consulta ORIGINAL (para no colar el ruido de un prefijo corto).
+        //
+        // También cuando lo que hay es todo desconocido (ningún título con
+        // votos de verdad): con «interstelar» TMDb solo daba dos títulos
+        // vacíos de nombre parecido y nunca se buscaba «Interstellar». En ese
+        // caso lo del prefijo se SUMA a lo que había, y el orden decide.
+        const weakResults = items.length > 0 && isWeakSearchResultSet(items);
         if (
           activeFilter !== "collections" &&
-          items.length === 0 &&
+          (items.length === 0 || weakResults) &&
           normalizedQuery.length >= SEARCH_FALLBACK_MIN_LEN
         ) {
           const prefix = trimmedQuery
@@ -1007,8 +999,16 @@ function SearchBar({
                   activeFilter !== "people" || isActorOrDirector(item),
               );
             if (filtered.length) {
-              items = filtered;
-              collResults = alt.collResults;
+              if (weakResults) {
+                items = dedupeSearchResults([...items, ...filtered]).sort(
+                  (a, b) =>
+                    scoreSearchResult(b, normalizedQuery) -
+                    scoreSearchResult(a, normalizedQuery),
+                );
+              } else {
+                items = filtered;
+                collResults = alt.collResults;
+              }
               usedPrefixFallback = true;
             }
           }
@@ -1173,7 +1173,9 @@ function SearchBar({
         const seenCollections = new Set();
         const batch = [
           ...dedupeSearchResults(media).filter(
-            (item) => item.media_type !== "person" || isActorOrDirector(item),
+            (item) =>
+              !isEmptySearchResult(item) &&
+              (item.media_type !== "person" || isActorOrDirector(item)),
           ),
           ...collections.filter((collection) => {
             if (!collection?.id || seenCollections.has(collection.id)) {
