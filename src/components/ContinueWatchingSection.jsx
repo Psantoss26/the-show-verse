@@ -78,6 +78,7 @@ import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 import PosterImage from "@/components/dashboard/DashboardPosterImage";
 import { getMobileCardsPerRow } from "@/lib/ui/mobileCardsPerRow";
 import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import { fadeInUp, scaleIn } from "@/lib/motion/revealVariants";
 
 const EMPTY_ARRAY = [];
 const MAX_ITEMS = 20;
@@ -234,26 +235,6 @@ function sortLocalProgress(items) {
   });
   return out.slice(0, MAX_ITEMS);
 }
-
-/* =================== ANIMATION VARIANTS =================== */
-const fadeInUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-  },
-};
-
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
-  },
-};
-
 
 /* =================== STYLE CONSTANTS =================== */
 const CONTINUE_WATCHING_BACKDROP_SIZE = "w1280";

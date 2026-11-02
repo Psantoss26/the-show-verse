@@ -30,6 +30,7 @@ import {
   DASHBOARD_PREVIEW_REDUCED_TRANSITION,
 } from "@/lib/dashboard/previewTiming";
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
+import { fadeInUp, staggerContainer, scaleIn } from "@/lib/motion/revealVariants";
 
 // El hero de este dashboard no repite los títulos del hero de Inicio.
 const FEATURED_AVOID_HOME = { avoid: ["home"] };
@@ -84,37 +85,6 @@ import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
 import useOwnCardPoster, { useCardArtworkState, useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
-
-/* =================== ANIMATION VARIANTS =================== */
-const fadeInUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-  },
-};
-
-const staggerContainer = {
-  hidden: { opacity: 1 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.1,
-    },
-  },
-};
-
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
-  },
-};
 
 const INITIAL_VISIBLE_ROWS = 6;
 const ROW_REVEAL_BATCH_SIZE = 4;

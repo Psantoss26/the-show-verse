@@ -102,6 +102,7 @@ import {
   preloadImage,
 } from "@/lib/dashboard/media";
 import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
+import { fadeInUp, scaleIn } from "@/lib/motion/revealVariants";
 
 /* =================== CONSTANTES / VARIANTES =================== */
 const EMPTY_ARRAY = [];
@@ -135,24 +136,6 @@ const SECTION_ACCENTS = {
 // Set a nivel de módulo con las URLs de backdrop ya cargadas: evita el shimmer
 // cuando una imagen ya se pintó antes (al volver a montar la tarjeta).
 const loadedBackdropSrcs = new Set();
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-  },
-};
-
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
-  },
-};
 
 
 /* =================== HELPERS =================== */

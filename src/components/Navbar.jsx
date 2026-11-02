@@ -49,6 +49,7 @@ import {
   Check,
   SlidersHorizontal,
   UserRoundSearch,
+  UserRound,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -69,6 +70,12 @@ import MobileOptionsSheet, {
 } from "@/components/ui/MobileOptionsSheet";
 import { useAppPullToRefreshLock } from "@/lib/android/appBridge";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
+import {
+  isEmptySearchResult,
+  isWeakSearchResultSet,
+  searchReachScore,
+  withoutEmptySearchResults,
+} from "@/lib/search/ranking";
 import {
   addSearchHistory,
   clearSearchHistory,
@@ -150,10 +157,14 @@ const SEARCH_FALLBACK_MIN_LEN = 5;
 const SEARCH_RESULTS_PAGE_SIZE = 8;
 // Páginas de TMDb que la búsqueda inicial ya trae de cada endpoint; la carga
 // incremental continúa a partir de la siguiente.
+// Solo la primera página de cada tipo al escribir: TMDb ya ordena por
+// relevancia y popularidad, así que lo representativo llega en ella. Antes se
+// pedía también la 2 y `/search/multi` (16 peticiones por búsqueda, ahora 8);
+// el resto llega con «Más resultados».
 const SEARCH_INITIAL_TMDB_PAGES = {
-  "/search/movie": 2,
-  "/search/tv": 2,
-  "/search/person": 2,
+  "/search/movie": 1,
+  "/search/tv": 1,
+  "/search/person": 1,
   "/search/collection": 1,
 };
 // Endpoints que se siguen paginando para cada filtro. `/search/multi` no hace
@@ -253,6 +264,9 @@ function scoreSearchResult(item, normalizedQuery) {
     let titleScore = 0;
     if (title === normalizedQuery) titleScore += 10000;
     else if (title.startsWith(normalizedQuery)) titleScore += 7000;
+    // Palabra entera dentro del título («nolan» en «christopher nolan») vale
+    // casi como empezar por ella; un trozo suelto de palabra, menos.
+    else if (` ${title} `.includes(` ${normalizedQuery} `)) titleScore += 6500;
     else if (title.includes(normalizedQuery)) titleScore += 5000;
     else if (normalizedQuery.length >= FUZZY_MIN_QUERY_LEN) {
       // Sin coincidencia por substring: puntuación tolerante a erratas para que
@@ -274,13 +288,9 @@ function scoreSearchResult(item, normalizedQuery) {
     bestTitleScore = Math.max(bestTitleScore, titleScore);
   }
 
-  let score = bestTitleScore;
-  const popularity = Number(item?.popularity || 0);
-  const votes = Number(item?.vote_count || 0);
-  score += Math.min(popularity, 500) * 6;
-  score += Math.min(votes, 2500) * 0.2;
-
-  return score;
+  // Votos y popularidad (ver `searchReachScore`): sin ellos, la coincidencia
+  // exacta de un título vacío ganaba a uno conocido que empieza por la consulta.
+  return bestTitleScore + searchReachScore(item);
 }
 
 function normalizeSearchResult(item, fallbackMediaType = null) {
@@ -341,6 +351,34 @@ function dedupeSearchResults(results) {
  * búsqueda. Cada resultado lleva `_search_language` para el emparejado de
  * títulos, igual que en la búsqueda inicial.
  */
+// Portada de un resultado del desplegable (la misma URL que pinta la fila).
+// Sin portada no hay URL: la fila pinta un hueco del mismo tamaño (antes pedía
+// `/default-poster.png`, que no existe; la imagen rota medía 0 px y la fila
+// encogía al llegar el error).
+const searchPosterSrc = (item) => {
+  const path = item.poster_path || item.profile_path;
+  return path ? `https://image.tmdb.org/t/p/w92${path}` : null;
+};
+
+// Descarga y decodifica las portadas de una página de resultados antes de
+// enseñarla. Con tope: una portada lenta no retiene el cambio de página.
+const SEARCH_PAGE_PRELOAD_MAX_MS = 250;
+function preloadSearchPosters(items) {
+  const loads = items
+    .map((item) => (item.media_type === "user" ? null : searchPosterSrc(item)))
+    .filter(Boolean)
+    .map((src) => {
+      const img = new Image();
+      img.src = src;
+      return img.decode().catch(() => {});
+    });
+  if (loads.length === 0) return Promise.resolve();
+  return Promise.race([
+    Promise.all(loads),
+    new Promise((resolve) => setTimeout(resolve, SEARCH_PAGE_PRELOAD_MAX_MS)),
+  ]);
+}
+
 async function fetchTmdbSearchPage(path, query, page, signal) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   const payloads = await Promise.all(
@@ -416,6 +454,10 @@ function SearchBar({
   const [remoteHasMore, setRemoteHasMore] = useState(false);
   const resultsScrollRef = useRef(null);
   const resultsListRef = useRef(null);
+  // Cambio de página pedido con las flechas: sentido y alto del panel antes del
+  // cambio, para animar el relevo (ver el efecto de `resultsPage`).
+  const pageSwapRef = useRef(null);
+  const pageSwapTokenRef = useRef(0);
   // MÓVIL: tantos resultados por página como QUEPAN en pantalla, para que el
   // desplegable se vea entero —con el selector de página al pie— sin tener que
   // hacer scroll. En escritorio se mantienen 8 (ver `SEARCH_RESULTS_PAGE_SIZE`).
@@ -841,61 +883,38 @@ function SearchBar({
             );
           };
 
-          const [
-            multiRaw,
-            moviePage1Raw,
-            moviePage2Raw,
-            tvPage1Raw,
-            tvPage2Raw,
-            personPage1Raw,
-            personPage2Raw,
-            collRaw,
-          ] = await Promise.all([
-            activeFilter === "all"
-              ? fetchResults("/search/multi")
-              : Promise.resolve([]),
+          const [movieRaw, tvRaw, personRaw, collRaw] = await Promise.all([
             ["all", "movies"].includes(activeFilter)
               ? fetchResults("/search/movie")
-              : Promise.resolve([]),
-            ["all", "movies"].includes(activeFilter)
-              ? fetchResults("/search/movie", 2)
               : Promise.resolve([]),
             ["all", "series"].includes(activeFilter)
               ? fetchResults("/search/tv")
               : Promise.resolve([]),
-            ["all", "series"].includes(activeFilter)
-              ? fetchResults("/search/tv", 2)
-              : Promise.resolve([]),
             ["all", "people"].includes(activeFilter)
               ? fetchResults("/search/person")
-              : Promise.resolve([]),
-            ["all", "people"].includes(activeFilter)
-              ? fetchResults("/search/person", 2)
               : Promise.resolve([]),
             ["all", "collections"].includes(activeFilter)
               ? fetchResults("/search/collection")
               : Promise.resolve([]),
           ]);
 
-          const multiResults = multiRaw
-            .map((item) => normalizeSearchResult(item))
-            .filter(Boolean);
-          const movieResults = [...moviePage1Raw, ...moviePage2Raw]
+          const movieResults = movieRaw
             .map((item) => normalizeSearchResult(item, "movie"))
             .filter(Boolean);
-          const tvResults = [...tvPage1Raw, ...tvPage2Raw]
+          const tvResults = tvRaw
             .map((item) => normalizeSearchResult(item, "tv"))
             .filter(Boolean);
-          const personResults = [...personPage1Raw, ...personPage2Raw]
+          const personResults = personRaw
             .map((item) => normalizeSearchResult(item, "person"))
             .filter(Boolean);
 
-          const items = dedupeSearchResults([
-            ...multiResults,
-            ...movieResults,
-            ...tvResults,
-            ...personResults,
-          ]).sort(
+          const items = withoutEmptySearchResults(
+            dedupeSearchResults([
+              ...movieResults,
+              ...tvResults,
+              ...personResults,
+            ]),
+          ).sort(
             (a, b) =>
               scoreSearchResult(b, normalizedQuery) -
                 scoreSearchResult(a, normalizedQuery) ||
@@ -933,9 +952,15 @@ function SearchBar({
         // por prefijo. Reintentamos con un prefijo recortado (la errata suele ir al
         // final) y conservamos solo candidatos con relevancia fuzzy real respecto a
         // la consulta ORIGINAL (para no colar el ruido de un prefijo corto).
+        //
+        // También cuando lo que hay es todo desconocido (ningún título con
+        // votos de verdad): con «interstelar» TMDb solo daba dos títulos
+        // vacíos de nombre parecido y nunca se buscaba «Interstellar». En ese
+        // caso lo del prefijo se SUMA a lo que había, y el orden decide.
+        const weakResults = items.length > 0 && isWeakSearchResultSet(items);
         if (
           activeFilter !== "collections" &&
-          items.length === 0 &&
+          (items.length === 0 || weakResults) &&
           normalizedQuery.length >= SEARCH_FALLBACK_MIN_LEN
         ) {
           const prefix = trimmedQuery
@@ -974,8 +999,16 @@ function SearchBar({
                   activeFilter !== "people" || isActorOrDirector(item),
               );
             if (filtered.length) {
-              items = filtered;
-              collResults = alt.collResults;
+              if (weakResults) {
+                items = dedupeSearchResults([...items, ...filtered]).sort(
+                  (a, b) =>
+                    scoreSearchResult(b, normalizedQuery) -
+                    scoreSearchResult(a, normalizedQuery),
+                );
+              } else {
+                items = filtered;
+                collResults = alt.collResults;
+              }
               usedPrefixFallback = true;
             }
           }
@@ -1140,7 +1173,9 @@ function SearchBar({
         const seenCollections = new Set();
         const batch = [
           ...dedupeSearchResults(media).filter(
-            (item) => item.media_type !== "person" || isActorOrDirector(item),
+            (item) =>
+              !isEmptySearchResult(item) &&
+              (item.media_type !== "person" || isActorOrDirector(item)),
           ),
           ...collections.filter((collection) => {
             if (!collection?.id || seenCollections.has(collection.id)) {
@@ -1194,10 +1229,73 @@ function SearchBar({
   const hasNextResultsPage =
     resultsPage + 1 < resultsPageCount || remoteHasMore;
 
-  const goToResultsPage = (nextPage) => {
+  // PASAR DE PÁGINA: antes la lista se cambiaba de golpe, con las portadas
+  // nuevas vacías unos fotogramas y el panel encogiendo de un salto en la
+  // última página. Ahora se precargan las portadas de la página de destino
+  // (con un tope corto para no frenar la pulsación) y el relevo se anima.
+  const goToResultsPage = async (nextPage) => {
+    const token = ++pageSwapTokenRef.current;
+    const pageItems = results.slice(
+      nextPage * resultsPageSize,
+      (nextPage + 1) * resultsPageSize,
+    );
+    await preloadSearchPosters(pageItems);
+    if (token !== pageSwapTokenRef.current) return;
+    pageSwapRef.current = {
+      direction: nextPage > resultsPage ? 1 : -1,
+      height: resultsScrollRef.current?.offsetHeight || 0,
+    };
     setResultsPage(nextPage);
     resultsScrollRef.current?.scrollTo({ top: 0 });
   };
+
+  useLayoutEffect(() => {
+    const swap = pageSwapRef.current;
+    pageSwapRef.current = null;
+    const scroller = resultsScrollRef.current;
+    const list = resultsListRef.current;
+    if (!swap || !scroller || !list) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    // WAAPI (solo transform/opacity en la lista): el panel de cristal no se
+    // toca, así que su desenfoque no se congela durante el relevo.
+    const easing = "cubic-bezier(0.22, 1, 0.36, 1)";
+    list.animate(
+      [
+        { opacity: 0, transform: `translateX(${swap.direction * 24}px)` },
+        { opacity: 1, transform: "none" },
+      ],
+      { duration: 260, easing },
+    );
+    // ALTO: la página nueva puede tener otro alto (menos filas en la última) y
+    // además se reajusta unos fotogramas después de pintarse; con un destino
+    // fijo, el panel saltaba al acabar. Mientras dura el relevo, cada cambio
+    // de alto de la lista relanza la animación desde el alto que se ve.
+    let heightAnimation = null;
+    const animateHeightFrom = (from) => {
+      heightAnimation?.cancel();
+      const to = scroller.offsetHeight;
+      if (!from || Math.abs(to - from) <= 1) return;
+      heightAnimation = scroller.animate(
+        [{ height: `${from}px` }, { height: `${to}px` }],
+        { duration: 260, easing },
+      );
+    };
+    animateHeightFrom(swap.height);
+    let lastListHeight = list.offsetHeight;
+    const observer = new ResizeObserver(() => {
+      const listHeight = list.offsetHeight;
+      if (listHeight === lastListHeight) return;
+      lastListHeight = listHeight;
+      animateHeightFrom(scroller.getBoundingClientRect().height);
+    });
+    observer.observe(list);
+    const stop = window.setTimeout(() => observer.disconnect(), 600);
+    return () => {
+      window.clearTimeout(stop);
+      observer.disconnect();
+    };
+  }, [resultsPage]);
 
   const handlePrevResultsPage = () => {
     if (hasPrevResultsPage) goToResultsPage(resultsPage - 1);
@@ -1763,13 +1861,19 @@ function SearchBar({
                                   height={48}
                                 />
                               </div>
+                            ) : !searchPosterSrc(item) ? (
+                              <div className="flex h-16 w-12 items-center justify-center rounded-lg border border-white/10 bg-neutral-900 text-white/25 shadow-lg transition-colors group-hover:border-white/20">
+                                {item.media_type === "person" ? (
+                                  <UserRound className="h-5 w-5" aria-hidden="true" />
+                                ) : item.media_type === "tv" ? (
+                                  <TvIcon className="h-5 w-5" aria-hidden="true" />
+                                ) : (
+                                  <FilmIcon className="h-5 w-5" aria-hidden="true" />
+                                )}
+                              </div>
                             ) : (
                               <OptimizedImage
-                                src={
-                                  item.poster_path || item.profile_path
-                                    ? `https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`
-                                    : "/default-poster.png"
-                                }
+                                src={searchPosterSrc(item)}
                                 alt={resultLabel}
                                 width={48}
                                 height={64}
@@ -3280,7 +3384,9 @@ function NavbarContent() {
               aria-controls="mobile-navigation-drawer"
               aria-expanded={mobileMenuOpen}
               aria-haspopup="dialog"
-              className="grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              // Mismo botón que búsqueda y alertas: sombra oscura bajo el icono
+              // para que se lea sobre portadas y fondos claros.
+              className="grid h-11 w-11 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-transform duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
             >
               <Menu className="sv-topbar-icon h-6 w-6" strokeWidth={2.2} aria-hidden="true" />
             </button>

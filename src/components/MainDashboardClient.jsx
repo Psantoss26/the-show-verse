@@ -129,6 +129,7 @@ import {
   HERO_LOGO_LANGS,
   preparePreviewBackdrop,
 } from "@/lib/dashboard/media";
+import { fadeInUp, staggerContainer, scaleIn } from "@/lib/motion/revealVariants";
 
 // Constantes para evitar recreación de referencias
 const EMPTY_ARRAY = [];
@@ -281,37 +282,6 @@ async function fetchDashboardJson(url, { timeoutMs = DASHBOARD_FETCH_TIMEOUT_MS,
     window.clearTimeout(timeoutId);
   }
 }
-
-/* =================== ANIMATION VARIANTS =================== */
-const fadeInUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-  },
-};
-
-const staggerContainer = {
-  hidden: { opacity: 1 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.1,
-    },
-  },
-};
-
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.95 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
-  },
-};
-
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
 const useIsMobileLayout = (breakpointPx = 768) => {
@@ -2814,8 +2784,14 @@ export function Row({
         variants={fadeInUp}
         className="relative"
       >
+        {/* El título es el MISMO motion.div (variante scaleIn) que en la fila
+            montada, para que React lo conserve al montar el Swiper. Si aquí
+            fuera un div normal, al montar la fila nacería un motion.div hijo
+            nuevo; con scroll rápido el padre ya ha disparado `whileInView` y
+            framer no propaga la variante a un hijo que llega tarde: el título
+            se quedaba oculto (opacidad 0) para siempre. */}
         {!hideTitle && (
-          <div className="mb-5 px-1 sm:px-0">
+          <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
             {labelText && (
               <div className="flex items-center gap-2 mb-1.5">
                 <div className={`h-px w-8 ${sectionAccent.line}`} />
@@ -2831,7 +2807,7 @@ export function Row({
               href={resolvedSectionHref}
               accent={accent}
             />
-          </div>
+          </motion.div>
         )}
         <div
           aria-hidden="true"

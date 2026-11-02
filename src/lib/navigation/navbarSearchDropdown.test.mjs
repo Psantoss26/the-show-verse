@@ -62,3 +62,19 @@ test("la etiqueta de resultados de búsqueda para actores es 'Actor' y no 'Actor
   assert.match(i18n, /search_badge_actor:\s*"Actor"/);
 });
 
+
+test("la vista previa móvil se abre por encima del desplegable de resultados", async () => {
+  // EL FALLO: el desplegable va a z-[99999] y la vista previa de pulsación
+  // larga solo subía por encima (PEEK_OVER_PAGE_Z) desde modales o menús; desde
+  // un resultado se abría a z-9999 y quedaba detrás, sin verse.
+  const { isInsidePageOverlay } = await import("../ui/pageModal.js");
+  const nodo = (selectorQueCoincide) => ({
+    closest: (selector) =>
+      selector.split(",").some((s) => s.trim() === selectorQueCoincide)
+        ? {}
+        : null,
+  });
+  assert.equal(isInsidePageOverlay(nodo("[data-search-portal]")), true);
+  assert.equal(isInsidePageOverlay(nodo("[role=\"menu\"]")), true);
+  assert.equal(isInsidePageOverlay(nodo(".otra-cosa")), false);
+});
