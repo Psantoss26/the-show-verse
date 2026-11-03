@@ -241,6 +241,20 @@ export function getPreviewMorphLead(tile) {
       ) || null
   );
 }
+
+// Fija la MISMA hora de inicio en todas las animaciones del despliegue de la
+// vista previa que cuelga de `tile` (capas, radios y texto sobre la imagen).
+// `useNeighborPush` la usa para arrancar la vista previa y las vecinas a la
+// vez sin esperar a que el hilo principal se entere de cuándo empezó.
+export function startPreviewMorphAt(tile, startTime) {
+  const card = tile?.querySelector("[data-preview-glass]")?.parentElement;
+  if (!card) return;
+  for (const animation of card.getAnimations({ subtree: true })) {
+    if (animation.id === MORPH_ID || animation.id === OVERLAY_ID) {
+      animation.startTime = startTime;
+    }
+  }
+}
 const STYLE_PROPS = ["transform", "opacity", "border-radius", "transform-origin"];
 const OVERLAY_ID = "sv-preview-overlay";
 // Lo que tarda en irse el texto sobre la imagen al empezar el cierre: antes de

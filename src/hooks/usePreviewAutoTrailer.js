@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useIsPresent } from "framer-motion";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import {
   PREVIEW_TRAILER_AUTOPLAY_DELAY_MS,
@@ -25,6 +26,18 @@ import {
  *     se vea (el backdrop sigue cubriendo) y se recuerda entre visitas: la
  *     siguiente vez el tráiler bueno es el único intento.
  *
+ *  5. Un iframe que aún no se ve se SUELTA en cuanto el puntero sale de la
+ *     tarjeta (`pointerleave` de `[data-preview-tile]`, antes que cualquier
+ *     cierre), y al empezar a cerrarse la vista previa (sale de su
+ *     <AnimatePresence>) se cancela el autoplay pendiente. Medido en Chrome con
+ *     GPU: al iniciarse, el reproductor de YouTube crea un contexto WebGL en una
+ *     `requestIdleCallback` que bloquea el proceso de GPU de TODO el navegador
+ *     150-200 ms; si coincidía con el cierre (salir ~1 s después de entrar), la
+ *     animación se congelaba ~40 fotogramas. Va en OTRO proceso: desmontarlo al
+ *     empezar el cierre llegaba tarde (medido: su callback saltó 20 ms después).
+ *     Uno que ya se reproduce se deja: ya pasó por ahí y se ve. Si el puntero
+ *     vuelve, el autoplay se arma de nuevo.
+ *
  * `onBeforeOpen`: lo que la tarjeta cierra al abrir el tráiler (el soundtrack).
  * `season`: el tráiler de esa temporada de la serie (Calendario: la del
  * episodio que se estrena), ver previewTrailer.js.
@@ -43,9 +56,13 @@ export default function usePreviewAutoTrailer({
   const [error, setError] = useState("");
   const titleRef = useRef({ id, mediaType, season });
   const onBeforeOpenRef = useRef(onBeforeOpen);
+  // Fuera de un <AnimatePresence> siempre es true.
+  const isPresent = useIsPresent();
+  const presentRef = useRef(isPresent);
   useEffect(() => {
     titleRef.current = { id, mediaType, season };
     onBeforeOpenRef.current = onBeforeOpen;
+    presentRef.current = isPresent;
   });
 
   // Otro título en la misma tarjeta: todo de cero.
@@ -77,8 +94,8 @@ export default function usePreviewAutoTrailer({
         currentId,
         currentSeason,
       );
-      // La tarjeta cambió de título mientras tanto: no es suyo.
-      if (titleRef.current.id !== currentId) return;
+      // La tarjeta cambió de título mientras tanto, o ya se está cerrando.
+      if (titleRef.current.id !== currentId || !presentRef.current) return;
       setTrailer(resolved || null);
       // Sin tráiler no hay aviso: en la preview no tenerlo no es un error.
       setShowTrailer(Boolean(resolved?.key));
@@ -111,8 +128,10 @@ export default function usePreviewAutoTrailer({
     stateRef.current = { showTrailer, trailerLoading };
   });
   const userToggledRef = useRef(false);
+  // Sube cuando el puntero vuelve tras soltar el iframe: rearma el autoplay.
+  const [rearm, setRearm] = useState(0);
   useEffect(() => {
-    if (!autoplay) return undefined;
+    if (!autoplay || !isPresent) return undefined;
     const timer = window.setTimeout(() => {
       const s = stateRef.current;
       if (!userToggledRef.current && !s.showTrailer && !s.trailerLoading) {
@@ -120,7 +139,7 @@ export default function usePreviewAutoTrailer({
       }
     }, PREVIEW_TRAILER_AUTOPLAY_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [autoplay, openTrailer, id]);
+  }, [autoplay, openTrailer, id, isPresent, rearm]);
 
   const handleUnavailable = useCallback(() => {
     const { id: currentId, mediaType: currentType, season: currentSeason } =
@@ -150,6 +169,35 @@ export default function usePreviewAutoTrailer({
     onUnavailable: handleUnavailable,
     onPlaying: handlePlaying,
   });
+
+  // Iframe aún tapado por el backdrop: fuera en cuanto el puntero deja la
+  // tarjeta, o como tarde al empezar el cierre (ver punto 5 arriba). Sin cambio
+  // visible. `about:blank` lo descarga en el acto, sin esperar al render.
+  useEffect(() => {
+    if (!showTrailer || trailerPlaying) return undefined;
+    const tile = iframeRef.current?.closest("[data-preview-tile]");
+    if (!tile) return undefined;
+    const onLeave = () => {
+      if (userToggledRef.current) return;
+      if (iframeRef.current) iframeRef.current.src = "about:blank";
+      setShowTrailer(false);
+      setTrailerLoading(false);
+      tile.addEventListener(
+        "pointerenter",
+        () => {
+          if (presentRef.current) setRearm((n) => n + 1);
+        },
+        { once: true },
+      );
+    };
+    tile.addEventListener("pointerleave", onLeave);
+    return () => tile.removeEventListener("pointerleave", onLeave);
+  }, [showTrailer, trailerPlaying, trailer?.key, iframeRef]);
+  useEffect(() => {
+    if (isPresent || trailerPlaying) return;
+    setShowTrailer(false);
+    setTrailerLoading(false);
+  }, [isPresent, trailerPlaying]);
 
   // Cerrar/abrir a mano cancela el autoplay pendiente.
   const setShowTrailerByUser = useCallback((value) => {
