@@ -35,6 +35,7 @@ import {
   saveNeuralPreferences,
 } from "@/lib/profile/neuralPreferences";
 import { prefetchNeuralGraph } from "@/lib/profile/neuralGraphData";
+import { HEADER_MORPH_EASING, HEADER_MORPH_MS, morphProfileHeader } from "@/lib/profile/headerMorph";
 import NeuralGraphSkeleton from "@/components/profile/neural/NeuralGraphSkeleton";
 import NeuralPreviewCard from "@/components/profile/neural/NeuralPreviewCard";
 import ProGate from "@/components/billing/ProGate";
@@ -161,9 +162,9 @@ function ProfilePendingSurface() {
 // Utilidades de presentación
 // ─────────────────────────────────────────────
 
-function ProfileAvatar({ user, size = "h-22 w-22 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26" }) {
+function ProfileAvatar({ user, size = "h-22 w-22 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26", morph }) {
   return (
-    <div className={`flex ${size} items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-3xl font-black text-white ring-2 ring-white/10`}>
+    <div data-header-morph={morph} className={`flex ${size} items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-3xl font-black text-white ring-2 ring-white/10`}>
       <Avatar
         src={user?.avatarUrl}
         name={user?.displayName || user?.username}
@@ -173,12 +174,13 @@ function ProfileAvatar({ user, size = "h-22 w-22 @[640px]/detail-page:h-26 @[640
   );
 }
 
-function CountStat({ value, label, href, icon, iconClassName = "text-emerald-400", entranceDelay = null, dense = false }) {
+function CountStat({ value, label, href, icon, iconClassName = "text-emerald-400", entranceDelay = null, dense = false, morph }) {
   // La tarjeta compartida de las cabeceras (mini tarjeta en móvil). Sin
   // cristal, como ha sido siempre en el Perfil. Crece en su turno de la entrada
   // (`entranceDelay`, ms), como las de Favoritos.
   return (
     <div
+      data-header-morph={morph}
       className={`min-w-0${entranceDelay == null ? "" : " sv-section-stat-in"}`}
       style={entranceDelay == null ? undefined : { "--sv-enter-delay": `${entranceDelay}ms` }}
     >
@@ -198,7 +200,7 @@ function CountStat({ value, label, href, icon, iconClassName = "text-emerald-400
 
 // Tarjeta de recuento en píldora, para la cabecera compacta de la vista neuronal.
 // Mismo icono y color que CountStat; en móvil solo icono y número.
-function CompactCount({ value, label, href, icon: Icon, iconClassName }) {
+function CompactCount({ value, label, href, icon: Icon, iconClassName, morph }) {
   const className = "inline-flex h-8 items-center gap-1.5 rounded-full bg-gradient-to-br from-white/10 to-white/5 px-2.5 text-xs shadow-lg transition hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70";
   const body = (
     <>
@@ -209,13 +211,13 @@ function CompactCount({ value, label, href, icon: Icon, iconClassName }) {
   );
   if (href) {
     return (
-      <Link href={href} className={className} aria-label={`${value ?? 0} ${label}`}>
+      <Link href={href} data-header-morph={morph} className={className} aria-label={`${value ?? 0} ${label}`}>
         {body}
       </Link>
     );
   }
   return (
-    <span className={className} aria-label={`${value ?? 0} ${label}`}>
+    <span data-header-morph={morph} className={className} aria-label={`${value ?? 0} ${label}`}>
       {body}
     </span>
   );
@@ -804,7 +806,6 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   // Cabecera compacta: solo en la vista neuronal, para que el lienzo gane alto.
   // Por defecto compacta; la preferencia guardada se aplica antes de pintar.
   const [neuralHeaderCollapsed, setNeuralHeaderCollapsed] = useState(NEURAL_DEFAULTS.headerCollapsed);
-  const [headerAnimating, setHeaderAnimating] = useState(false);
   const router = useRouter();
   const isBackNav = useIsHistoryNavigation();
   // Entrada del perfil (cabecera, pestañas, contenido): solo al ENTRAR. Al
@@ -841,15 +842,31 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   const [pendingTab, setPendingTab] = useState(null);
   const tab = pendingTab || routeTab;
   const compactHeader = tab === "neuronal" && neuralHeaderCollapsed;
-  // Cualquier cambio de la cabecera (botón o cambio de pestaña) se anima con
-  // recorte, para que no asome el contenido mientras crece o encoge.
+  // Cualquier cambio de la cabecera (botón o cambio de pestaña) se anima como
+  // un morph entre las dos cabeceras (ver `morphProfileHeader`). En efecto de
+  // layout: el DOM ya está en el estado final y se anima ANTES de pintarlo.
   const previousCompactRef = useRef(compactHeader);
-  useEffect(() => {
+  const headerBoxRef = useRef(null);
+  const compactLayerRef = useRef(null);
+  const fullLayerRef = useRef(null);
+  const cancelHeaderMorphRef = useRef(null);
+  useLayoutEffect(() => {
     if (previousCompactRef.current === compactHeader) return;
     previousCompactRef.current = compactHeader;
+    cancelHeaderMorphRef.current?.();
+    cancelHeaderMorphRef.current = null;
+    const box = headerBoxRef.current;
+    const compactLayer = compactLayerRef.current;
+    const fullLayer = fullLayerRef.current;
+    if (!box || !compactLayer || !fullLayer) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    setHeaderAnimating(true);
+    cancelHeaderMorphRef.current = morphProfileHeader({
+      box,
+      incoming: compactHeader ? compactLayer : fullLayer,
+      outgoing: compactHeader ? fullLayer : compactLayer,
+    });
   }, [compactHeader]);
+  useEffect(() => () => cancelHeaderMorphRef.current?.(), []);
 
   // Preferencia guardada de la cabecera compacta (por cuenta). Antes del primer
   // pintado se aplica SIN animación —ni recorte—: es el estado de partida, no un
@@ -1119,38 +1136,46 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
       <ProfileBackdrop />
 
       <div
-        className={`relative z-10 mx-auto max-w-[1600px] px-4 pb-8 pt-4 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none @[640px]/detail-page:px-6 @[640px]/detail-page:pb-8 @[1024px]/detail-page:px-8 @[1024px]/detail-page:pb-12 ${
+        className={`relative z-10 mx-auto max-w-[1600px] px-4 pb-8 pt-4 transition-[padding] duration-(--sv-header-morph-ms) ease-(--sv-header-morph-easing) motion-reduce:transition-none @[640px]/detail-page:px-6 @[640px]/detail-page:pb-8 @[1024px]/detail-page:px-8 @[1024px]/detail-page:pb-12 ${
           compactHeader ? "@[640px]/detail-page:pt-4" : "@[640px]/detail-page:pt-8 @[1024px]/detail-page:pt-12"
         }`}
+        // Márgenes de cabecera y pestañas con la misma curva que el morph.
+        style={{ "--sv-header-morph-ms": `${HEADER_MORPH_MS}ms`, "--sv-header-morph-easing": HEADER_MORPH_EASING }}
       >
-        {/* ── CABECERA COMPACTA (vista neuronal) ──
-            Una fila con avatar y nombre en lugar de la cabecera completa. Se
-            pliega y despliega con filas de rejilla (0fr ↔ 1fr), que animan la
-            ALTURA real: el lienzo de la vista neuronal crece a la vez. */}
+        {/* ── CABECERA (completa y compacta) ──
+            Las dos están montadas y superpuestas: la activa ocupa sitio y la
+            otra queda encima, absoluta e invisible. El cambio lo anima
+            `morphProfileHeader` (altura de la caja, fundido y viaje de avatar,
+            nombre y tarjetas). */}
+        <div ref={headerBoxRef} className="relative">
+        {/* Compacta (vista neuronal): una fila con avatar, nombre y recuentos. */}
         <div
+          ref={compactLayerRef}
           aria-hidden={!compactHeader}
           inert={!compactHeader || undefined}
-          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-            compactHeader ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-          }`}
+          className={compactHeader ? "" : "pointer-events-none absolute inset-x-0 top-0 opacity-0"}
         >
-          <div className="min-h-0 overflow-hidden">
             <div className="flex items-center gap-3 py-1.5">
-              <ProfileAvatar user={user} size="h-8 w-8 shrink-0" />
-              <p className="min-w-0 flex-1 truncate text-sm font-black tracking-tight text-white @[640px]/detail-page:text-base">
-                {user.displayName}<span className="text-emerald-400">.</span>
-                <span className="ml-2 hidden text-xs font-semibold text-zinc-500 @[480px]/detail-page:inline">@{user.username}</span>
+              <ProfileAvatar user={user} size="h-8 w-8 shrink-0" morph="avatar" />
+              {/* El nombre va aparte del @usuario: es lo que viaja desde el
+                  título grande (el @usuario solo se funde). */}
+              <p className="flex min-w-0 flex-1 items-baseline text-sm font-black tracking-tight text-white @[640px]/detail-page:text-base">
+                <span data-header-morph="name" className="min-w-0 truncate">
+                  {user.displayName}<span className="text-emerald-400">.</span>
+                </span>
+                <span className="ml-2 hidden shrink-0 text-xs font-semibold text-zinc-500 @[480px]/detail-page:inline">@{user.username}</span>
               </p>
               {/* Las cuatro tarjetas de recuento, en píldoras. */}
               <div className="flex shrink-0 items-center gap-1.5">
-                <CompactCount value={counts.films} label="Películas" icon={Film} iconClassName="text-sky-400" />
-                <CompactCount value={stats.completedShows} label="Series" icon={CheckCircle2} iconClassName="text-violet-400" />
+                <CompactCount value={counts.films} label="Películas" icon={Film} iconClassName="text-sky-400" morph="stat-0" />
+                <CompactCount value={stats.completedShows} label="Series" icon={CheckCircle2} iconClassName="text-violet-400" morph="stat-1" />
                 <CompactCount
                   value={counts.following}
                   label="Siguiendo"
                   icon={UserRoundCheck}
                   iconClassName="text-emerald-400"
                   href={`/u/${user.username}/following`}
+                  morph="stat-2"
                 />
                 <CompactCount
                   value={counts.followers}
@@ -1158,29 +1183,21 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   icon={Users}
                   iconClassName="text-amber-400"
                   href={`/u/${user.username}/followers`}
+                  morph="stat-3"
                 />
               </div>
             </div>
-          </div>
         </div>
 
-        {/* ── CABECERA ── */}
+        {/* Completa. */}
         <div
+          ref={fullLayerRef}
           aria-hidden={compactHeader}
           inert={compactHeader || undefined}
-          onTransitionEnd={(event) => {
-            if (event.target === event.currentTarget) setHeaderAnimating(false);
-          }}
-          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-            compactHeader ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
-          }`}
+          className={compactHeader ? "pointer-events-none absolute inset-x-0 top-0 opacity-0" : ""}
         >
-          {/* Sin recorte en reposo: los botones y tarjetas tienen sombras y
-              escalado al pasar el ratón que no deben cortarse. Solo recorta
-              plegada o mientras se anima. */}
-          <div className={`min-h-0 ${compactHeader || headerAnimating ? "overflow-hidden" : ""}`}>
         <header className="flex flex-wrap items-center gap-3 @[1024px]/detail-page:flex-nowrap @[1024px]/detail-page:justify-between @[1024px]/detail-page:gap-6">
-          <ProfileAvatar user={user} size={`h-16 w-16 shrink-0 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26${enter("sv-section-header-in")}`} />
+          <ProfileAvatar user={user} size={`h-16 w-16 shrink-0 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26${enter("sv-section-header-in")}`} morph="avatar" />
           <div className={`min-w-0 flex-1 text-left${enter("sv-section-header-in")}`}>
             <ProfileTitleRow
               profile={profile}
@@ -1213,6 +1230,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               icon={Film}
               iconClassName="text-sky-400"
               entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[0]}
+              morph="stat-0"
             />
             <CountStat
               dense={denseStats}
@@ -1221,6 +1239,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               icon={CheckCircle2}
               iconClassName="text-violet-400"
               entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[1]}
+              morph="stat-1"
             />
             <CountStat
               dense={denseStats}
@@ -1230,6 +1249,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               iconClassName="text-emerald-400"
               href={`/u/${user.username}/following`}
               entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[2]}
+              morph="stat-2"
             />
             <CountStat
               dense={denseStats}
@@ -1239,6 +1259,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               iconClassName="text-amber-400"
               href={`/u/${user.username}/followers`}
               entranceDelay={isBackNav ? null : PROFILE_STAT_DELAYS_MS[3]}
+              morph="stat-3"
             />
           </div>
         </header>
@@ -1510,7 +1531,7 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
       // Con la cabecera compacta, el margen superior se iguala al hueco de
       // encima para que la fila compacta quede centrada entre la barra de
       // navegación y las pestañas.
-      className={`flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain transition-[margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] [scrollbar-width:none] [-ms-overflow-style:none] motion-reduce:transition-none [&::-webkit-scrollbar]:hidden ${
+      className={`flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain transition-[margin] duration-(--sv-header-morph-ms) ease-(--sv-header-morph-easing) [scrollbar-width:none] [-ms-overflow-style:none] motion-reduce:transition-none [&::-webkit-scrollbar]:hidden ${
         compact ? "mt-1.5" : "mt-3 @[640px]/detail-page:mt-8"
       }`}
     >

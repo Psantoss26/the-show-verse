@@ -404,6 +404,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
       className="flex min-w-0 items-center justify-between gap-2 @[1024px]/detail-page:justify-start @[1024px]/detail-page:gap-4"
     >
       <h1
+        data-header-morph="name"
         ref={nameRef}
         className="min-w-0 flex-1 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white @[1024px]/detail-page:flex-initial @[640px]/detail-page:text-[clamp(2.25rem,4.1vw,3.5rem)]"
       >
