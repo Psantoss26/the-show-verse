@@ -225,14 +225,35 @@ export default function MobileTitlePeek() {
     leavingRef.current = peek?.leavingTo || null;
   }, [peek]);
   useEffect(() => {
-    if (
-      leavingRef.current &&
-      new URL(leavingRef.current, window.location.origin).pathname === pathname
-    ) {
+    const leaving = leavingRef.current;
+    if (leaving && new URL(leaving, window.location.origin).pathname === pathname) {
+      return;
+    }
+    // Atrás a mitad del relevo (la tarjeta, ya crecida a cabecera, seguía
+    // encima de la ficha): se retira al instante. Con `setPeek(null)` hacía su
+    // animación de salida y volvía a verse la portada encogiéndose hasta la
+    // tarjeta sobre la página recuperada.
+    if (leaving) {
+      endPeekHandoff();
+      removeInstantly();
       return;
     }
     setPeek(null);
-  }, [pathname]);
+  }, [pathname, removeInstantly]);
+  // Atrás ANTES de que la ficha llegue a la ruta (el toque y el gesto de
+  // volver casi a la vez): la ruta no cambia y el efecto anterior no corre.
+  const leavingTo = peek?.leavingTo || null;
+  useEffect(() => {
+    if (!leavingTo) return undefined;
+    const target = new URL(leavingTo, window.location.origin).pathname;
+    const onPopState = () => {
+      if (window.location.pathname === target) return;
+      endPeekHandoff();
+      removeInstantly();
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [leavingTo, removeInstantly]);
 
   // Ida a la ficha: la página de detrás se funde a oscuro (`scrimRef`) y,
   // cuando la ficha ya está en pantalla con su imagen y se ha pintado al
@@ -243,7 +264,6 @@ export default function MobileTitlePeek() {
   const layerRef = useRef(null);
   const scrimRef = useRef(null);
   const leaveFadeRef = useRef(null);
-  const leavingTo = peek?.leavingTo || null;
   useLayoutEffect(() => {
     const scrim = scrimRef.current;
     if (!leavingTo || !scrim || typeof scrim.animate !== "function") return;
