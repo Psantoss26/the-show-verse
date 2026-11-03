@@ -83,6 +83,8 @@ La barra se sigue fijando bajo la barra superior al hacer scroll (`isPinned` de 
 
 Al abrir una ficha (`/details/...`) desde dentro de la app, Next la pinta en el slot `src/app/@overlay/(.)details/...` y **deja montada la página de origen**, que `OverlayRouteHost` oculta con `<Activity mode="hidden">`. Al volver atrás reaparece igual que estaba, sin volver a cargar ni animar. Recargar la URL o entrar por un enlace externo sirve la ficha completa de siempre.
 
+Al reaparecer, React repite los efectos de la página aunque nada haya cambiado. Los de carga que no deben repetirse usan `useRevealSkippedEffect` (`src/lib/navigation/useRevealSkippedEffect.js`): se saltan durante el revelado (`isScreenReveal`) si sus dependencias son las de la última ejecución y esta había terminado. En Descubrir lo usan la lectura de filtros guardados, el catálogo de géneros y plataformas, el vaciado de vistos por cambio de cuenta y la primera tanda: antes, al volver de una ficha, todas las tandas cargadas al desplazarse se sustituían por la primera, la página se encogía y el scroll caía arriba para volver a bajar tanda a tanda.
+
 ### Cómo se abre una ficha (ajustes)
 
 En *Ajustes* (`DetailOpenSettings`) se elige:

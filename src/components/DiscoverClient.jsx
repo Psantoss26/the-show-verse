@@ -32,6 +32,7 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import useCardEntrance from "@/hooks/useCardEntrance";
 import FlipReorder from "@/components/ui/FlipReorder";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { useRevealSkippedEffect } from "@/lib/navigation/useRevealSkippedEffect";
 import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
 import { peekListArtwork, requestListArtwork } from "@/lib/tmdb/artworkBatch";
@@ -1175,7 +1176,10 @@ export default function DiscoverClient() {
   const seenReady =
     seenMode === "all" || (hydrated && (!hasSession || watchedKeys !== null));
 
-  useEffect(() => {
+  // Al volver de una ficha la página reaparece con sus filtros ya puestos:
+  // leerlos otra vez daba listas nuevas (mismo contenido, otra referencia) y
+  // con ellas una carga nueva que sustituía todo lo pintado.
+  useRevealSkippedEffect(() => {
     const savedFilters = loadFiltersFromStorage();
     setContent(savedFilters.content);
     setSortPreset(savedFilters.sortPreset);
@@ -1284,7 +1288,7 @@ export default function DiscoverClient() {
   }
 
   // --- Meta Loader ---
-  useEffect(() => {
+  useRevealSkippedEffect(() => {
     let cancelled = false;
     const ac = new AbortController();
     async function loadMeta() {
@@ -1352,7 +1356,7 @@ export default function DiscoverClient() {
       cancelled = true;
       ac.abort();
     };
-  }, [content]);
+  }, [content], metaReady);
 
   // --- Keyword Search ---
   useEffect(() => {
@@ -1393,8 +1397,9 @@ export default function DiscoverClient() {
     return () => ac.abort();
   }, [seenMode, hasSession, watchedKeys]);
 
-  // Otra cuenta: su historial es otro.
-  useEffect(() => {
+  // Otra cuenta: su historial es otro. (Al reaparecer la cuenta es la misma:
+  // vaciarlo volvía a filtrar «Por ver» / «Vistas» desde la primera tanda.)
+  useRevealSkippedEffect(() => {
     setWatchedKeys(null);
   }, [account?.id]);
 
@@ -1618,7 +1623,9 @@ export default function DiscoverClient() {
 
   // Primera tanda: cada vez que cambian los filtros. Lo anterior sigue a la
   // vista hasta que llega la tanda nueva entera, y se sustituye de golpe.
-  useEffect(() => {
+  // Al volver de una ficha no se repite (si había terminado): se conservan
+  // todas las tandas cargadas y el scroll restaurado sigue teniendo dónde caer.
+  useRevealSkippedEffect(() => {
     if (!filtersReady || !filtersSettled || !seenReady) return;
 
     const ac = new AbortController();
@@ -1662,7 +1669,7 @@ export default function DiscoverClient() {
     debouncedQ,
     imdbActive,
     debouncedImdbRange,
-  ]);
+  ], !loading);
 
   const providersFiltered = useMemo(() => {
     const pq = providerQuery.trim().toLowerCase();
