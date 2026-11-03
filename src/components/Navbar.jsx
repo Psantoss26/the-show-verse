@@ -2780,6 +2780,60 @@ function NavbarContent() {
     return () => document.removeEventListener("pointerdown", fuera);
   }, [desktopSearchOpen, tabletSearchOpen]);
 
+  // TABLET: SECCIONES EN LA BARRA SUPERIOR SI CABEN. Inicio, Películas,
+  // Series, Descubrir y Biblioteca van a la izquierda, tras el botón del menú
+  // lateral, como en escritorio; si chocarían con el grupo de la derecha
+  // (búsqueda, alertas y perfil) se recogen y queda solo el menú. El logo
+  // centrado se mantiene únicamente si cabe ENTRE los dos grupos sin tocarlos.
+  //   "full"     → secciones + logo
+  //   "sections" → secciones, sin logo
+  //   "compact"  → sin secciones (logo centrado, como antes)
+  // Se mide el ancho NATURAL de las secciones (su fila interior es `w-max` y no
+  // depende de si se muestran), así que mostrar u ocultar no cambia la medida
+  // ni hace oscilar el resultado. Las clases que lo aplican van con `md:`: en
+  // teléfono no hay secciones arriba aunque la medida diga otra cosa.
+  const tabletRowRef = useRef(null);
+  const tabletMenuButtonRef = useRef(null);
+  const tabletSectionsInnerRef = useRef(null);
+  const [tabletNavFit, setTabletNavFit] = useState("sections");
+  useLayoutEffect(() => {
+    const row = tabletRowRef.current;
+    const menuButton = tabletMenuButtonRef.current;
+    const sections = tabletSectionsInnerRef.current;
+    const right = mobileRightRef.current;
+    if (!row || !menuButton || !sections || !right) return undefined;
+
+    const GAP = 16; // aire mínimo entre grupos
+    const LOGO_GAP = 32; // con menos, el logo se lee pegado a «Biblioteca»
+    const LOGO_HALF = 28; // el logo mide 56px (ver su <span>)
+    const measure = () => {
+      const style = window.getComputedStyle(row);
+      const rowWidth = row.clientWidth;
+      const leftEnd =
+        parseFloat(style.paddingLeft) + menuButton.offsetWidth + 2 + sections.offsetWidth;
+      const rightStart = rowWidth - parseFloat(style.paddingRight) - right.offsetWidth;
+      const center = rowWidth / 2;
+      const next =
+        leftEnd + LOGO_GAP <= center - LOGO_HALF &&
+        rightStart - LOGO_GAP >= center + LOGO_HALF
+          ? "full"
+          : leftEnd + GAP <= rightStart
+            ? "sections"
+            : "compact";
+      setTabletNavFit((prev) => (prev === next ? prev : next));
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    observer.observe(sections);
+    observer.observe(right);
+    return () => observer.disconnect();
+  }, []);
+  // Con la búsqueda abierta, el campo crece hacia la izquierda sobre ellos.
+  const tabletSectionsShown = tabletNavFit !== "compact" && !tabletSearchOpen;
+  const tabletLogoHidden = tabletSearchOpen || tabletNavFit === "sections";
+
   // Desplegable del perfil: se cierra al pulsar fuera y con Escape, como
   // cualquier menú del sistema.
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -3354,6 +3408,7 @@ function NavbarContent() {
 
         {/* ---------------- Mobile ---------------- */}
         <div
+          ref={tabletRowRef}
           // Con el drawer abierto, la barra entera se recoge: en TABLET el panel
           // también tapa su lado derecho. Se aparta la barra, no solo su bloque
           // de perfil, porque va con `justify-between` y encoger el contenedor
@@ -3377,11 +3432,13 @@ function NavbarContent() {
           data-compact-controls={isImmersiveRoute || isScrolled ? "" : undefined}
         >
           {/* Izquierda: el menú lateral concentra la navegación principal en
-              móvil y evita duplicar Inicio, Películas y Series en la cabecera. */}
+              móvil. En TABLET, si caben (ver `tabletNavFit`), las cinco
+              secciones principales le siguen en la barra, como en escritorio. */}
           <div
             className={`flex flex-shrink-0 origin-left items-center gap-0.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
             <button
+              ref={tabletMenuButtonRef}
               type="button"
               onClick={() => setMobileMenuOpen(true)}
               aria-label={t("open_menu", "Abrir menú")}
@@ -3403,9 +3460,89 @@ function NavbarContent() {
             >
               <SearchIcon className="sv-topbar-icon h-6 w-6" aria-hidden="true" />
             </button>
-            {/* TABLET: la barra se despliega EN LÍNEA, como en escritorio. El
-                ancho deja libre el grupo de la derecha (alertas y perfil); el
-                logo se aparta mientras está abierta porque queda debajo. */}
+            {/* TABLET: secciones principales. Cuando no caben, el envoltorio se
+                queda a ancho 0 (la fila interior conserva su ancho natural para
+                poder medirla) y deja de ser enfocable. */}
+            <div
+              aria-hidden={tabletSectionsShown ? undefined : true}
+              inert={!tabletSectionsShown}
+              className={`hidden overflow-hidden transition-opacity duration-200 motion-reduce:transition-none md:flex ${
+                tabletSectionsShown ? "opacity-100" : "pointer-events-none w-0 opacity-0"
+              }`}
+            >
+              <nav
+                ref={tabletSectionsInnerRef}
+                aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
+                className="flex w-max items-center gap-1 pl-1"
+              >
+                {[
+                  ["/", "nav_home", "Inicio"],
+                  ["/movies", "nav_movies", "Películas"],
+                  ["/series", "nav_series", "Series"],
+                  ["/discover", "nav_discover", "Descubrir"],
+                  ["/biblioteca", "nav_library", "Biblioteca"],
+                ].map(([href, labelKey, fallback]) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    prefetch
+                    {...navPrefetchHandlers(href)}
+                    aria-current={isActive(href) ? "page" : undefined}
+                    className={`${navLinkClass(href)} whitespace-nowrap ${
+                      isActive(href) ? getActiveTabStyle(href) : ""
+                    } ${isScrolled ? "" : "[text-shadow:0_1px_3px_rgba(0,0,0,0.9)]"}`}
+                  >
+                    {t(labelKey, fallback)}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+          </div>
+
+          {/* Centro: el logo lleva al dashboard de Inicio.
+
+              Va CENTRADO EN LA PANTALLA (posición absoluta), no repartiendo el
+              hueco sobrante: así no se desplaza con los controles de los lados. */}
+          <Link
+            href="/"
+            prefetch
+            {...navPrefetchHandlers("/")}
+            aria-label={t("nav_home", "Inicio")}
+            className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass} ${
+              tabletLogoHidden ? "md:pointer-events-none md:opacity-0" : ""
+            }`}
+            aria-hidden={tabletLogoHidden || undefined}
+            tabIndex={tabletLogoHidden ? -1 : undefined}
+          >
+            {/* TAMAÑO REAL DEL LOGO. El PNG lleva mucho margen transparente: su
+                tinta ocupa el 39,6% del ancho y el 34,2% del alto. Por eso la
+                imagen se amplía ×2.8 sobre una caja de 40px —la tinta acaba
+                midiendo ~44×38px, que es el tamaño con el que se diseñó la
+                barra— y el contenedor la RECORTA a 56px: así el botón no invade
+                el sitio del selector aunque la imagen escalada sea mucho más
+                ancha que su marco. */}
+            <span className="flex h-10 w-[56px] items-center justify-center overflow-hidden">
+              <OptimizedImage
+                src="/logo-TSV-sinFondo.png"
+                alt=""
+                width={40}
+                height={40}
+                className="h-full w-[40px] object-contain scale-[2.8] origin-center"
+              />
+            </span>
+          </Link>
+
+          {/* Derecha: alertas y perfil; en TABLET, búsqueda, alertas y perfil,
+              en el mismo orden que en escritorio. */}
+          <div
+            ref={mobileRightRef}
+            className={`flex flex-shrink-0 origin-right items-center gap-2 pr-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
+          >
+            {account ? <TodayNavbarEntry variant="mobile" /> : null}
+            {/* TABLET: la barra se despliega EN LÍNEA, como en escritorio, y
+                crece hacia la izquierda. El ancho deja libres el menú y el resto
+                de este grupo; el logo y las secciones se apartan mientras está
+                abierta porque quedan debajo. */}
             <div
               ref={tabletSearchRef}
               className={`hidden items-center overflow-hidden rounded-full transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:flex ${
@@ -3429,47 +3566,6 @@ function NavbarContent() {
                 </button>
               )}
             </div>
-          </div>
-
-          {/* Centro: el logo lleva al dashboard de Inicio.
-
-              Va CENTRADO EN LA PANTALLA (posición absoluta), no repartiendo el
-              hueco sobrante: así no se desplaza con los controles de los lados. */}
-          <Link
-            href="/"
-            prefetch
-            {...navPrefetchHandlers("/")}
-            aria-label={t("nav_home", "Inicio")}
-            className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass} ${
-              tabletSearchOpen ? "md:pointer-events-none md:opacity-0" : ""
-            }`}
-            aria-hidden={tabletSearchOpen || undefined}
-            tabIndex={tabletSearchOpen ? -1 : undefined}
-          >
-            {/* TAMAÑO REAL DEL LOGO. El PNG lleva mucho margen transparente: su
-                tinta ocupa el 39,6% del ancho y el 34,2% del alto. Por eso la
-                imagen se amplía ×2.8 sobre una caja de 40px —la tinta acaba
-                midiendo ~44×38px, que es el tamaño con el que se diseñó la
-                barra— y el contenedor la RECORTA a 56px: así el botón no invade
-                el sitio del selector aunque la imagen escalada sea mucho más
-                ancha que su marco. */}
-            <span className="flex h-10 w-[56px] items-center justify-center overflow-hidden">
-              <OptimizedImage
-                src="/logo-TSV-sinFondo.png"
-                alt=""
-                width={40}
-                height={40}
-                className="h-full w-[40px] object-contain scale-[2.8] origin-center"
-              />
-            </span>
-          </Link>
-
-          {/* Derecha: alertas y perfil. */}
-          <div
-            ref={mobileRightRef}
-            className={`flex flex-shrink-0 origin-right items-center gap-2 pr-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
-          >
-            {account ? <TodayNavbarEntry variant="mobile" /> : null}
             {profileAuthLoading ? (
               <AlertsMenuBoot variant="mobile" />
             ) : account ? (
