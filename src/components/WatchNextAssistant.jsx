@@ -548,7 +548,7 @@ export default function WatchNextAssistant() {
       />
 
       {/* Barra de conversaciones (escritorio): PANEL INDEPENDIENTE que flota
-          en la zona izquierda, separado de la barra lateral de la app (4rem)
+          en la zona izquierda, separado de la barra lateral de la app (4rem), 20rem de ancho,
           y de la superior, con las cuatro esquinas redondeadas.
           Antes iba pegado a la esquina de la pantalla y por debajo de las dos
           barras: así las tapaba y no se veía el fondo de color detrás de ellas.
@@ -564,7 +564,7 @@ export default function WatchNextAssistant() {
           arriba tras ese desplazamiento; si no cabe todo, desplaza la lista. */}
       <aside
         aria-label="Conversaciones"
-        className={`relative -top-8 isolate z-10 ml-16 hidden h-[min(50rem,90%)] max-h-[calc(100%-7rem)] w-72 shrink-0 flex-col self-center overflow-hidden rounded-[2rem] ${LIQUID_GLASS_BAR} transform-gpu desktop:flex`}
+        className={`relative -top-8 isolate z-10 ml-16 hidden h-[min(50rem,90%)] max-h-[calc(100%-7rem)] w-80 shrink-0 flex-col self-center overflow-hidden rounded-[2rem] ${LIQUID_GLASS_BAR} transform-gpu desktop:flex`}
       >
         <div className="flex items-center gap-3 px-4 pb-4 pt-5">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/10 text-cyan-100">
@@ -601,8 +601,16 @@ export default function WatchNextAssistant() {
         </div>
       </aside>
 
-      {/* Conversación */}
-      <section className="relative z-10 flex min-w-0 flex-1 flex-col">
+      {/* Conversación.
+          CENTRADA EN LA VENTANA (escritorio), no en el hueco a la derecha del
+          panel. Un `pr-` deshace el desplazamiento: el panel y su margen
+          (4rem + 20rem) más la barra lateral de la app (4.5rem) = 28.5rem.
+          `100%` es el ancho de la página (el bloque contenedor del padding):
+          a la sección le quedan 100% − 24rem, y la columna del chat necesita
+          48rem + 2rem de márgenes, así que el `pr-` nunca pasa de
+          100% − 74rem. En pantallas estrechas se reduce (hasta 0) en vez de
+          estrechar el chat: se acerca al centro todo lo que cabe. */}
+      <section className="relative z-10 flex min-w-0 flex-1 flex-col desktop:pr-[clamp(0px,calc(100%-74rem),28.5rem)]">
         {/* Cabecera móvil: título y acciones */}
         <header className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-1 desktop:hidden">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-300/10 text-cyan-100">

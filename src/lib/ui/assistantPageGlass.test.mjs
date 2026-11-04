@@ -74,6 +74,7 @@ test("la barra de conversaciones es un panel independiente, separado de las barr
   // Separada 4rem de la barra lateral,
   // con las cuatro esquinas redondeadas y el cristal de la barra lateral.
   assert.match(aside, /ml-16/);
+  assert.match(aside, /w-80/);
   // Alto según la pantalla (90% con tope de 50rem), centrado a la altura de la
   // barra lateral de la app en vez de estirado de arriba abajo.
   assert.match(aside, /h-\[min\(50rem,90%\)\] max-h-\[calc\(100%-7rem\)\]/);
@@ -85,4 +86,14 @@ test("la barra de conversaciones es un panel independiente, separado de las barr
   // Ya no se cuela bajo las barras de la app: así no les tapa el fondo.
   assert.doesNotMatch(assistant, /desktop:-ml-\[4\.5rem\]|desktop:-mt-\[calc\(4rem/);
   assert.doesNotMatch(aside, /pl-\[4\.5rem\]|pt-\[calc\(4rem/);
+});
+
+test("el chat se centra en la ventana, no en el hueco a la derecha del panel", async () => {
+  const assistant = await readFile(assistantPath, "utf8");
+  // 28.5rem = barra lateral (4.5rem) + margen (4rem) + panel (20rem); el tope
+  // 100% − 74rem evita estrechar la columna de 48rem en pantallas medianas.
+  assert.match(
+    assistant,
+    /<section className="relative z-10 flex min-w-0 flex-1 flex-col desktop:pr-\[clamp\(0px,calc\(100%-74rem\),28\.5rem\)\]">/,
+  );
 });
