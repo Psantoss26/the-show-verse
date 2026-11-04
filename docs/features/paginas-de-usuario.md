@@ -121,6 +121,8 @@ Al abrir una ficha (`/details/...`) desde dentro de la app, Next la pinta en el 
 
 Al reaparecer, React repite los efectos de la página aunque nada haya cambiado. Los de carga que no deben repetirse usan `useRevealSkippedEffect` (`src/lib/navigation/useRevealSkippedEffect.js`): se saltan durante el revelado (`isScreenReveal`) si sus dependencias son las de la última ejecución y esta había terminado. En Descubrir lo usan la lectura de filtros guardados, el catálogo de géneros y plataformas, el vaciado de vistos por cambio de cuenta y la primera tanda: antes, al volver de una ficha, todas las tandas cargadas al desplazarse se sustituían por la primera, la página se encogía y el scroll caía arriba para volver a bajar tanda a tanda.
 
+Los detalles de lista (listas propias, de la comunidad y colecciones) hacen lo mismo: la siembra de la caché antes de pintar (`useRevealSkippedLayoutEffect`, la variante de layout del mismo módulo), la carga inicial y el reinicio de tarjetas pintadas por lotes de `ListDetailsTools` (60 + 60…) se saltan al revelar. Antes, al volver de una ficha tras haber bajado más allá de la primera tanda, la lista de la comunidad volvía a pedir su página 1 y sustituía todas las cargadas, y la rejilla volvía a 60 tarjetas: el título del que se salió desaparecía. La carga inicial solo cuenta como terminada cuando llegó su respuesta (`initialLoadDoneRef`/`loadDoneRef`): si la pantalla se ocultó con ella a medias, se repite.
+
 ### Cómo se abre una ficha (ajustes)
 
 En *Ajustes* (`DetailOpenSettings`) se elige:

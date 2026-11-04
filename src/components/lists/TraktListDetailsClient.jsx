@@ -2,7 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { Heart, Loader2, ExternalLink, ChevronDown, UserRound, ListVideo } from 'lucide-react'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
@@ -20,6 +20,7 @@ import {
     resolveCommunityListDetailsInitialState,
     updateListInIndexCache,
 } from '@/lib/lists/detailsInitialState'
+import { useRevealSkippedEffect, useRevealSkippedLayoutEffect } from '@/lib/navigation/useRevealSkippedEffect'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { requestListArtwork } from '@/lib/tmdb/artworkBatch'
 import { buildListShareCard, buildListShareStory, listNoun, normalizeListShareItem } from '@/lib/lists/shareList'
@@ -29,7 +30,6 @@ const PAGE_SIZE = 48
 // de IMDb (ver `imdbReady`).
 const IMDB_AFTER_ARTWORK_ITEMS = 24
 const TRAKT_LIST_DETAILS_CACHE_TTL_MS = 20 * 60 * 1000
-const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 function getDetailsCacheKey(listId) {
     return getCommunityListDetailsCacheKey(listId)
@@ -118,7 +118,11 @@ export default function TraktListDetailsClient({ username, listId }) {
     // ScrollRestoration recupere la posición, sin romper la hidratación.
     const [state, setState] = useState(() => resolveCommunityListDetailsInitialState(null))
 
-    useClientLayoutEffect(() => {
+    // Al volver de una ficha la página sigue montada (OverlayRouteHost) y React
+    // repite sus efectos al revelarla: ni la caché ni la primera página deben
+    // sustituir lo que ya estaba pintado (todas las tandas cargadas al
+    // desplazarse se cambiaban por la primera y el scroll perdía su sitio).
+    useRevealSkippedLayoutEffect(() => {
         if (!isBackNav) return
         const cached = readDetailsCache(listId)
         if (cached) setState(resolveCommunityListDetailsInitialState(cached))
@@ -128,7 +132,7 @@ export default function TraktListDetailsClient({ username, listId }) {
     // si no la hay, su vista provisional desde el índice de /lists (nombre,
     // descripción, recuento, likes, creador). Antes la página se quedaba vacía
     // hasta que llegaban los datos (2-3 s sin caché).
-    useClientLayoutEffect(() => {
+    useRevealSkippedLayoutEffect(() => {
         if (isBackNav) return
         const cached = readDetailsCache(listId)
         if (cached) {
@@ -178,9 +182,12 @@ export default function TraktListDetailsClient({ username, listId }) {
         [baseApiUrl]
     )
 
-    // Load inicial (page 1)
-    useEffect(() => {
+    // Load inicial (page 1). Si se ocultó a medias, se repite al revelar.
+    const initialLoadDoneRef = useRef(false)
+    useRevealSkippedEffect(() => {
         let cancelled = false
+        initialLoadDoneRef.current = false
+        setLikeReady(false)
         if (!baseApiUrl) return
         // Sin caché se conserva lo sembrado antes de pintar (vista provisional).
         const cached = readDetailsCache(listId)
@@ -207,10 +214,12 @@ export default function TraktListDetailsClient({ username, listId }) {
 
                     writeDetailsCache(listId, nextState)
 
+                    initialLoadDoneRef.current = true
                     setState(nextState)
                     setLikeReady(true)
                 } catch (e) {
                     if (cancelled) return
+                    initialLoadDoneRef.current = true
                     setLikeReady(true)
                     setState((p) => ({
                         ...p,
@@ -228,9 +237,8 @@ export default function TraktListDetailsClient({ username, listId }) {
 
         return () => {
             cancelled = true
-            setLikeReady(false)
         }
-    }, [baseApiUrl, fetchPage, username, listId])
+    }, [baseApiUrl, fetchPage, username, listId], initialLoadDoneRef.current)
 
     // Lo que confirma el servidor al dar o quitar el me gusta se guarda en la
     // lista, en su caché (para volver) y en el índice de /lists (recuento).

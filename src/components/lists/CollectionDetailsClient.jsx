@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
+import { useRevealSkippedEffect, useRevealSkippedLayoutEffect } from '@/lib/navigation/useRevealSkippedEffect'
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { Banknote, Clock3, ExternalLink, Film, Heart } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
@@ -36,7 +37,6 @@ import { pickCollectionCoverBackdrop } from '@/lib/lists/coverBackdrop'
 import { buildListShareCard, buildListShareStory, listYearSpan, normalizeListShareItem } from '@/lib/lists/shareList'
 
 const COLLECTION_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000
-const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 
 function readCollectionDetailsCache(collectionId) {
@@ -168,7 +168,10 @@ export default function CollectionDetailsClient({ collectionId }) {
     // altura completa de la colección.
     const [state, setState] = useState(() => resolveCollectionDetailsInitialState(null))
 
-    useClientLayoutEffect(() => {
+    // Al volver de una ficha la página sigue montada (OverlayRouteHost) y React
+    // repite sus efectos al revelarla: ni la caché ni la respuesta nueva deben
+    // sustituir lo que ya estaba pintado.
+    useRevealSkippedLayoutEffect(() => {
         if (!isBackNav) return
         const cached = readCollectionDetailsCache(collectionId)
         if (cached) setState(resolveCollectionDetailsInitialState(cached))
@@ -178,7 +181,7 @@ export default function CollectionDetailsClient({ collectionId }) {
     // o, si no la hay, su vista provisional desde el índice de /lists (nombre,
     // póster, recuento). Antes la página se quedaba vacía hasta que llegaban
     // los datos (2-3 s sin caché).
-    useClientLayoutEffect(() => {
+    useRevealSkippedLayoutEffect(() => {
         if (isBackNav) return
         const cached = readCollectionDetailsCache(collectionId)
         if (cached) {
@@ -246,8 +249,10 @@ export default function CollectionDetailsClient({ collectionId }) {
         document.title = formatPageTitle(collection?.name || 'Colección')
     }, [collection?.name])
 
-    useEffect(() => {
+    const loadDoneRef = useRef(false)
+    useRevealSkippedEffect(() => {
         let cancelled = false
+        loadDoneRef.current = false
         if (!collectionId) return
         // Sin caché se conserva lo sembrado antes de pintar (vista provisional);
         // volver a un estado vacío dejaba la pantalla en blanco hasta la red.
@@ -272,9 +277,11 @@ export default function CollectionDetailsClient({ collectionId }) {
                 }
 
                 writeCollectionDetailsCache(collectionId, nextState)
+                loadDoneRef.current = true
                 setState(nextState)
             } catch (e) {
                 if (cancelled) return
+                loadDoneRef.current = true
                 setState((p) => ({
                     loading: false,
                     error: e?.message || 'Error al cargar la colección',
@@ -287,7 +294,7 @@ export default function CollectionDetailsClient({ collectionId }) {
         return () => {
             cancelled = true
         }
-    }, [collectionId])
+    }, [collectionId], loadDoneRef.current)
 
     const { parts } = state
     const tmdbUrl = useMemo(

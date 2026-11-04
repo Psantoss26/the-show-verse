@@ -1,7 +1,7 @@
 // /src/app/lists/[listId]/page.jsx
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from "next/navigation";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { useAuth } from '@/context/AuthContext'
@@ -21,6 +21,7 @@ import {
     shouldRenderCachedListDuringAuthHydration,
 } from '@/lib/lists/detailsInitialState'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
+import { useRevealSkippedEffect, useRevealSkippedLayoutEffect } from '@/lib/navigation/useRevealSkippedEffect'
 import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
 import { buildListShareCard, buildListShareStory, normalizeListShareItem } from '@/lib/lists/shareList'
@@ -56,7 +57,6 @@ import {
     UsersRound,
 } from 'lucide-react'
 
-const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 // --- COMPONENTES UI ---
 
@@ -221,7 +221,10 @@ export default function ListDetailsPage() {
     const [editInCommunity, setEditInCommunity] = useState(false)
     const [savingEdit, setSavingEdit] = useState(false)
 
-    useClientLayoutEffect(() => {
+    // Al volver de una ficha la página sigue montada (OverlayRouteHost) y React
+    // repite sus efectos al revelarla: ni la caché ni la recarga deben
+    // sustituir lo que ya estaba pintado.
+    useRevealSkippedLayoutEffect(() => {
         if (!isBackNav) return
         const cached = readTmdbListDetailsCache(listId)
         if (!cached) return
@@ -236,7 +239,7 @@ export default function ListDetailsPage() {
     // descripción, recuento, visibilidad). Antes la página se quedaba vacía
     // hasta tener sesión y datos. `loading` sigue en true: solo los títulos
     // esperan a la red.
-    useClientLayoutEffect(() => {
+    useRevealSkippedLayoutEffect(() => {
         if (isBackNav) return
         const cached = readTmdbListDetailsCache(listId)
         const seed = cached || personalListPreviewFromIndex(findListInIndexCache('personal', listId))
@@ -309,10 +312,9 @@ export default function ListDetailsPage() {
         }
     }
 
-    useEffect(() => {
+    useRevealSkippedEffect(() => {
         if (!listId) return
         load()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [listId])
 
     useEffect(() => {

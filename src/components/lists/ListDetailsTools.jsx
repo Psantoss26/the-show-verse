@@ -48,6 +48,7 @@ import {
 } from "@/lib/search/titleMatching";
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
+import { useRevealSkippedEffect } from "@/lib/navigation/useRevealSkippedEffect";
 
 const DETAILS_HREF_RE = /^\/details\/(movie|tv)\/(\d+)(?:[/?#]|$)/;
 // Lo que ha de pasar sin scroll para dar el hover por intencionado: los
@@ -619,7 +620,10 @@ export default function FilterableListItems({
   const posterErrorHandler = (entry) =>
     hideMissingPosters ? () => markPosterBroken(entry.meta.posterPath) : undefined;
 
-  useEffect(() => {
+  // Al volver de una ficha la página sigue montada (OverlayRouteHost) y React
+  // repite este efecto al revelarla: reiniciar a la primera tanda quitaba las
+  // tarjetas ya pintadas y el punto de vuelta desaparecía.
+  useRevealSkippedEffect(() => {
     if (skipInitialResetRef.current) {
       skipInitialResetRef.current = false;
       return;
