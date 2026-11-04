@@ -43,7 +43,7 @@ test("cada sección del desplegable lleva su color", async () => {
 test("el icono se pinta con su color esté activa o no la sección", async () => {
   const navbar = await readFile(navbarPath, "utf8");
 
-  // Igual que «Qué ver con IA», que va siempre en cian: la fila activa ya se
+  // Igual que «Asistente», que va siempre en cian: la fila activa ya se
   // distingue por su fondo y su negrita, no por encender el icono.
   assert.match(navbar, /<Icon className=\{`h-4 w-4 shrink-0 \$\{tone\}`\} \/>/);
   assert.match(navbar, /<Sparkles className="h-4 w-4 shrink-0 text-cyan-400" \/>/);

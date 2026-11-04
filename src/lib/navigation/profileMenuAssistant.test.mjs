@@ -16,7 +16,7 @@ test("el desplegable de Perfil lleva a la página del asistente", async () => {
   const dropdown = profileDropdownBlock(await readFile(navbarPath, "utf8"));
 
   assert.match(dropdown, /<div className="my-2\.5 h-px bg-white\/5" \/>/);
-  assert.match(dropdown, /href="\/assistant"[\s\S]*?Qué ver con IA/);
+  assert.match(dropdown, /href="\/assistant"[\s\S]*?<span className="truncate">Asistente<\/span>/);
   // Cierra el menú al navegar.
   assert.match(dropdown, /href="\/assistant"[\s\S]*?setProfileMenuOpen\(false\)/);
 });
@@ -37,6 +37,6 @@ test("el menú lateral del móvil también enlaza a /assistant", async () => {
   );
   assert.match(
     drawer,
-    /href="\/assistant"[\s\S]*?setMobileMenuOpen\(false\)[\s\S]*?<span>Qué ver con IA<\/span>/,
+    /href="\/assistant"[\s\S]*?setMobileMenuOpen\(false\)[\s\S]*?<span>Asistente<\/span>/,
   );
 });

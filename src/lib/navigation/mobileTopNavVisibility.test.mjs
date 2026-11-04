@@ -23,5 +23,5 @@ test("el navbar móvil deja el asistente en el menú y ya no enlaza Recomendacio
   assert.doesNotMatch(navbar, /href="\/recommendations"/);
   assert.doesNotMatch(mobileNavbar, /WatchNextAssistant/);
   // El asistente es una página: el menú lateral la enlaza.
-  assert.match(navbar, /href="\/assistant"[\s\S]*?<span>Qué ver con IA<\/span>/);
+  assert.match(navbar, /href="\/assistant"[\s\S]*?<span>Asistente<\/span>/);
 });

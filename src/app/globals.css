@@ -1553,6 +1553,53 @@ body {
   }
 }
 
+/* ENTRADAS DE «QUÉ VER CON IA» (/assistant, WatchNextAssistant). En CSS y no
+   en framer por lo mismo que las secciones del dashboard: la página llega
+   pintada del servidor y así arranca en el primer pintado, sin quedarse
+   invisible hasta hidratar. Misma receta que `.sv-details-entry`: relleno
+   `backwards` (un transform que se queda al acabar mantendría la capa
+   promovida y dejaría plano el cristal PARA SIEMPRE), `translate` 2D y el
+   fundido sobre la PROPIA pieza de cristal (panel, caja de texto), nunca sobre
+   un envoltorio suyo, que es lo que lo deja plano mientras dura.
+   El retardo de cada pieza va en `--sv-enter-delay` (inline): cascada al
+   cargar y al cambiar de conversación (React remonta la lista con su `key`). */
+@keyframes sv-assistant-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@keyframes sv-assistant-side-in {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+
+.sv-assistant-rise {
+  animation: sv-assistant-rise 440ms cubic-bezier(0.22, 1, 0.36, 1)
+    var(--sv-enter-delay, 0ms) backwards;
+}
+
+.sv-assistant-side-in {
+  animation: sv-assistant-side-in 520ms cubic-bezier(0.22, 1, 0.36, 1)
+    var(--sv-enter-delay, 0ms) backwards;
+}
+
+.sv-assistant-fade {
+  animation: sv-section-fade-in 320ms ease-out var(--sv-enter-delay, 0ms)
+    backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-assistant-rise,
+  .sv-assistant-side-in,
+  .sv-assistant-fade {
+    animation: none;
+  }
+}
+
 /* PWA INSTALADA EN MÓVIL: SIN SELECCIÓN DE TEXTO NI PULSACIÓN LARGA. Instalada
    debe comportarse como una app nativa: mantener el dedo sobre un título o una
    tarjeta no selecciona texto ni abre el menú de enlace/imagen (iOS). En

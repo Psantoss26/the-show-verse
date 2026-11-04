@@ -30,13 +30,18 @@ test("las recomendaciones son tarjetas de título de la app con ficha rápida", 
     readFile(assistantPath, "utf8"),
     readFile(pagePath, "utf8"),
   ]);
-  assert.match(assistant, /<PosterTile item=\{item\} \/>/);
+  assert.match(assistant, /<PosterTile item=\{\{ \.\.\.item, posterPath: /);
   // Solo el póster: nada de título, año, nota ni motivo debajo.
   const card = assistant.slice(
     assistant.indexOf("function TitleCard"),
-    assistant.indexOf("function AssistantAvatar"),
+    assistant.indexOf("// VISTA DE LISTA"),
   );
   assert.doesNotMatch(card, /item\?\.(title|year|voteAverage|reason)|<p\b/);
+  // Mismo póster por idioma que la lista; hueco del mismo tamaño mientras
+  // llega el lote, no el póster del motor.
+  assert.match(card, /const ladder = useLadderPoster\(type, item\?\.id\);/);
+  assert.match(card, /ladder\.pending \? \(/);
+  assert.match(card, /posterPath: ladder\.path \|\| item\?\.posterPath \|\| null/);
   assert.match(page, /<DetailModalProvider placement="right">/);
 });
 
@@ -102,4 +107,44 @@ test("el chat se centra en la ventana, no en el hueco a la derecha del panel", a
     assistant,
     /<section className="relative z-10 flex min-w-0 flex-1 flex-col desktop:pr-\[clamp\(0px,calc\(100%-74rem\),28\.5rem\)\]">/,
   );
+});
+
+test("vista de lista como la de Favoritos, con selector y preferencia guardada", async () => {
+  const assistant = await readFile(assistantPath, "utf8");
+  const row = assistant.slice(
+    assistant.indexOf("function TitleListRow"),
+    assistant.indexOf("function ViewModeSwitch"),
+  );
+  // La misma fila que Favoritos (TitleRow) con sus datos: duración y géneros,
+  // nota de TMDb y de IMDb, y el mismo clic (ficha rápida / ficha completa).
+  assert.match(row, /<TitleRow/);
+  assert.match(row, /showTitleMeta/);
+  assert.match(row, /showImdb\s+imdbRating=\{imdbRating\}\s+imdbLoading=\{imdbLoading\}/);
+  // Póster (no backdrop) con la escalera de idioma de las tarjetas, por lote;
+  // TitleRow antepone la portada elegida en la ficha.
+  assert.doesNotMatch(row, /media=\{/);
+  assert.match(row, /const ladder = useLadderPoster\(type, item\?\.id\);/);
+  assert.match(row, /posterPath=\{ladder\.pending \? "" : ladder\.path \|\| item\?\.posterPath \|\| ""\}/);
+  assert.match(assistant, /requestListArtwork\(type, id\)/);
+  // Notas de IMDb: el cargador de Favoritos y Pendientes, solo en lista.
+  assert.match(assistant, /useImdbScoreLoader\(\{\s*items: scoreItems,\s*enabled: viewMode === "list",/);
+  assert.match(assistant, /setImdbScores\(readScoreCache\("imdb"\)\)/);
+  assert.match(row, /onClick=\{previewClick\(target, \{ mediaType: type \}\)\}/);
+  assert.match(row, /detail=\{item\?\.reason \|\| null\}/);
+  // Se elige en el panel (escritorio) o con el botón de la cabecera (móvil) y
+  // se recuerda en el dispositivo.
+  assert.match(assistant, /<ViewModeSwitch value=\{viewMode\} onChange=\{setViewMode\} \/>/);
+  assert.match(assistant, /aria-label=\{viewMode === "list" \? "Ver como pósters" : "Ver como lista"\}/);
+  assert.match(assistant, /const VIEW_MODE_KEY = "showverse:assistant:viewMode";/);
+  assert.match(assistant, /<Message\s+message=\{message\}\s+viewMode=\{viewMode\}\s+imdbScores=\{imdbScores\}\s+imdbLoading=\{imdbLoading\}/);
+});
+
+test("la página se llama Asistente", async () => {
+  const [assistant, page] = await Promise.all([
+    readFile(assistantPath, "utf8"),
+    readFile(pagePath, "utf8"),
+  ]);
+  assert.match(page, /title: "Asistente",/);
+  assert.match(assistant, /<h1 className="truncate text-base font-bold text-white">Asistente<\/h1>/);
+  assert.match(assistant, /const activeTitle = empty \? "Asistente"/);
 });

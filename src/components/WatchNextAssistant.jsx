@@ -1,6 +1,6 @@
 "use client";
 
-// «Qué ver con IA» a pantalla completa (/assistant).
+// Asistente («Qué ver con IA») a pantalla completa (/assistant).
 //
 // Antes era un panel modal que el navbar mantenía montado (escritorio: desde el
 // desplegable de Perfil; móvil: una fila del menú lateral). Ahora es una página
@@ -26,6 +26,8 @@ import {
   Brain,
   Dices,
   History,
+  LayoutGrid,
+  List,
   Loader2,
   MessageSquarePlus,
   Sparkles,
@@ -34,9 +36,14 @@ import {
 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
 import PosterTile from "@/components/social/PosterTile";
+import { TitleRow } from "@/components/details/sectionSheet/SectionSheetRows";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import AssistantRoulette from "@/components/assistant/AssistantRoulette";
 import MobileOptionsSheet from "@/components/ui/MobileOptionsSheet";
 import useFitViewportPage from "@/hooks/useFitViewportPage";
+import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
+import { peekListArtwork, requestListArtwork } from "@/lib/tmdb/artworkBatch";
+import { getScoreItemKey, readScoreCache } from "@/lib/userLists/listScoreCache";
 import { LIQUID_GLASS_BAR, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import {
   WELCOME_TEXT,
@@ -58,6 +65,22 @@ const PROMPT_SUGGESTIONS = [
 ];
 
 const QUICK_PICK_PROMPT = "Recomiéndame 3 cosas para ver ahora";
+
+// Vista de las recomendaciones: pósters (rejilla) o lista, como en Favoritos.
+// Preferencia del dispositivo; se lee tras montar (el servidor no la conoce).
+const VIEW_MODE_KEY = "showverse:assistant:viewMode";
+const VIEW_MODES = ["grid", "list"];
+
+function readViewMode() {
+  try {
+    const saved = window.localStorage.getItem(VIEW_MODE_KEY);
+    return VIEW_MODES.includes(saved) ? saved : "grid";
+  } catch {
+    return "grid";
+  }
+}
+
+
 const COMPOSER_MAX_HEIGHT = 160;
 
 function providerLabel(provider) {
@@ -65,6 +88,22 @@ function providerLabel(provider) {
   if (provider === "openai") return "OpenAI";
   if (provider === "ollama") return "Ollama";
   return provider;
+}
+
+// Retardo de entrada para las clases `sv-assistant-*` de globals.css.
+function enterDelay(ms) {
+  return { "--sv-enter-delay": `${Math.max(0, Math.round(ms))}ms` };
+}
+
+// Cascada de los mensajes al abrir una conversación: solo los últimos
+// (los que se ven, porque se abre abajo del todo) entran escalonados; los de
+// más arriba, sin retardo. Los mensajes que llegan después (índice >= `count`)
+// entran sin esperar a nadie.
+const MESSAGE_STAGGER_VISIBLE = 6;
+const MESSAGE_STAGGER_MS = 70;
+function messageDelay(index, count) {
+  if (index >= count) return 0;
+  return Math.max(0, index - (count - MESSAGE_STAGGER_VISIBLE)) * MESSAGE_STAGGER_MS;
 }
 
 function relativeDay(ts) {
@@ -83,15 +122,114 @@ function relativeDay(ts) {
 
 // ---------------------------------------------------------------------------
 
+// Póster con la ESCALERA DE IDIOMA de las tarjetas (en → es → original → sin
+// idioma, lib/tmdb/imageLanguageLadder.js), pedido por lote a
+// /api/tmdb/artwork como en Descubrir. `pending` mientras llega el lote: así
+// no se pinta antes el póster del motor y luego se cambia.
+function useLadderPoster(type, id) {
+  const [ladder, setLadder] = useState(() => peekListArtwork(type, id));
+  useEffect(() => {
+    const peeked = peekListArtwork(type, id);
+    setLadder(peeked);
+    if (peeked !== undefined) return undefined;
+    let alive = true;
+    requestListArtwork(type, id).then((picks) => {
+      if (alive) setLadder(picks ?? null);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [type, id]);
+  return { path: ladder?.poster || null, pending: ladder === undefined };
+}
+
 // Solo el póster: la tarjeta de título de la app (PosterTile), sin título,
 // año, nota ni motivo debajo. El nombre va en el `alt` de la imagen. Al
 // pulsarla, PosterTile abre la ficha rápida (DetailModal, drawer derecho en
 // escritorio); en el móvil DetailModalProvider navega a la ficha completa
 // (DetailsClient) en vez de abrir el modal.
+// PÓSTER con el mismo criterio que la vista de lista: el elegido en la ficha
+// (PosterTile lo antepone solo) y, si no, el de la escalera de idioma. Hasta
+// que llega el lote se pinta un hueco del mismo tamaño en vez del póster del
+// motor, para que no cambie de imagen delante del usuario.
 function TitleCard({ item }) {
+  const type = item?.mediaType === "tv" ? "tv" : "movie";
+  const ladder = useLadderPoster(type, item?.id);
   return (
     <div className="w-[7.5rem] shrink-0 snap-start sm:w-32 desktop:w-auto">
-      <PosterTile item={item} />
+      {ladder.pending ? (
+        <div aria-hidden="true" className="aspect-[2/3] w-full rounded-xl bg-zinc-900 shadow-md" />
+      ) : (
+        <PosterTile item={{ ...item, posterPath: ladder.path || item?.posterPath || null }} />
+      )}
+    </div>
+  );
+}
+
+// VISTA DE LISTA: la misma fila que Favoritos (TitleRow, la de las listas y
+// colecciones) con los mismos datos: año, duración y géneros
+// (`showTitleMeta`), nota de TMDb y nota de IMDb. La PORTADA es un póster con
+// el mismo criterio que las tarjetas: la elegida en la ficha (TitleRow la
+// busca sola) y, si no hay, la de la escalera de idioma. Debajo, el motivo de
+// la recomendación. Mismo clic que el póster: ficha rápida en escritorio,
+// ficha completa en el móvil (lo decide DetailModalProvider).
+function TitleListRow({ item, imdbRating = null, imdbLoading = false }) {
+  const previewClick = usePreviewOpen();
+  const type = item?.mediaType === "tv" ? "tv" : "movie";
+  const ladder = useLadderPoster(type, item?.id);
+  const target = { ...item, media_type: type, poster_path: item?.posterPath || null };
+  return (
+    <TitleRow
+      item={target}
+      mediaType={type}
+      id={item?.id}
+      title={item?.title}
+      year={item?.year ? String(item.year) : ""}
+      voteAverage={item?.voteAverage}
+      href={`/details/${type}/${item?.id}`}
+      prefetch={false}
+      onClick={previewClick(target, { mediaType: type })}
+      showTitleMeta
+      showImdb
+      imdbRating={imdbRating}
+      imdbLoading={imdbLoading}
+      // Mientras llega la escalera: hueco con su esqueleto (""), no el póster
+      // del motor. Sin respuesta del lote, el del motor.
+      posterPath={ladder.pending ? "" : ladder.path || item?.posterPath || ""}
+      posterLoading={ladder.pending}
+      detail={item?.reason || null}
+      // Anillo de color al pasar el ratón, como en Favoritos (en cian).
+      className="relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(34,211,238,0.9)]"
+    />
+  );
+}
+
+// Selector Pósters / Lista (panel de escritorio).
+function ViewModeSwitch({ value, onChange }) {
+  const options = [
+    { id: "grid", label: "Pósters", Icon: LayoutGrid },
+    { id: "list", label: "Lista", Icon: List },
+  ];
+  return (
+    <div role="radiogroup" aria-label="Vista de las recomendaciones" className="grid grid-cols-2 gap-1 rounded-2xl bg-white/[0.05] p-1">
+      {options.map(({ id, label, Icon }) => {
+        const active = value === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(id)}
+            className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-colors ${
+              active ? "bg-cyan-500/25 text-cyan-50" : "text-zinc-400 hover:bg-white/[0.06] hover:text-white"
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -107,7 +245,7 @@ function AssistantAvatar() {
   );
 }
 
-function Message({ message }) {
+function Message({ message, viewMode = "grid", imdbScores = null, imdbLoading = false }) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
@@ -136,7 +274,24 @@ function Message({ message }) {
             {providerLabel(message.provider)}
           </span>
         ) : null}
-        {recs.length ? (
+        {recs.length && viewMode === "list" ? (
+          <div className="mt-3 grid gap-2">
+            {recs.map((item) => {
+              const scoreKey = getScoreItemKey({
+                id: item.id,
+                media_type: item.mediaType === "tv" ? "tv" : "movie",
+              });
+              return (
+                <TitleListRow
+                  key={`${item.mediaType}-${item.id}`}
+                  item={item}
+                  imdbRating={imdbScores?.get(scoreKey) ?? null}
+                  imdbLoading={imdbLoading && !imdbScores?.has(scoreKey)}
+                />
+              );
+            })}
+          </div>
+        ) : recs.length ? (
           <div className="-mx-4 mt-3 flex snap-x gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden desktop:mx-0 desktop:grid desktop:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] desktop:gap-3 desktop:overflow-visible desktop:px-0">
             {recs.map((item) => (
               <TitleCard key={`${item.mediaType}-${item.id}`} item={item} />
@@ -150,7 +305,7 @@ function Message({ message }) {
 
 function TypingIndicator() {
   return (
-    <div className="flex gap-3" role="status" aria-label="El asistente está escribiendo">
+    <div className="sv-assistant-rise flex gap-3" role="status" aria-label="El asistente está escribiendo">
       <AssistantAvatar />
       <div className="flex items-center gap-1 rounded-3xl rounded-tl-lg bg-white/[0.06] px-4 py-3.5">
         {[0, 160, 320].map((delay) => (
@@ -165,20 +320,28 @@ function TypingIndicator() {
   );
 }
 
-function ConversationList({ conversations, activeId, onSelect, onDelete }) {
+function ConversationList({ conversations, loaded, activeId, onSelect, onDelete, baseDelay = 0 }) {
+  // Hasta haber leído las conversaciones guardadas no se pinta NADA: si no,
+  // al cargar la página salía un instante «Tus conversaciones aparecerán
+  // aquí» antes de que llegara la lista (se lee de localStorage tras hidratar).
+  if (!loaded) return null;
   if (!conversations.length) {
     return (
-      <p className="px-3 py-2 text-xs leading-relaxed text-zinc-500">
+      <p className="sv-assistant-fade px-3 py-2 text-xs leading-relaxed text-zinc-500" style={enterDelay(baseDelay)}>
         Tus conversaciones aparecerán aquí. Se guardan en este dispositivo.
       </p>
     );
   }
   return (
     <ul className="space-y-0.5">
-      {conversations.map((c) => {
+      {conversations.map((c, index) => {
         const active = c.id === activeId;
         return (
-          <li key={c.id} className="group/conv relative">
+          <li
+            key={c.id}
+            className="sv-assistant-rise group/conv relative"
+            style={enterDelay(baseDelay + Math.min(index, 8) * 40)}
+          >
             <button
               type="button"
               onClick={() => onSelect(c.id)}
@@ -213,12 +376,21 @@ export default function WatchNextAssistant() {
   const [conversationId, setConversationId] = useState(newConversationId);
   const [messages, setMessages] = useState([]);
   const [conversations, setConversations] = useState([]);
+  const [conversationsLoaded, setConversationsLoaded] = useState(false);
+  // Mensajes que había al abrir la conversación en curso: esos entran en
+  // cascada; los que se añaden luego, uno a uno según llegan.
+  const [entryCount, setEntryCount] = useState(0);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [roulette, setRoulette] = useState(null); // null | items[]
   const [rouletteLoading, setRouletteLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(null);
+  const [viewMode, setViewModeState] = useState("grid");
+  // Notas de IMDb de la vista de lista: el mismo cargador y la misma caché que
+  // Favoritos y Pendientes (lotes, entradas negativas, reintento).
+  const [imdbScores, setImdbScores] = useState(() => new Map());
+  const [imdbLoading, setImdbLoading] = useState(false);
 
   const rootRef = useRef(null);
   const scrollerRef = useRef(null);
@@ -228,7 +400,19 @@ export default function WatchNextAssistant() {
 
   useEffect(() => {
     setConversations(readConversations());
+    setConversationsLoaded(true);
+    setViewModeState(readViewMode());
+    setImdbScores(readScoreCache("imdb"));
   }, []);
+
+  const setViewMode = (mode) => {
+    setViewModeState(mode);
+    try {
+      window.localStorage.setItem(VIEW_MODE_KEY, mode);
+    } catch {
+      // Sin almacenamiento: la vista vale mientras la página esté abierta.
+    }
+  };
 
   // Guardar la conversación en curso en cuanto el usuario ha escrito algo.
   useEffect(() => {
@@ -306,6 +490,30 @@ export default function WatchNextAssistant() {
     return last?.recommendations || [];
   }, [messages]);
 
+  // Títulos de TODA la conversación, en el formato del cargador de notas de
+  // IMDb (`media_type` + `id`, la clave de `getScoreItemKey`). Solo se piden
+  // con la vista de lista, que es la que las enseña.
+  const scoreItems = useMemo(() => {
+    const seen = new Map();
+    for (const message of messages) {
+      for (const item of message.recommendations || []) {
+        const media_type = item?.mediaType === "tv" ? "tv" : "movie";
+        const id = Number(item?.id);
+        if (!Number.isFinite(id)) continue;
+        seen.set(`${media_type}:${id}`, { id, media_type, title: item?.title || "" });
+      }
+    }
+    return [...seen.values()];
+  }, [messages]);
+
+  useImdbScoreLoader({
+    items: scoreItems,
+    enabled: viewMode === "list",
+    frozen: false,
+    setImdbScores,
+    setLoading: setImdbLoading,
+  });
+
   const focusInput = () => {
     // En táctil no se abre el teclado por sorpresa.
     if (window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) {
@@ -325,6 +533,7 @@ export default function WatchNextAssistant() {
     instantScrollRef.current = true;
     setConversationId(newConversationId());
     setMessages([]);
+    setEntryCount(0);
     setInput("");
     setHistoryOpen(false);
     focusInput();
@@ -337,6 +546,7 @@ export default function WatchNextAssistant() {
     instantScrollRef.current = true;
     setConversationId(found.id);
     setMessages(found.messages);
+    setEntryCount(found.messages.length);
     setHistoryOpen(false);
   };
 
@@ -473,7 +683,8 @@ export default function WatchNextAssistant() {
   };
 
   const empty = messages.length === 0;
-  const activeTitle = empty ? "Qué ver con IA" : conversationTitle(messages);
+  const activeTitle = empty ? "Asistente" : conversationTitle(messages);
+  const hasRecommendations = latestRecommendations.length > 0;
 
   const quickActions = (
     <>
@@ -554,18 +765,20 @@ export default function WatchNextAssistant() {
           arriba tras ese desplazamiento; si no cabe todo, desplaza la lista. */}
       <aside
         aria-label="Conversaciones"
-        className={`relative -top-8 isolate z-10 ml-16 hidden h-[min(50rem,90%)] max-h-[calc(100%-7rem)] w-80 shrink-0 flex-col self-center overflow-hidden rounded-[2rem] ${LIQUID_GLASS_BAR} transform-gpu desktop:flex`}
+        // Entra desde la izquierda al cargar; el fundido va en el PROPIO
+        // panel de cristal (ver `.sv-assistant-side-in` en globals.css).
+        className={`sv-assistant-side-in relative -top-8 isolate z-10 ml-16 hidden h-[min(50rem,90%)] max-h-[calc(100%-7rem)] w-80 shrink-0 flex-col self-center overflow-hidden rounded-[2rem] ${LIQUID_GLASS_BAR} transform-gpu desktop:flex`}
       >
-        <div className="flex items-center gap-3 px-4 pb-4 pt-5">
+        <div className="sv-assistant-rise flex items-center gap-3 px-4 pb-4 pt-5" style={enterDelay(80)}>
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/10 text-cyan-100">
             <Bot className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-bold text-white">Qué ver con IA</h1>
+            <h1 className="truncate text-base font-bold text-white">Asistente</h1>
             <p className="truncate text-xs text-zinc-400">Con tus listas, historial y notas</p>
           </div>
         </div>
-        <div className="px-4">
+        <div className="sv-assistant-rise px-4" style={enterDelay(140)}>
           <button
             type="button"
             onClick={startNewConversation}
@@ -577,13 +790,21 @@ export default function WatchNextAssistant() {
           {/* En filas a todo el ancho: en dos columnas no cabían y partían
               el texto en dos líneas. */}
           <div className="mt-2 grid gap-1.5">{quickActions}</div>
+          <div className="mt-4">
+            <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+              Vista
+            </div>
+            <ViewModeSwitch value={viewMode} onChange={setViewMode} />
+          </div>
         </div>
-        <div className="mx-4 mb-1.5 mt-7 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+        <div className="sv-assistant-fade mx-4 mb-1.5 mt-6 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500" style={enterDelay(200)}>
           Recientes
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]">
           <ConversationList
             conversations={conversations}
+            loaded={conversationsLoaded}
+            baseDelay={240}
             activeId={conversationId}
             onSelect={openConversation}
             onDelete={deleteConversation}
@@ -603,15 +824,33 @@ export default function WatchNextAssistant() {
       <section className="relative z-10 flex min-w-0 flex-1 flex-col desktop:pr-[clamp(0px,calc(100%-74rem),28.5rem)]">
         {/* Cabecera móvil: título y acciones */}
         <header className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-1 desktop:hidden">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-300/10 text-cyan-100">
+          <div className="sv-assistant-fade grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-300/10 text-cyan-100">
             <Bot className="h-[18px] w-[18px]" />
           </div>
-          <h1 className="min-w-0 flex-1 truncate text-base font-bold text-white">{activeTitle}</h1>
+          {/* Con `key`: el título se funde de nuevo al cambiar de conversación. */}
+          <h1 key={conversationId} className="sv-assistant-fade min-w-0 flex-1 truncate text-base font-bold text-white">{activeTitle}</h1>
+          {/* Pósters / Lista en el móvil: un botón que alterna, solo cuando
+              hay recomendaciones en la conversación. */}
+          {hasRecommendations ? (
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === "list" ? "grid" : "list")}
+              aria-label={viewMode === "list" ? "Ver como pósters" : "Ver como lista"}
+              className={`sv-assistant-rise grid h-10 w-10 place-items-center rounded-full text-white ${LIQUID_GLASS_PANEL}`}
+            >
+              {viewMode === "list" ? (
+                <LayoutGrid className="h-[18px] w-[18px]" />
+              ) : (
+                <List className="h-[18px] w-[18px]" />
+              )}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setHistoryOpen(true)}
             aria-label="Conversaciones guardadas"
-            className={`grid h-10 w-10 place-items-center rounded-full text-white ${LIQUID_GLASS_PANEL}`}
+            style={enterDelay(60)}
+            className={`sv-assistant-rise grid h-10 w-10 place-items-center rounded-full text-white ${LIQUID_GLASS_PANEL}`}
           >
             <History className="h-[18px] w-[18px]" />
           </button>
@@ -619,7 +858,8 @@ export default function WatchNextAssistant() {
             type="button"
             onClick={startNewConversation}
             aria-label="Conversación nueva"
-            className={`grid h-10 w-10 place-items-center rounded-full text-white ${LIQUID_GLASS_PANEL}`}
+            style={enterDelay(100)}
+            className={`sv-assistant-rise grid h-10 w-10 place-items-center rounded-full text-white ${LIQUID_GLASS_PANEL}`}
           >
             <MessageSquarePlus className="h-[18px] w-[18px]" />
           </button>
@@ -632,35 +872,51 @@ export default function WatchNextAssistant() {
           {roulette ? (
             <AssistantRoulette items={roulette} onBack={() => setRoulette(null)} />
           ) : empty ? (
-            <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-4 py-8">
-              <div className="mb-4 grid h-14 w-14 place-items-center rounded-3xl bg-cyan-300/10 text-cyan-100">
+            // `key` por conversación: «Conversación nueva» vuelve a hacer la
+            // entrada en cascada de la bienvenida.
+            <div key={conversationId} className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-4 py-8">
+              <div className="sv-assistant-rise mb-4 grid h-14 w-14 place-items-center rounded-3xl bg-cyan-300/10 text-cyan-100" style={enterDelay(120)}>
                 <Sparkles className="h-7 w-7" />
               </div>
-              <h2 className="text-2xl font-bold text-white sm:text-3xl">¿Qué te apetece ver?</h2>
-              <p className="mt-2 max-w-lg text-sm leading-relaxed text-zinc-400">{WELCOME_TEXT}</p>
+              <h2 className="sv-assistant-rise text-2xl font-bold text-white sm:text-3xl" style={enterDelay(180)}>¿Qué te apetece ver?</h2>
+              <p className="sv-assistant-rise mt-2 max-w-lg text-sm leading-relaxed text-zinc-400" style={enterDelay(240)}>{WELCOME_TEXT}</p>
               <div className="mt-6 grid gap-2 sm:grid-cols-2">
-                {PROMPT_SUGGESTIONS.map((suggestion) => (
+                {PROMPT_SUGGESTIONS.map((suggestion, index) => (
                   <button
                     key={suggestion}
                     type="button"
                     onClick={() => sendPrompt(suggestion)}
                     disabled={loading}
-                    className="rounded-2xl bg-white/[0.06] px-4 py-3 text-left text-sm text-zinc-200 transition hover:bg-white/[0.1] hover:text-white disabled:opacity-50"
+                    style={enterDelay(300 + index * 50)}
+                    className="sv-assistant-rise rounded-2xl bg-white/[0.06] px-4 py-3 text-left text-sm text-zinc-200 transition hover:bg-white/[0.1] hover:text-white disabled:opacity-50"
                   >
                     {suggestion}
                   </button>
                 ))}
               </div>
-              <div className="mt-4 flex flex-wrap gap-2 desktop:hidden">{quickActions}</div>
+              <div className="sv-assistant-rise mt-4 flex flex-wrap gap-2 desktop:hidden" style={enterDelay(500)}>{quickActions}</div>
             </div>
           ) : (
+            // `key` por conversación: al cambiar de chat la lista se monta de
+            // nuevo y los mensajes que se ven entran en cascada.
             <div
+              key={conversationId}
               className="mx-auto w-full max-w-3xl space-y-6 px-4 pb-6 pt-2 desktop:pt-8"
               aria-live="polite"
             >
               {messages.map((message, index) => (
-                <div key={`${message.at || 0}-${index}`} data-message={message.role}>
-                  <Message message={message} />
+                <div
+                  key={`${message.at || 0}-${index}`}
+                  data-message={message.role}
+                  className="sv-assistant-rise"
+                  style={enterDelay(messageDelay(index, entryCount))}
+                >
+                  <Message
+                    message={message}
+                    viewMode={viewMode}
+                    imdbScores={imdbScores}
+                    imdbLoading={imdbLoading}
+                  />
                 </div>
               ))}
               {loading ? <TypingIndicator /> : null}
@@ -671,7 +927,8 @@ export default function WatchNextAssistant() {
         {/* Caja de texto, fija abajo */}
         <div className="shrink-0 px-3 pb-3 pt-1 desktop:px-6 desktop:pb-5">
           <div
-            className={`relative isolate mx-auto flex w-full max-w-3xl items-end gap-2 rounded-[1.75rem] py-1.5 pl-4 pr-1.5 ${LIQUID_GLASS_PANEL} transform-gpu`}
+            style={enterDelay(160)}
+            className={`sv-assistant-rise relative isolate mx-auto flex w-full max-w-3xl items-end gap-2 rounded-[1.75rem] py-1.5 pl-4 pr-1.5 ${LIQUID_GLASS_PANEL} transform-gpu`}
           >
             <textarea
               ref={inputRef}
@@ -727,6 +984,7 @@ export default function WatchNextAssistant() {
           </button>
           <ConversationList
             conversations={conversations}
+            loaded={conversationsLoaded}
             activeId={conversationId}
             onSelect={openConversation}
             onDelete={deleteConversation}

@@ -3344,7 +3344,7 @@ function NavbarContent() {
                             </Link>
 
 
-                            {/* «Qué ver con IA» es una página propia
+                            {/* El Asistente («Qué ver con IA») es una página propia
                                 (/assistant), ya no un panel que el navbar
                                 tenía que mantener montado. */}
                             <Link
@@ -3359,7 +3359,7 @@ function NavbarContent() {
                               }`}
                             >
                               <Sparkles className="h-4 w-4 shrink-0 text-cyan-400" />
-                              <span className="truncate">Qué ver con IA</span>
+                              <span className="truncate">Asistente</span>
                             </Link>
                           </div>
                         </motion.div>
@@ -4002,7 +4002,7 @@ function NavbarContent() {
                       }`}
                     >
                       <Sparkles className="h-5 w-5 text-cyan-400" />
-                      <span>Qué ver con IA</span>
+                      <span>Asistente</span>
                     </Link>
                   </section>
                 </div>
