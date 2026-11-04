@@ -21,10 +21,6 @@ const watchedControlPath = path.resolve(
   currentDirectory,
   "../../components/trakt/TraktWatchedControl.jsx",
 );
-const recommendationsPath = path.resolve(
-  currentDirectory,
-  "../../app/recommendations/RecommendationsClient.jsx",
-);
 
 test("series and movie mobile action rows share the same button sizing contract", async () => {
   const source = await readFile(componentPath, "utf8");
@@ -57,13 +53,12 @@ test("series and movie mobile action rows share the same button sizing contract"
 });
 
 test("all detail action variants use the shared liquid glass surface", async () => {
-  const [actions, liquidButton, starRating, watchedControl, recommendations] =
+  const [actions, liquidButton, starRating, watchedControl] =
     await Promise.all([
       readFile(componentPath, "utf8"),
       readFile(liquidButtonPath, "utf8"),
       readFile(starRatingPath, "utf8"),
       readFile(watchedControlPath, "utf8"),
-      readFile(recommendationsPath, "utf8"),
     ]);
 
   assert.match(
@@ -94,10 +89,6 @@ test("all detail action variants use the shared liquid glass surface", async () 
   assert.match(
     watchedControl,
     /<LiquidButton[\s\S]*?liquidGlass=\{liquidGlass\}/,
-  );
-  assert.match(
-    recommendations,
-    /function RecommendationActionButton[\s\S]*?<LiquidButton\s+liquidGlass/,
   );
 });
 

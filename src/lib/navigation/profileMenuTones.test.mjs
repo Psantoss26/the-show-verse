@@ -9,7 +9,6 @@ const navbarPath = new URL("../../components/Navbar.jsx", import.meta.url);
 // atados: cambiar el color de una sección en un sitio y no en el otro es
 // exactamente el tipo de deriva que nadie nota hasta que chirría.
 const TONOS = {
-  "/recommendations": "emerald",
   "/social": "pink",
   "/lists": "purple",
   "/calendar": "amber",
@@ -33,13 +32,6 @@ test("cada sección del desplegable lleva su color", async () => {
   const grupos = profileMenuGroupsBlock(navbar);
 
   for (const [href, color] of Object.entries(TONOS)) {
-    if (href === "/recommendations") {
-      assert.match(
-        navbar,
-        /<ThumbsUp className="h-4 w-4 shrink-0 text-emerald-400" \/>/,
-      );
-      continue;
-    }
     const entrada = grupos.match(
       new RegExp(`href: "${href}"[\\s\\S]{0,220}?tone: "([^"]+)"`),
     );

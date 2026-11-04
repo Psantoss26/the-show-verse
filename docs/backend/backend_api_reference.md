@@ -288,10 +288,6 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 | `GET` | `/v1/dashboard/{surface}` | Opcional | Filas del dashboard para `home`, `movies` o `series`. Con sesion añade filas personales. Ver [dashboards-implementation](../architecture/dashboards-implementation.md) |
 | `GET` | `/v1/dashboard/sections/{key}` | Opcional | Lista completa de una seccion (`anticipated`, `for_you`, `trending`) para su pagina "Ver todos" |
 | `GET` | `/v1/calendar/episodes` | Opcional | Proximos episodios. Anonimo: series populares; con sesion prioriza en progreso, favoritos y pendientes. Nunca consulta Trakt |
-| `GET` | `/v1/recommendations?type=all\|movie\|tv&limit=40` | Si | Baraja de la pagina Recomendaciones (deslizar), sin descartados, pendientes ni favoritos |
-| `POST` | `/v1/recommendations/dismiss` | Si | Descarta un titulo |
-| `DELETE` | `/v1/recommendations/dismiss/{mediaType}/{tmdbId}` | Si | Deshace un descarte |
-| `GET` | `/v1/recommendations/dismissed` | Si | Titulos descartados |
 
 ## Notificaciones push
 

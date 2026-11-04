@@ -15,7 +15,6 @@ export const MOBILE_BOTTOM_NAV_ITEMS = [
   { key: "watchlist", href: "/watchlist", labelKey: "nav_watchlist", fallbackLabel: "Pendientes", tone: "blue" },
   { key: "calendar", href: "/calendar", labelKey: "nav_calendar", fallbackLabel: "Calendario", tone: "gold" },
   { key: "recap", href: "/recap", labelKey: "nav_recap", fallbackLabel: "Recap", tone: "lime" },
-  { key: "recommendations", href: "/recommendations", labelKey: "nav_recommendations", fallbackLabel: "Recomendaciones", tone: "green" },
 ];
 
 export const DEFAULT_MOBILE_BOTTOM_NAV = ["social", "lists", "in-progress", "history", "favorites", "watchlist"];
@@ -27,9 +26,14 @@ const itemByKey = new Map(MOBILE_BOTTOM_NAV_ITEMS.map((item) => [item.key, item]
 // había puesto en la barra conserva su configuración con Social en su lugar.
 const LEGACY_KEYS = { today: "social" };
 
-export function sanitizeMobileBottomNav(value) {
-  if (!Array.isArray(value)) return DEFAULT_MOBILE_BOTTOM_NAV;
+// Secciones que ya no existen: se quitan de la barra guardada sin tocar el
+// resto, en vez de devolver la barra entera a la de por defecto.
+const REMOVED_KEYS = new Set(["recommendations"]);
 
+export function sanitizeMobileBottomNav(input) {
+  if (!Array.isArray(input)) return DEFAULT_MOBILE_BOTTOM_NAV;
+
+  const value = input.filter((key) => !REMOVED_KEYS.has(key));
   const hadLegacy = value.some((key) => LEGACY_KEYS[key]);
   const mapped = value.map((key) => LEGACY_KEYS[key] || key);
   const keys = [...new Set(mapped.filter((key) => typeof key === "string" && itemByKey.has(key)))];

@@ -4,7 +4,7 @@ import { createRunLog } from "./schedule";
 
 export const USER_ROUTES = [
   "/", "/favorites", "/watchlist", "/history", "/in-progress", "/completed",
-  "/continue-watching", "/lists", "/recommendations", "/calendar", "/biblioteca",
+  "/continue-watching", "/lists", "/calendar", "/biblioteca",
   "/profile", "/profile/settings", ...["level", "statistics", "activity", "watched", "reviews", "favorites", "watchlist", "ratings", "lists", "social"].map((section) => `/profile/${section}`),
 ];
 const SECTIONS = ["activity", "watched", "reviews", "favorites", "watchlist", "ratings", "lists", "followers", "following"];
@@ -21,7 +21,6 @@ const READS = [
   // más, una por lista (algunas de 1.500 títulos), que en el primer uso se
   // comían el límite de peticiones del backend junto con la navegación.
   "/api/community/lists/discover?sort=items_desc&limit=60&page=1&preview=12",
-  "/api/recommendations?type=all&limit=40", "/api/recommendations?type=movie&limit=40", "/api/recommendations?type=tv&limit=40",
 ];
 
 // Copia en marcha. Si se interrumpe (sin conexión a mitad, la app cerrada), la

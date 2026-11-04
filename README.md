@@ -139,13 +139,9 @@ Cada página personal con su vista predeterminada, buscador, filtros, orden, agr
 </td>
 </tr>
 <tr>
-<td width="50%">
+<td width="50%" colspan="2">
 <img src="docs/assets/readme/biblio.jpg" alt="Biblioteca de Plex">
 <p align="center"><sub><b>Biblioteca</b>: tu servidor Plex</sub></p>
-</td>
-<td width="50%">
-<img src="docs/assets/readme/recs.jpg" alt="Recomendaciones">
-<p align="center"><sub><b>Recomendaciones</b>: desliza para descartar, guardar o marcar favorito</sub></p>
 </td>
 </tr>
 </table>

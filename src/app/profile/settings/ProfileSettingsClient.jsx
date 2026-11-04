@@ -50,7 +50,6 @@ import {
   X,
   Upload,
   Tv,
-  ThumbsUp,
   Users,
   Sparkles,
 } from "lucide-react";
@@ -119,7 +118,6 @@ const MOBILE_BOTTOM_NAV_PREVIEW_ICONS = {
   watchlist: Bookmark,
   calendar: CalendarDays,
   recap: PartyPopper,
-  recommendations: ThumbsUp,
 };
 
 const MOBILE_BOTTOM_NAV_PREVIEW_TONES = {

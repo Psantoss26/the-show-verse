@@ -24,6 +24,10 @@ test("la clave antigua «today» se convierte en Social sin perder la barra", ()
   assert.deepEqual(sanitizeMobileBottomNav(["today", "social", "lists"]), ["social", "lists"]);
 });
 
+test("Recomendaciones (sección retirada) se quita sin perder la barra", () => {
+  assert.deepEqual(sanitizeMobileBottomNav(["recommendations", "lists"]), ["lists"]);
+});
+
 test("desktop side nav hides on dashboards and shows on full-screen pages", async () => {
   const { showsDesktopSideNav } = await import("./mobileBottomNav.js");
   for (const path of ["/", "/movies", "/series/", "/dashboard/trending", "/login", "/embed/details/movie/550"]) {

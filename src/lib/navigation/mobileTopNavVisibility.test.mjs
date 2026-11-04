@@ -8,7 +8,7 @@ const assistantPath = new URL(
   import.meta.url,
 );
 
-test("el navbar móvil da acceso rápido a Recomendaciones y deja el asistente en el menú", async () => {
+test("el navbar móvil deja el asistente en el menú y ya no enlaza Recomendaciones", async () => {
   const [navbar, assistant] = await Promise.all([
     readFile(navbarPath, "utf8"),
     readFile(assistantPath, "utf8"),
@@ -27,10 +27,7 @@ test("el navbar móvil da acceso rápido a Recomendaciones y deja el asistente e
     mobileNavbar,
     /className="p-2 rounded-full text-white hover:bg-white\/10 transition-colors"[\s\S]*?aria-label="Abrir menú"/,
   );
-  assert.match(
-    mobileNavbar,
-    /href="\/recommendations"[\s\S]*?aria-label=\{t\("nav_recommendations", "Recomendaciones"\)\}[\s\S]*?<ThumbsUp/,
-  );
+  assert.doesNotMatch(navbar, /href="\/recommendations"/);
   assert.doesNotMatch(mobileNavbar, /<WatchNextAssistant isMobile heroNavMode/);
   assert.match(
     navbar,

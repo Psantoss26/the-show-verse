@@ -68,6 +68,11 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Secciones retiradas: un enlace guardado o un acceso directo antiguo lleva
+  // al inicio en vez de a un 404.
+  async redirects() {
+    return [{ source: "/recommendations", destination: "/", permanent: true }];
+  },
   experimental: {
     viewTransition: true,
   },

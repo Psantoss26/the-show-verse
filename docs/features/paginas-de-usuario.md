@@ -36,17 +36,6 @@ La lista se carga de 200 en 200 al hacer scroll, pero la cabecera (Vistos, Títu
 
 **Desplegable móvil:** la primera fila lleva Tipo, Agrupar (solo icono y valor) y la papelera del modo borrar; la segunda, Ordenar, los tres modos de vista y, en las vistas de tarjetas y compacta, el botón que alterna póster y backdrop.
 
-## Recomendaciones (deslizar)
-
-`/recommendations` es una baraja de títulos:
-
-- ← izquierda: **descartar**. Se guarda en el backend y vale en todos los dispositivos.
-- → derecha: añadir a **pendientes**.
-- ↑ arriba: añadir a **favoritos**.
-- Botón: añadir a una **lista**.
-
-El backend entrega la baraja ya filtrada (sin descartados, pendientes ni favoritos), así que el cliente solo la consume en orden. Umbrales del gesto en `src/lib/recommendations/swipeDecision.js`. Backend: `/v1/recommendations`.
-
 ## Secciones del dashboard (`/dashboard/[section]`)
 
 Páginas «Ver todos» de *Tendencias*, *Populares*, *Recomendados* y *Más esperadas* (`src/lib/dashboard/sectionItems.js`). La lista llega ya en el RSC, sin esqueletos, y es la misma (mismo orden) que la fila de Inicio. Tienen botón de recargar junto al de volver. Backend: `/v1/dashboard/sections/{key}`. Sin portada propia ni votada, el póster de cada tarjeta sigue la misma escalera de idioma que Favoritos (inglés → español → original → sin idioma, `poster` del lote `/api/tmdb/artwork`), no el es-ES que trae el motor, que solo se usa si la escalera no encuentra ninguno. Las 24 primeras llegan elegidas en el RSC (`lib/dashboard/sectionArtwork.js`, póster y backdrop con el mismo criterio que el lote); el resto, por el lote en tandas de 16, sin pintar el póster del motor mientras se resuelve. Ver [[dashboards-implementation]].

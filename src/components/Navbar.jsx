@@ -42,7 +42,6 @@ import {
   MonitorPlay,
   Eye,
   FolderKanban,
-  ThumbsUp,
   History,
   Trash2,
   Users,
@@ -131,7 +130,6 @@ const MOBILE_BOTTOM_NAV_ICONS = {
   watchlist: Bookmark,
   calendar: CalendarDaysIcon,
   recap: PartyPopper,
-  recommendations: ThumbsUp,
 };
 
 // Lo que dura la salida de la barra lateral de escritorio antes de desmontarse
@@ -2466,8 +2464,7 @@ function NavbarContent() {
   // portada ocupa desde el borde superior y el navbar va TRANSPARENTE encima.
   // Se distingue de la ficha porque allí hay además un velo oscuro de
   // legibilidad; aquí la barra va limpia, sin ningún fondo.
-  const isRecommendationsRoute = /^\/recommendations\/?$/.test(pathname || "");
-  const isImmersiveRoute = isDetailsRoute || isRecommendationsRoute;
+  const isImmersiveRoute = isDetailsRoute;
   // En escritorio, las fichas comparten la entrada transparente de los
   // dashboards: el glass se reserva para cuando el usuario ya ha empezado a
   // desplazarse. En móvil se mantiene la composición específica de la ficha.
@@ -2553,7 +2550,6 @@ function NavbarContent() {
         // móvil, donde no hay hover previo.
         prefetchNavRoute("/movies");
         prefetchNavRoute("/series");
-        prefetchNavRoute("/recommendations");
         prefetchNavRoute("/lists");
         prefetchNavRoute("/social");
         prefetchNavRoute("/in-progress");
@@ -3362,22 +3358,6 @@ function NavbarContent() {
                               <span className="truncate">Recap</span>
                             </Link>
 
-                            <Link
-                              href="/recommendations"
-                              prefetch
-                              {...navPrefetchHandlers("/recommendations")}
-                              role="menuitem"
-                              onClick={() => setProfileMenuOpen(false)}
-                              aria-current={isActive("/recommendations") ? "page" : undefined}
-                              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
-                                isActive("/recommendations")
-                                  ? "bg-white/10 font-bold text-white"
-                                  : "text-zinc-300 hover:bg-white/5 hover:text-white"
-                              }`}
-                            >
-                              <ThumbsUp className="h-4 w-4 shrink-0 text-emerald-400" />
-                              <span className="truncate">Recomendaciones</span>
-                            </Link>
 
                             {/* No es un enlace: abre el recomendador y luego cierra
                                 el menú. El asistente se mantiene montado fuera de
@@ -4024,18 +4004,6 @@ function NavbarContent() {
                       <span>Recap</span>
                     </Link>
 
-                    <Link
-                      href="/recommendations"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                        isActive("/recommendations")
-                          ? "bg-emerald-500/20 text-emerald-300 font-bold"
-                          : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                      }`}
-                    >
-                      <ThumbsUp className="h-5 w-5 text-emerald-400" />
-                      <span>{t("nav_recommendations", "Recomendaciones")}</span>
-                    </Link>
 
                     <WatchNextAssistant isMobile triggerVariant="drawer" />
                   </section>

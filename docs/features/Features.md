@@ -16,7 +16,7 @@ aliases: [Funcionalidades, Features MOC]
 | [[comunidad]] | Comentarios y reseñas, sentimiento, listas de la comunidad, «me gusta», «Tus amigos». |
 | [[recap-anual]] | «Tu año en The Show Verse» (`/recap`). |
 | [[detecciones-streaming]] | Detecciones de la extensión y la app Android, corrección y aprendizaje. |
-| [[paginas-de-usuario]] | Continuar viendo, Completadas, Recomendaciones (deslizar), exportación, importaciones y fichas en overlay. |
+| [[paginas-de-usuario]] | Continuar viendo, Completadas, exportación, importaciones y fichas en overlay. |
 | [[planes-y-suscripciones]] | Planes Gratis, Sin anuncios y Pro: `/planes`, Ajustes → Suscripción, bloqueos Pro, anuncios y Stripe. |
 | [[vista-previa-movil]] | Vista previa al mantener pulsada una tarjeta en el móvil: portada con logo, botones y puntuaciones. |
 | [[modo-ligero]] | Modo ligero: sin desenfoques de cristal solo en los dispositivos que van a tirones; Ajustes → Efectos visuales. |

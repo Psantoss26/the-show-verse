@@ -142,16 +142,8 @@ const RULES = [
     icon: "unwatched", label: "Historial", text: "Visionado eliminado del historial",
   })],
 
-  // ── Continuar viendo y recomendaciones ──────────────────────────────────
+  // ── Continuar viendo ──────────────────────────────────────────────────
   ["DELETE", /^\/api\/progress$/, () => ({ icon: "progress", label: "Continuar viendo", text: "Quitado de Continuar viendo" })],
-  ["POST", /^\/api\/recommendations\/dismiss$/, (_, b) => ({
-    icon: "dismiss", label: "Recomendaciones", text: "No te lo volveremos a recomendar",
-    ...titleRef(b, { tmdbId: b.tmdbId, mediaType: mediaTypeOf(b.mediaType) }),
-  })],
-  ["DELETE", /^\/api\/recommendations\/dismiss\/(movie|tv)\/(\d+)$/, (m) => ({
-    icon: "recommend", label: "Recomendaciones", text: "Vuelve a tus recomendaciones",
-    ...titleRef({}, { tmdbId: m[2], mediaType: m[1] }),
-  })],
 
   // ── Listas ──────────────────────────────────────────────────────────────
   ["POST", /^\/api\/lists$/, (_, b) => ({
