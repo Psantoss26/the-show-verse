@@ -4,6 +4,11 @@ import { sendEmbeddedDetailsAction } from "../navigation/embeddedDetails";
 import { useRouter as useNextRouter } from "next/navigation";
 import { isServerReachable } from "./client.js";
 import { openSavedRoute } from "./navigation.js";
+import {
+  isDetailsNavigation,
+  navigateWithCleanBackCapture,
+  usesBackGestureCapture,
+} from "../navigation/backGestureCapture.js";
 
 export function useRouter() {
   const router = useNextRouter();
@@ -11,7 +16,14 @@ export function useRouter() {
     ...router,
     push(href, options) {
       if (sendEmbeddedDetailsAction("navigate", href)) return;
-      if (isServerReachable()) return router.push(href, options);
+      if (isServerReachable()) {
+        // A una ficha en el teléfono: que el gesto de atrás vuelva a esta
+        // página tal cual (ver lib/navigation/backGestureCapture).
+        if (usesBackGestureCapture() && isDetailsNavigation(href)) {
+          return navigateWithCleanBackCapture(() => router.push(href, options));
+        }
+        return router.push(href, options);
+      }
       return openSavedRoute(href, { navigate: (path) => router.push(path, options) });
     },
     replace(href, options) {

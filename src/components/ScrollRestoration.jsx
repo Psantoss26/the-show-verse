@@ -9,6 +9,7 @@ import {
 } from "@/lib/hooks/useIsHistoryNavigation";
 import { installPageImageRetention } from "@/lib/images/retainPageImages";
 import { isOverlayOpen } from "@/components/navigation/OverlayRouteHost";
+import { isCleanBackEntry } from "@/lib/navigation/backGestureCapture";
 
 const STORAGE_PREFIX = "showverse:scroll-position:";
 const HISTORY_NAVIGATION_MARKER_KEY = "showverse:pending-history-navigation";
@@ -256,7 +257,13 @@ export default function ScrollRestoration() {
       // con `router.replace`, que se tomaba por vuelta atrás si se había
       // vuelto hacía menos de 30 s (la ficha restauraba un scroll viejo).
       historyNavigationUntilRef.current = 0;
-      const result = originalPushState.apply(this, args);
+      // Desde la entrada de captura limpia (lib/navigation/backGestureCapture)
+      // la navegación la SUSTITUYE: el historial queda página → destino.
+      const url = args[2];
+      const result =
+        url != null && url !== "" && isCleanBackEntry()
+          ? originalReplaceState.apply(this, args)
+          : originalPushState.apply(this, args);
       syncHistoryPage();
       return result;
     };

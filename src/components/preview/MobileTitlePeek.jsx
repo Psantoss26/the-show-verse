@@ -52,6 +52,12 @@ import {
   revealPeekHandoffParts,
   settlePeekCard,
 } from "@/lib/navigation/peekHandoff";
+import {
+  holdCleanBackEntry,
+  isCleanBackEntry,
+  isDetailsNavigation,
+  pushCleanBackEntry,
+} from "@/lib/navigation/backGestureCapture";
 
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { PEEK_OVER_PAGE_Z, isInsidePageOverlay } from "@/lib/ui/pageModal";
@@ -168,18 +174,12 @@ function waitForKeyboardClose(done) {
   };
 }
 
-// ENTRADA DE HISTORIAL DE LA VISTA PREVIA. Con el gesto de atrás de Android,
-// Chrome no enseña la página de destino sino una captura que hizo al salir de
-// ella (en cada `pushState`, del último fotograma pintado). Si se salía a la
-// ficha desde la vista previa, la captura de la página llevaba la vista previa
-// encima; y Chrome la conserva: volver con el gesto, aún después de salir de
-// nuevo con un toque normal, enseñaba la vista previa un instante. Ahora, al
-// abrirse (con la página aún limpia), la vista previa empuja una entrada con
-// la MISMA URL: la captura de la página es la buena. Ir a la ficha SUSTITUYE
-// esa entrada (`router.replace`, sin captura nueva); cerrarla la deshace
-// (`history.back()`), y el gesto de atrás con ella abierta la cierra.
-const PEEK_HISTORY_KEY = "svTitlePeek";
-const isPeekHistoryEntry = () => Boolean(window.history.state?.[PEEK_HISTORY_KEY]);
+// ENTRADA DE HISTORIAL DE LA VISTA PREVIA (ver lib/navigation/
+// backGestureCapture): al abrirse, con la página aún sin ella, empuja una
+// entrada con la misma URL, así que la captura que Chrome enseña con el gesto
+// de atrás es la página limpia. Ir a la ficha sustituye esa entrada; cerrarla
+// la deshace (`history.back()`), y el gesto de atrás con ella abierta la
+// cierra.
 
 function resolvePeekTarget(node) {
   const target = node?.closest?.(TITLE_PEEK_SELECTOR);
@@ -216,23 +216,23 @@ export default function MobileTitlePeek() {
     setPortalReady(true);
   }, []);
 
-  // ¿Es nuestra la entrada de historial actual? (ver PEEK_HISTORY_KEY)
+  // ¿Es nuestra la entrada de historial actual? (ver arriba)
   const ownsEntryRef = useRef(false);
   // El `popstate` de nuestro propio `history.back()` al cerrar.
   const ignorePopRef = useRef(false);
   const pushPeekEntry = useCallback(() => {
-    if (ownsEntryRef.current || isPeekHistoryEntry()) return;
-    // Sin URL: Next no lo toma por una navegación. El estado de Next viaja en
-    // la copia, así que al volver a esta entrada no se recarga nada.
-    window.history.pushState({ ...window.history.state, [PEEK_HISTORY_KEY]: true }, "");
+    if (ownsEntryRef.current || !pushCleanBackEntry()) return false;
     ownsEntryRef.current = true;
+    holdCleanBackEntry(true);
+    return true;
   }, []);
   // Cerrada sin ir a la ficha: fuera la entrada, si seguimos en ella (si se
   // cerró porque se navegó a otra página, ya quedó detrás).
   useEffect(() => {
     if (peek || !ownsEntryRef.current) return;
     ownsEntryRef.current = false;
-    if (!isPeekHistoryEntry()) return;
+    holdCleanBackEntry(false);
+    if (!isCleanBackEntry()) return;
     ignorePopRef.current = true;
     window.history.back();
   }, [peek]);
@@ -247,19 +247,16 @@ export default function MobileTitlePeek() {
       setPeek((current) =>
         current && !current.leavingTo ? { ...current, leavingTo: href } : current,
       );
-      if (ownsEntryRef.current && isPeekHistoryEntry()) {
-        ownsEntryRef.current = false;
-        router.replace(href);
-      } else {
-        router.push(href);
-      }
+      // Desde la entrada de la vista previa, la navegación la sustituye.
+      ownsEntryRef.current = false;
+      holdCleanBackEntry(false);
+      router.push(href);
     },
     [router],
   );
 
   // Atrás con la vista previa abierta (el gesto ya enseña la página limpia):
-  // se cierra sin su salida animada. Y una entrada nuestra que quedó atrás
-  // (se navegó desde la vista previa a otra página) se salta.
+  // se cierra sin su salida animada.
   useEffect(() => {
     const onPopState = () => {
       if (ignorePopRef.current) {
@@ -268,12 +265,8 @@ export default function MobileTitlePeek() {
       }
       if (ownsEntryRef.current) {
         ownsEntryRef.current = false;
+        holdCleanBackEntry(false);
         if (!leavingRef.current) removeInstantly();
-        return;
-      }
-      if (isPeekHistoryEntry()) {
-        ignorePopRef.current = true;
-        window.history.back();
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -445,10 +438,8 @@ export default function MobileTitlePeek() {
         // Sin vibración (iOS, permisos): no pasa nada.
       }
       const { target, item } = gesture;
-      const open = () => {
+      const show = () => {
         if (disposed) return;
-        // Antes de pintarla: Chrome captura aquí la página tal cual.
-        pushPeekEntry();
         const rect = target.getBoundingClientRect();
         setPeek({
           key: `${item.media_type}:${item.id}:${Date.now()}`,
@@ -464,6 +455,17 @@ export default function MobileTitlePeek() {
           // búsqueda…): encima de todo.
           overModal: isInsidePageOverlay(target),
         });
+      };
+      // Antes de pintarla, su entrada de historial, y un fotograma de la página
+      // tal cual: Chrome captura el SIGUIENTE fotograma pintado tras el
+      // `pushState` (el segundo rAF corre con el primero ya en pantalla).
+      const open = () => {
+        if (disposed) return;
+        if (!pushPeekEntry()) {
+          show();
+          return;
+        }
+        window.requestAnimationFrame(() => window.requestAnimationFrame(show));
       };
       // TECLADO ABIERTO (resultados de la búsqueda con el campo enfocado): la
       // vista previa mide su tarjeta UNA vez, al abrirse, con el alto visible
@@ -569,10 +571,36 @@ export default function MobileTitlePeek() {
     };
 
     const onClick = (event) => {
-      if (Date.now() > suppressClickUntilRef.current) return;
+      if (Date.now() > suppressClickUntilRef.current) {
+        openDetailsLinkCleanly(event);
+        return;
+      }
       suppressClickUntilRef.current = 0;
       event.preventDefault();
       event.stopPropagation();
+    };
+
+    // Un enlace a una ficha: lo navega `router.push`, que antes deja capturada
+    // esta página tal cual para el gesto de atrás (ver
+    // lib/navigation/backGestureCapture). Solo se anula el seguimiento del
+    // enlace (Link no navega si `defaultPrevented`): el clic sigue llegando a
+    // la tarjeta (secuencia de títulos, etc.).
+    const openDetailsLinkCleanly = (event) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+      ) {
+        return;
+      }
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!link || link.hasAttribute("download")) return;
+      const target = link.getAttribute("target");
+      if (target && target !== "_self") return;
+      const href = link.getAttribute("href");
+      if (!isDetailsNavigation(href)) return;
+      event.preventDefault();
+      router.push(href);
     };
 
     // Arrastrar el enlace o la imagen (Android lo empieza con la pulsación
@@ -608,7 +636,7 @@ export default function MobileTitlePeek() {
       document.removeEventListener("dragstart", onDragStart, true);
       window.removeEventListener("scroll", onScroll, passive);
     };
-  }, [canPeek, reduceMotion, pushPeekEntry]);
+  }, [canPeek, reduceMotion, pushPeekEntry, router]);
 
   // Los trozos de JS de la ficha, descargados y evaluados en reposo: tocar un
   // título ya no espera a bajarlos (ver detailsWarmup).
