@@ -45,9 +45,14 @@ desde el lanzamiento.
   perfil (cuenta el plan de quien **mira**), `/recap` (pantalla «Tu año es
   Pro»), Plex en Ajustes → Conexiones, huecos «Pro» en el editor de favoritos
   del perfil y aviso con enlace a `/planes` al pasar del límite de listas.
-- Insignia de plan (`PlanBadge`) en la cabecera del perfil y en las filas de
-  miembros (seguidores, seguidos, pestaña Social, `/members`): solo para quien
-  paga una suscripción en vigor (`publicPlanBadge`). Ver [[social-y-perfiles]].
+- Insignia de plan (`PlanBadge`, logo y colores en `planVisuals.js`, los
+  mismos que las tarjetas de `/planes`): junto al nombre en el título del
+  perfil (y en la cabecera compacta) para **todos** los planes, Gratis
+  incluido; en las filas de miembros (seguidores, seguidos, pestaña Social,
+  `/members`) solo Sin anuncios y Pro. El backend envía siempre el plan
+  público (`publicPlanBadge`: la suscripción en vigor o `free`), también con
+  la facturación apagada; la gracia de lanzamiento no cuenta. Ver
+  [[social-y-perfiles]].
 - Anuncios (`AdSlot`): cada 4 filas del dashboard y al final de la ficha. No
   pintan nada salvo que el plan lleve anuncios **y** haya red configurada
   (`NEXT_PUBLIC_ADSENSE_CLIENT` y el slot de la unidad);

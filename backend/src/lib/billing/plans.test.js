@@ -57,14 +57,15 @@ test('los precios de Stripe se buscan en ambos sentidos', () => {
   assert.equal(planForStripePrice('price_desconocido', env), null);
 });
 
-test('la insignia pública solo la lleva quien paga', () => {
+test('la insignia pública es el plan que se paga o Gratis', () => {
   const env = { ...on, BILLING_LAUNCH_AT: '2027-01-20T00:00:00Z' };
   assert.equal(publicPlanBadge({ plan: 'pro', planExpiresAt: '2027-03-01' }, { now, env }), 'pro');
   assert.equal(publicPlanBadge({ plan: 'adfree', planExpiresAt: null }, { now, env }), 'adfree');
-  assert.equal(publicPlanBadge({ plan: 'free' }, { now, env }), null);
-  // Caducada o en la gracia de lanzamiento: sin insignia.
-  assert.equal(publicPlanBadge({ plan: 'pro', planExpiresAt: '2027-01-01' }, { now, env }), null);
-  assert.equal(publicPlanBadge({ plan: 'free', createdAt: '2026-01-01' }, { now, env }), null);
-  // Con la facturación apagada no la lleva nadie.
-  assert.equal(publicPlanBadge({ plan: 'pro', planExpiresAt: '2027-03-01' }, { now, env: {} }), null);
+  assert.equal(publicPlanBadge({ plan: 'free' }, { now, env }), 'free');
+  assert.equal(publicPlanBadge(null, { now }), 'free');
+  // Caducada o en la gracia de lanzamiento: Gratis.
+  assert.equal(publicPlanBadge({ plan: 'pro', planExpiresAt: '2027-01-01' }, { now }), 'free');
+  assert.equal(publicPlanBadge({ plan: 'free', createdAt: '2026-01-01' }, { now }), 'free');
+  // Con la facturación apagada se enseña igual.
+  assert.equal(publicPlanBadge({ plan: 'pro', planExpiresAt: '2027-03-01' }, { now }), 'pro');
 });

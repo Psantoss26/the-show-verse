@@ -20,6 +20,7 @@
 // aquí, fuera de los botones: siguen abiertos (y al día) aunque los botones se
 // recojan o se desplieguen por debajo.
 
+import PlanBadge from "@/components/billing/PlanBadge";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -95,9 +96,15 @@ function useCollapsedActions({ rowRef, nameRef, actionsRef, statsRef, levels, wa
     // Ancho del nombre ENTERO, con decimales: `scrollWidth` redondea y un
     // nombre que se pasa 1,7 px (ya con «…») no se detectaba.
     const range = document.createRange();
+    // La insignia del plan va pegada al nombre y no encoge: cuenta como parte
+    // de él (su ancho y el hueco hasta el nombre).
     const nameWidth = () => {
       range.selectNodeContents(name);
-      return range.getBoundingClientRect().width;
+      const text = range.getBoundingClientRect().width;
+      const badge = name.nextElementSibling;
+      if (!badge) return text;
+      const gap = Number.parseFloat(getComputedStyle(name.parentElement).columnGap) || 0;
+      return text + badge.getBoundingClientRect().width + gap;
     };
     // La rejilla de tarjetas va DESPUÉS en el árbol: su ref aún no está puesta
     // cuando corre este efecto. Se busca en cada medida y se observa al verla.
@@ -192,7 +199,10 @@ function useCollapsedActions({ rowRef, nameRef, actionsRef, statsRef, levels, wa
       };
 
       let next = level;
-      const truncated = full > name.getBoundingClientRect().width + 0.5;
+      const badgeNode = name.nextElementSibling;
+      const shown = name.getBoundingClientRect().width +
+        (badgeNode ? full - range.getBoundingClientRect().width : 0);
+      const truncated = full > shown + 0.5;
       if (index < 0 || truncated) {
         // Recoger: el primer nivel (más allá del actual) que no se sabe que
         // no quepa; si ninguno, el último.
@@ -403,13 +413,19 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
       ref={rowRef}
       className="flex min-w-0 items-center justify-between gap-2 @[1024px]/detail-page:justify-start @[1024px]/detail-page:gap-4"
     >
-      <h1
-        data-header-morph="name"
-        ref={nameRef}
-        className="min-w-0 flex-1 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white @[1024px]/detail-page:flex-initial @[640px]/detail-page:text-[clamp(2.25rem,4.1vw,3.5rem)]"
-      >
-        {user.displayName}<span className="text-emerald-400">.</span>
-      </h1>
+      {/* Nombre e insignia del plan: el nombre se corta con «…» y la
+          insignia se queda entera a su derecha. Solo el nombre viaja a la
+          cabecera compacta (data-header-morph). */}
+      <div className="flex min-w-0 flex-1 items-center gap-2 @[640px]/detail-page:gap-3 @[1024px]/detail-page:flex-initial">
+        <h1
+          data-header-morph="name"
+          ref={nameRef}
+          className="min-w-0 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white @[640px]/detail-page:text-[clamp(2.25rem,4.1vw,3.5rem)]"
+        >
+          {user.displayName}<span className="text-emerald-400">.</span>
+        </h1>
+        <PlanBadge plan={user.plan} size="title" showFree />
+      </div>
 
       {/* Margen vertical negativo: los botones (44-48 px) son más altos que
           el nombre y, sin él, alargan la fila y separan el @usuario de debajo. */}

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Check, ChevronDown, Loader2, Minus, ShieldOff, Sparkles, Tv } from "lucide-react";
+import { Check, ChevronDown, Loader2, Minus } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import useEntitlements from "@/hooks/useEntitlements";
 import useBillingActions from "@/components/billing/useBillingActions";
+import { PLAN_VISUALS as PLAN_STYLE } from "@/components/billing/planVisuals";
 import {
   COMPARISON_ROWS,
   INTERVAL_LABELS,
@@ -27,13 +28,6 @@ import {
 const ACTIVE_STATUSES = new Set(["trialing", "active", "past_due"]);
 
 const MAX_YEARLY_SAVING = Math.max(...PLAN_ORDER.map((id) => yearlySavings(PLANS[id])?.percent || 0));
-
-// Acento de cada plan: icono, color del icono y de las marcas de la lista.
-const PLAN_STYLE = {
-  free: { icon: Tv, tile: "bg-white/[0.06] text-zinc-300", check: "text-zinc-300" },
-  adfree: { icon: ShieldOff, tile: "bg-sky-400/10 text-sky-300", check: "text-sky-300" },
-  pro: { icon: Sparkles, tile: "bg-emerald-400/15 text-emerald-300", check: "text-emerald-400" },
-};
 
 function IntervalSwitch({ value, onChange }) {
   const options = [
