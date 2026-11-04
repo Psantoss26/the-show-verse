@@ -59,10 +59,10 @@ import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } 
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
 import {
-  AdvancedFilterGroups,
   AdvancedFiltersBadge,
   AdvancedFiltersButton,
   AdvancedFiltersPanel,
+  AdvancedFiltersSheetButton,
 } from "@/components/userLists/AdvancedFilters";
 import {
   applyAdvancedFilters,
@@ -2391,14 +2391,17 @@ export default function InProgressClient({
             open={mobileFiltersOpen}
             onClose={() => setMobileFiltersOpen(false)}
             accent="emerald"
+            headerAction={
+              <AdvancedFiltersSheetButton
+                count={activeAdvancedFilters.length}
+                accent="emerald"
+                onClick={() => {
+                  setMobileFiltersOpen(false);
+                  setAdvancedFiltersOpen(true);
+                }}
+              />
+            }
           >
-            <AdvancedFilterGroups
-              filters={advancedFilters}
-              onChange={setAdvancedFilters}
-              accent="emerald"
-              {...advancedGroupProps}
-              showReset={activeAdvancedFilters.length > 0}
-            />
             <InlineDropdown
               label="Ordenar"
               valueLabel={sortLabels[sortBy]}

@@ -75,7 +75,7 @@ Las tarjetas en modo **backdrop** hacen lo mismo con el kind `cardBackdrop`, que
 
 ## Filtros avanzados de las páginas de usuario
 
-Favoritos, Pendientes, Historial y En progreso (también Completadas) tienen **filtros avanzados** además de sus filtros, orden y agrupación. En el ordenador se abren con el botón «Filtros» de la barra (con el número de filtros activos), en un panel lateral a la derecha (`MobileOptionsSheet placement="side"`) con un pie para restablecer y cerrar («Ver N títulos»). En el móvil van dentro de la misma hoja de filtros de la página, justo después de Tipo, y el botón de filtros lleva también el contador.
+Favoritos, Pendientes, Historial y En progreso (también Completadas) tienen **filtros avanzados** además de sus filtros, orden y agrupación. En el ordenador se abren con el botón «Filtros» de la barra (con el número de filtros activos), en un panel lateral a la derecha (`MobileOptionsSheet placement="side"`) con un pie para restablecer y cerrar («Ver N títulos»). En el móvil, la hoja de filtros de la página lleva junto a su título el botón «Avanzados» (`headerAction` de `MobileOptionsSheet`, `AdvancedFiltersSheetButton`), que cierra esa hoja y abre la de filtros avanzados, inferior en móvil; el botón de filtros de la barra y el de «Avanzados» llevan el contador.
 
 - **Puntuación:** barras de dos tiradores para mi nota, IMDb y TMDb (0–10). Al restringir una, los títulos sin esa nota quedan fuera. La de IMDb pide las notas que falten (`useImdbScoreLoader`).
 - **Año:** barra entre el año más antiguo y el más reciente de la lista.

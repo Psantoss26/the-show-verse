@@ -75,10 +75,10 @@ import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOp
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
 import {
-  AdvancedFilterGroups,
   AdvancedFiltersBadge,
   AdvancedFiltersButton,
   AdvancedFiltersPanel,
+  AdvancedFiltersSheetButton,
 } from "@/components/userLists/AdvancedFilters";
 import {
   applyAdvancedFilters,
@@ -4323,6 +4323,16 @@ export default function HistoryClient() {
                   open={mobileFiltersOpen}
                   onClose={() => setMobileFiltersOpen(false)}
                   accent="emerald"
+                  headerAction={
+                    <AdvancedFiltersSheetButton
+                      count={activeAdvancedFilters.length}
+                      accent="emerald"
+                      onClick={() => {
+                        setMobileFiltersOpen(false);
+                        setAdvancedFiltersOpen(true);
+                      }}
+                    />
+                  }
                 >
                   <InlineDropdown
                     label="Tipo"
@@ -4367,13 +4377,6 @@ export default function HistoryClient() {
                       </>
                     )}
                   </InlineDropdown>
-                  <AdvancedFilterGroups
-                    filters={advancedFilters}
-                    onChange={setAdvancedFilters}
-                    accent="emerald"
-                    {...advancedGroupProps}
-                    showReset={activeAdvancedFilters.length > 0}
-                  />
                   <InlineDropdown
                     label="Ordenar"
                     valueLabel={

@@ -88,6 +88,9 @@ export default function MobileOptionsSheet({
   // Pie fijo bajo el contenido desplazable (p. ej. «Restablecer» / «Ver
   // resultados»).
   footer = null,
+  // Botón junto al título, antes de cerrar (p. ej. «Avanzados», que abre los
+  // filtros avanzados en su propia hoja).
+  headerAction = null,
   children,
 }) {
   const titleId = useId();
@@ -233,6 +236,12 @@ export default function MobileOptionsSheet({
                 <p className="mt-0.5 truncate text-xs font-bold text-zinc-400">{subtitle}</p>
               ) : null}
             </div>
+            {headerAction ? (
+              // Sin esto, pulsarlo empezaría el arrastre de cierre de la cabecera.
+              <div className="shrink-0" onPointerDown={(event) => event.stopPropagation()}>
+                {headerAction}
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={onClose}

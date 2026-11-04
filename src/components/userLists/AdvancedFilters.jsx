@@ -4,11 +4,12 @@
 // Filtros avanzados de las páginas de usuario (lógica en
 // lib/userLists/advancedFilters.js).
 //   - `AdvancedFilterGroups`: los grupos (barras de nota y año, géneros,
-//     plataformas, visto). Se pintan dentro de cualquier MobileOptionsSheet:
-//     en móvil amplían la hoja de filtros de la página; en escritorio van en
-//     `AdvancedFiltersPanel`, la misma hoja de lado (placement="side").
+//     plataformas, visto…), dentro de `AdvancedFiltersPanel`: una hoja propia,
+//     de lado desde 640px e inferior en móvil (placement="side").
 //   - `AdvancedFiltersButton`: el botón de la barra de escritorio, con el
 //     número de filtros activos.
+//   - `AdvancedFiltersSheetButton`: el de móvil, en la cabecera de la hoja de
+//     filtros de la página.
 
 import { useEffect, useState } from "react";
 import {
@@ -544,7 +545,25 @@ export function AdvancedFiltersButton({ open, onClick, count = 0, accent = "red"
   );
 }
 
-// Escritorio: hoja de lado con los grupos y un pie para restablecer / cerrar.
+// Móvil: botón de la cabecera de la hoja de filtros de la página, que abre
+// los filtros avanzados en su propia hoja (AdvancedFiltersPanel).
+export function AdvancedFiltersSheetButton({ onClick, count = 0, accent = "red" }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-haspopup="dialog"
+      className="flex h-10 items-center gap-1.5 rounded-full bg-white/5 pl-3 pr-3.5 text-[13px] font-bold text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+    >
+      <SlidersHorizontal className="h-4 w-4 shrink-0" style={{ color: ACCENT_HEX[accent] || ACCENT_HEX.red }} aria-hidden="true" />
+      Avanzados
+      <AdvancedFiltersBadge count={count} accent={accent} />
+    </button>
+  );
+}
+
+// Hoja de los filtros avanzados: de lado en escritorio (desde 640px) e
+// inferior en móvil, con los grupos y un pie para restablecer / cerrar.
 export function AdvancedFiltersPanel({
   open,
   onClose,
