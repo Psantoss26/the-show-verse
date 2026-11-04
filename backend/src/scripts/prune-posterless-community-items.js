@@ -88,6 +88,12 @@ if (apply) {
         inTraktList,
       ));
   }
+  // `item_count` = títulos guardados (ver community/store.js).
+  await db.execute(sql`
+    update community_lists l
+       set item_count = (select count(*)::int from community_list_items i where i.list_id = l.id)
+     where l.source = 'trakt'
+  `);
   console.log('Aplicado.');
 } else {
   console.log('Simulación: añade --apply para guardar los cambios.');

@@ -274,7 +274,7 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 | `GET` | `/v1/community/{type}/{tmdbId}/lists` | Opcional | Listas de la comunidad que contienen el titulo |
 | `GET` | `/v1/community/{type}/{tmdbId}/following` | Si | "Tus amigos": que han hecho con este titulo las cuentas que sigues |
 | `GET` | `/v1/community/lists/discover` | Opcional | Descubrir listas de la comunidad |
-| `GET` | `/v1/community/lists/{id}` | Opcional | Detalle de una lista de la comunidad (`?page=&limit=`). `hasMore` dice si queda otra página de títulos guardados; `list.item_count` es el recuento de Trakt y puede ser mayor que lo guardado, así que no sirve para saber dónde acaba |
+| `GET` | `/v1/community/lists/{id}` | Opcional | Detalle de una lista de la comunidad (`?page=&limit=`). `hasMore` dice si queda otra página. `list.item_count` (aquí y en el índice) son los títulos guardados, no el total de la lista en Trakt: la importación copia como mucho 150 por lista. Se recalcula al importar, al borrar títulos sin póster y al abrir una lista que no cuadra; `npm run community:sync-item-counts -- --apply` corrige todas de una vez |
 | `POST`/`DELETE` | `/v1/community/lists/{id}/like` | Si | Me gusta en una lista |
 | `GET` | `/v1/community/collections/likes` | Opcional | Me gusta de colecciones (sagas TMDb) |
 | `POST`/`DELETE` | `/v1/community/collections/{id}/like` | Si | Me gusta en una coleccion |

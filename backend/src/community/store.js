@@ -57,6 +57,22 @@ async function readCommunityListItemsWithRatings({ listId, limit, offset }) {
   }
 }
 
+// `item_count` de una lista = títulos guardados en community_list_items. La
+// importación de Trakt copia como mucho 150 por lista y guardaba el total de
+// Trakt (1466 con 154 copiados): la ficha, las tarjetas de /lists, sus totales
+// y el orden por número de títulos contaban títulos que la app no tiene.
+// Se recalcula tras importar, tras borrar títulos sin póster y al abrir una
+// lista cuyo recuento no cuadra (filas anteriores a este cambio).
+export async function syncCommunityListItemCounts(listIds) {
+  const ids = [...new Set((listIds || []).filter(Boolean))];
+  if (!ids.length) return;
+  await db.update(communityLists)
+    .set({
+      itemCount: sql`(select count(*)::int from community_list_items i where i.list_id = "community_lists"."id")`,
+    })
+    .where(inArray(communityLists.id, ids));
+}
+
 // Rellena posterPath (y título si falta) de items de lista comunitaria cuya columna
 // posterPath es null (el sembrado solo hidrata 5 por lista). Usa el caché Postgres
 // (tmdb_cache) vía getMediaMetadataMap, así en visitas repetidas es barato; además
@@ -116,8 +132,10 @@ async function hydrateListItemPosters(items, { allowDelete = false } = {}) {
     )).catch(() => {});
   }
   if (allowDelete && removeIds.length) {
+    const listIds = items.filter((it) => removeIds.includes(it.id)).map((it) => it.listId);
     db.delete(communityListItems)
       .where(inArray(communityListItems.id, removeIds))
+      .then(() => syncCommunityListItemCounts(listIds))
       .catch(() => {});
   }
   return items.filter((it) => it.posterPath);
@@ -648,9 +666,9 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50, view
   const offset = (Math.max(Number(page) || 1, 1) - 1) * safeLimit;
   // Una lectura local de todos los ids/puntuaciones, nunca peticiones TMDb.
   // Sirve para que la media sea de la lista completa aunque su grid pagine.
-  // Se lee una fila de más para saber si queda otra página: `item_count` es
-  // el recuento de Trakt y puede ser mucho mayor que lo guardado (1466 frente
-  // a 154), y la ficha seguía ofreciendo «Cargar más» con páginas vacías.
+  // Se lee una fila de más para saber si queda otra página: con el recuento
+  // de Trakt de `item_count` (1466 frente a 154 guardados) la ficha seguía
+  // ofreciendo «Cargar más» con páginas vacías.
   const [pageRows, allRatingRows] = await readCommunityListItemsWithRatings({
     listId: id,
     limit: safeLimit + 1,
@@ -661,6 +679,11 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50, view
   // Solo en las listas importadas de Trakt se borran de verdad los títulos sin
   // póster: las de usuario reflejan su lista personal y ahí solo se ocultan.
   const hydrated = await hydrateListItemPosters(items, { allowDelete: list.source === 'trakt' });
+  // Se descuentan los títulos sin póster que esta página acaba de quitar.
+  const itemCount = Math.max(allRatingRows.length - (items.length - hydrated.length), 0);
+  if (itemCount !== Number(list.itemCount)) {
+    syncCommunityListItemCounts([id]).catch(() => {});
+  }
   const ratedItems = await hydrateListRatings(allRatingRows);
   const visibleItems = mergeListItemRatings(hydrated, ratedItems);
   const api = listRowToApi(list);
@@ -670,7 +693,13 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50, view
     // solo se copiaban `list` y `user`: con sesión la ficha recibía siempre
     // la lista sin `liked` y, al volver o recargar, el corazón salía vacío
     // aunque el me gusta estuviera guardado en list_likes.
-    list: { ...api.list, user: api.user, liked: api.liked },
+    // `item_count`: lo guardado, aunque la fila aún tenga el total de Trakt.
+    list: {
+      ...api.list,
+      item_count: itemCount,
+      user: api.user,
+      liked: api.liked,
+    },
     items: visibleItems,
     ratingSummary: buildRatingSummary(ratedItems),
     // La muestra para IMDb es deliberadamente ligera: permite una media más

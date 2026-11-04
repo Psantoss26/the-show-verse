@@ -14,6 +14,7 @@
     "level:backfill": "node src/scripts/backfill-level-state.js",
     "streaming:stats": "node src/scripts/streaming-stats.js",
     "community:prune-posterless": "node src/scripts/prune-posterless-community-items.js",
+    "community:sync-item-counts": "node src/scripts/sync-community-list-item-counts.js",
     "user:restore": "node src/scripts/restore-user-data.js",
     "demo:social": "node src/scripts/seed-social-demo.js",
     "bots:social": "node src/scripts/social-bots.js",

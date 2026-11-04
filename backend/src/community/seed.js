@@ -8,7 +8,7 @@ import { normalizeTraktList, posterUrl } from './normalize.js';
 import { collectTitleComments } from './commentsFetch.js';
 import { buildHeuristicSentiment } from './sentiment.js';
 import { translateManyToEs } from './translate.js';
-import { upsertSentiment, upsertCommunityList, insertListMemberships } from './store.js';
+import { upsertSentiment, upsertCommunityList, insertListMemberships, syncCommunityListItemCounts } from './store.js';
 import { tmdbDetails } from '../dashboard/tmdb.js';
 
 const commentsCacheInflight = new Map();
@@ -173,6 +173,8 @@ export async function runSeed({ tmdbId, mediaType }) {
           membershipItems.push({ tmdbId: numId, mediaType, position: members.length });
         }
         await insertListMemberships(listId, membershipItems);
+        // `item_count` = lo copiado, no el total de Trakt (ver store.js).
+        await syncCommunityListItemCounts([listId]);
       }
     } catch (listErr) {
       // Swallow: list-copy is a bonus feature, not core to community seeding.
