@@ -42,7 +42,7 @@ import AssistantRoulette from "@/components/assistant/AssistantRoulette";
 import MobileOptionsSheet from "@/components/ui/MobileOptionsSheet";
 import useFitViewportPage from "@/hooks/useFitViewportPage";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
-import { peekListArtwork, requestListArtwork } from "@/lib/tmdb/artworkBatch";
+import { useLadderPoster } from "@/components/assistant/useLadderPoster";
 import { getScoreItemKey, readScoreCache } from "@/lib/userLists/listScoreCache";
 import { LIQUID_GLASS_BAR, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import {
@@ -121,27 +121,6 @@ function relativeDay(ts) {
 }
 
 // ---------------------------------------------------------------------------
-
-// Póster con la ESCALERA DE IDIOMA de las tarjetas (en → es → original → sin
-// idioma, lib/tmdb/imageLanguageLadder.js), pedido por lote a
-// /api/tmdb/artwork como en Descubrir. `pending` mientras llega el lote: así
-// no se pinta antes el póster del motor y luego se cambia.
-function useLadderPoster(type, id) {
-  const [ladder, setLadder] = useState(() => peekListArtwork(type, id));
-  useEffect(() => {
-    const peeked = peekListArtwork(type, id);
-    setLadder(peeked);
-    if (peeked !== undefined) return undefined;
-    let alive = true;
-    requestListArtwork(type, id).then((picks) => {
-      if (alive) setLadder(picks ?? null);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [type, id]);
-  return { path: ladder?.poster || null, pending: ladder === undefined };
-}
 
 // Solo el póster: la tarjeta de título de la app (PosterTile), sin título,
 // año, nota ni motivo debajo. El nombre va en el `alt` de la imagen. Al

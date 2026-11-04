@@ -125,7 +125,9 @@ test("vista de lista como la de Favoritos, con selector y preferencia guardada",
   assert.doesNotMatch(row, /media=\{/);
   assert.match(row, /const ladder = useLadderPoster\(type, item\?\.id\);/);
   assert.match(row, /posterPath=\{ladder\.pending \? "" : ladder\.path \|\| item\?\.posterPath \|\| ""\}/);
-  assert.match(assistant, /requestListArtwork\(type, id\)/);
+  assert.match(assistant, /import \{ useLadderPoster \} from "@\/components\/assistant\/useLadderPoster";/);
+  const ladder = await readFile(new URL("../../components/assistant/useLadderPoster.js", import.meta.url), "utf8");
+  assert.match(ladder, /requestListArtwork\(type, id\)/);
   // Notas de IMDb: el cargador de Favoritos y Pendientes, solo en lista.
   assert.match(assistant, /useImdbScoreLoader\(\{\s*items: scoreItems,\s*enabled: viewMode === "list",/);
   assert.match(assistant, /setImdbScores\(readScoreCache\("imdb"\)\)/);
