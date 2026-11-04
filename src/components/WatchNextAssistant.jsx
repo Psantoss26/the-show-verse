@@ -526,26 +526,29 @@ export default function WatchNextAssistant() {
           esquinas, el centro quedaba negro y la violeta se cortaba en una
           franja bajo la barra superior. Los degradados se miden en % de la
           ventana, así que el reparto es el mismo en cualquier ancho, y se
-          apagan solos sin borde (y sin el coste del filtro). La violeta tiene
-          el centro por debajo de la barra superior: la tiñe sin encenderla. */}
+          apagan solos sin borde (y sin el coste del filtro).
+          UN SOLO COLOR: el azul de los acentos de la página (sky-400, el de
+          las burbujas y los iconos), más presente en los extremos izquierdo y
+          derecho y en el centro, y más suave arriba y abajo. */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0"
         style={{
           backgroundImage: [
-            "radial-gradient(55% 70% at 0% 20%, rgba(8,145,178,0.22), transparent 70%)",
-            "radial-gradient(50% 60% at 100% 30%, rgba(109,40,217,0.20), transparent 72%)",
-            "radial-gradient(60% 55% at 45% 105%, rgba(14,116,144,0.24), transparent 70%)",
-            "radial-gradient(40% 40% at 55% 40%, rgba(34,211,238,0.05), transparent 70%)",
-            // Luz tenue arriba en el centro: sin ella, en pantallas anchas la
-            // barra superior quedaba negra entre las dos manchas laterales.
-            "radial-gradient(45% 30% at 50% 0%, rgba(34,211,238,0.08), transparent 75%)",
+            // Extremos, de arriba abajo.
+            "radial-gradient(32% 85% at 0% 50%, rgba(56,189,248,0.22), transparent 75%)",
+            "radial-gradient(32% 85% at 100% 50%, rgba(56,189,248,0.22), transparent 75%)",
+            // Luz central; la de arriba tiñe la barra superior y la de abajo
+            // acompaña a la caja de texto.
+            "radial-gradient(60% 60% at 50% 45%, rgba(56,189,248,0.22), transparent 72%)",
+            "radial-gradient(55% 35% at 50% 0%, rgba(56,189,248,0.16), transparent 75%)",
+            "radial-gradient(60% 40% at 50% 105%, rgba(56,189,248,0.20), transparent 72%)",
           ].join(","),
         }}
       />
 
       {/* Barra de conversaciones (escritorio): PANEL INDEPENDIENTE que flota
-          en la zona izquierda, separado de la barra lateral de la app (2.5rem)
+          en la zona izquierda, separado de la barra lateral de la app (4rem)
           y de la superior, con las cuatro esquinas redondeadas.
           Antes iba pegado a la esquina de la pantalla y por debajo de las dos
           barras: así las tapaba y no se veía el fondo de color detrás de ellas.
@@ -553,15 +556,15 @@ export default function WatchNextAssistant() {
           lee como pieza de la misma familia y deja pasar el color del fondo.
           ALTO SEGÚN LA PANTALLA, CENTRADO: el 90% del hueco de la página, con
           un tope de 50rem (78% y 42rem quedaba demasiado corto y aislado en el
-          centro), en vez de estirarse de arriba abajo. 2.5rem a la izquierda
-          (`ml-10`): con 1.5rem iba demasiado pegado a la barra lateral. Va centrado
+          centro), en vez de estirarse de arriba abajo. 4rem a la izquierda
+          (`ml-16`): con 1.5rem y 2.5rem iba demasiado pegado a la barra lateral. Va centrado
           con `self-center` y sube 2rem (`-top-8`, la mitad de la barra
           superior): así su centro coincide con el de la ventana, que es donde
           está la barra lateral de la app. `max-h` le guarda al menos 1.5rem
           arriba tras ese desplazamiento; si no cabe todo, desplaza la lista. */}
       <aside
         aria-label="Conversaciones"
-        className={`relative -top-8 isolate z-10 ml-10 hidden h-[min(50rem,90%)] max-h-[calc(100%-7rem)] w-72 shrink-0 flex-col self-center overflow-hidden rounded-[2rem] ${LIQUID_GLASS_BAR} transform-gpu desktop:flex`}
+        className={`relative -top-8 isolate z-10 ml-16 hidden h-[min(50rem,90%)] max-h-[calc(100%-7rem)] w-72 shrink-0 flex-col self-center overflow-hidden rounded-[2rem] ${LIQUID_GLASS_BAR} transform-gpu desktop:flex`}
       >
         <div className="flex items-center gap-3 px-4 pb-4 pt-5">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/10 text-cyan-100">

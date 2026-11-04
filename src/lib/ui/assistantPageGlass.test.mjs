@@ -59,15 +59,21 @@ test("el fondo llega bajo la barra superior y la lateral, como en las páginas d
   const fondo = assistant.slice(assistant.indexOf("FONDO DE PÁGINA"), assistant.indexOf("Barra de conversaciones (escritorio)"));
   assert.match(fondo, /radial-gradient\(\d+% \d+% at/);
   assert.doesNotMatch(fondo, /max-w-\[|blur-\[/);
+  // Un solo color: el azul de los acentos de la página (sky-400), también en
+  // los extremos.
+  const colores = new Set(fondo.match(/rgba\(\d+,\d+,\d+/g));
+  assert.deepEqual([...colores], ["rgba(56,189,248"]);
+  assert.match(fondo, /at 0% 50%, rgba\(56,189,248,/);
+  assert.match(fondo, /at 100% 50%, rgba\(56,189,248,/);
 });
 
 test("la barra de conversaciones es un panel independiente, separado de las barras", async () => {
   const assistant = await readFile(assistantPath, "utf8");
   const aside = assistant.match(/<aside[\s\S]*?>/)?.[0];
   assert.ok(aside, "no se localiza la barra de conversaciones");
-  // Separada 2.5rem de la barra lateral,
+  // Separada 4rem de la barra lateral,
   // con las cuatro esquinas redondeadas y el cristal de la barra lateral.
-  assert.match(aside, /ml-10/);
+  assert.match(aside, /ml-16/);
   // Alto según la pantalla (90% con tope de 50rem), centrado a la altura de la
   // barra lateral de la app en vez de estirado de arriba abajo.
   assert.match(aside, /h-\[min\(50rem,90%\)\] max-h-\[calc\(100%-7rem\)\]/);
