@@ -1244,22 +1244,23 @@ html {
    y, agrandada para que se vea en el teléfono, ralentizaba toda la app en el
    móvil. La máscara cuesta lo mismo que no tener manchas (medido con trazas
    de Chromium: 1075 ms de composición en 120 fotogramas frente a 1079 ms sin
-   manchas) y da la misma intensidad que el escritorio (canal del color a
-   390 px ≈ 21 de media; escritorio a 1440 px ≈ 19). Desde 560 px la pantalla
-   es menos alargada y las manchas cubren más: bajan a 0.75 de opacidad. */
+   manchas) e se queda algo por debajo de la intensidad del escritorio, con zonas
+   oscuras entre manchas (canal del color a 390 px ≈ 14 de media; con 3.4× y
+   opacidad 1 eran ≈ 21 y casi todo el fondo tenía color). Desde 560 px la
+   pantalla es menos alargada y las manchas cubren más: bajan a 0.6. */
 @media (max-width: 767px) {
   div.fixed.inset-0.pointer-events-none.overflow-hidden>div.absolute.rounded-full.aspect-square {
-    transform: scale(3.4) !important;
+    transform: scale(3) !important;
     filter: none !important;
     -webkit-mask-image: radial-gradient(closest-side, #000 25%, rgb(0 0 0 / 50%) 62%, transparent 100%) !important;
     mask-image: radial-gradient(closest-side, #000 25%, rgb(0 0 0 / 50%) 62%, transparent 100%) !important;
-    opacity: 1 !important;
+    opacity: 0.8 !important;
   }
 }
 
 @media (min-width: 560px) and (max-width: 767px) {
   div.fixed.inset-0.pointer-events-none.overflow-hidden>div.absolute.rounded-full.aspect-square {
-    opacity: 0.75 !important;
+    opacity: 0.6 !important;
   }
 }
 
