@@ -1212,7 +1212,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                 la insignia se queda entera. */}
             <div className="mt-1.5 flex min-w-0 items-center gap-2 @[640px]/detail-page:mt-2">
               <p className="min-w-0 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:text-sm">@{user.username}</p>
-              <PlanBadge plan={user.plan} size="md" showFree />
+              <PlanBadge plan={user.plan} size="md" showFree snap />
             </div>
             {user.bio && (
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">

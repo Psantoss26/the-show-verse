@@ -1,5 +1,8 @@
+"use client";
+
 import { PLAN_VISUALS } from "@/components/billing/planVisuals";
 import { planName } from "@/lib/billing/plans";
+import usePixelSnappedTop from "@/hooks/usePixelSnappedTop";
 
 // Insignia del plan de un usuario, junto a su nombre: logo y nombre del plan
 // con los colores de las tarjetas de /planes (planVisuals). El backend envía
@@ -11,6 +14,9 @@ import { planName } from "@/lib/billing/plans";
 // solo destaca quien paga.
 // `collapse`: en pantallas estrechas solo la medalla (filas de miembros, donde
 // el texto se comía el nombre); el plan sigue en el tooltip y para lectores.
+// `snap`: lleva la insignia al píxel entero (usePixelSnappedTop) para que el
+// texto quede centrado con la medalla; se usa bajo el nombre del perfil, donde
+// la altura del nombre deja la fila en fracciones de píxel.
 // `size`: "sm" (filas de miembros) o "md" (bajo el nombre del perfil, junto
 // al @usuario).
 const SIZES = {
@@ -18,9 +24,11 @@ const SIZES = {
   md: { pill: "h-6 gap-1.5 pl-[3px] pr-2.5 text-[11px]", medal: "h-[18px] w-[18px]", glyph: "h-3 w-3" },
 };
 
-export default function PlanBadge({ plan, size = "sm", collapse = false, showFree = false, className = "", ...rest }) {
+export default function PlanBadge({ plan, size = "sm", collapse = false, showFree = false, snap = false, className = "", ...rest }) {
   const visuals = PLAN_VISUALS[plan];
-  if (!visuals || (plan === "free" && !showFree)) return null;
+  const shown = Boolean(visuals) && (plan !== "free" || showFree);
+  const snapRef = usePixelSnappedTop({ enabled: snap && shown, observe: "header" });
+  if (!shown) return null;
   const Icon = visuals.icon;
   const name = planName(plan);
   const sizes = SIZES[size];
@@ -28,6 +36,7 @@ export default function PlanBadge({ plan, size = "sm", collapse = false, showFre
   const pill = collapse ? `h-5 text-[10px] sm:gap-1 sm:pl-0.5 sm:pr-2 ${visuals.pillSm}` : `${sizes.pill} ${visuals.pill}`;
   return (
     <span
+      ref={snapRef}
       title={`Plan ${name}`}
       className={`inline-flex shrink-0 items-center rounded-full font-bold uppercase leading-none tracking-wider ${pill} ${className}`}
       {...rest}
