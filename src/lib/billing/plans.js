@@ -63,18 +63,70 @@ export const PRO_FEATURES = {
   },
 };
 
-// Lo que ofrece cada plan, en el mismo orden en las tres tarjetas de /planes
-// para compararlas de un vistazo. `values` por plan: true/false o un texto.
+// Lo que pinta cada tarjeta de /planes: solo lo que el plan AÑADE al anterior,
+// para que se lean cortas (sobre todo en el móvil). `included: false` marca lo
+// que el plan no tiene y conviene decir (los anuncios del plan gratis).
+export const PLAN_HIGHLIGHTS = {
+  free: {
+    intro: null,
+    items: [
+      { text: "Seguimiento, pendientes y calendario" },
+      { text: "Importar de Trakt, IMDb y Letterboxd" },
+      { text: "3 listas propias" },
+      { text: "3 películas y 3 series en tu perfil" },
+      { text: "Con anuncios", included: false },
+    ],
+  },
+  adfree: {
+    intro: "Todo lo de Gratis, y además:",
+    items: [{ text: "Sin anuncios en toda la app" }],
+  },
+  pro: {
+    intro: "Todo lo de Sin anuncios, y además:",
+    items: [
+      { text: "Estadísticas de lo que ves" },
+      { text: "Recap anual para compartir" },
+      { text: "Vista neuronal" },
+      { text: "Sincronización con Plex" },
+      { text: "Listas ilimitadas" },
+      { text: "5 películas y 5 series en tu perfil" },
+    ],
+  },
+};
+
+// Comparativa completa bajo las tarjetas: qué es cada cosa y qué trae cada
+// plan. `values` por plan: true/false o un texto.
 export const COMPARISON_ROWS = [
-  { label: "Seguimiento, pendientes y calendario", values: { free: true, adfree: true, pro: true } },
-  { label: "Importar de Trakt, IMDb y Letterboxd", values: { free: true, adfree: true, pro: true } },
-  { label: "Sin anuncios", values: { free: false, adfree: true, pro: true } },
-  { label: "Listas propias", values: { free: "3", adfree: "3", pro: "Ilimitadas" } },
-  { label: "Favoritos en tu perfil", values: { free: "3 + 3", adfree: "3 + 3", pro: "5 + 5" } },
-  { label: "Estadísticas", values: { free: false, adfree: false, pro: true } },
-  { label: "Recap anual", values: { free: false, adfree: false, pro: true } },
-  { label: "Vista neuronal", values: { free: false, adfree: false, pro: true } },
-  { label: "Sincronización con Plex", values: { free: false, adfree: false, pro: true } },
+  {
+    label: "Seguimiento y calendario",
+    description: "Marca lo que ves, lleva tus pendientes y mira cuándo sale cada episodio.",
+    values: { free: true, adfree: true, pro: true },
+  },
+  {
+    label: "Importar tu historial",
+    description: "Trae lo que ya tenías en Trakt, IMDb o Letterboxd.",
+    values: { free: true, adfree: true, pro: true },
+  },
+  {
+    label: "Sin anuncios",
+    description: "Ni entre las filas del inicio ni al final de las fichas.",
+    values: { free: false, adfree: true, pro: true },
+  },
+  {
+    label: "Listas propias",
+    description: "Colecciones a tu manera para organizar y compartir títulos.",
+    values: { free: "3", adfree: "3", pro: "∞" },
+  },
+  {
+    label: "Favoritos en tu perfil",
+    description: "Películas y series destacadas en tu página de usuario.",
+    values: { free: "3 + 3", adfree: "3 + 3", pro: "5 + 5" },
+  },
+  ...["stats", "recap", "neural", "plex"].map((id) => ({
+    label: PRO_FEATURES[id].title,
+    description: PRO_FEATURES[id].description,
+    values: { free: false, adfree: false, pro: true },
+  })),
 ];
 
 export const INTERVAL_LABELS = { month: "mes", year: "año" };

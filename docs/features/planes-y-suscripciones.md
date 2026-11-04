@@ -27,9 +27,15 @@ desde el lanzamiento.
 
 ## Qué ve el usuario
 
-- `/planes`: selector mensual/anual y tres tarjetas (precio, botón y la misma
-  lista de características en el mismo orden, para comparar de un vistazo). Los botones abren Stripe Checkout; con una suscripción
-  activa, el portal de cliente. Vuelve con `?checkout=success|cancel`.
+- `/planes`: selector mensual/anual, tres tarjetas y una comparativa. Cada
+  tarjeta lleva precio, botón y solo lo que el plan **añade** al anterior
+  («Todo lo de Gratis, y además:…», `PLAN_HIGHLIGHTS`); la comparativa de
+  debajo (`COMPARISON_ROWS`) explica cada función en una línea y marca qué
+  trae cada plan. En el móvil la tarjeta se compacta (precio junto al nombre,
+  sin el bloque de precio grande) y la comparativa va plegada tras «Comparar
+  planes en detalle»; desde `sm` siempre está abierta. Los botones abren
+  Stripe Checkout; con una suscripción activa, el portal de cliente. Vuelve
+  con `?checkout=success|cancel`.
 - Ajustes → **Suscripción** (`?tab=subscription`): plan actual («Acceso
   completo» con los pagos apagados), renovación, cancelación programada o cobro
   pendiente, botón «Gestionar» (portal de Stripe) y debajo los tres planes
@@ -59,7 +65,7 @@ por un instante a quien sí tiene acceso).
   periodo + 2 días de margen); `getEntitlements` solo lee esos dos campos.
 - Rutas: `backend/src/routes/billing.js` y proxies `src/app/api/billing/*`.
 - Cliente: `src/hooks/useEntitlements.js` (una petición por sesión, compartida),
-  `src/components/billing/*` (`PlanPicker`: selector y tarjetas de planes), `src/components/settings/SubscriptionPanel.jsx`.
+  `src/components/billing/*` (`PlanPicker`: selector, tarjetas y comparativa de planes; los textos están en `src/lib/billing/plans.js`), `src/components/settings/SubscriptionPanel.jsx`.
 - Límites aplicados en el servidor: creación de listas (402 `plan_limit`) y
   `/api/plex/sync` (402 `plan_required`). Estadísticas, recap y vista neuronal
   solo se bloquean en el cliente.

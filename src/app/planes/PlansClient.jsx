@@ -40,12 +40,12 @@ export default function PlansClient() {
     <main className="relative min-h-[100svh] overflow-hidden bg-black text-zinc-100">
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[480px] bg-[radial-gradient(ellipse_55%_55%_at_50%_0%,rgba(16,185,129,0.14),transparent)]" />
 
-      <div className="relative mx-auto max-w-6xl px-4 pb-24 pt-10 lg:pt-16">
+      <div className="relative mx-auto max-w-6xl px-4 pb-24 pt-6 sm:pt-10 lg:pt-16">
         <header className="mx-auto max-w-xl text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
+          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-5xl">
             Elige tu plan<span className="text-emerald-500">.</span>
           </h1>
-          <p className="mt-3 text-base text-zinc-400">Lo esencial es gratis. Paga solo si quieres quitar los anuncios o ir a por todo.</p>
+          <p className="mt-2 text-sm text-zinc-400 sm:mt-3 sm:text-base">Lo esencial es gratis. Paga solo si quieres quitar los anuncios o ir a por todo.</p>
         </header>
 
         {notice ? (

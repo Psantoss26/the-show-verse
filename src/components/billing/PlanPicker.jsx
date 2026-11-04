@@ -2,16 +2,27 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Check, Loader2, ShieldOff, Sparkles, Tv, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, Minus, ShieldOff, Sparkles, Tv } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import useEntitlements from "@/hooks/useEntitlements";
 import useBillingActions from "@/components/billing/useBillingActions";
-import { COMPARISON_ROWS, INTERVAL_LABELS, PLAN_ORDER, PLANS, formatPrice, yearlySavings } from "@/lib/billing/plans";
+import {
+  COMPARISON_ROWS,
+  INTERVAL_LABELS,
+  PLAN_HIGHLIGHTS,
+  PLAN_ORDER,
+  PLANS,
+  formatPrice,
+  yearlySavings,
+} from "@/lib/billing/plans";
 
-// Selector mensual/anual y las tres tarjetas de planes, con la misma lista de
-// características en el mismo orden para compararlas. Lo usan /planes y
-// Ajustes → Suscripción.
+// Selector mensual/anual, las tres tarjetas de planes (cada una con lo que
+// añade al plan anterior) y debajo la comparativa completa con qué es cada
+// cosa. Lo usan /planes y Ajustes → Suscripción.
+//
+// En el móvil las tarjetas se compactan (precio junto al nombre, sin bloque de
+// precio grande) y la comparativa se pliega tras un botón.
 
 const ACTIVE_STATUSES = new Set(["trialing", "active", "past_due"]);
 
@@ -55,36 +66,38 @@ function IntervalSwitch({ value, onChange }) {
   );
 }
 
-function Price({ plan, interval }) {
+function priceNote(plan, interval) {
   const cents = plan.prices[interval];
   const savings = interval === "year" ? yearlySavings(plan) : null;
+  if (savings) return `${formatPrice(savings.monthly)} al mes`;
+  if (cents) return `${formatPrice(plan.prices.year)} si pagas el año`;
+  return "Sin tarjeta";
+}
+
+function Price({ plan, interval }) {
+  const cents = plan.prices[interval];
   return (
     <div>
       <p className="flex items-baseline gap-1.5">
         <span className="text-5xl font-bold tracking-tight text-white tabular-nums">{formatPrice(cents)}</span>
         <span className="text-sm text-zinc-500">{cents ? `/ ${INTERVAL_LABELS[interval]}` : "para siempre"}</span>
       </p>
-      <p className="mt-1.5 h-4 text-xs text-zinc-500">
-        {savings ? `${formatPrice(savings.monthly)} al mes` : cents ? `${formatPrice(plan.prices.year)} si pagas el año` : "Sin tarjeta"}
-      </p>
+      <p className="mt-1.5 h-4 text-xs text-zinc-500">{priceNote(plan, interval)}</p>
     </div>
   );
 }
 
-function FeatureRow({ row, planId }) {
-  const value = row.values[planId];
-  const included = value !== false;
+// Precio compacto del móvil, a la derecha del nombre.
+function CompactPrice({ plan, interval }) {
+  const cents = plan.prices[interval];
   return (
-    <li className="flex items-center justify-between gap-3 py-2.5 text-sm">
-      <span className={included ? "text-zinc-200" : "text-zinc-600"}>{row.label}</span>
-      {value === true ? (
-        <Check className={`h-4 w-4 shrink-0 ${PLAN_STYLE[planId].check}`} aria-label="Incluido" />
-      ) : value === false ? (
-        <X className="h-4 w-4 shrink-0 text-zinc-700" aria-label="No incluido" />
-      ) : (
-        <span className="shrink-0 text-sm font-bold text-white">{value}</span>
-      )}
-    </li>
+    <div className="ml-auto shrink-0 text-right sm:hidden">
+      <p className="flex items-baseline justify-end gap-1">
+        <span className="text-2xl font-bold tracking-tight text-white tabular-nums">{formatPrice(cents)}</span>
+        {cents ? <span className="text-xs text-zinc-500">/ {INTERVAL_LABELS[interval]}</span> : null}
+      </p>
+      <p className="text-[11px] text-zinc-500">{priceNote(plan, interval)}</p>
+    </div>
   );
 }
 
@@ -92,44 +105,127 @@ function PlanCard({ plan, interval, current, action }) {
   const style = PLAN_STYLE[plan.id];
   const Icon = style.icon;
   const highlighted = plan.highlighted;
+  const highlights = PLAN_HIGHLIGHTS[plan.id];
+  const badge = current ? "Tu plan" : highlighted ? `${plan.trialDays} días gratis` : null;
   return (
     <article
       aria-labelledby={`plan-${plan.id}`}
-      className={`relative flex flex-col rounded-3xl p-6 sm:p-7 ${
+      className={`relative flex flex-col rounded-3xl p-5 sm:p-7 ${
         highlighted
           ? "bg-gradient-to-b from-emerald-500/[0.13] to-white/[0.02] ring-1 ring-emerald-400/40 shadow-[0_0_70px_-25px_rgba(16,185,129,0.6)]"
           : "bg-white/[0.03] ring-1 ring-white/[0.07]"
       }`}
     >
-      <div className="flex items-center gap-3">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${style.tile}`}>
-          <Icon className="h-5 w-5" aria-hidden="true" />
+      {badge ? (
+        <span
+          className={`absolute -top-2.5 left-5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-wider sm:left-7 ${
+            current ? "bg-zinc-200 text-black" : "bg-emerald-400 text-black"
+          }`}
+        >
+          {badge}
         </span>
-        <h2 id={`plan-${plan.id}`} className="text-lg font-bold text-white">
-          {plan.name}
-        </h2>
-        {current ? (
-          <span className="ml-auto rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-200">Tu plan</span>
-        ) : highlighted ? (
-          <span className="ml-auto rounded-full bg-emerald-400 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-black">
-            {plan.trialDays} días gratis
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-3 text-sm text-zinc-400">{plan.tagline}</p>
+      ) : null}
 
-      <div className="mt-6">
+      <div className="flex items-center gap-3">
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 ${style.tile}`}>
+          <Icon className="h-[18px] w-[18px] sm:h-5 sm:w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2 id={`plan-${plan.id}`} className="text-base font-bold leading-tight text-white sm:text-lg">
+            {plan.name}
+          </h2>
+          <p className="mt-0.5 text-xs text-zinc-400 sm:hidden">{plan.tagline}</p>
+        </div>
+        <CompactPrice plan={plan} interval={interval} />
+      </div>
+      <p className="mt-3 hidden text-sm text-zinc-400 sm:block">{plan.tagline}</p>
+
+      <div className="mt-6 hidden sm:block">
         <Price plan={plan} interval={interval} />
       </div>
 
-      <div className="mt-6">{action}</div>
+      <div className="mt-4 sm:mt-6">{action}</div>
 
-      <ul className="mt-6 divide-y divide-white/[0.06] border-t border-white/[0.06]">
-        {COMPARISON_ROWS.map((row) => (
-          <FeatureRow key={row.label} row={row} planId={plan.id} />
-        ))}
-      </ul>
+      <div className="mt-4 sm:mt-6">
+        {highlights.intro ? <p className="mb-2 text-xs font-bold text-zinc-300 sm:text-sm">{highlights.intro}</p> : null}
+        <ul className="space-y-1.5 sm:space-y-2.5">
+          {highlights.items.map((item) => {
+            const included = item.included !== false;
+            return (
+              <li key={item.text} className="flex items-start gap-2.5 text-sm">
+                {included ? (
+                  <Check className={`mt-0.5 h-4 w-4 shrink-0 ${style.check}`} aria-hidden="true" />
+                ) : (
+                  <Minus className="mt-0.5 h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
+                )}
+                <span className={included ? "text-zinc-200" : "text-zinc-500"}>{item.text}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </article>
+  );
+}
+
+function ComparisonValue({ value, planId }) {
+  if (value === true) {
+    return <Check className={`mx-auto h-4 w-4 ${PLAN_STYLE[planId].check}`} aria-label="Incluido" />;
+  }
+  if (value === false) {
+    return <Minus className="mx-auto h-4 w-4 text-zinc-700" aria-label="No incluido" />;
+  }
+  return <span className="text-sm font-bold text-white tabular-nums">{value}</span>;
+}
+
+// Tabla con todo lo que trae cada plan y qué es cada cosa. En el móvil va
+// plegada (el botón solo existe ahí); desde sm siempre abierta.
+function PlanComparison() {
+  const [open, setOpen] = useState(false);
+  const grid = "grid grid-cols-[minmax(0,1fr)_3.25rem_3.25rem_3.25rem] items-center gap-x-1 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_7rem] sm:gap-x-2";
+  return (
+    <section aria-labelledby="plan-comparison" className="mx-auto mt-6 max-w-4xl sm:mt-14">
+      <h2 id="plan-comparison" className="hidden text-center text-xl font-bold text-white sm:block">
+        Qué incluye cada plan
+      </h2>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="plan-comparison-table"
+        onClick={() => setOpen((value) => !value)}
+        className="flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-bold text-zinc-300 ring-1 ring-inset ring-white/[0.08] transition-colors hover:text-white sm:hidden"
+      >
+        {open ? "Ocultar comparativa" : "Comparar planes en detalle"}
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+
+      <div id="plan-comparison-table" className={`${open ? "block" : "hidden"} mt-4 sm:mt-6 sm:block`} role="table" aria-label="Comparativa de planes">
+        <div role="row" className={`${grid} border-b border-white/[0.08] pb-3`}>
+          {/* sr-only va dentro: suelto saldría del flujo del grid y movería las columnas. */}
+          <span role="columnheader">
+            <span className="sr-only">Función</span>
+          </span>
+          {PLAN_ORDER.map((id) => (
+            <span key={id} role="columnheader" className="text-center text-[11px] font-bold leading-tight text-zinc-300 sm:text-sm">
+              {PLANS[id].name}
+            </span>
+          ))}
+        </div>
+        {COMPARISON_ROWS.map((row) => (
+          <div key={row.label} role="row" className={`${grid} border-b border-white/[0.05] py-3`}>
+            <div role="rowheader" className="min-w-0 pr-2">
+              <p className="text-sm font-bold text-zinc-200">{row.label}</p>
+              <p className="mt-0.5 text-xs leading-snug text-zinc-500">{row.description}</p>
+            </div>
+            {PLAN_ORDER.map((id) => (
+              <div key={id} role="cell" className="text-center">
+                <ComparisonValue value={row.values[id]} planId={id} />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -201,11 +297,13 @@ export default function PlanPicker({ loginNext = "/planes", className = "" }) {
         </p>
       ) : null}
 
-      <div className="mt-8 grid gap-5 md:grid-cols-3">
+      <div className="mt-8 grid gap-6 sm:gap-5 md:grid-cols-3">
         {PLAN_ORDER.map((id) => (
           <PlanCard key={id} plan={PLANS[id]} interval={interval} current={knownPlan === id} action={actionFor(PLANS[id])} />
         ))}
       </div>
+
+      <PlanComparison />
     </div>
   );
 }
