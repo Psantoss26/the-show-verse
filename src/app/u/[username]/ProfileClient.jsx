@@ -1163,8 +1163,8 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                 <span data-header-morph="name" className="min-w-0 truncate">
                   {user.displayName}<span className="text-emerald-400">.</span>
                 </span>
-                <PlanBadge plan={user.plan} collapse showFree className="ml-2 self-center" />
                 <span className="ml-2 hidden shrink-0 text-xs font-semibold text-zinc-500 @[480px]/detail-page:inline">@{user.username}</span>
+                <PlanBadge plan={user.plan} collapse showFree className="ml-2 self-center" />
               </p>
               {/* Las cuatro tarjetas de recuento, en píldoras. */}
               <div className="flex shrink-0 items-center gap-1.5">
@@ -1208,7 +1208,12 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               statsRef={statsRef}
               onDenseStatsChange={setDenseStats}
             />
-            <p className="mt-1 min-w-0 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:mt-1.5 @[640px]/detail-page:text-sm">@{user.username}</p>
+            {/* @usuario y plan bajo el nombre: el @usuario se corta con «…» y
+                la insignia se queda entera. */}
+            <div className="mt-1.5 flex min-w-0 items-center gap-2 @[640px]/detail-page:mt-2">
+              <p className="min-w-0 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:text-sm">@{user.username}</p>
+              <PlanBadge plan={user.plan} size="md" showFree />
+            </div>
             {user.bio && (
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
                 {user.bio}

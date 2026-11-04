@@ -45,9 +45,10 @@ desde el lanzamiento.
   perfil (cuenta el plan de quien **mira**), `/recap` (pantalla «Tu año es
   Pro»), Plex en Ajustes → Conexiones, huecos «Pro» en el editor de favoritos
   del perfil y aviso con enlace a `/planes` al pasar del límite de listas.
-- Insignia de plan (`PlanBadge`, logo y colores en `planVisuals.js`, los
-  mismos que las tarjetas de `/planes`): junto al nombre en el título del
-  perfil (y en la cabecera compacta) para **todos** los planes, Gratis
+- Insignia de plan (`PlanBadge`: píldora sin borde con medalla; logos propios
+  en `planIcons.jsx` y colores en `planVisuals.js`, los mismos que las
+  tarjetas de `/planes`): bajo el nombre del perfil, junto al
+  `@usuario` (y en la cabecera compacta) para **todos** los planes, Gratis
   incluido; en las filas de miembros (seguidores, seguidos, pestaña Social,
   `/members`) solo Sin anuncios y Pro. El backend envía siempre el plan
   público (`publicPlanBadge`: la suscripción en vigor o `free`), también con

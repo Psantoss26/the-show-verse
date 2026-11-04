@@ -6,20 +6,16 @@ import { planName } from "@/lib/billing/plans";
 // siempre el plan público (`publicPlanBadge`: el que se paga o 'free'),
 // también con la facturación apagada.
 //
-// `showFree`: el plan Gratis solo se enseña donde se pide (título del
+// `showFree`: el plan Gratis solo se enseña donde se pide (cabecera del
 // perfil); en las listas de miembros llevaría insignia casi todo el mundo y
 // solo destaca quien paga.
-// `collapse`: en pantallas estrechas solo el logo (filas de miembros, donde el
-// texto se comía el nombre); el plan sigue en el tooltip y para lectores.
-// `size`: "sm" (filas), "md" y "title" (junto al nombre grande del perfil;
-// crece con el contenedor `detail-page`).
+// `collapse`: en pantallas estrechas solo la medalla (filas de miembros, donde
+// el texto se comía el nombre); el plan sigue en el tooltip y para lectores.
+// `size`: "sm" (filas de miembros) o "md" (bajo el nombre del perfil, junto
+// al @usuario).
 const SIZES = {
-  sm: { box: "h-5 gap-1 px-2 text-[10px]", icon: "h-3 w-3" },
-  md: { box: "h-6 gap-1.5 px-2.5 text-[11px]", icon: "h-3.5 w-3.5" },
-  title: {
-    box: "h-6 gap-1.5 px-2.5 text-[11px] @[640px]/detail-page:h-7 @[640px]/detail-page:px-3 @[640px]/detail-page:text-xs",
-    icon: "h-3.5 w-3.5 @[640px]/detail-page:h-4 @[640px]/detail-page:w-4",
-  },
+  sm: { pill: "h-5 gap-1 pl-0.5 pr-2 text-[10px]", medal: "h-4 w-4", glyph: "h-2.5 w-2.5" },
+  md: { pill: "h-6 gap-1.5 pl-[3px] pr-2.5 text-[11px]", medal: "h-[18px] w-[18px]", glyph: "h-3 w-3" },
 };
 
 export default function PlanBadge({ plan, size = "sm", collapse = false, showFree = false, className = "", ...rest }) {
@@ -27,17 +23,20 @@ export default function PlanBadge({ plan, size = "sm", collapse = false, showFre
   if (!visuals || (plan === "free" && !showFree)) return null;
   const Icon = visuals.icon;
   const name = planName(plan);
-  const sizing = collapse ? "h-5 w-5 justify-center text-[10px] sm:w-auto sm:gap-1 sm:px-2" : SIZES[size].box;
-  const iconSize = collapse ? SIZES.sm.icon : SIZES[size].icon;
+  const sizes = SIZES[size];
+  // Plegada: en el móvil queda solo la medalla, sin píldora.
+  const pill = collapse ? `h-5 text-[10px] sm:gap-1 sm:pl-0.5 sm:pr-2 ${visuals.pillSm}` : `${sizes.pill} ${visuals.pill}`;
   return (
     <span
       title={`Plan ${name}`}
-      className={`inline-flex shrink-0 items-center rounded-full font-bold uppercase leading-none tracking-wider ${sizing} ${visuals.badge} ${className}`}
+      className={`inline-flex shrink-0 items-center rounded-full font-bold uppercase leading-none tracking-wider ${pill} ${className}`}
       {...rest}
     >
-      <Icon className={`shrink-0 ${iconSize}`} aria-hidden="true" />
+      <span className={`flex shrink-0 items-center justify-center rounded-full ${collapse ? SIZES.sm.medal : sizes.medal} ${visuals.medal}`}>
+        <Icon className={`shrink-0 ${collapse ? SIZES.sm.glyph : sizes.glyph}`} />
+      </span>
       <span className="sr-only">Plan </span>
-      <span className={collapse ? "sr-only sm:not-sr-only" : undefined}>{name}</span>
+      <span className={`${collapse ? "sr-only sm:not-sr-only" : ""} ${visuals.label}`}>{name}</span>
     </span>
   );
 }
