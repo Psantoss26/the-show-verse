@@ -71,7 +71,7 @@ import {
 } from "@/lib/history/episodeSeasonMetadata";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
-import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
+import { ControlledOptionsSheet, OptionsSheetTrigger, SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
 import {
@@ -79,6 +79,7 @@ import {
   AdvancedFiltersButton,
   AdvancedFiltersPanel,
   AdvancedFiltersSheetButton,
+  useAdvancedFiltersRequested,
 } from "@/components/userLists/AdvancedFilters";
 import {
   applyAdvancedFilters,
@@ -3170,14 +3171,19 @@ export default function HistoryClient() {
       return false;
     }
   });
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Abierta/cerrada fuera del estado de la página: abrir o cerrar la hoja no
+  // repinta las tarjetas (ver useOptionsSheetController).
+  const filtersSheet = useOptionsSheetController();
   // Filtros avanzados (notas, año, géneros, plataformas): panel lateral en
   // escritorio, dentro de la hoja de filtros en móvil. Todo lo del historial
   // está visto, así que aquí no hay selector de visto.
   const [advancedFilters, setAdvancedFiltersState] = useState(() =>
     readAdvancedFilters(HISTORY_ADVANCED_FILTERS_KEY),
   );
-  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const advancedSheet = useOptionsSheetController();
+  // true desde la primera vez que se abre la hoja de avanzados (ya subida):
+  // entonces se piden sus datos.
+  const advancedRequested = useAdvancedFiltersRequested(advancedSheet);
   const setAdvancedFilters = useCallback((next) => {
     setAdvancedFiltersState(next);
     writeAdvancedFilters(HISTORY_ADVANCED_FILTERS_KEY, next);
@@ -3697,7 +3703,10 @@ export default function HistoryClient() {
   // Datos por TÍTULO para los filtros avanzados: las entradas solo traen el
   // año. Géneros y nota TMDb (title-meta por lotes), IMDb, mis notas y
   // plataformas se piden solo al abrir los filtros o con alguno activo.
-  const advancedPanelShown = advancedFiltersOpen || mobileFiltersOpen;
+  // Solo la hoja de filtros avanzados: la de filtros de la página no enseña
+  // nada de esto, y pedirlo al abrirla repintaba la página a mitad de su
+  // animación.
+  const advancedPanelShown = advancedRequested;
   const historyTitleKeys = useMemo(() => {
     const keys = new Set();
     for (const entry of raw || []) {
@@ -4296,15 +4305,16 @@ export default function HistoryClient() {
                     <CalendarDays className="w-4 h-4" />
                   </button>
                   </motion.div>
-                  <button
-                    type="button"
-                    onClick={() => setMobileFiltersOpen((v) => !v)}
+                  <OptionsSheetTrigger
+                    controller={filtersSheet}
                     aria-label="Filtros y vista"
-                    className={`relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                      mobileFiltersOpen
+                    className={(open) =>
+                      `relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                      open
                         ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                         : "text-zinc-200 hover:bg-black/30"
-                    }`}
+                    }`
+                    }
                   >
                     <SlidersHorizontal className="w-4 h-4" />
                     {activeAdvancedFilters.length ? (
@@ -4315,21 +4325,20 @@ export default function HistoryClient() {
                         />
                       </span>
                     ) : null}
-                  </button>
+                  </OptionsSheetTrigger>
                   </div>
                 </div>
 
-                <MobileOptionsSheet
-                  open={mobileFiltersOpen}
-                  onClose={() => setMobileFiltersOpen(false)}
+                <ControlledOptionsSheet
+                  controller={filtersSheet}
                   accent="emerald"
                   headerAction={
                     <AdvancedFiltersSheetButton
                       count={activeAdvancedFilters.length}
                       accent="emerald"
                       onClick={() => {
-                        setMobileFiltersOpen(false);
-                        setAdvancedFiltersOpen(true);
+                        filtersSheet.close();
+                        advancedSheet.open();
                       }}
                     />
                   }
@@ -4497,16 +4506,15 @@ export default function HistoryClient() {
                       tone={editMode ? "default" : "danger"}
                       onClick={() => {
                         setEditMode(!editMode);
-                        setMobileFiltersOpen(false);
+                        filtersSheet.close();
                       }}
                     >
                       {editMode ? "Salir del modo borrar" : "Borrar registros"}
                     </SheetAction>
                   </SheetOptionGroup>
-                </MobileOptionsSheet>
+                </ControlledOptionsSheet>
                 <AdvancedFiltersPanel
-                  open={advancedFiltersOpen}
-                  onClose={() => setAdvancedFiltersOpen(false)}
+                  controller={advancedSheet}
                   accent="emerald"
                   activeFilters={activeAdvancedFilters}
                   resultCount={null}
@@ -4697,8 +4705,7 @@ export default function HistoryClient() {
                   </InlineDropdown>
 
                   <AdvancedFiltersButton
-                    open={advancedFiltersOpen}
-                    onClick={() => setAdvancedFiltersOpen(true)}
+                    controller={advancedSheet}
                     count={activeAdvancedFilters.length}
                     accent="emerald"
                   />

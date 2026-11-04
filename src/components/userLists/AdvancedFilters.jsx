@@ -11,7 +11,7 @@
 //   - `AdvancedFiltersSheetButton`: el de móvil, en la cabecera de la hoja de
 //     filtros de la página.
 
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import {
   CalendarClock,
   CalendarDays,
@@ -31,7 +31,13 @@ import {
   Tv,
   Users,
 } from "lucide-react";
-import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
+import {
+  ControlledOptionsSheet,
+  SheetAction,
+  SheetOption,
+  SheetOptionGroup,
+  useOptionsSheetOpen,
+} from "@/components/ui/MobileOptionsSheet";
 import {
   ADVANCED_PROVIDER_OPTIONS,
   DAY_PART_OPTIONS,
@@ -529,11 +535,31 @@ export function AdvancedFiltersBadge({ count, accent = "red" }) {
   );
 }
 
-export function AdvancedFiltersButton({ open, onClick, count = 0, accent = "red" }) {
+// La página pide los datos de los filtros avanzados (fichas, notas…) la
+// primera vez que se abre su hoja, pero sin repintarse en el fotograma en que
+// empieza a subir: se entera al terminar la animación, y solo una vez.
+const ADVANCED_DATA_DELAY_MS = 380;
+
+export function useAdvancedFiltersRequested(controller) {
+  const open = useOptionsSheetOpen(controller);
+  const [requested, setRequested] = useState(false);
+  useEffect(() => {
+    if (!open || requested) return undefined;
+    const timer = window.setTimeout(
+      () => startTransition(() => setRequested(true)),
+      ADVANCED_DATA_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [open, requested]);
+  return requested;
+}
+
+export function AdvancedFiltersButton({ controller, count = 0, accent = "red" }) {
+  const open = useOptionsSheetOpen(controller);
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={controller.open}
       aria-haspopup="dialog"
       aria-expanded={open ? "true" : "false"}
       className="sv-page-toolbar-trigger inline-flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10"
@@ -565,8 +591,7 @@ export function AdvancedFiltersSheetButton({ onClick, count = 0, accent = "red" 
 // Hoja de los filtros avanzados: de lado en escritorio (desde 640px) e
 // inferior en móvil, con los grupos y un pie para restablecer / cerrar.
 export function AdvancedFiltersPanel({
-  open,
-  onClose,
+  controller,
   accent = "red",
   activeFilters = [],
   resultCount = null,
@@ -576,9 +601,8 @@ export function AdvancedFiltersPanel({
 }) {
   const accentHex = ACCENT_HEX[accent] || ACCENT_HEX.red;
   return (
-    <MobileOptionsSheet
-      open={open}
-      onClose={onClose}
+    <ControlledOptionsSheet
+      controller={controller}
       title="Filtros avanzados"
       subtitle={
         activeFilters.length
@@ -600,7 +624,7 @@ export function AdvancedFiltersPanel({
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={controller.close}
             className="flex min-h-11 flex-1 items-center justify-center rounded-2xl px-4 text-sm font-black text-white shadow-lg transition hover:brightness-110"
             style={{ background: accentHex }}
           >
@@ -612,6 +636,6 @@ export function AdvancedFiltersPanel({
       }
     >
       <AdvancedFilterGroups filters={filters} onChange={onChange} accent={accent} {...groupProps} />
-    </MobileOptionsSheet>
+    </ControlledOptionsSheet>
   );
 }

@@ -53,9 +53,25 @@ const LOCAL_DROPDOWNS = [
   "components/details/CreditFilterControls.jsx",
 ];
 
+// Páginas de usuario con filtros avanzados: su hoja va con un controlador
+// (abrir o cerrar no repinta la página; ver useOptionsSheetController) y la
+// cierra él mismo.
+const CONTROLLED_PAGES = new Set([
+  "app/favorites/FavoritesClient.jsx",
+  "app/history/HistoryClient.jsx",
+  "app/in-progress/InProgressClient.jsx",
+  "app/watchlist/WatchlistClient.jsx",
+]);
+
 test("las páginas abren su menú móvil en la hoja común, que se puede cerrar", () => {
   for (const page of PAGES) {
     const source = read(page);
+    if (CONTROLLED_PAGES.has(page)) {
+      assert.match(source, /<ControlledOptionsSheet\s+controller=\{filtersSheet\}/, page);
+      assert.match(source, /<OptionsSheetTrigger\s+controller=\{filtersSheet\}/, page);
+      assert.doesNotMatch(source, /mobileFiltersOpen/, page);
+      continue;
+    }
     assert.match(source, /import MobileOptionsSheet\b.*from "@\/components\/ui\/MobileOptionsSheet";/, page);
     assert.match(source, /<MobileOptionsSheet\s[^>]*?onClose=/s, page);
     // Ya no hay desplegable en el sitio en el menú móvil de la página (Actor
@@ -80,7 +96,20 @@ test("las vistas laterales abren sus filtros en la hoja, dentro del ancho del pa
   assert.doesNotMatch(filmography, /tabs=\{|role="radiogroup"/);
   assert.match(sheet, /placement === "sectionSheet" \? "sm:ml-auto sm:w-\[30rem\]/);
   // La vista lateral de debajo marca `data-sv-sheet-open`: la hoja no se lo quita.
-  assert.match(sheet, /if \(root\.hasAttribute\("data-sv-sheet-open"\)\) return undefined;/);
+  assert.match(sheet, /if \(root\.hasAttribute\(SHEET_OPEN_ATTR\)\) return;/);
+  assert.match(sheet, /if \(pageBelowHolders \|\| !ownsPageBelowAttr\) return;/);
+});
+
+test("la hoja anima entera al abrir y al cerrar aunque la página esté ocupada", () => {
+  // Se desmonta al acabar la animación de salida, no con un temporizador fijo
+  // que la cortaba si arrancaba tarde.
+  assert.match(sheet, /onAnimationEnd=\{\(event\) => \{\s*if \(closing && event\.target === event\.currentTarget && EXIT_ANIMATIONS\.has\(event\.animationName\)\)/);
+  assert.match(sheet, /MOBILE_OPTIONS_SHEET_EXIT_MS \+ EXIT_FALLBACK_EXTRA_MS/);
+  // La pausa de la página (recalcula ~11.000 elementos) no va en el primer
+  // fotograma de la animación.
+  assert.match(sheet, /pageBelowHolders > 0 \? \(hold\(\), \(\) => \{\}\) : afterTwoFrames\(hold\)/);
+  assert.match(sheet, /if \(held\) afterTwoFrames\(releasePageBelow\)/);
+  assert.match(sheet, /export function useOptionsSheetController\(\)/);
 });
 
 test("los desplegables de las páginas se pintan como opciones a la vista dentro de la hoja", () => {

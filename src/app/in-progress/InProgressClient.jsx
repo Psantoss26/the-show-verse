@@ -55,7 +55,7 @@ import { tmdbImageLangsParam } from "@/lib/tmdb/imageLanguages";
 import { pickLadderBackdrop, pickLadderPoster } from "@/lib/details/tmdbImages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
-import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
+import { ControlledOptionsSheet, OptionsSheetTrigger, SheetOption, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
 import {
@@ -63,6 +63,7 @@ import {
   AdvancedFiltersButton,
   AdvancedFiltersPanel,
   AdvancedFiltersSheetButton,
+  useAdvancedFiltersRequested,
 } from "@/components/userLists/AdvancedFilters";
 import {
   applyAdvancedFilters,
@@ -627,7 +628,6 @@ function GroupDivider({
   total,
   avgProgress,
   isFirstGroup = false,
-  mobileFiltersOpen = false,
 }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
 
@@ -635,9 +635,7 @@ function GroupDivider({
     <motion.div
       className={
         isFirstGroup
-          ? mobileFiltersOpen
-            ? "mt-0 mb-4 sm:my-8"
-            : "mt-2 mb-4 sm:my-8"
+          ? "mt-2 mb-4 sm:my-8"
           : "my-4 sm:my-8"
       }
       initial={{ opacity: 0, y: 20 }}
@@ -1353,7 +1351,9 @@ export default function InProgressClient({
   );
   const [q, setQ] = useState("");
   const [isMobile, setIsMobile] = useState(false);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Abierta/cerrada fuera del estado de la página: abrir o cerrar la hoja no
+  // repinta las tarjetas (ver useOptionsSheetController).
+  const filtersSheet = useOptionsSheetController();
   // Filtros avanzados (notas, año, géneros, plataformas): panel lateral en
   // escritorio, dentro de la hoja de filtros en móvil. Todo son series ya
   // empezadas, así que no hay selector de visto. Los mismos para En progreso y
@@ -1361,7 +1361,10 @@ export default function InProgressClient({
   const [advancedFilters, setAdvancedFiltersState] = useState(() =>
     readAdvancedFilters(IN_PROGRESS_ADVANCED_FILTERS_KEY),
   );
-  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const advancedSheet = useOptionsSheetController();
+  // true desde la primera vez que se abre la hoja de avanzados (ya subida):
+  // entonces se piden sus datos.
+  const advancedRequested = useAdvancedFiltersRequested(advancedSheet);
   const setAdvancedFilters = useCallback((next) => {
     setAdvancedFiltersState(next);
     writeAdvancedFilters(IN_PROGRESS_ADVANCED_FILTERS_KEY, next);
@@ -1812,8 +1815,7 @@ export default function InProgressClient({
     advancedTitleKeys,
     {
       enabled:
-        advancedFiltersOpen ||
-        mobileFiltersOpen ||
+        advancedRequested ||
         advancedNeeds.titleMeta ||
         advancedNeeds.languages ||
         advancedNeeds.votes,
@@ -2365,15 +2367,16 @@ export default function InProgressClient({
               )}
             </div>
             <WatchingSectionNav className="h-11 shrink-0" />
-            <button
-              type="button"
-              onClick={() => setMobileFiltersOpen((v) => !v)}
+            <OptionsSheetTrigger
+              controller={filtersSheet}
               aria-label="Filtros y vista"
-              className={`relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                mobileFiltersOpen
+              className={(open) =>
+                `relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                open
                   ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                   : "text-zinc-200 hover:bg-black/30"
-              }`}
+              }`
+              }
             >
               <SlidersHorizontal className="w-4 h-4" />
               {activeAdvancedFilters.length ? (
@@ -2384,20 +2387,19 @@ export default function InProgressClient({
                   />
                 </span>
               ) : null}
-            </button>
+            </OptionsSheetTrigger>
           </div>
 
-          <MobileOptionsSheet
-            open={mobileFiltersOpen}
-            onClose={() => setMobileFiltersOpen(false)}
+          <ControlledOptionsSheet
+            controller={filtersSheet}
             accent="emerald"
             headerAction={
               <AdvancedFiltersSheetButton
                 count={activeAdvancedFilters.length}
                 accent="emerald"
                 onClick={() => {
-                  setMobileFiltersOpen(false);
-                  setAdvancedFiltersOpen(true);
+                  filtersSheet.close();
+                  advancedSheet.open();
                 }}
               />
             }
@@ -2460,10 +2462,9 @@ export default function InProgressClient({
             {viewMode === "poster" && (
               <ImageModeSheetGroup value={posterImageMode} onChange={setPosterImageMode} />
             )}
-          </MobileOptionsSheet>
+          </ControlledOptionsSheet>
           <AdvancedFiltersPanel
-            open={advancedFiltersOpen}
-            onClose={() => setAdvancedFiltersOpen(false)}
+            controller={advancedSheet}
             accent="emerald"
             activeFilters={activeAdvancedFilters}
             resultCount={contentPending ? null : filtered.length}
@@ -2541,8 +2542,7 @@ export default function InProgressClient({
             </InlineDropdown>
 
             <AdvancedFiltersButton
-              open={advancedFiltersOpen}
-              onClick={() => setAdvancedFiltersOpen(true)}
+              controller={advancedSheet}
               count={activeAdvancedFilters.length}
               accent="emerald"
             />
@@ -2648,7 +2648,6 @@ export default function InProgressClient({
                       total={filtered.length}
                       avgProgress={group.avgProgress}
                       isFirstGroup={groupIndex === 0}
-                      mobileFiltersOpen={mobileFiltersOpen}
                     />
 
                     {viewMode === "cards" ? (

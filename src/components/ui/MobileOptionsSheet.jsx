@@ -21,13 +21,57 @@
 //     (`data-sv-sheet-open`, globals.css): el velo ya la desenfoca y así cada
 //     toque dentro de la hoja no reorganiza las capas de toda la página.
 
-import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircle2, SlidersHorizontal, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 export const MOBILE_OPTIONS_SHEET_EXIT_MS = 220;
+// Si `animationend` no llega (pestaña oculta, animación anulada), se desmonta
+// igual pasado este margen extra.
+const EXIT_FALLBACK_EXTRA_MS = 400;
+const EXIT_ANIMATIONS = new Set(["sv-options-sheet-out", "sv-options-side-out"]);
+
+// `data-sv-sheet-open` (pausa el cristal de la página tapada) cambia el estilo
+// de TODA la página: ~11.000 elementos, 35 ms en un portátil y 140 ms con la
+// CPU de un móvil. Ponerlo o quitarlo en el mismo fotograma en que empieza la
+// animación de la hoja retrasaba ese fotograma y la hoja aparecía ya a mitad
+// de camino. Se hace dos fotogramas después, con la animación ya corriendo en
+// el compositor. Varias hojas a la vez (la de filtros cerrándose mientras sube
+// la de filtros avanzados) lo comparten: se quita al soltarlo la última, así
+// el relevo no lo quita y lo vuelve a poner.
+const SHEET_OPEN_ATTR = "data-sv-sheet-open";
+let pageBelowHolders = 0;
+let ownsPageBelowAttr = false;
+
+function holdPageBelow() {
+  pageBelowHolders += 1;
+  if (pageBelowHolders !== 1) return;
+  const root = document.documentElement;
+  // Si ya lo puso la vista lateral de debajo, es suyo: no se toca.
+  if (root.hasAttribute(SHEET_OPEN_ATTR)) return;
+  root.setAttribute(SHEET_OPEN_ATTR, "");
+  ownsPageBelowAttr = true;
+}
+
+function releasePageBelow() {
+  pageBelowHolders = Math.max(0, pageBelowHolders - 1);
+  if (pageBelowHolders || !ownsPageBelowAttr) return;
+  document.documentElement.removeAttribute(SHEET_OPEN_ATTR);
+  ownsPageBelowAttr = false;
+}
+
+function afterTwoFrames(callback) {
+  let second = 0;
+  const first = requestAnimationFrame(() => {
+    second = requestAnimationFrame(callback);
+  });
+  return () => {
+    cancelAnimationFrame(first);
+    cancelAnimationFrame(second);
+  };
+}
 // Arrastre que cierra la hoja (px hacia abajo), o un gesto rápido.
 const DRAG_CLOSE_DISTANCE = 96;
 const DRAG_CLOSE_VELOCITY = 0.6;
@@ -49,6 +93,73 @@ const ACCENTS = {
 };
 
 const OptionsSheetContext = createContext(null);
+
+// Controlador de abierta/cerrada FUERA del estado de la página. Si el `open`
+// vive en el componente de la página (Favoritos, Historial…), abrir o cerrar
+// la hoja repinta la página entera —cientos de tarjetas— en el mismo
+// fotograma en que empieza la animación, y la hoja aparecía tarde. Con el
+// controlador solo se repintan la hoja y su botón (`useOptionsSheetOpen`). La
+// página, que crea el contenido, lo sigue pasando como `children`.
+function createSheetController() {
+  let open = false;
+  const listeners = new Set();
+  const set = (next) => {
+    if (next === open) return;
+    open = next;
+    listeners.forEach((listener) => listener());
+  };
+  return {
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    getSnapshot: () => open,
+    open: () => set(true),
+    close: () => set(false),
+    toggle: () => set(!open),
+  };
+}
+
+const getServerSnapshot = () => false;
+
+export function useOptionsSheetController() {
+  const [controller] = useState(createSheetController);
+  return controller;
+}
+
+export function useOptionsSheetOpen(controller) {
+  return useSyncExternalStore(
+    controller?.subscribe ?? noopSubscribe,
+    controller?.getSnapshot ?? getServerSnapshot,
+    getServerSnapshot,
+  );
+}
+
+const noopSubscribe = () => () => {};
+
+// Botón que abre la hoja de un controlador; `className(open)` para el estado
+// activo. Solo él se repinta al abrir y cerrar.
+export function OptionsSheetTrigger({ controller, className, children, ...props }) {
+  const open = useOptionsSheetOpen(controller);
+  return (
+    <button
+      type="button"
+      aria-expanded={open ? "true" : "false"}
+      aria-haspopup="dialog"
+      {...props}
+      onClick={controller.toggle}
+      className={typeof className === "function" ? className(open) : className}
+    >
+      {children}
+    </button>
+  );
+}
+
+// La hoja ligada a un controlador.
+export function ControlledOptionsSheet({ controller, onClose, ...props }) {
+  const open = useOptionsSheetOpen(controller);
+  return <MobileOptionsSheet {...props} open={open} onClose={onClose ?? controller.close} />;
+}
 
 // ¿Se está pintando dentro de la hoja? Los desplegables de las páginas lo
 // consultan para pintarse como grupo de píldoras en vez de como desplegable.
@@ -104,7 +215,17 @@ export default function MobileOptionsSheet({
 
   useEffect(() => setPortalReady(true), []);
 
-  // Montada mientras está abierta o saliendo.
+  const finishExit = () => {
+    setPresent(false);
+    setClosing(false);
+    setDragOffset(0);
+  };
+
+  // Montada mientras está abierta o saliendo. Se desmonta al TERMINAR la
+  // animación de salida (`animationend`), no a los 220 ms de pedir el cierre:
+  // si el hilo principal estaba ocupado (la página repinta al cerrar), la
+  // animación arrancaba tarde y el temporizador la cortaba a los pocos
+  // fotogramas (la hoja bajaba ~30 px y desaparecía de golpe).
   useEffect(() => {
     if (open) {
       setPresent(true);
@@ -115,26 +236,29 @@ export default function MobileOptionsSheet({
     if (!present) return undefined;
     setClosing(true);
     const timer = window.setTimeout(
-      () => {
-        setPresent(false);
-        setClosing(false);
-        setDragOffset(0);
-      },
-      prefersReducedMotion() ? 0 : MOBILE_OPTIONS_SHEET_EXIT_MS,
+      finishExit,
+      prefersReducedMotion() ? 0 : MOBILE_OPTIONS_SHEET_EXIT_MS + EXIT_FALLBACK_EXTRA_MS,
     );
     return () => window.clearTimeout(timer);
   }, [open, present]);
 
   useModalGuard({ open, onClose });
 
-  // Si ya lo puso la vista lateral de debajo, es suyo: al cerrar la hoja no se
-  // quita.
+  // Pausa del cristal de la página tapada (ver holdPageBelow): se coge dos
+  // fotogramas después de abrir y se suelta dos después de empezar a cerrar.
+  // Con otra hoja ya sosteniéndola (relevo), se coge al momento: no cuesta nada.
   useEffect(() => {
     if (!open || !pausePageBelow) return undefined;
-    const root = document.documentElement;
-    if (root.hasAttribute("data-sv-sheet-open")) return undefined;
-    root.setAttribute("data-sv-sheet-open", "");
-    return () => root.removeAttribute("data-sv-sheet-open");
+    let held = false;
+    const hold = () => {
+      held = true;
+      holdPageBelow();
+    };
+    const cancel = pageBelowHolders > 0 ? (hold(), () => {}) : afterTwoFrames(hold);
+    return () => {
+      cancel();
+      if (held) afterTwoFrames(releasePageBelow);
+    };
   }, [open, pausePageBelow]);
 
   // Foco al panel al abrir (lectores de pantalla y Escape).
@@ -194,6 +318,11 @@ export default function MobileOptionsSheet({
       <div
         ref={panelRef}
         tabIndex={-1}
+        onAnimationEnd={(event) => {
+          if (closing && event.target === event.currentTarget && EXIT_ANIMATIONS.has(event.animationName)) {
+            finishExit();
+          }
+        }}
         className={`relative flex max-h-[min(85dvh,44rem)] w-full flex-col overflow-hidden rounded-t-[2rem] outline-none ${
           placement === "sectionSheet" ? "sm:ml-auto sm:w-[30rem] sm:rounded-bl-[2rem] lg:w-[34rem]" : ""
         } ${

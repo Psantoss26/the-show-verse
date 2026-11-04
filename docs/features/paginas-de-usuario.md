@@ -115,6 +115,12 @@ En el móvil, el botón de filtros de la barra de Favoritos, Pendientes, Histori
 
 La barra se sigue fijando bajo la barra superior al hacer scroll (`isPinned` de `useStickyToolbarState`).
 
+**Animación de la hoja:** sube y baja solo con `transform`, que corre en el compositor. Tres cosas la estropeaban en móvil y están corregidas:
+
+- **Desmontaje:** la hoja se desmonta al terminar su animación de salida (`animationend`), con un tope de seguridad. Antes lo hacía un temporizador fijo de 220 ms, y si el hilo principal estaba ocupado la animación arrancaba tarde y se cortaba: la hoja bajaba unos píxeles y desaparecía.
+- **Pausa del cristal:** `data-sv-sheet-open` recalcula el estilo de toda la página (unos 11.000 elementos). Ahora se pone dos fotogramas después de abrir y se quita dos después de empezar a cerrar, con la animación ya en marcha. Si dos hojas se relevan (filtros → avanzados), la pausa se comparte y no se quita y se vuelve a poner.
+- **Estado abierto/cerrado:** en Favoritos, Pendientes, Historial y En progreso va en un controlador externo (`useOptionsSheetController`, `ControlledOptionsSheet`, `OptionsSheetTrigger`), así que abrir o cerrar no repinta la página entera. La página solo se entera, una vez y al terminar de subir, de que se abrió la hoja de avanzados (`useAdvancedFiltersRequested`), para pedir sus datos. Las cabeceras de grupo ya no cambian de posición al abrir la hoja: era un resto del antiguo desplegable en el sitio.
+
 ## Fichas superpuestas (rutas interceptoras)
 
 Al abrir una ficha (`/details/...`) desde dentro de la app, Next la pinta en el slot `src/app/@overlay/(.)details/...` y **deja montada la página de origen**, que `OverlayRouteHost` oculta con `<Activity mode="hidden">`. Al volver atrás reaparece igual que estaba, sin volver a cargar ni animar. Recargar la URL o entrar por un enlace externo sirve la ficha completa de siempre.

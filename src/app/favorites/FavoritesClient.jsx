@@ -103,13 +103,14 @@ import {
 } from "@/lib/userLists/listScoreCache";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
-import MobileOptionsSheet, { SheetOption, SheetOptionBreak, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
+import { ControlledOptionsSheet, OptionsSheetTrigger, SheetOption, SheetOptionBreak, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
 import {
   AdvancedFiltersBadge,
   AdvancedFiltersButton,
   AdvancedFiltersPanel,
   AdvancedFiltersSheetButton,
+  useAdvancedFiltersRequested,
 } from "@/components/userLists/AdvancedFilters";
 import {
   applyAdvancedFilters,
@@ -1687,7 +1688,6 @@ function GroupDivider({
   count,
   total,
   groupBy,
-  mobileFiltersOpen,
   forceSticky = false,
   disableStickyAnimation = false,
   hasPreviousGroup = false,
@@ -1702,7 +1702,7 @@ function GroupDivider({
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   const reduceMotion = useReducedMotion();
   const skipMotion = isBackNav || disableStickyAnimation || reduceMotion;
-  const { ref, isSticky } = useStickyGroup(mobileFiltersOpen, forceSticky);
+  const { ref, isSticky } = useStickyGroup(false, forceSticky);
 
   const renderSticky = isSticky || forceSticky;
   const stickyTransitionClass =
@@ -1727,9 +1727,7 @@ function GroupDivider({
       // Fijada bajo el navbar: sus superficies pasan al cristal del
       // navbar (regla `[data-menu-pinned]` en globals.css).
       data-menu-pinned={renderSticky}
-      className={`sticky z-[60] ${hasPreviousGroup ? "my-4" : mobileFiltersOpen ? "mt-0 mb-4" : "mt-2 mb-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 ${skipMotion ? "transition-none" : "transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]"} lg:top-[136px] ${
-        mobileFiltersOpen ? "top-[216px]" : "top-[108px]"
-      }`}
+      className={`sticky z-[60] ${hasPreviousGroup ? "my-4" : "mt-2 mb-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 ${skipMotion ? "transition-none" : "transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]"} top-[108px] lg:top-[136px]`}
       // Solo opacidad al entrar: trasladar este nodo alteraría la medición
       // del punto de acople. Al retroceder no se anima.
       initial={skipMotion ? false : { opacity: 0 }}
@@ -2269,13 +2267,18 @@ export default function FavoritesClient() {
   });
 
   const [q, setQ] = useState("");
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Abierta/cerrada fuera del estado de la página: abrir o cerrar la hoja no
+  // repinta las tarjetas (ver useOptionsSheetController).
+  const filtersSheet = useOptionsSheetController();
   // Filtros avanzados (notas, año, géneros, plataformas, visto): panel lateral
   // en escritorio, dentro de la hoja de filtros en móvil.
   const [advancedFilters, setAdvancedFiltersState] = useState(() =>
     readAdvancedFilters(FAVORITES_ADVANCED_FILTERS_KEY),
   );
-  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const advancedSheet = useOptionsSheetController();
+  // true desde la primera vez que se abre la hoja de avanzados (ya subida):
+  // entonces se piden sus datos.
+  const advancedRequested = useAdvancedFiltersRequested(advancedSheet);
   const setAdvancedFilters = useCallback((next) => {
     setAdvancedFiltersState(next);
     writeAdvancedFilters(FAVORITES_ADVANCED_FILTERS_KEY, next);
@@ -2830,7 +2833,7 @@ export default function FavoritesClient() {
   const { metaByKey: titleMetaByKey, pending: titleMetaPending } =
     useTitleMetaMap(advancedTitleKeys, {
       enabled:
-        advancedFiltersOpen || mobileFiltersOpen ||
+        advancedRequested ||
         advancedNeeds.titleMeta ||
         advancedNeeds.languages ||
         advancedNeeds.votes,
@@ -3558,15 +3561,16 @@ export default function FavoritesClient() {
                 </button>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => setMobileFiltersOpen((v) => !v)}
+            <OptionsSheetTrigger
+              controller={filtersSheet}
               aria-label="Filtros y vista"
-              className={`relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                mobileFiltersOpen
+              className={(open) =>
+                `relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                open
                   ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                   : "text-zinc-200 hover:bg-black/30"
-              }`}
+              }`
+              }
             >
               <SlidersHorizontal className="w-4 h-4" />
               {activeAdvancedFilters.length ? (
@@ -3577,20 +3581,19 @@ export default function FavoritesClient() {
                   />
                 </span>
               ) : null}
-            </button>
+            </OptionsSheetTrigger>
           </div>
 
-          <MobileOptionsSheet
-            open={mobileFiltersOpen}
-            onClose={() => setMobileFiltersOpen(false)}
+          <ControlledOptionsSheet
+            controller={filtersSheet}
             accent="red"
             headerAction={
               <AdvancedFiltersSheetButton
                 count={activeAdvancedFilters.length}
                 accent="red"
                 onClick={() => {
-                  setMobileFiltersOpen(false);
-                  setAdvancedFiltersOpen(true);
+                  filtersSheet.close();
+                  advancedSheet.open();
                 }}
               />
             }
@@ -3770,7 +3773,7 @@ export default function FavoritesClient() {
               </SheetOption>
             </SheetOptionGroup>
             <ImageModeSheetGroup value={imageMode} onChange={setImageMode} />
-          </MobileOptionsSheet>
+          </ControlledOptionsSheet>
 
           {/* Desktop: Single row */}
           <div ref={toolbarSearchFitRef} className="sv-page-toolbar relative z-10 hidden lg:flex gap-3">
@@ -3959,8 +3962,7 @@ export default function FavoritesClient() {
             </InlineDropdown>
 
             <AdvancedFiltersButton
-              open={advancedFiltersOpen}
-              onClick={() => setAdvancedFiltersOpen(true)}
+              controller={advancedSheet}
               count={activeAdvancedFilters.length}
               accent="red"
             />
@@ -4024,8 +4026,7 @@ export default function FavoritesClient() {
         </motion.div>
 
         <AdvancedFiltersPanel
-          open={advancedFiltersOpen}
-          onClose={() => setAdvancedFiltersOpen(false)}
+          controller={advancedSheet}
           accent="red"
           activeFilters={activeAdvancedFilters}
           resultCount={listLoading ? null : filtered.length}
@@ -4089,7 +4090,6 @@ export default function FavoritesClient() {
                     total={sorted.length}
                     stats={group.stats}
                     groupBy={groupBy}
-                    mobileFiltersOpen={mobileFiltersOpen}
                     forceSticky={forcedStickyGroupKey === group.key}
                     disableStickyAnimation={forcedStickyGroupKey === group.key}
                     hasPreviousGroup={groupIndex > 0}
