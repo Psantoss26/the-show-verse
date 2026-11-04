@@ -1,60 +1,54 @@
 "use client";
 
+// «Qué ver con IA» a pantalla completa (/assistant).
+//
+// Antes era un panel modal que el navbar mantenía montado (escritorio: desde el
+// desplegable de Perfil; móvil: una fila del menú lateral). Ahora es una página
+// de chat: los dos accesos del navbar son enlaces a /assistant.
+//
+//  - Conversación: burbujas del usuario a la derecha y del asistente a la
+//    izquierda, indicador de «escribiendo» mientras responde y las
+//    recomendaciones como tarjetas de título de la app (PosterTile: abren la
+//    ficha rápida, igual que en Favoritos o Pendientes).
+//  - Caja de texto fija abajo: Enter envía, Shift+Enter hace salto de línea.
+//  - Conversaciones guardadas en el dispositivo (lib/assistant/conversations):
+//    barra propia a la izquierda en escritorio; en el móvil, hoja inferior
+//    desde la cabecera. «Conversación nueva» empieza otra.
+//  - Encaja entre las barras de la app: la barra superior, la lateral de
+//    escritorio (DesktopSideNavInset la aparta sola) y la inferior del móvil.
+//    Con el teclado del móvil abierto, la página mide lo que queda visible
+//    sobre él, así que la caja de texto queda justo encima.
 
-import OptimizedImage from "@/components/OptimizedImage";
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import useModalGuard from "@/hooks/useModalGuard";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowRight,
+  ArrowUp,
   Bot,
   Brain,
   Dices,
-  Film,
+  History,
   Loader2,
-  Send,
+  MessageSquarePlus,
   Sparkles,
-  Tv,
-  X,
+  Trash2,
   Zap,
 } from "lucide-react";
-
-function getCoordinatesForPercent(percent) {
-  const x = Math.cos(2 * Math.PI * percent);
-  const y = Math.sin(2 * Math.PI * percent);
-  return [x, y];
-}
-
-function makeSvgSlice(index, total, radius = 140, cx = 150, cy = 150) {
-  const percentStart = index / total;
-  const percentEnd = (index + 1) / total;
-  
-  const [startX, startY] = getCoordinatesForPercent(percentStart - 0.25);
-  const [endX, endY] = getCoordinatesForPercent(percentEnd - 0.25);
-  
-  const x1 = cx + radius * startX;
-  const y1 = cy + radius * startY;
-  const x2 = cx + radius * endX;
-  const y2 = cy + radius * endY;
-  
-  const largeArcFlag = 1 / total > 0.5 ? 1 : 0;
-  
-  return `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
-}
-
-const ROULETTE_COLORS = [
-  "#0891b2", // cyan
-  "#8b5cf6", // violet
-  "#ec4899", // pink
-  "#f59e0b", // amber
-  "#10b981", // emerald
-  "#ef4444", // red
-  "#3b82f6", // blue
-  "#6366f1", // indigo
-];
+import LiquidButton from "@/components/LiquidButton";
+import PosterTile from "@/components/social/PosterTile";
+import AssistantRoulette from "@/components/assistant/AssistantRoulette";
+import MobileOptionsSheet from "@/components/ui/MobileOptionsSheet";
+import useFitViewportPage from "@/hooks/useFitViewportPage";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import {
+  WELCOME_TEXT,
+  conversationTitle,
+  hasUserMessages,
+  newConversationId,
+  readConversations,
+  readRecentRecommendationKeys,
+  saveRecentRecommendations,
+  upsertConversation,
+  writeConversations,
+} from "@/lib/assistant/conversations";
 
 const PROMPT_SUGGESTIONS = [
   "Algo corto, intenso y con buena nota",
@@ -64,1024 +58,642 @@ const PROMPT_SUGGESTIONS = [
 ];
 
 const QUICK_PICK_PROMPT = "Recomiéndame 3 cosas para ver ahora";
-const RECENT_RECOMMENDATIONS_KEY = "watchNextRecent";
-const RECENT_RECOMMENDATIONS_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-const RECENT_RECOMMENDATIONS_LIMIT = 40;
+const COMPOSER_MAX_HEIGHT = 160;
 
-function tmdbImg(path, size = "w342") {
-  return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
+function providerLabel(provider) {
+  if (provider === "gemini") return "Gemini";
+  if (provider === "openai") return "OpenAI";
+  if (provider === "ollama") return "Ollama";
+  return provider;
 }
 
-function mediaLabel(mediaType) {
-  return mediaType === "tv" ? "Serie" : "Película";
+function relativeDay(ts) {
+  const date = new Date(Number(ts));
+  const today = new Date();
+  const days = Math.round(
+    (new Date(today.getFullYear(), today.getMonth(), today.getDate()) -
+      new Date(date.getFullYear(), date.getMonth(), date.getDate())) /
+      86400000,
+  );
+  if (days <= 0) return "Hoy";
+  if (days === 1) return "Ayer";
+  if (days < 7) return `Hace ${days} días`;
+  return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 }
 
-function recommendationKey(item) {
-  return item?.mediaType && item?.id
-    ? `${item.mediaType}:${Number(item.id)}`
-    : null;
-}
+// ---------------------------------------------------------------------------
 
-function readRecentRecommendationEntries() {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(RECENT_RECOMMENDATIONS_KEY);
-    const parsed = JSON.parse(raw || "[]");
-    const now = Date.now();
-    const fresh = Array.isArray(parsed)
-      ? parsed.filter(
-          (entry) =>
-            entry?.key &&
-            Number.isFinite(Number(entry?.recommendedAt)) &&
-            now - Number(entry.recommendedAt) < RECENT_RECOMMENDATIONS_TTL_MS,
-        )
-      : [];
-    if (fresh.length !== parsed?.length) {
-      window.localStorage.setItem(
-        RECENT_RECOMMENDATIONS_KEY,
-        JSON.stringify(fresh.slice(0, RECENT_RECOMMENDATIONS_LIMIT)),
-      );
-    }
-    return fresh;
-  } catch {
-    return [];
-  }
-}
-
-function readRecentRecommendationKeys() {
-  return readRecentRecommendationEntries()
-    .map((entry) => entry.key)
+function TitleCard({ item }) {
+  const meta = [item?.mediaType === "tv" ? "Serie" : "Película", item?.year]
     .filter(Boolean)
-    .slice(0, RECENT_RECOMMENDATIONS_LIMIT);
-}
-
-function saveRecentRecommendations(items) {
-  if (typeof window === "undefined" || !Array.isArray(items) || !items.length) {
-    return;
-  }
-
-  try {
-    const now = Date.now();
-    const previous = readRecentRecommendationEntries();
-    const next = new Map(
-      previous.map((entry) => [
-        entry.key,
-        {
-          key: entry.key,
-          title: entry.title || "",
-          mediaType: entry.mediaType || "",
-          recommendedAt: Number(entry.recommendedAt) || now,
-        },
-      ]),
-    );
-
-    for (const item of items) {
-      const key = recommendationKey(item);
-      if (!key) continue;
-      next.set(key, {
-        key,
-        title: item?.title || "",
-        mediaType: item?.mediaType || "",
-        recommendedAt: now,
-      });
-    }
-
-    const sorted = [...next.values()]
-      .sort((a, b) => Number(b.recommendedAt) - Number(a.recommendedAt))
-      .slice(0, RECENT_RECOMMENDATIONS_LIMIT);
-    window.localStorage.setItem(
-      RECENT_RECOMMENDATIONS_KEY,
-      JSON.stringify(sorted),
-    );
-  } catch {
-    // localStorage can be unavailable in private browsing or strict modes.
-  }
-}
-
-function RecommendationCard({ item, onNavigate }) {
-  const poster = tmdbImg(item?.posterPath);
-  const backdrop = tmdbImg(item?.backdropPath, "w780");
-  const Icon = item?.mediaType === "tv" ? Tv : Film;
-
+    .join(" · ");
   return (
-    <Link
-      href={item?.href || "#"}
-      onClick={onNavigate}
-      className="group relative isolate flex min-h-[154px] overflow-hidden rounded-[2rem] border border-transparent bg-black/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] p-3 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] transition duration-300 hover:-translate-y-0.5 hover:bg-white/5 hover:shadow-[0_24px_70px_rgba(0,0,0,0.45)]"
-    >
-      <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70 -z-10" />
-      {backdrop ? (
-        <OptimizedImage
-          src={backdrop}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 -z-20 h-full w-full object-cover opacity-10 blur-sm transition duration-500 group-hover:opacity-18"
-          loading="lazy"
-          decoding="async"
-          draggable={false}
-        />
+    <div className="w-[8.5rem] shrink-0 snap-start sm:w-36 desktop:w-auto">
+      <PosterTile item={item} />
+      <p className="mt-2 line-clamp-1 text-sm font-bold text-white" title={item?.title}>
+        {item?.title}
+      </p>
+      <p className="mt-0.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-cyan-200/80">
+        <span className="truncate">{meta}</span>
+        {item?.voteAverage ? (
+          <span className="shrink-0 text-yellow-200/90">★ {Number(item.voteAverage).toFixed(1)}</span>
+        ) : null}
+      </p>
+      {item?.reason ? (
+        <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-zinc-400">{item.reason}</p>
       ) : null}
+    </div>
+  );
+}
 
-      <div className="h-32 w-[86px] shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl shadow-black/50 sm:h-36 sm:w-24">
-        {poster ? (
-          <OptimizedImage
-            src={poster}
-            alt={item?.title || ""}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-            loading="lazy"
-            decoding="async"
-            draggable={false}
-          />
-        ) : (
-          <div className="grid h-full w-full place-items-center text-zinc-600">
-            <Icon className="h-6 w-6" />
-          </div>
-        )}
-      </div>
+function AssistantAvatar() {
+  return (
+    <div
+      aria-hidden="true"
+      className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-cyan-400/15 text-cyan-200"
+    >
+      <Sparkles className="h-4 w-4" />
+    </div>
+  );
+}
 
-      <div className="min-w-0 flex-1 px-1 py-1 sm:px-2">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h4 className="line-clamp-2 text-base font-black text-white sm:text-lg">
-              {item?.title}
-            </h4>
-            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-200/80">
-              {mediaLabel(item?.mediaType)}
-              {item?.year ? ` · ${item.year}` : ""}
-            </p>
-          </div>
-          {item?.voteAverage ? (
-            <span className="shrink-0 rounded-lg bg-yellow-400/10 px-2 py-1 text-xs font-black text-yellow-200">
-              {Number(item.voteAverage).toFixed(1)}
-            </span>
-          ) : null}
+function Message({ message }) {
+  if (message.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-3xl rounded-br-lg bg-cyan-500 px-4 py-2.5 text-sm leading-relaxed text-white shadow-[0_12px_30px_rgba(34,211,238,0.18)]">
+          {message.text}
         </div>
+      </div>
+    );
+  }
 
-        <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-zinc-300">
-          {item?.reason}
-        </p>
-
-        {item?.matchTags?.length ? (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {item.matchTags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-white/10 bg-black/35 px-2.5 py-1 text-[10px] font-bold text-zinc-300"
-              >
-                {tag}
-              </span>
+  const recs = Array.isArray(message.recommendations) ? message.recommendations : [];
+  return (
+    <div className="flex gap-3">
+      <AssistantAvatar />
+      <div className="min-w-0 flex-1">
+        <div
+          className={`inline-block max-w-full whitespace-pre-wrap break-words rounded-3xl rounded-tl-lg px-4 py-2.5 text-sm leading-relaxed ${
+            message.error ? "bg-red-500/10 text-red-100" : "bg-white/[0.06] text-zinc-100"
+          }`}
+        >
+          {message.text}
+        </div>
+        {message.provider && message.provider !== "ranking" ? (
+          <span className="ml-1 mt-1.5 flex w-fit items-center gap-1.5 text-[10px] text-cyan-200/70">
+            <Brain className="h-3 w-3" />
+            {providerLabel(message.provider)}
+          </span>
+        ) : null}
+        {recs.length ? (
+          <div className="-mx-4 mt-3 flex snap-x gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden desktop:mx-0 desktop:grid desktop:grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] desktop:gap-4 desktop:overflow-visible desktop:px-0">
+            {recs.map((item) => (
+              <TitleCard key={`${item.mediaType}-${item.id}`} item={item} />
             ))}
           </div>
         ) : null}
       </div>
-
-      <ArrowRight className="mt-2 h-5 w-5 shrink-0 text-zinc-500 transition group-hover:translate-x-1 group-hover:text-cyan-200" />
-    </Link>
+    </div>
   );
 }
 
-export default function WatchNextAssistant({
-  isMobile = false,
-  heroNavMode = false,
-  triggerVariant = "icon",
-  open: openProp,
-  onOpenChange,
-  // Monta SOLO el panel, sin botón. Lo usa el navbar de escritorio: el
-  // asistente ya no tiene icono propio en la barra —se abre desde el
-  // desplegable de Perfil— pero el componente tiene que seguir montado fuera de
-  // ese desplegable, porque es quien mantiene vivo el panel.
-  hideTrigger = false,
-}) {
-  const [mounted, setMounted] = useState(false);
-  // ESTADO OPCIONALMENTE CONTROLADO.
-  //
-  // El panel se pinta con `createPortal`, pero en el árbol de React sigue
-  // siendo hijo de ESTE componente: si quien lo renderiza se desmonta, el panel
-  // se va con él. Por eso quien lo abre desde un menú que se cierra solo -- el
-  // desplegable de Perfil se cierra al pulsar fuera, y el panel está fuera --
-  // necesita poder tener el componente montado en otro sitio y solo mandarle
-  // abrirse. Sin `open`, se sigue gobernando a sí mismo como hasta ahora.
-  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
-  const isControlled = openProp !== undefined;
-  const open = isControlled ? openProp : uncontrolledOpen;
-  const setOpen = useCallback(
-    (value) => {
-      const next = typeof value === "function" ? value(open) : value;
-      if (!isControlled) setUncontrolledOpen(next);
-      onOpenChange?.(next);
-    },
-    [isControlled, onOpenChange, open],
+function TypingIndicator() {
+  return (
+    <div className="flex gap-3" role="status" aria-label="El asistente está escribiendo">
+      <AssistantAvatar />
+      <div className="flex items-center gap-1 rounded-3xl rounded-tl-lg bg-white/[0.06] px-4 py-3.5">
+        {[0, 160, 320].map((delay) => (
+          <span
+            key={delay}
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-300 motion-reduce:animate-none"
+            style={{ animationDelay: `${delay}ms`, animationDuration: "1s" }}
+          />
+        ))}
+      </div>
+    </div>
   );
+}
+
+function ConversationList({ conversations, activeId, onSelect, onDelete }) {
+  if (!conversations.length) {
+    return (
+      <p className="px-3 py-2 text-xs leading-relaxed text-zinc-500">
+        Tus conversaciones aparecerán aquí. Se guardan en este dispositivo.
+      </p>
+    );
+  }
+  return (
+    <ul className="space-y-0.5">
+      {conversations.map((c) => {
+        const active = c.id === activeId;
+        return (
+          <li key={c.id} className="group/conv relative">
+            <button
+              type="button"
+              onClick={() => onSelect(c.id)}
+              aria-current={active ? "true" : undefined}
+              className={`flex w-full flex-col rounded-xl px-3 py-2 pr-9 text-left transition-colors ${
+                active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <span className="truncate text-sm">{c.title}</span>
+              <span className="text-[11px] text-zinc-500">{relativeDay(c.updatedAt)}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(c.id)}
+              aria-label={`Borrar «${c.title}»`}
+              className="absolute right-1.5 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-zinc-500 transition hover:bg-white/10 hover:text-red-300 desktop:opacity-0 desktop:group-hover/conv:opacity-100 desktop:focus-visible:opacity-100"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+export default function WatchNextAssistant() {
+  useFitViewportPage();
+
+  const [conversationId, setConversationId] = useState(newConversationId);
+  const [messages, setMessages] = useState([]);
+  const [conversations, setConversations] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      text: "Dime qué te apetece ahora mismo y cruzaré tus pendientes, favoritos, historial y valoraciones para proponerte algo con sentido.",
-      recommendations: [],
-    },
-  ]);
-  const inputRef = useRef(null);
-  const messagesEndRef = useRef(null);
-  const titleId = "watch-next-assistant-title";
-  const drawerTrigger = triggerVariant === "drawer";
-  const reduceMotion = useReducedMotion();
-
-  const [showRoulette, setShowRoulette] = useState(false);
-  const [rouletteItems, setRouletteItems] = useState([]);
-  const [isSpinning, setIsSpinning] = useState(false);
-  const [spinRotation, setSpinRotation] = useState(0);
-  const [chosenItem, setChosenItem] = useState(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [roulette, setRoulette] = useState(null); // null | items[]
   const [rouletteLoading, setRouletteLoading] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(null);
 
-  const handleOpenRoulette = async () => {
-    setChosenItem(null);
-    setSpinRotation(0);
-
-    if (latestRecommendations && latestRecommendations.length >= 3) {
-      setRouletteItems(latestRecommendations.slice(0, 8));
-      setShowRoulette(true);
-      return;
-    }
-
-    setRouletteLoading(true);
-    try {
-      const res = await fetch("/api/ai/watch-next", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: "",
-          mode: "quick_pick",
-          limit: 8,
-          recentKeys: readRecentRecommendationKeys(),
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error || "Error al cargar candidatos");
-
-      const recs = Array.isArray(json?.recommendations) ? json.recommendations : [];
-      if (recs.length === 0) throw new Error("No hay recomendaciones disponibles");
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: "He preparado estas recomendaciones especiales para girar la ruleta.",
-          recommendations: recs,
-          provider: json?.provider || null,
-          mode: json?.mode || null,
-        },
-      ]);
-      setRouletteItems(recs.slice(0, 8));
-      setShowRoulette(true);
-    } catch (err) {
-      alert(err.message || "No se pudo iniciar la ruleta.");
-    } finally {
-      setRouletteLoading(false);
-    }
-  };
-
-  const handleSpin = () => {
-    if (isSpinning || rouletteItems.length < 3) return;
-
-    setIsSpinning(true);
-    setChosenItem(null);
-
-    const total = rouletteItems.length;
-    const winningIndex = Math.floor(Math.random() * total);
-
-    const sliceAngle = 360 / total;
-    const targetAngle = 360 - (winningIndex + 0.5) * sliceAngle;
-    const extraSpins = reduceMotion ? 360 : 360 * 6; // 1 rotation if reduced motion, 6 otherwise
-
-    const currentModulo = spinRotation % 360;
-    const baseRotation = spinRotation - currentModulo;
-    const nextRotation = baseRotation + extraSpins + targetAngle;
-
-    setSpinRotation(nextRotation);
-
-    const duration = reduceMotion ? 600 : 5100;
-    setTimeout(() => {
-      setIsSpinning(false);
-      setChosenItem(rouletteItems[winningIndex]);
-    }, duration);
-  };
-
+  const rootRef = useRef(null);
+  const scrollerRef = useRef(null);
+  const inputRef = useRef(null);
+  const abortRef = useRef(null);
+  const instantScrollRef = useRef(true);
 
   useEffect(() => {
-    setMounted(true);
+    setConversations(readConversations());
   }, []);
+
+  // Guardar la conversación en curso en cuanto el usuario ha escrito algo.
+  useEffect(() => {
+    if (!hasUserMessages(messages)) return;
+    const updatedAt = Number(messages.at(-1)?.at) || Date.now();
+    setConversations((prev) => {
+      const next = upsertConversation(prev, { id: conversationId, updatedAt, messages });
+      writeConversations(next);
+      return next;
+    });
+  }, [conversationId, messages]);
+
+  // Bajar al último mensaje. Al cambiar de conversación, sin animación.
+  useLayoutEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const instant = instantScrollRef.current;
+    instantScrollRef.current = false;
+    // Una respuesta nueva con tarjetas puede medir más que la pantalla: se
+    // queda al principio de la respuesta, no al final de las tarjetas.
+    const last = el.querySelector("[data-message]:last-of-type");
+    if (!instant && !loading && last?.dataset.message === "assistant") {
+      const top = last.offsetTop - 16;
+      el.scrollTo({ top: Math.min(top, el.scrollHeight), behavior: "smooth" });
+      return;
+    }
+    el.scrollTo({ top: el.scrollHeight, behavior: instant ? "auto" : "smooth" });
+  }, [messages, loading, conversationId]);
+
+  // TECLADO DEL MÓVIL. Chrome y Safari no encogen la página al abrirlo (solo
+  // el viewport visual), así que la caja de texto quedaría tapada. Mientras
+  // está abierto, la página mide exactamente lo visible bajo su borde
+  // superior; cerrado, manda el alto en CSS (que descuenta la barra inferior).
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const root = rootRef.current;
+        if (!root) return;
+        const keyboardOpen = window.innerHeight - vv.height > 120;
+        if (!keyboardOpen) {
+          setKeyboardHeight(null);
+          return;
+        }
+        const top = root.getBoundingClientRect().top;
+        setKeyboardHeight(Math.max(240, Math.round(vv.offsetTop + vv.height - top)));
+      });
+    };
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      cancelAnimationFrame(frame);
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  // La caja crece con el texto hasta COMPOSER_MAX_HEIGHT y luego desplaza.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT)}px`;
+  }, [input]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const latestRecommendations = useMemo(() => {
     const last = [...messages]
       .reverse()
-      .find(
-        (msg) =>
-          Array.isArray(msg.recommendations) && msg.recommendations.length,
-      );
+      .find((m) => Array.isArray(m.recommendations) && m.recommendations.length);
     return last?.recommendations || [];
   }, [messages]);
 
-  const latestProvider = useMemo(() => {
-    const last = [...messages]
-      .reverse()
-      .find((msg) => msg.role === "assistant" && msg.provider !== undefined);
-    return last?.provider || null;
-  }, [messages]);
-
-  const close = () => {
-    setOpen(false);
-    setShowRoulette(false);
+  const focusInput = () => {
+    // En táctil no se abre el teclado por sorpresa.
+    if (window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) {
+      inputRef.current?.focus();
+    }
   };
 
-  // Auto-scroll chat to bottom on new messages
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "end",
-      });
-    }
-  }, [messages, loading]);
+  const resetPending = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(false);
+    setRoulette(null);
+  };
 
-  // Comportamiento común del modal: bloqueo de scroll de fondo + cierre con Esc.
-  useModalGuard({ open, onClose: close });
+  const startNewConversation = () => {
+    resetPending();
+    instantScrollRef.current = true;
+    setConversationId(newConversationId());
+    setMessages([]);
+    setInput("");
+    setHistoryOpen(false);
+    focusInput();
+  };
 
-  const sendPrompt = async (value = input, options = {}) => {
-    const isQuickPick = options.mode === "quick_pick";
+  const openConversation = (id) => {
+    const found = conversations.find((c) => c.id === id);
+    if (!found) return;
+    resetPending();
+    instantScrollRef.current = true;
+    setConversationId(found.id);
+    setMessages(found.messages);
+    setHistoryOpen(false);
+  };
+
+  const deleteConversation = (id) => {
+    setConversations((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      writeConversations(next);
+      return next;
+    });
+    if (id === conversationId) startNewConversation();
+  };
+
+  const requestRecommendations = useCallback(async ({ message, mode, limit, signal }) => {
+    const res = await fetch("/api/ai/watch-next", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        mode,
+        limit,
+        recentKeys: readRecentRecommendationKeys(),
+      }),
+      signal,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.error || "No se pudo recomendar");
+    return json;
+  }, []);
+
+  const sendPrompt = async (value = input, { mode = "chat" } = {}) => {
+    const isQuickPick = mode === "quick_pick";
     const prompt = String(value || "").trim();
     const displayPrompt = prompt || (isQuickPick ? QUICK_PICK_PROMPT : "");
     if (!displayPrompt || loading) return;
 
+    const controller = new AbortController();
+    abortRef.current = controller;
     setInput("");
+    setRoulette(null);
     setLoading(true);
-    setMessages((prev) => [...prev, { role: "user", text: displayPrompt }]);
+    setMessages((prev) => [...prev, { role: "user", text: displayPrompt, at: Date.now() }]);
 
     try {
-      const res = await fetch("/api/ai/watch-next", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: prompt,
-          mode: isQuickPick ? "quick_pick" : "chat",
-          limit: isQuickPick ? 3 : 5,
-          recentKeys: readRecentRecommendationKeys(),
-        }),
+      const json = await requestRecommendations({
+        message: prompt,
+        mode: isQuickPick ? "quick_pick" : "chat",
+        limit: isQuickPick ? 3 : 5,
+        signal: controller.signal,
       });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error || "No se pudo recomendar");
-
-      const recommendations = Array.isArray(json?.recommendations)
-        ? json.recommendations
-        : [];
+      const recommendations = Array.isArray(json?.recommendations) ? json.recommendations : [];
       saveRecentRecommendations(recommendations);
-
       const note =
         json?.mode === "ranking"
           ? json?.contextSummary?.aiEnabled
             ? " La IA no ha podido completar la selección, así que he usado ranking local con tus datos."
             : " No hay IA configurada ahora mismo, así que he usado ranking local con tus datos."
           : "";
-
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           text: `${json?.reply || "Estas opciones encajan bien para ahora."}${note}`,
           recommendations,
-          contextSummary: json?.contextSummary || null,
           provider: json?.provider || null,
           mode: json?.mode || null,
+          at: Date.now(),
         },
       ]);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: error?.message || "No he podido preparar recomendaciones ahora mismo.",
+          recommendations: [],
+          error: true,
+          at: Date.now(),
+        },
+      ]);
+    } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setLoading(false);
+      }
+    }
+  };
+
+  const openRoulette = async () => {
+    if (latestRecommendations.length >= 3) {
+      setRoulette(latestRecommendations.slice(0, 8));
+      setHistoryOpen(false);
+      return;
+    }
+    if (rouletteLoading || loading) return;
+    setRouletteLoading(true);
+    try {
+      const json = await requestRecommendations({ message: "", mode: "quick_pick", limit: 8 });
+      const recs = Array.isArray(json?.recommendations) ? json.recommendations : [];
+      if (recs.length < 3) throw new Error("No hay recomendaciones suficientes para la ruleta.");
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", text: "Probar la ruleta", at: Date.now() },
+        {
+          role: "assistant",
+          text: "He preparado estas recomendaciones para girar la ruleta.",
+          recommendations: recs,
+          provider: json?.provider || null,
+          mode: json?.mode || null,
+          at: Date.now(),
+        },
+      ]);
+      setRoulette(recs.slice(0, 8));
+      setHistoryOpen(false);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          text:
-            error?.message ||
-            "No he podido preparar recomendaciones ahora mismo.",
-          recommendations: [],
+          text: error?.message || "No se pudo iniciar la ruleta.",
+          error: true,
+          at: Date.now(),
         },
       ]);
     } finally {
-      setLoading(false);
+      setRouletteLoading(false);
     }
   };
 
-  const modal = (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          // MISMO VELO que los modales de la ficha (AddToListModal, VideoModal,
-          // StarRating…): `bg-black/60` + desenfoque. Antes era `/80` (`/90` en
-          // escritorio) y SIN desenfoque, así que la página de detrás quedaba
-          // casi apagada y el conjunto se leía como una pantalla nueva, no como
-          // una capa de cristal sobre la ficha. El velo forma parte de la receta
-          // tanto como el panel: es lo que oscurece y difumina el fondo para que
-          // el cristal del panel tenga algo coherente que atravesar.
-          className="fixed inset-0 z-[9999] overflow-hidden bg-black/60 backdrop-blur-lg p-0 sm:p-3"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: reduceMotion ? 0.12 : 0.25 }}
-          onMouseDown={close}
-        >
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            initial={
-              reduceMotion ? { opacity: 0 } : { opacity: 0, y: 32, scale: 0.94 }
-            }
-            animate={
-              reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }
-            }
-            exit={
-              reduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, y: 22, scale: 0.985 }
-            }
-            transition={{
-              duration: reduceMotion ? 0.12 : 0.32,
-              delay: reduceMotion ? 0 : 0.08,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-            // ACABADO COMPARTIDO. Este panel llevaba su propia versión del
-            // cristal —`bg-black/45`, `backdrop-blur-3xl`, sin `saturate`, otro
-            // degradado y otra sombra—, que es exactamente la deriva que
-            // `LIQUID_GLASS_PANEL` existe para evitar (ver su cabecera). Con la
-            // constante, el modal es la MISMA pieza que los de la ficha y
-            // cambiarla en un sitio los cambia a todos.
-            //
-            // La constante aporta solo el ACABADO; la FORMA (alto, ancho, radio
-            // y el flex de la columna) sigue siendo propia, como en el resto de
-            // consumidores.
-            className={`relative isolate mx-auto flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden ${LIQUID_GLASS_PANEL} transform-gpu sm:rounded-[2rem] sm:h-[calc(100dvh-24px)] sm:w-[calc(100vw-24px)]`}
+  const onComposerKeyDown = (event) => {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    sendPrompt();
+  };
+
+  const empty = messages.length === 0;
+  const activeTitle = empty ? "Qué ver con IA" : conversationTitle(messages);
+
+  const quickActions = (
+    <>
+      <button
+        type="button"
+        onClick={() => sendPrompt("", { mode: "quick_pick" })}
+        disabled={loading}
+        className="inline-flex items-center gap-2 rounded-full bg-cyan-500/20 px-3.5 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Zap className="h-3.5 w-3.5" />
+        Recomiéndame 3
+      </button>
+      <button
+        type="button"
+        onClick={openRoulette}
+        disabled={loading || rouletteLoading}
+        className="inline-flex items-center gap-2 rounded-full bg-cyan-500/20 px-3.5 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {rouletteLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Dices className="h-3.5 w-3.5" />}
+        {rouletteLoading ? "Cargando…" : "Probar la ruleta"}
+      </button>
+    </>
+  );
+
+  return (
+    <div
+      ref={rootRef}
+      data-assistant-page=""
+      className="relative isolate flex h-[calc(100svh-9rem-var(--sv-safe-top,0px)-var(--sv-safe-bottom,0px))] w-full overflow-hidden desktop:h-[calc(100svh-4rem-var(--sv-safe-top,0px))]"
+      style={keyboardHeight ? { height: `${keyboardHeight}px` } : undefined}
+    >
+      {/* Luz de fondo: da al cristal de la barra y de la caja algo que
+          atravesar. Degradados, sin filtros: no cuesta nada al desplazar. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_45%_at_15%_0%,rgba(34,211,238,0.10),transparent_70%),radial-gradient(50%_40%_at_90%_100%,rgba(139,92,246,0.10),transparent_70%)]"
+      />
+
+      {/* Barra de conversaciones (escritorio) */}
+      <aside
+        aria-label="Conversaciones"
+        className={`relative isolate my-3 ml-1 hidden w-72 shrink-0 flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} transform-gpu desktop:flex`}
+      >
+        <div className="flex items-center gap-3 px-5 pb-3 pt-5">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/10 text-cyan-100">
+            <Bot className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-bold text-white">Qué ver con IA</h1>
+            <p className="truncate text-xs text-zinc-400">Con tus listas, historial y notas</p>
+          </div>
+        </div>
+        <div className="px-3">
+          <button
+            type="button"
+            onClick={startNewConversation}
+            className="flex w-full items-center gap-2.5 rounded-2xl bg-white/[0.07] px-3.5 py-2.5 text-sm font-bold text-white transition hover:bg-white/[0.12]"
           >
-            {/* Header */}
-            <header className="flex items-center justify-between gap-4 border-b border-transparent bg-black/10 px-4 py-3 sm:px-6 backdrop-blur-sm flex-shrink-0">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100">
-                  <Bot className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <h2
-                    id={titleId}
-                    className="truncate text-sm font-bold text-white sm:text-base"
-                  >
-                    Qué ver ahora
-                  </h2>
-                </div>
+            <MessageSquarePlus className="h-4 w-4 text-cyan-300" />
+            Conversación nueva
+          </button>
+          <div className="mt-3 flex flex-wrap gap-2">{quickActions}</div>
+        </div>
+        <div className="mx-5 mb-1 mt-5 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+          Recientes
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]">
+          <ConversationList
+            conversations={conversations}
+            activeId={conversationId}
+            onSelect={openConversation}
+            onDelete={deleteConversation}
+          />
+        </div>
+      </aside>
+
+      {/* Conversación */}
+      <section className="relative flex min-w-0 flex-1 flex-col">
+        {/* Cabecera móvil: título y acciones */}
+        <header className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-1 desktop:hidden">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-300/10 text-cyan-100">
+            <Bot className="h-[18px] w-[18px]" />
+          </div>
+          <h1 className="min-w-0 flex-1 truncate text-base font-bold text-white">{activeTitle}</h1>
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(true)}
+            aria-label="Conversaciones guardadas"
+            className={`grid h-10 w-10 place-items-center rounded-full text-white ${LIQUID_GLASS_PANEL}`}
+          >
+            <History className="h-[18px] w-[18px]" />
+          </button>
+          <button
+            type="button"
+            onClick={startNewConversation}
+            aria-label="Conversación nueva"
+            className={`grid h-10 w-10 place-items-center rounded-full text-white ${LIQUID_GLASS_PANEL}`}
+          >
+            <MessageSquarePlus className="h-[18px] w-[18px]" />
+          </button>
+        </header>
+
+        <div
+          ref={scrollerRef}
+          className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]"
+        >
+          {roulette ? (
+            <AssistantRoulette items={roulette} onBack={() => setRoulette(null)} />
+          ) : empty ? (
+            <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-4 py-8">
+              <div className="mb-4 grid h-14 w-14 place-items-center rounded-3xl bg-cyan-300/10 text-cyan-100">
+                <Sparkles className="h-7 w-7" />
               </div>
-              <button
-                type="button"
-                onClick={close}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white"
-                aria-label="Cerrar"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </header>
-
-            {/* Content - Responsive Layout */}
-            <div className="min-h-0 flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_340px] gap-0 lg:gap-4 lg:p-4 lg:overflow-hidden">
-              {showRoulette ? (
-                <div className="col-span-full flex flex-col lg:grid lg:grid-cols-[1.2fr_1fr] gap-6 p-4 lg:p-6 overflow-y-auto min-h-0 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent] transform-gpu">
-                  {/* Left Column: The Wheel */}
-                  <div className="flex flex-col items-center justify-center relative bg-black/20 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-inner min-h-[360px] lg:min-h-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowRoulette(false)}
-                      className="absolute top-4 left-4 text-xs font-bold text-zinc-400 hover:text-white transition flex items-center gap-1.5 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl border border-white/5 cursor-pointer"
-                    >
-                      ← Volver al chat
-                    </button>
-
-                    <div className="relative mt-8 select-none scale-[0.85] sm:scale-100">
-                      {/* Puntero de la Ruleta (Flecha superior apuntando hacia abajo) */}
-                      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)]">
-                          <path d="M12 22L2 6h20L12 22z" fill="#eab308" stroke="#ffffff" strokeWidth="2.5" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-
-                      {/* Aro de luces LED exterior decorativo */}
-                      <div className="absolute inset-0 -m-3.5 rounded-full border border-white/5 bg-black/40 shadow-[0_0_50px_rgba(34,211,238,0.15)] pointer-events-none" />
-
-                      {/* SVG de la Ruleta */}
-                      <svg
-                        width="300"
-                        height="300"
-                        viewBox="0 0 300 300"
-                        className="drop-shadow-[0_20px_50px_rgba(0,0,0,0.8)]"
-                      >
-                        {/* Ruleta Rotativa */}
-                        <g
-                          style={{
-                            transform: `rotate(${spinRotation}deg)`,
-                            transformOrigin: "150px 150px",
-                            transition: isSpinning
-                              ? `transform ${reduceMotion ? "0.6s" : "5.2s"} cubic-bezier(0.12, 0.8, 0.08, 1)`
-                              : "none",
-                          }}
-                        >
-                          {/* Slices */}
-                          {rouletteItems.map((item, idx) => {
-                            const total = rouletteItems.length;
-                            const color = ROULETTE_COLORS[idx % ROULETTE_COLORS.length];
-                            return (
-                              <path
-                                key={`${item.id}-${idx}`}
-                                d={makeSvgSlice(idx, total, 138, 150, 150)}
-                                fill={color}
-                                stroke="#18181b"
-                                strokeWidth="2"
-                              />
-                            );
-                          })}
-
-                          {/* Labels */}
-                          {rouletteItems.map((item, idx) => {
-                            const total = rouletteItems.length;
-                            return (
-                              <g key={`label-${item.id}-${idx}`} transform={`rotate(${(idx + 0.5) * (360 / total)}, 150, 150)`}>
-                                <text
-                                  x={150}
-                                  y={150 - 138 + 35}
-                                  fill="white"
-                                  fontSize="10px"
-                                  fontWeight="bold"
-                                  textAnchor="middle"
-                                  transform={`rotate(90, 150, ${150 - 138 + 35})`}
-                                  className="select-none pointer-events-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"
-                                >
-                                  {item.title.length > 18 ? item.title.slice(0, 16) + "..." : item.title}
-                                </text>
-                              </g>
-                            );
-                          })}
-                        </g>
-
-                        {/* Borde exterior del aro central */}
-                        <circle cx="150" cy="150" r="38" fill="rgba(255,255,255,0.05)" className="pointer-events-none" />
-
-                        {/* Botón Central de Giro (GIRAR) */}
-                        <circle
-                          cx="150"
-                          cy="150"
-                          r="32"
-                          fill="#18181b"
-                          stroke="#ffffff"
-                          strokeWidth="2.5"
-                          className={`cursor-pointer transition duration-200 ${
-                            isSpinning ? "opacity-60 cursor-not-allowed" : "hover:fill-zinc-800 active:scale-95"
-                          }`}
-                          onClick={handleSpin}
-                        />
-                        <text
-                          x="150"
-                          y="154"
-                          fill={isSpinning ? "#71717a" : "#eab308"}
-                          fontSize="10px"
-                          fontWeight="black"
-                          textAnchor="middle"
-                          className="cursor-pointer pointer-events-none select-none tracking-wider font-sans"
-                        >
-                          {isSpinning ? "SPIN..." : "GIRAR"}
-                        </text>
-                      </svg>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Result / Status Card */}
-                  <div className="flex flex-col justify-center min-h-[200px] lg:min-h-0 bg-black/20 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-inner">
-                    {isSpinning ? (
-                      <div className="flex flex-col items-center justify-center text-center py-12">
-                        <Loader2 className="h-10 w-10 animate-spin text-cyan-400 mb-4" />
-                        <h3 className="text-lg font-black text-white mb-2 animate-pulse">
-                          Seleccionando tu próximo visionado...
-                        </h3>
-                        <p className="text-sm text-zinc-400">
-                          Cruzando tus gustos y pendientes 🤞
-                        </p>
-                      </div>
-                    ) : chosenItem ? (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        transition={{ duration: 0.4, ease: "easeOut" }}
-                        className="flex flex-col h-full justify-between"
-                      >
-                        <div>
-                          <span className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20 inline-block mb-4">
-                            ¡Elección final!
-                          </span>
-
-                          <div className="flex gap-4 mb-4 items-start">
-                            {chosenItem.posterPath ? (
-                              <div className="h-32 w-[84px] shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-xl">
-                                <OptimizedImage
-                                  src={tmdbImg(chosenItem.posterPath, "w342")}
-                                  alt={chosenItem.title}
-                                  className="h-full w-full object-cover"
-                                />
-                              </div>
-                            ) : null}
-
-                            <div className="min-w-0 flex-1">
-                              <h3 className="text-xl font-black text-white leading-tight mb-1">
-                                {chosenItem.title}
-                              </h3>
-                              <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-200/80 mb-2">
-                                {mediaLabel(chosenItem.mediaType)}
-                                {chosenItem.year ? ` · ${chosenItem.year}` : ""}
-                              </p>
-                              {chosenItem.voteAverage ? (
-                                <span className="inline-block rounded-lg bg-yellow-400/10 px-2 py-0.5 text-xs font-black text-yellow-200 border border-yellow-400/20">
-                                  ★ {Number(chosenItem.voteAverage).toFixed(1)}
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <div className="border-t border-white/5 pt-4">
-                            <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                              ¿Por qué te gustará?
-                            </h4>
-                            <p className="text-sm leading-relaxed text-zinc-300 line-clamp-4 lg:line-clamp-none">
-                              {chosenItem.reason || "Es perfecta para tus gustos actuales."}
-                            </p>
-                          </div>
-
-                          {chosenItem.matchTags?.length ? (
-                            <div className="flex flex-wrap gap-1.5 mt-4">
-                              {chosenItem.matchTags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[10px] font-bold text-zinc-400"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 mt-6 border-t border-white/5 pt-5">
-                          <button
-                            type="button"
-                            onClick={handleSpin}
-                            className="rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-bold text-zinc-200 transition cursor-pointer"
-                          >
-                            Girar otra vez
-                          </button>
-                          <Link
-                            href={chosenItem.href || "#"}
-                            onClick={() => {
-                              setShowRoulette(false);
-                              close();
-                            }}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 px-4 py-2.5 text-xs font-bold text-white transition cursor-pointer"
-                          >
-                            <span>Ver detalles</span>
-                            <ArrowRight className="h-4 w-4" />
-                          </Link>
-                        </div>
-                      </motion.div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-center py-12">
-                        <Dices className="h-10 w-10 text-cyan-300/40 mb-4 animate-bounce" />
-                        <h3 className="text-lg font-black text-white mb-2">
-                          Gira la ruleta
-                        </h3>
-                        <p className="text-sm leading-relaxed text-zinc-400 max-w-xs">
-                          Pulsa el botón <strong>GIRAR</strong> en el centro de la ruleta para elegir una recomendación de forma aleatoria.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* Chat Section - Solo visible en mobile */}
-                  <div className="lg:hidden flex flex-col min-h-0 overflow-hidden">
-                    <div
-                      className="flex-1 overflow-y-auto px-4 py-4 space-y-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]"
-                      aria-live="polite"
-                      style={{
-                        scrollbarColor: "rgba(255,255,255,0.1) transparent",
-                      }}
-                    >
-                      {messages.map((message, index) => {
-                        const isUser = message.role === "user";
-                        return (
-                          <div
-                            key={`${message.role}-${index}`}
-                            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                          >
-                            <div
-                              className={`max-w-[85%] rounded-3xl px-4 py-3 text-sm leading-relaxed ${
-                                isUser
-                                  ? "bg-cyan-500 text-white shadow-[0_12px_30px_rgba(34,211,238,0.18)]"
-                                  : "bg-black/20 backdrop-blur-md text-zinc-100 border border-transparent"
-                              }`}
-                            >
-                              <p>{message.text}</p>
-                              {!isUser &&
-                                message.provider &&
-                                message.provider !== "ranking" && (
-                                  <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/5 px-2 py-1 text-[10px] text-cyan-200">
-                                    <Brain className="h-3 w-3" />
-                                    {message.provider === "gemini"
-                                      ? "Gemini"
-                                      : message.provider === "openai"
-                                        ? "OpenAI"
-                                        : message.provider}
-                                  </span>
-                                )}
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {loading && (
-                        <div className="flex justify-start">
-                          <div className="inline-flex items-center gap-2 rounded-3xl bg-black/20 backdrop-blur-md border border-transparent px-4 py-2.5 text-sm text-zinc-300">
-                            <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
-                            <span>Pensando...</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {latestRecommendations.length > 0 && (
-                        <div className="space-y-3 pt-2">
-                          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-zinc-500">
-                            Recomendaciones
-                          </div>
-                          <div className="space-y-3">
-                            {latestRecommendations.slice(0, 5).map((item) => {
-                              const poster = tmdbImg(item?.posterPath, "w342");
-                              const Icon = item?.mediaType === "tv" ? Tv : Film;
-                              return (
-                                <Link
-                                  key={`${item.mediaType}-${item.id}`}
-                                  href={item?.href || "#"}
-                                  onClick={close}
-                                  className="group grid grid-cols-[84px_minmax(0,1fr)] gap-3 rounded-[2rem] border border-transparent bg-black/20 backdrop-blur-md p-3 transition hover:bg-white/5"
-                                >
-                                  {poster ? (
-                                    <OptimizedImage
-                                      src={poster}
-                                      alt={item?.title}
-                                      className="h-20 w-14 rounded-2xl object-cover"
-                                      loading="lazy"
-                                    />
-                                  ) : (
-                                    <div className="flex h-20 w-14 items-center justify-center rounded-2xl bg-white/10 text-zinc-400">
-                                      <Icon className="h-6 w-6" />
-                                    </div>
-                                  )}
-                                  <div className="min-w-0">
-                                    <p className="line-clamp-2 text-sm font-semibold text-white">
-                                      {item?.title}
-                                    </p>
-                                    <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-cyan-300/70">
-                                      {mediaLabel(item?.mediaType)}
-                                      {item?.year ? ` · ${item.year}` : ""}
-                                    </p>
-                                    <p className="mt-2 text-xs leading-relaxed text-zinc-300 line-clamp-3">
-                                      {item?.reason || "Una recomendación para ti."}
-                                    </p>
-                                  </div>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      <div ref={messagesEndRef} />
-                    </div>
-                  </div>
-
-                  {/* Desktop Recommendations Grid - Main content */}
-                  <div className="hidden lg:flex lg:flex-col min-h-0 lg:border lg:border-transparent lg:rounded-2xl lg:bg-black/20 lg:overflow-hidden lg:backdrop-blur-md">
-                    <div
-                      className="flex-1 overflow-y-auto px-4 py-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]"
-                      style={{
-                        scrollbarColor: "rgba(255,255,255,0.1) transparent",
-                      }}
-                    >
-                      {latestRecommendations.length > 0 ? (
-                        <div className="grid gap-3 auto-rows-max">
-                          {latestRecommendations.map((item) => (
-                            <RecommendationCard
-                              key={`${item.mediaType}-${item.id}`}
-                              item={item}
-                              onNavigate={close}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                          <Sparkles className="h-8 w-8 text-cyan-300/60 mb-3" />
-                          <p className="text-sm font-semibold text-zinc-400">
-                            Dime qué te apetece ver
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              sendPrompt("", {
-                                mode: "quick_pick",
-                              })
-                            }
-                            disabled={loading}
-                            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-transparent bg-cyan-500/20 backdrop-blur-md px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-                            aria-label="Recomendar 3 películas o series sin escribir"
-                          >
-                            <Zap className="h-3.5 w-3.5" />
-                            Recomiéndame 3
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Desktop Chat Sidebar */}
-                  <div className="hidden lg:flex lg:flex-col min-h-0 lg:border lg:border-transparent lg:rounded-2xl lg:bg-black/20 lg:overflow-hidden lg:backdrop-blur-md">
-                    <div
-                      className="flex-1 overflow-y-auto px-4 py-4 space-y-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]"
-                      aria-live="polite"
-                      style={{
-                        scrollbarColor: "rgba(255,255,255,0.1) transparent",
-                      }}
-                    >
-                      {messages.map((message, index) => {
-                        const isUser = message.role === "user";
-                        return (
-                          <div
-                            key={`${message.role}-${index}`}
-                            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                          >
-                            <div
-                              className={`max-w-full rounded-2xl px-3 py-2 text-xs leading-relaxed ${
-                                isUser
-                                  ? "bg-cyan-500 text-white shadow-[0_12px_30px_rgba(34,211,238,0.18)]"
-                                  : "bg-black/20 backdrop-blur-md text-zinc-100 border border-transparent"
-                              }`}
-                            >
-                              <p>{message.text}</p>
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {loading && (
-                        <div className="flex justify-start">
-                          <div className="inline-flex items-center gap-1.5 rounded-2xl bg-black/20 backdrop-blur-md border border-transparent px-3 py-2 text-xs text-zinc-300">
-                            <Loader2 className="h-3 w-3 animate-spin text-cyan-400" />
-                            <span>Pensando...</span>
-                          </div>
-                        </div>
-                      )}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Input Area - Fixed at bottom */}
-            <div className="border-t border-transparent bg-black/10 p-3 sm:p-4 backdrop-blur-md flex-shrink-0">
-              <div className="mb-2 flex min-w-0 flex-wrap gap-1.5 pb-2 sm:flex-nowrap sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden">
-                <button
-                  type="button"
-                  onClick={() =>
-                    sendPrompt("", {
-                      mode: "quick_pick",
-                    })
-                  }
-                  disabled={loading}
-                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-transparent bg-cyan-500/20 backdrop-blur-md px-3 py-1 text-left text-xs font-bold leading-snug text-cyan-100 transition hover:bg-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-50 sm:shrink-0 sm:whitespace-nowrap"
-                  aria-label="Recomendar 3 películas o series sin escribir"
-                >
-                  <Zap className="h-3.5 w-3.5" />
-                  Recomiéndame 3
-                </button>
-                <button
-                  type="button"
-                  onClick={handleOpenRoulette}
-                  disabled={loading || rouletteLoading}
-                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-transparent bg-cyan-500/20 backdrop-blur-md px-3 py-1 text-left text-xs font-bold leading-snug text-cyan-100 transition hover:bg-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-50 sm:shrink-0 sm:whitespace-nowrap"
-                  aria-label="Abrir ruleta de recomendaciones"
-                >
-                  {rouletteLoading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-200" />
-                  ) : (
-                    <Dices className="h-3.5 w-3.5" />
-                  )}
-                  <span>{rouletteLoading ? "Cargando..." : "Probar Ruleta"}</span>
-                </button>
+              <h2 className="text-2xl font-bold text-white sm:text-3xl">¿Qué te apetece ver?</h2>
+              <p className="mt-2 max-w-lg text-sm leading-relaxed text-zinc-400">{WELCOME_TEXT}</p>
+              <div className="mt-6 grid gap-2 sm:grid-cols-2">
                 {PROMPT_SUGGESTIONS.map((suggestion) => (
                   <button
                     key={suggestion}
                     type="button"
                     onClick={() => sendPrompt(suggestion)}
                     disabled={loading}
-                    className="max-w-full rounded-full border border-transparent bg-black/20 backdrop-blur-md px-3 py-1 text-left text-xs font-medium leading-snug text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-50 sm:shrink-0 sm:whitespace-nowrap"
+                    className="rounded-2xl bg-white/[0.06] px-4 py-3 text-left text-sm text-zinc-200 transition hover:bg-white/[0.1] hover:text-white disabled:opacity-50"
                   >
                     {suggestion}
                   </button>
                 ))}
               </div>
-
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  sendPrompt();
-                }}
-                className="flex items-center gap-2 rounded-2xl border border-transparent bg-black/20 backdrop-blur-md p-2.5 focus-within:bg-black/30 shadow-inner"
-              >
-                <input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="¿Qué te apetece ver?"
-                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
-                />
-                <button
-                  type="submit"
-                  disabled={loading || !input.trim()}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-500 text-white transition hover:bg-cyan-600 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Enviar"
-                >
-                  <Send className="h-4 w-4" />
-                </button>
-              </form>
+              <div className="mt-4 flex flex-wrap gap-2 desktop:hidden">{quickActions}</div>
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-
-  return (
-    <>
-      {hideTrigger ? null : (
-        <button
-          type="button"
-          onClick={() => {
-            setOpen(true);
-            window.setTimeout(() => inputRef.current?.focus(), 120);
-          }}
-          className={[
-            drawerTrigger
-              ? "group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-neutral-300 transition-all duration-200 hover:bg-white/5 hover:text-white active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
-              : [
-                  "group relative grid shrink-0 place-items-center rounded-full transition-all duration-300 ease-out",
-                  open
-                    ? isMobile
-                      ? "text-cyan-200 bg-cyan-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(34,211,238,0.2)]"
-                      : "text-cyan-200"
-                    : [
-                        isMobile
-                          ? "text-white"
-                          : heroNavMode
-                            ? "text-neutral-100"
-                            : "text-neutral-400",
-                        isMobile
-                          ? "hover:text-cyan-200 hover:bg-white/10"
-                          : "hover:text-cyan-300 hover:bg-cyan-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(34,211,238,0.15)]",
-                        heroNavMode
-                          ? "drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]"
-                          : "",
-                      ].join(" "),
-                  "hover:-translate-y-0.5 hover:scale-[1.05] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
-                  isMobile ? "h-10 w-10 p-2" : "p-2",
-                ].join(" "),
-          ].join(" ")}
-          aria-label="Abrir recomendador de qué ver"
-        >
-          {open && !isMobile && !drawerTrigger && (
-            <span
-              className="absolute inset-0 rounded-full border border-cyan-500/10 bg-cyan-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(34,211,238,0.08)]"
-              aria-hidden="true"
-            />
+          ) : (
+            <div
+              className="mx-auto w-full max-w-3xl space-y-6 px-4 pb-6 pt-2 desktop:pt-8"
+              aria-live="polite"
+            >
+              {messages.map((message, index) => (
+                <div key={`${message.at || 0}-${index}`} data-message={message.role}>
+                  <Message message={message} />
+                </div>
+              ))}
+              {loading ? <TypingIndicator /> : null}
+            </div>
           )}
-          <Sparkles
-            className={`relative z-10 h-5 w-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-              drawerTrigger ? "text-cyan-400" : ""
-            }`}
-            aria-hidden="true"
-          />
-          {drawerTrigger ? <span>Qué ver con IA</span> : null}
-        </button>
-      )}
+        </div>
 
-      {mounted ? createPortal(modal, document.body) : null}
-    </>
+        {/* Caja de texto, fija abajo */}
+        <div className="shrink-0 px-3 pb-3 pt-1 desktop:px-6 desktop:pb-5">
+          <div
+            className={`relative isolate mx-auto flex w-full max-w-3xl items-end gap-2 rounded-[1.75rem] py-1.5 pl-4 pr-1.5 ${LIQUID_GLASS_PANEL} transform-gpu`}
+          >
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onComposerKeyDown}
+              onFocus={() => {
+                const el = scrollerRef.current;
+                if (el) window.setTimeout(() => el.scrollTo({ top: el.scrollHeight }), 250);
+              }}
+              placeholder="¿Qué te apetece ver?"
+              aria-label="Mensaje para el asistente"
+              enterKeyHint="send"
+              className="max-h-40 min-w-0 flex-1 resize-none self-center bg-transparent py-2.5 text-[15px] leading-6 text-white outline-none placeholder:text-zinc-500"
+            />
+            <LiquidButton
+              type="button"
+              liquidGlass
+              groupId="assistant-composer"
+              activeColor="teal"
+              active={Boolean(input.trim())}
+              disabled={loading || !input.trim()}
+              loading={loading}
+              title="Enviar"
+              onClick={() => sendPrompt()}
+              className="!h-11 !w-11 shrink-0"
+            >
+              <ArrowUp className="h-5 w-5" />
+            </LiquidButton>
+          </div>
+          <p className="mx-auto mt-1.5 hidden max-w-3xl text-center text-[11px] text-zinc-500 desktop:block">
+            Enter para enviar · Shift + Enter para un salto de línea
+          </p>
+        </div>
+      </section>
+
+      <MobileOptionsSheet
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title="Conversaciones"
+        icon={History}
+        accent="zinc"
+      >
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={startNewConversation}
+            className="flex w-full items-center gap-2.5 rounded-2xl bg-white/[0.07] px-3.5 py-3 text-sm font-bold text-white"
+          >
+            <MessageSquarePlus className="h-4 w-4 text-cyan-300" />
+            Conversación nueva
+          </button>
+          <ConversationList
+            conversations={conversations}
+            activeId={conversationId}
+            onSelect={openConversation}
+            onDelete={deleteConversation}
+          />
+        </div>
+      </MobileOptionsSheet>
+    </div>
   );
 }

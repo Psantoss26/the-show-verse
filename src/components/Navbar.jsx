@@ -57,7 +57,6 @@ import {
   Menu,
   PartyPopper,
 } from "lucide-react";
-import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
 import AlertsMenu, { AlertsMenuBoot } from "@/components/notifications/AlertsMenu";
 import TodayNavbarEntry from "@/components/today/TodayNavbarEntry";
@@ -2838,7 +2837,6 @@ function NavbarContent() {
   // una sola vez, FUERA del desplegable. Si viviera dentro, al cerrarse el menú
   // se desmontaría su panel -- y el menú se cierra en cuanto se pulsa fuera, que
   // es justo lo que pasa al usar el asistente.
-  const [assistantOpen, setAssistantOpen] = useState(false);
   const profileMenuRef = useRef(null);
   const mobileRightRef = useRef(null);
   // El panel se saca de la barra con un portal (ver más abajo), así que deja de
@@ -3225,19 +3223,6 @@ function NavbarContent() {
               />
             ) : null}
 
-            {/* SIN ICONO PROPIO EN LA BARRA: el asistente se abre desde el
-                desplegable de Perfil. El componente sigue montado AQUÍ, y no
-                dentro del desplegable, porque es quien mantiene vivo su panel:
-                el menú se cierra al pulsar fuera —y el panel está fuera—, así
-                que allí dentro se desmontaría al primer clic. Con `hideTrigger`
-                no pinta nada, solo sostiene el panel. */}
-            <WatchNextAssistant
-              hideTrigger
-              heroNavMode={heroNavMode}
-              open={assistantOpen}
-              onOpenChange={setAssistantOpen}
-            />
-
             {profileAuthLoading ? (
               // MISMO RECUADRO QUE EL BOTÓN REAL, flecha incluida. Si el
               // marcador solo pintase el disco, al hidratar aparecería de
@@ -3359,21 +3344,23 @@ function NavbarContent() {
                             </Link>
 
 
-                            {/* No es un enlace: abre el recomendador y luego cierra
-                                el menú. El asistente se mantiene montado fuera de
-                                este portal para que su panel no se desmonte. */}
-                            <button
-                              type="button"
+                            {/* «Qué ver con IA» es una página propia
+                                (/assistant), ya no un panel que el navbar
+                                tenía que mantener montado. */}
+                            <Link
+                              href="/assistant"
                               role="menuitem"
-                              onClick={() => {
-                                setProfileMenuOpen(false);
-                                setAssistantOpen(true);
-                              }}
-                              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                              onClick={() => setProfileMenuOpen(false)}
+                              aria-current={isActive("/assistant") ? "page" : undefined}
+                              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                                isActive("/assistant")
+                                  ? "bg-white/10 font-bold text-white"
+                                  : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                              }`}
                             >
                               <Sparkles className="h-4 w-4 shrink-0 text-cyan-400" />
                               <span className="truncate">Qué ver con IA</span>
-                            </button>
+                            </Link>
                           </div>
                         </motion.div>
                       ) : null}
@@ -4005,7 +3992,18 @@ function NavbarContent() {
                     </Link>
 
 
-                    <WatchNextAssistant isMobile triggerVariant="drawer" />
+                    <Link
+                      href="/assistant"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                        isActive("/assistant")
+                          ? "bg-cyan-500/20 text-cyan-100 font-bold"
+                          : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                      }`}
+                    >
+                      <Sparkles className="h-5 w-5 text-cyan-400" />
+                      <span>Qué ver con IA</span>
+                    </Link>
                   </section>
                 </div>
               </div>

@@ -3,16 +3,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const navbarPath = new URL("../../components/Navbar.jsx", import.meta.url);
-const assistantPath = new URL(
-  "../../components/WatchNextAssistant.jsx",
-  import.meta.url,
-);
 
 test("el navbar móvil deja el asistente en el menú y ya no enlaza Recomendaciones", async () => {
-  const [navbar, assistant] = await Promise.all([
-    readFile(navbarPath, "utf8"),
-    readFile(assistantPath, "utf8"),
-  ]);
+  const navbar = await readFile(navbarPath, "utf8");
 
   const mobileNavbar = navbar.slice(
     navbar.indexOf("{/* ---------------- Mobile ---------------- */}"),
@@ -28,10 +21,7 @@ test("el navbar móvil deja el asistente en el menú y ya no enlaza Recomendacio
     /className="p-2 rounded-full text-white hover:bg-white\/10 transition-colors"[\s\S]*?aria-label="Abrir menú"/,
   );
   assert.doesNotMatch(navbar, /href="\/recommendations"/);
-  assert.doesNotMatch(mobileNavbar, /<WatchNextAssistant isMobile heroNavMode/);
-  assert.match(
-    navbar,
-    /<WatchNextAssistant isMobile triggerVariant="drawer" \/>/,
-  );
-  assert.match(assistant, /drawerTrigger \? <span>Qué ver con IA<\/span>/);
+  assert.doesNotMatch(mobileNavbar, /WatchNextAssistant/);
+  // El asistente es una página: el menú lateral la enlaza.
+  assert.match(navbar, /href="\/assistant"[\s\S]*?<span>Qué ver con IA<\/span>/);
 });
