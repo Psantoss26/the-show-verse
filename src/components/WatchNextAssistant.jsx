@@ -170,8 +170,8 @@ function TitleCard({ item }) {
 // colecciones) con los mismos datos: año, duración y géneros
 // (`showTitleMeta`), nota de TMDb y nota de IMDb. La PORTADA es un póster con
 // el mismo criterio que las tarjetas: la elegida en la ficha (TitleRow la
-// busca sola) y, si no hay, la de la escalera de idioma. Debajo, el motivo de
-// la recomendación. Mismo clic que el póster: ficha rápida en escritorio,
+// busca sola) y, si no hay, la de la escalera de idioma. Sin el motivo de la
+// recomendación: los mismos datos que Favoritos y nada más. Mismo clic que el póster: ficha rápida en escritorio,
 // ficha completa en el móvil (lo decide DetailModalProvider).
 function TitleListRow({ item, imdbRating = null, imdbLoading = false }) {
   const previewClick = usePreviewOpen();
@@ -197,7 +197,6 @@ function TitleListRow({ item, imdbRating = null, imdbLoading = false }) {
       // del motor. Sin respuesta del lote, el del motor.
       posterPath={ladder.pending ? "" : ladder.path || item?.posterPath || ""}
       posterLoading={ladder.pending}
-      detail={item?.reason || null}
       // Anillo de color al pasar el ratón, como en Favoritos (en cian).
       className="relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(34,211,238,0.9)]"
     />
@@ -800,7 +799,9 @@ export default function WatchNextAssistant() {
         <div className="sv-assistant-fade mx-4 mb-1.5 mt-6 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500" style={enterDelay(200)}>
           Recientes
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]">
+        {/* Sin barra de desplazamiento visible (como la conversación): se sigue
+            desplazando con rueda, panel táctil o dedo. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ConversationList
             conversations={conversations}
             loaded={conversationsLoaded}
@@ -867,7 +868,9 @@ export default function WatchNextAssistant() {
 
         <div
           ref={scrollerRef}
-          className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]"
+          // Sin barra de desplazamiento visible: el chat se desplaza igual
+          // (rueda, panel táctil, dedo, teclado) pero sin la barra vertical.
+          className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {roulette ? (
             <AssistantRoulette items={roulette} onBack={() => setRoulette(null)} />

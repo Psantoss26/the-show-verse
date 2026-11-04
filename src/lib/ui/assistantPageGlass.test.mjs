@@ -130,7 +130,8 @@ test("vista de lista como la de Favoritos, con selector y preferencia guardada",
   assert.match(assistant, /useImdbScoreLoader\(\{\s*items: scoreItems,\s*enabled: viewMode === "list",/);
   assert.match(assistant, /setImdbScores\(readScoreCache\("imdb"\)\)/);
   assert.match(row, /onClick=\{previewClick\(target, \{ mediaType: type \}\)\}/);
-  assert.match(row, /detail=\{item\?\.reason \|\| null\}/);
+  // Sin el texto de por qué se eligió: solo los datos de Favoritos.
+  assert.doesNotMatch(row, /reason|detail=/);
   // Se elige en el panel (escritorio) o con el botón de la cabecera (móvil) y
   // se recuerda en el dispositivo.
   assert.match(assistant, /<ViewModeSwitch value=\{viewMode\} onChange=\{setViewMode\} \/>/);
@@ -147,4 +148,17 @@ test("la página se llama Asistente", async () => {
   assert.match(page, /title: "Asistente",/);
   assert.match(assistant, /<h1 className="truncate text-base font-bold text-white">Asistente<\/h1>/);
   assert.match(assistant, /const activeTitle = empty \? "Asistente"/);
+});
+
+test("la conversación y Recientes no enseñan barra de desplazamiento", async () => {
+  const assistant = await readFile(assistantPath, "utf8");
+  assert.match(
+    assistant,
+    /className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain \[scrollbar-width:none\] \[&::-webkit-scrollbar\]:hidden"/,
+  );
+  assert.match(
+    assistant,
+    /className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 \[scrollbar-width:none\] \[&::-webkit-scrollbar\]:hidden"/,
+  );
+  assert.doesNotMatch(assistant, /scrollbar-width:thin/);
 });
