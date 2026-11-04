@@ -21,7 +21,12 @@ Diseño y decisiones: [[2026-10-26-planes-de-pago-design]].
 | Favoritos destacados del perfil | 3 + 3 | 3 + 3 | 5 + 5 |
 | Estadísticas, recap, vista neuronal, Plex | — | — | Sí |
 
-Pro tiene 7 días de prueba la primera vez. Quien se registró antes de
+Pro tiene 7 días de prueba la primera vez.
+
+La cuenta del creador, `@psantos26`, tiene Pro permanente: `users.plan = 'pro'`
+sin `plan_expires_at` (migración `0031_pro_psantos26`). Así lleva la insignia
+Pro y conserva todo con la facturación encendida. Solo lo cambiaría un webhook
+de una suscripción suya de Stripe (`refreshUserPlan`). Quien se registró antes de
 `BILLING_LAUNCH_AT` tiene Pro gratis `BILLING_GRACE_DAYS` días (30 por defecto)
 desde el lanzamiento.
 
