@@ -31,6 +31,12 @@ test("las recomendaciones son tarjetas de título de la app con ficha rápida", 
     readFile(pagePath, "utf8"),
   ]);
   assert.match(assistant, /<PosterTile item=\{item\} \/>/);
+  // Solo el póster: nada de título, año, nota ni motivo debajo.
+  const card = assistant.slice(
+    assistant.indexOf("function TitleCard"),
+    assistant.indexOf("function AssistantAvatar"),
+  );
+  assert.doesNotMatch(card, /item\?\.(title|year|voteAverage|reason)|<p\b/);
   assert.match(page, /<DetailModalProvider placement="right">/);
 });
 

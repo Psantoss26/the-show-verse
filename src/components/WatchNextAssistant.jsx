@@ -83,25 +83,15 @@ function relativeDay(ts) {
 
 // ---------------------------------------------------------------------------
 
+// Solo el póster: la tarjeta de título de la app (PosterTile), sin título,
+// año, nota ni motivo debajo. El nombre va en el `alt` de la imagen. Al
+// pulsarla, PosterTile abre la ficha rápida (DetailModal, drawer derecho en
+// escritorio); en el móvil DetailModalProvider navega a la ficha completa
+// (DetailsClient) en vez de abrir el modal.
 function TitleCard({ item }) {
-  const meta = [item?.mediaType === "tv" ? "Serie" : "Película", item?.year]
-    .filter(Boolean)
-    .join(" · ");
   return (
-    <div className="w-[8.5rem] shrink-0 snap-start sm:w-36 desktop:w-auto">
+    <div className="w-[7.5rem] shrink-0 snap-start sm:w-32 desktop:w-auto">
       <PosterTile item={item} />
-      <p className="mt-2 line-clamp-1 text-sm font-bold text-white" title={item?.title}>
-        {item?.title}
-      </p>
-      <p className="mt-0.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-cyan-200/80">
-        <span className="truncate">{meta}</span>
-        {item?.voteAverage ? (
-          <span className="shrink-0 text-yellow-200/90">★ {Number(item.voteAverage).toFixed(1)}</span>
-        ) : null}
-      </p>
-      {item?.reason ? (
-        <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-zinc-400">{item.reason}</p>
-      ) : null}
     </div>
   );
 }
@@ -147,7 +137,7 @@ function Message({ message }) {
           </span>
         ) : null}
         {recs.length ? (
-          <div className="-mx-4 mt-3 flex snap-x gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden desktop:mx-0 desktop:grid desktop:grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] desktop:gap-4 desktop:overflow-visible desktop:px-0">
+          <div className="-mx-4 mt-3 flex snap-x gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden desktop:mx-0 desktop:grid desktop:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] desktop:gap-3 desktop:overflow-visible desktop:px-0">
             {recs.map((item) => (
               <TitleCard key={`${item.mediaType}-${item.id}`} item={item} />
             ))}
