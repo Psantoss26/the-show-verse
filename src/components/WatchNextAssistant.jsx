@@ -37,7 +37,7 @@ import PosterTile from "@/components/social/PosterTile";
 import AssistantRoulette from "@/components/assistant/AssistantRoulette";
 import MobileOptionsSheet from "@/components/ui/MobileOptionsSheet";
 import useFitViewportPage from "@/hooks/useFitViewportPage";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_BAR, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import {
   WELCOME_TEXT,
   conversationTitle,
@@ -512,22 +512,50 @@ export default function WatchNextAssistant() {
     <div
       ref={rootRef}
       data-assistant-page=""
+      // La página ocupa el hueco que dejan las barras de la app (la superior,
+      // la lateral de escritorio vía DesktopSideNavInset y la inferior del
+      // móvil). El fondo de color no depende de eso: es `fixed inset-0` y pasa
+      // por debajo de las barras igualmente.
       className="relative isolate flex h-[calc(100svh-9rem-var(--sv-safe-top,0px)-var(--sv-safe-bottom,0px))] w-full overflow-hidden desktop:h-[calc(100svh-4rem-var(--sv-safe-top,0px))]"
       style={keyboardHeight ? { height: `${keyboardHeight}px` } : undefined}
     >
-      {/* Luz de fondo: da al cristal de la barra y de la caja algo que
-          atravesar. Degradados, sin filtros: no cuesta nada al desplazar. */}
+      {/* FONDO DE PÁGINA: capa `fixed inset-0`, como en Favoritos, Pendientes
+          o Historial, así que llega bajo la barra superior y la lateral.
+          DEGRADADOS RADIALES y no manchas con `blur`: las manchas tenían un
+          ancho máximo (800px) y en una pantalla ancha solo cubrían las
+          esquinas, el centro quedaba negro y la violeta se cortaba en una
+          franja bajo la barra superior. Los degradados se miden en % de la
+          ventana, así que el reparto es el mismo en cualquier ancho, y se
+          apagan solos sin borde (y sin el coste del filtro). La violeta tiene
+          el centro por debajo de la barra superior: la tiñe sin encenderla. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_45%_at_15%_0%,rgba(34,211,238,0.10),transparent_70%),radial-gradient(50%_40%_at_90%_100%,rgba(139,92,246,0.10),transparent_70%)]"
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          backgroundImage: [
+            "radial-gradient(55% 70% at 0% 20%, rgba(8,145,178,0.22), transparent 70%)",
+            "radial-gradient(50% 60% at 100% 30%, rgba(109,40,217,0.20), transparent 72%)",
+            "radial-gradient(60% 55% at 45% 105%, rgba(14,116,144,0.24), transparent 70%)",
+            "radial-gradient(40% 40% at 55% 40%, rgba(34,211,238,0.05), transparent 70%)",
+            // Luz tenue arriba en el centro: sin ella, en pantallas anchas la
+            // barra superior quedaba negra entre las dos manchas laterales.
+            "radial-gradient(45% 30% at 50% 0%, rgba(34,211,238,0.08), transparent 75%)",
+          ].join(","),
+        }}
       />
 
-      {/* Barra de conversaciones (escritorio) */}
+      {/* Barra de conversaciones (escritorio): PANEL INDEPENDIENTE que flota
+          en la zona izquierda, separado de la barra lateral de la app (1.5rem)
+          y de la superior (1.5rem), con las cuatro esquinas redondeadas.
+          Antes iba pegado a la esquina de la pantalla y por debajo de las dos
+          barras: así las tapaba y no se veía el fondo de color detrás de ellas.
+          El cristal es el de la barra lateral (LIQUID_GLASS_BAR), así que se
+          lee como pieza de la misma familia y deja pasar el color del fondo. */}
       <aside
         aria-label="Conversaciones"
-        className={`relative isolate my-3 ml-1 hidden w-72 shrink-0 flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} transform-gpu desktop:flex`}
+        className={`relative isolate z-10 my-6 ml-6 hidden w-72 shrink-0 flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_BAR} transform-gpu desktop:flex`}
       >
-        <div className="flex items-center gap-3 px-5 pb-3 pt-5">
+        <div className="flex items-center gap-3 px-4 pb-4 pt-5">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/10 text-cyan-100">
             <Bot className="h-5 w-5" />
           </div>
@@ -536,7 +564,7 @@ export default function WatchNextAssistant() {
             <p className="truncate text-xs text-zinc-400">Con tus listas, historial y notas</p>
           </div>
         </div>
-        <div className="px-3">
+        <div className="px-4">
           <button
             type="button"
             onClick={startNewConversation}
@@ -545,12 +573,14 @@ export default function WatchNextAssistant() {
             <MessageSquarePlus className="h-4 w-4 text-cyan-300" />
             Conversación nueva
           </button>
-          <div className="mt-3 flex flex-wrap gap-2">{quickActions}</div>
+          {/* En filas a todo el ancho: en dos columnas no cabían y partían
+              el texto en dos líneas. */}
+          <div className="mt-2 grid gap-1.5">{quickActions}</div>
         </div>
-        <div className="mx-5 mb-1 mt-5 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+        <div className="mx-4 mb-1.5 mt-7 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">
           Recientes
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]">
+        <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]">
           <ConversationList
             conversations={conversations}
             activeId={conversationId}
@@ -561,7 +591,7 @@ export default function WatchNextAssistant() {
       </aside>
 
       {/* Conversación */}
-      <section className="relative flex min-w-0 flex-1 flex-col">
+      <section className="relative z-10 flex min-w-0 flex-1 flex-col">
         {/* Cabecera móvil: título y acciones */}
         <header className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-1 desktop:hidden">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-300/10 text-cyan-100">
@@ -593,7 +623,7 @@ export default function WatchNextAssistant() {
           {roulette ? (
             <AssistantRoulette items={roulette} onBack={() => setRoulette(null)} />
           ) : empty ? (
-            <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-4 py-8">
+            <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-4 py-8">
               <div className="mb-4 grid h-14 w-14 place-items-center rounded-3xl bg-cyan-300/10 text-cyan-100">
                 <Sparkles className="h-7 w-7" />
               </div>

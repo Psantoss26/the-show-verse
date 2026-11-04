@@ -8,7 +8,7 @@ const pagePath = new URL("../../app/assistant/page.jsx", import.meta.url);
 test("la página del asistente usa el cristal compartido y LiquidButton", async () => {
   const assistant = await readFile(assistantPath, "utf8");
 
-  assert.match(assistant, /import \{ LIQUID_GLASS_PANEL \} from "@\/lib\/ui\/liquidGlass"/);
+  assert.match(assistant, /import \{ LIQUID_GLASS_BAR, LIQUID_GLASS_PANEL \} from "@\/lib\/ui\/liquidGlass"/);
   assert.match(assistant, /import LiquidButton from "@\/components\/LiquidButton"/);
   // La receta a mano del panel antiguo no vuelve.
   assert.doesNotMatch(assistant, /backdrop-blur-3xl|bg-black\/45/);
@@ -38,6 +38,39 @@ test("la página descuenta las barras de la app y sigue al teclado del móvil", 
   const assistant = await readFile(assistantPath, "utf8");
   assert.match(assistant, /useFitViewportPage\(\)/);
   assert.match(assistant, /100svh-9rem-var\(--sv-safe-top,0px\)-var\(--sv-safe-bottom,0px\)/);
-  assert.match(assistant, /desktop:h-\[calc\(100svh-4rem/);
+  assert.match(assistant, /desktop:h-\[calc\(100svh-4rem-var\(--sv-safe-top,0px\)\)\]/);
   assert.match(assistant, /window\.visualViewport/);
+});
+
+test("el fondo llega bajo la barra superior y la lateral, como en las páginas de usuario", async () => {
+  const assistant = await readFile(assistantPath, "utf8");
+  const favorites = await readFile(
+    new URL("../../app/favorites/FavoritesClient.jsx", import.meta.url),
+    "utf8",
+  );
+  // La misma capa que Favoritos: fija a toda la ventana, no dentro del hueco
+  // de la página (que empieza bajo la barra superior y junto a la lateral).
+  assert.match(favorites, /fixed inset-0 pointer-events-none overflow-hidden z-0/);
+  assert.match(assistant, /pointer-events-none fixed inset-0 z-0/);
+  assert.doesNotMatch(assistant, /absolute inset-0 -z-10 bg-\[radial-gradient/);
+  // Degradados en % de la ventana, no manchas con ancho máximo: con
+  // `max-w-[800px]` en una pantalla ancha el centro quedaba negro y la violeta
+  // hacía una franja bajo la barra superior.
+  const fondo = assistant.slice(assistant.indexOf("FONDO DE PÁGINA"), assistant.indexOf("Barra de conversaciones (escritorio)"));
+  assert.match(fondo, /radial-gradient\(\d+% \d+% at/);
+  assert.doesNotMatch(fondo, /max-w-\[|blur-\[/);
+});
+
+test("la barra de conversaciones es un panel independiente, separado de las barras", async () => {
+  const assistant = await readFile(assistantPath, "utf8");
+  const aside = assistant.match(/<aside[\s\S]*?>/)?.[0];
+  assert.ok(aside, "no se localiza la barra de conversaciones");
+  // Separada 1.5rem de la barra lateral y de la superior, y del borde inferior,
+  // con las cuatro esquinas redondeadas y el cristal de la barra lateral.
+  assert.match(aside, /my-6 ml-6/);
+  assert.match(aside, /rounded-\[2rem\]/);
+  assert.match(aside, /\$\{LIQUID_GLASS_BAR\}/);
+  // Ya no se cuela bajo las barras de la app: así no les tapa el fondo.
+  assert.doesNotMatch(assistant, /desktop:-ml-\[4\.5rem\]|desktop:-mt-\[calc\(4rem/);
+  assert.doesNotMatch(aside, /pl-\[4\.5rem\]|pt-\[calc\(4rem/);
 });
