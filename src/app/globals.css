@@ -1237,23 +1237,29 @@ html {
    ====================================================================
    Las manchas miden en `vw` (60/55/65vw) pero su `blur` va en px. En un
    teléfono (390 px) una mancha de ~230 px con 95-120 px de desenfoque se
-   diluía hasta no verse y el fondo quedaba negro. Aquí crecen 2.4× y el
-   desenfoque pasa a `vw`, de modo que la proporción mancha/desenfoque es la
-   misma en cualquier ancho de móvil. Medido con capturas (canal del color a
-   390 px ≈ 22 de media, escritorio a 1440 px ≈ 19). Desde 560 px la pantalla
-   es menos alargada y las manchas cubren más: bajan a 0.7 de opacidad para
-   quedar igual de intensas. */
+   diluía hasta no verse y el fondo quedaba negro.
+
+   SIN `filter: blur()`: el fundido lo hace una máscara de degradado radial.
+   Una capa fija con `blur` se vuelve a componer en cada fotograma del scroll
+   y, agrandada para que se vea en el teléfono, ralentizaba toda la app en el
+   móvil. La máscara cuesta lo mismo que no tener manchas (medido con trazas
+   de Chromium: 1075 ms de composición en 120 fotogramas frente a 1079 ms sin
+   manchas) y da la misma intensidad que el escritorio (canal del color a
+   390 px ≈ 21 de media; escritorio a 1440 px ≈ 19). Desde 560 px la pantalla
+   es menos alargada y las manchas cubren más: bajan a 0.75 de opacidad. */
 @media (max-width: 767px) {
   div.fixed.inset-0.pointer-events-none.overflow-hidden>div.absolute.rounded-full.aspect-square {
-    transform: scale(2.4) !important;
-    filter: blur(15vw) saturate(1.3) !important;
+    transform: scale(3.4) !important;
+    filter: none !important;
+    -webkit-mask-image: radial-gradient(closest-side, #000 25%, rgb(0 0 0 / 50%) 62%, transparent 100%) !important;
+    mask-image: radial-gradient(closest-side, #000 25%, rgb(0 0 0 / 50%) 62%, transparent 100%) !important;
     opacity: 1 !important;
   }
 }
 
 @media (min-width: 560px) and (max-width: 767px) {
   div.fixed.inset-0.pointer-events-none.overflow-hidden>div.absolute.rounded-full.aspect-square {
-    opacity: 0.7 !important;
+    opacity: 0.75 !important;
   }
 }
 
