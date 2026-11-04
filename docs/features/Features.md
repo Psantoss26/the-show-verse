@@ -20,6 +20,7 @@ aliases: [Funcionalidades, Features MOC]
 | [[planes-y-suscripciones]] | Planes Gratis, Sin anuncios y Pro: `/planes`, Ajustes → Suscripción, bloqueos Pro, anuncios y Stripe. |
 | [[vista-previa-movil]] | Vista previa al mantener pulsada una tarjeta en el móvil: portada con logo, botones y puntuaciones. |
 | [[modo-ligero]] | Modo ligero: sin desenfoques de cristal solo en los dispositivos que van a tirones; Ajustes → Efectos visuales. |
+| [[asistente]] | Asistente «Qué ver con IA» (`/assistant`): qué entiende del mensaje (géneros, ánimo, duración, nota, plataformas, cines, época, «parecida a», pendientes) y cómo elige los títulos. |
 
 Otras funcionalidades ya documentadas fuera de esta carpeta:
 

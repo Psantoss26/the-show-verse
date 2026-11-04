@@ -17,6 +17,20 @@ import {
   getTraktRecommended,
   getTraktTrending,
 } from "@/lib/api/traktHelpers";
+import { backendFetchJson, setBackendAuthCookies } from "@/lib/backend/server";
+import {
+  GENRES,
+  describeIntent,
+  genreIdsFor,
+  parseWatchIntent,
+} from "@/lib/ai/watchNextIntent";
+import {
+  RELAXED_AT_LEVEL,
+  buildDiscoverQueries,
+  checkCandidate,
+  runtimeRange,
+  scoreCandidate,
+} from "@/lib/ai/watchNextCandidates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,22 +122,6 @@ const WATCH_NEXT_RESPONSE_FORMAT = {
   },
 };
 
-const GENRE_HINTS = [
-  { id: 28, words: ["acción", "accion", "peleas", "explosiones"] },
-  { id: 12, words: ["aventura", "épica", "epica"] },
-  { id: 16, words: ["animación", "animacion", "anime"] },
-  { id: 35, words: ["comedia", "risa", "divertida", "ligera", "ligero"] },
-  { id: 80, words: ["crimen", "mafia", "policíaca", "policiaca"] },
-  { id: 18, words: ["drama", "emocional", "intensa", "intenso"] },
-  { id: 27, words: ["terror", "miedo", "susto"] },
-  { id: 9648, words: ["misterio", "intriga"] },
-  { id: 10749, words: ["romance", "amor", "romántica", "romantica"] },
-  { id: 878, words: ["ciencia ficción", "ciencia ficcion", "sci-fi", "scifi"] },
-  { id: 53, words: ["thriller", "tensión", "tension", "suspense"] },
-  { id: 10759, words: ["acción", "accion", "aventura"] },
-  { id: 10765, words: ["fantasía", "fantasia", "sci-fi", "sobrenatural"] },
-];
-
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -156,7 +154,7 @@ function releaseDateOf(item) {
 function normalizeItem(item, source = "base") {
   if (!item?.id) return null;
   const mediaType = mediaTypeOf(item);
-  const title = mediaType === "movie" ? item?.title : item?.name || item?.title;
+  const title = mediaType === "movie" ? item?.title || item?.name : item?.name || item?.title;
   if (!title) return null;
 
   return {
@@ -170,11 +168,18 @@ function normalizeItem(item, source = "base") {
     releaseDate: releaseDateOf(item),
     voteAverage:
       typeof item?.vote_average === "number" ? Number(item.vote_average) : null,
+    voteCount: typeof item?.vote_count === "number" ? Number(item.vote_count) : null,
     popularity: typeof item?.popularity === "number" ? item.popularity : 0,
     genreIds: safeArray(item?.genre_ids).map(Number).filter(Number.isFinite),
+    originalLanguage: item?.original_language || null,
+    originCountry: safeArray(item?.origin_country),
     userRating:
       typeof item?.user_rating === "number" ? Number(item.user_rating) : null,
     sources: [source],
+    // Criterios que la búsqueda de la que salió ya garantiza (ver
+    // buildDiscoverQueries) y cómo encajó con los géneros pedidos.
+    verified: [],
+    genreMatch: null,
     score: 0,
   };
 }
@@ -207,9 +212,11 @@ function itemKey(item) {
   return `${item?.mediaType || mediaTypeOf(item)}:${Number(item?.id || 0)}`;
 }
 
-function addCandidates(map, items, source, baseScore = 0) {
+function addCandidates(map, items, source, baseScore = 0, { mediaType = null, verified = [], genreMatch = null } = {}) {
   for (const raw of safeArray(items)) {
-    const item = normalizeItem(raw, source);
+    // Los resultados de /discover/{tipo} y /{tipo}/{id}/recommendations no
+    // traen `media_type`: lo pone quien sabe de dónde salen.
+    const item = normalizeItem(mediaType && !raw?.media_type ? { ...raw, media_type: mediaType } : raw, source);
     if (!item) continue;
     const key = itemKey(item);
     const prev = map.get(key);
@@ -217,13 +224,21 @@ function addCandidates(map, items, source, baseScore = 0) {
       prev.sources = Array.from(new Set([...prev.sources, source]));
       prev.score += baseScore;
       prev.voteAverage = prev.voteAverage ?? item.voteAverage;
+      prev.voteCount = prev.voteCount ?? item.voteCount;
       prev.popularity = Math.max(prev.popularity || 0, item.popularity || 0);
       prev.genreIds = Array.from(new Set([...prev.genreIds, ...item.genreIds]));
+      prev.originalLanguage = prev.originalLanguage || item.originalLanguage;
+      if (!prev.originCountry?.length) prev.originCountry = item.originCountry;
       if (!prev.posterPath && item.posterPath) prev.posterPath = item.posterPath;
       if (!prev.backdropPath && item.backdropPath) prev.backdropPath = item.backdropPath;
       if (!prev.overview && item.overview) prev.overview = item.overview;
+      if (!prev.releaseDate && item.releaseDate) prev.releaseDate = item.releaseDate;
+      prev.verified = Array.from(new Set([...(prev.verified || []), ...verified]));
+      if (genreMatch === "all" || !prev.genreMatch) prev.genreMatch = genreMatch || prev.genreMatch;
     } else {
       item.score = baseScore;
+      item.verified = [...verified];
+      item.genreMatch = genreMatch;
       map.set(key, item);
     }
   }
@@ -282,69 +297,150 @@ async function getTmdbNoveltyCandidates(limit = 40) {
   };
 }
 
-async function getTmdbQualityCandidates(limit = 30) {
-  const [movies, shows] = await Promise.all([
-    tmdbList("/movie/top_rated", { page: 1, region: "ES" }).catch(() => []),
-    tmdbList("/tv/top_rated", { page: 1 }).catch(() => []),
-  ]);
-
-  return [...movies, ...shows]
-    .filter((item) => item?.media_type !== "person")
-    .slice(0, limit);
+// Búsquedas de /discover que ya cumplen los criterios del mensaje (plataforma,
+// minutos, nota, fechas, idioma, géneros…), ver buildDiscoverQueries.
+async function runDiscoverQueries(intent, today) {
+  const queries = buildDiscoverQueries(intent, { today, region: "ES" });
+  const results = await Promise.all(
+    queries.map((query) =>
+      tmdbList(query.path, query.params)
+        .then((items) => ({ query, items }))
+        .catch(() => ({ query, items: [] })),
+    ),
+  );
+  return results;
 }
 
-async function getTmdbDiscoveryCandidates(message, limit = 32) {
-  const wantedGenres = getWantedGenreIds(message);
-  const wantedType = getWantedMediaType(message);
-  const yearIntent = extractYearIntent(message);
-  const genreParam = wantedGenres.length ? wantedGenres.slice(0, 4).join("|") : null;
+async function tmdbJson(path, params = {}, revalidate = 60 * 60 * 12) {
+  if (!TMDB_API_KEY) return null;
+  const url = new URL(`${TMDB_BASE}${path}`);
+  url.searchParams.set("api_key", TMDB_API_KEY);
+  url.searchParams.set("language", "es-ES");
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+  }
+  const res = await fetch(url, { next: { revalidate } });
+  return res.ok ? safeJson(res) : null;
+}
 
-  const commonParams = {
-    page: 1,
-    sort_by: yearIntent ? "vote_count.desc" : "popularity.desc",
-    "vote_count.gte": yearIntent ? 30 : 80,
-    "vote_average.gte": 5.5,
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      out[index] = await fn(items[index], index).catch(() => null);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+// «Parecida a X»: busca X en TMDb y trae sus recomendaciones y similares.
+// «Parecida a mis favoritas»: lo mismo con las últimas favoritas.
+async function getSimilarCandidates(intent, favorites) {
+  const seeds = [];
+  if (intent.similar?.title) {
+    const results = await tmdbList("/search/multi", { query: intent.similar.title, include_adult: false }).catch(() => []);
+    const wanted = normalizedTitle(intent.similar.title);
+    const media = results.filter((r) => r?.media_type === "movie" || r?.media_type === "tv");
+    const exact = media.find((r) => normalizedTitle(r.title || r.name) === wanted);
+    const seed = exact || media[0];
+    if (seed) seeds.push({ id: seed.id, mediaType: seed.media_type, title: seed.title || seed.name, source: "similar" });
+  } else if (intent.similar?.favorites) {
+    for (const fav of safeArray(favorites).slice(0, 4)) {
+      seeds.push({ id: Number(fav.id), mediaType: mediaTypeOf(fav), title: fav.title || fav.name, source: "similar_favorites" });
+    }
+  }
+  if (!seeds.length) return { seeds, lists: [] };
+
+  const lists = await Promise.all(
+    seeds.flatMap((seed) => [
+      tmdbList(`/${seed.mediaType}/${seed.id}/recommendations`, { page: 1 })
+        .then((items) => ({ seed, items }))
+        .catch(() => ({ seed, items: [] })),
+      tmdbList(`/${seed.mediaType}/${seed.id}/similar`, { page: 1 })
+        .then((items) => ({ seed, items: items.slice(0, 10) }))
+        .catch(() => ({ seed, items: [] })),
+    ]),
+  );
+  return { seeds, lists };
+}
+
+// Ficha de un candidato que no salió de una búsqueda que garantice duración o
+// plataforma (Pendientes, tendencias, similares): minutos, plataformas en
+// España, idioma, país, géneros y votos.
+async function getTitleFacts(item) {
+  const json = await tmdbJson(`/${item.mediaType}/${item.id}`, { append_to_response: "watch/providers" });
+  if (!json) return null;
+  const es = json?.["watch/providers"]?.results?.ES || {};
+  const providerIds = [...safeArray(es.flatrate), ...safeArray(es.free), ...safeArray(es.ads)]
+    .map((p) => Number(p?.provider_id))
+    .filter(Number.isFinite);
+  const episodeRuntime =
+    Number(safeArray(json.episode_run_time)[0]) ||
+    Number(json.last_episode_to_air?.runtime) ||
+    Number(json.next_episode_to_air?.runtime) ||
+    null;
+  return {
+    runtime: Number(json.runtime) || null,
+    episodeRuntime: episodeRuntime || null,
+    providerIds,
+    originalLanguage: json.original_language || null,
+    originCountry: safeArray(json.origin_country),
+    genreIds: safeArray(json.genres).map((g) => Number(g?.id)).filter(Number.isFinite),
+    voteCount: typeof json.vote_count === "number" ? json.vote_count : null,
+    voteAverage: typeof json.vote_average === "number" ? json.vote_average : null,
+    releaseDate: json.release_date || json.first_air_date || null,
+    numberOfSeasons: Number(json.number_of_seasons) || null,
   };
+}
 
-  // When a specific year is requested, use primary_release_year (exact match)
-  // When a decade range is requested, use primary_release_date.gte/lte
-  if (yearIntent?.specificYear) {
-    commonParams["primary_release_year"] = yearIntent.specificYear;
-  } else if (yearIntent?.yearMin) {
-    commonParams["primary_release_date.gte"] = `${yearIntent.yearMin}-01-01`;
-    commonParams["primary_release_date.lte"] = `${yearIntent.yearMax || yearIntent.yearMin + 9}-12-31`;
-  }
+// Pendientes, favoritos, valoraciones e historial del backend propio (lo que
+// el usuario ve en la app). Sin sesión del backend, `connected: false` y se
+// usan los de TMDb/Trakt.
+function mapBackendItem(row) {
+  const mediaType = row?.mediaType === "movie" ? "movie" : "tv";
+  return {
+    id: Number(row?.tmdbId),
+    media_type: mediaType,
+    title: row?.title || null,
+    name: row?.title || null,
+    poster_path: row?.posterPath || null,
+    backdrop_path: row?.backdropPath || null,
+    release_date: row?.releaseDate || null,
+    first_air_date: row?.firstAirDate || null,
+    year: row?.year || null,
+    genre_ids: safeArray(row?.genreIds),
+    overview: row?.overview || "",
+    vote_average: typeof row?.voteAverage === "number" ? row.voteAverage : undefined,
+    user_rating: typeof row?.userRating === "number" ? row.userRating : typeof row?.rating === "number" ? row.rating : undefined,
+  };
+}
 
-  const movieParams = genreParam
-    ? { ...commonParams, with_genres: genreParam, region: "ES" }
-    : { ...commonParams, region: "ES" };
-  const tvParams = genreParam
-    ? { ...commonParams, with_genres: genreParam }
-    : commonParams;
-
-  // For TV year filtering use first_air_date instead of primary_release_date
-  if (yearIntent?.specificYear) {
-    tvParams["first_air_date_year"] = yearIntent.specificYear;
-    delete tvParams["primary_release_year"];
-  } else if (yearIntent?.yearMin) {
-    tvParams["first_air_date.gte"] = `${yearIntent.yearMin}-01-01`;
-    tvParams["first_air_date.lte"] = `${yearIntent.yearMax || yearIntent.yearMin + 9}-12-31`;
-    delete tvParams["primary_release_date.gte"];
-    delete tvParams["primary_release_date.lte"];
-  }
-
-  const [movies, shows] = await Promise.all([
-    wantedType === "tv"
-      ? Promise.resolve([])
-      : tmdbList("/discover/movie", movieParams).catch(() => []),
-    wantedType === "movie"
-      ? Promise.resolve([])
-      : tmdbList("/discover/tv", tvParams).catch(() => []),
+async function getBackendLibrary(request) {
+  const [watchlist, favorites, ratings, history] = await Promise.all([
+    backendFetchJson(request, "/v1/watchlist?limit=500").catch(() => null),
+    backendFetchJson(request, "/v1/favorites?limit=200").catch(() => null),
+    backendFetchJson(request, "/v1/ratings?limit=300").catch(() => null),
+    backendFetchJson(request, "/v1/history?limit=1500").catch(() => null),
   ]);
-
-  return [...movies, ...shows]
-    .filter((item) => item?.media_type !== "person")
-    .slice(0, limit);
+  const ok = (r) => r?.ok && Array.isArray(r.json?.results);
+  const rows = (r) => (ok(r) ? r.json.results : []);
+  const historyKeys = new Set(
+    rows(history)
+      .filter((row) => row?.tmdbId)
+      .map((row) => `${row.mediaType === "movie" ? "movie" : "tv"}:${Number(row.tmdbId)}`),
+  );
+  return {
+    connected: [watchlist, favorites, ratings, history].some(ok),
+    watchlist: rows(watchlist).map(mapBackendItem).filter((x) => x.id),
+    favorites: rows(favorites).map(mapBackendItem).filter((x) => x.id),
+    rated: rows(ratings).map(mapBackendItem).filter((x) => x.id),
+    historyKeys,
+    // La última respuesta con tokens renovados, para devolverlos en cookies.
+    authResult: [watchlist, favorites, ratings, history].find((r) => r?.refreshedTokens) || null,
+  };
 }
 
 async function getTmdbAccount(sessionId) {
@@ -445,34 +541,6 @@ async function getTraktContext(cookieStore) {
   }
 }
 
-function getWantedMediaType(message) {
-  const text = String(message || "").toLowerCase();
-  if (/\b(pel[ií]cula|peli|film|cine)\b/.test(text)) return "movie";
-  if (/\b(serie|series|cap[ií]tulos?|temporada)\b/.test(text)) return "tv";
-  return null;
-}
-
-function getWantedGenreIds(message) {
-  const text = String(message || "").toLowerCase();
-  const ids = new Set();
-  for (const hint of GENRE_HINTS) {
-    if (hint.words.some((word) => text.includes(word))) ids.add(hint.id);
-  }
-  return Array.from(ids);
-}
-
-function wantsFutureReleases(message) {
-  return /\b(pr[oó]xim[oa]s?|futur[oa]s?|cuando salga|estrenos? futuros?|esperad[oa]s?)\b/i.test(
-    String(message || ""),
-  );
-}
-
-function wantsRewatch(message) {
-  return /\b(rever|revisionar|volver a ver|rewatch|repetir|otra vez)\b/i.test(
-    String(message || ""),
-  );
-}
-
 function normalizeRecentKeys(value) {
   return [
     ...new Set(
@@ -487,44 +555,6 @@ function clampRecommendationLimit(value, fallback = 5) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(1, Math.min(8, Math.trunc(n)));
-}
-
-/**
- * Extract a specific year or decade range from the user message.
- * Returns { yearMin, yearMax, specificYear } or null if nothing found.
- */
-function extractYearIntent(message) {
-  const text = String(message || "");
-
-  // Specific 4-digit year: "del año 1996", "de 1996", "año 1996", "1996"
-  const specificYearMatch = text.match(/\b(19[0-9]{2}|20[0-2][0-9])\b/);
-  if (specificYearMatch) {
-    const year = parseInt(specificYearMatch[1], 10);
-    return { yearMin: year, yearMax: year, specificYear: year };
-  }
-
-  // Decade patterns: "años 90", "los 90", "los 80s", "de los 2000s"
-  const decadeMatch = text.match(/\b(?:a[ñn]os?\s+|los\s+|de\s+los\s+|de\s+)([12][0-9]){0,1}([0-9]{2})(?:s|'s)?\b/i);
-  if (decadeMatch) {
-    const raw = decadeMatch[0].replace(/[^0-9]/g, "");
-    const decade = parseInt(raw.slice(-2), 10);
-    if (decade >= 20 && decade <= 99) {
-      // Two-digit decade like "90" → 1990s, "80" → 1980s, "70" → 1970s
-      const century = decade >= 20 && decade <= 29 ? 2000 : 1900;
-      const yearMin = century + Math.floor(decade / 10) * 10;
-      return { yearMin, yearMax: yearMin + 9, specificYear: null };
-    }
-  }
-
-  // Named decade patterns
-  if (/\b(noventa|90s|'?90s?)\b/i.test(text)) return { yearMin: 1990, yearMax: 1999, specificYear: null };
-  if (/\b(ochenta|80s|'?80s?)\b/i.test(text)) return { yearMin: 1980, yearMax: 1989, specificYear: null };
-  if (/\b(setenta|70s|'?70s?)\b/i.test(text)) return { yearMin: 1970, yearMax: 1979, specificYear: null };
-  if (/\b(dos\s*mil|2000s|'?00s?)\b/i.test(text)) return { yearMin: 2000, yearMax: 2009, specificYear: null };
-  if (/\b(2010s|'?10s?)\b/i.test(text)) return { yearMin: 2010, yearMax: 2019, specificYear: null };
-  if (/\b(2020s|'?20s?)\b/i.test(text)) return { yearMin: 2020, yearMax: 2029, specificYear: null };
-
-  return null;
 }
 
 function inferFavoriteGenres({ favorites, rated, traktRatings }) {
@@ -550,111 +580,6 @@ function inferFavoriteGenres({ favorites, rated, traktRatings }) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
     .map(([id]) => id);
-}
-
-function scoreCandidates({
-  candidates,
-  message,
-  profileGenres,
-  watchedSet,
-  recentKeySet,
-  quickPick = false,
-}) {
-  const wantedType = getWantedMediaType(message);
-  const wantedGenres = getWantedGenreIds(message);
-  const yearIntent = extractYearIntent(message);
-  const text = String(message || "").toLowerCase();
-  const wantsShort = /corta|corto|rápida|rapida|poco tiempo|algo breve/.test(text);
-  const wantsQuality = /buena|mejor|obra maestra|top|calidad|notaza/.test(text);
-  const allowWatched = wantsRewatch(message);
-
-  // Has ANY specific user intent (genre, type, year) — if so, we should suppress
-  // novelty bonuses so discovery candidates (filtered by intent) can compete.
-  const hasSpecificIntent = !!(yearIntent || wantedGenres.length > 0 || wantedType);
-
-  return candidates
-    .map((item) => {
-      let score = item.score || 0;
-      const key = itemKey(item);
-      const genreIds = new Set(item.genreIds || []);
-
-      const daysFromRelease = item.releaseDate
-        ? Math.round(
-            (new Date(`${item.releaseDate}T00:00:00Z`).getTime() - Date.now()) /
-              86400000,
-          )
-        : null;
-      const isRecentRelease =
-        Number.isFinite(daysFromRelease) &&
-        daysFromRelease <= 45 &&
-        daysFromRelease >= -180;
-      const isNearRelease =
-        Number.isFinite(daysFromRelease) &&
-        daysFromRelease > 45 &&
-        daysFromRelease <= 120;
-
-      if (!hasSpecificIntent) {
-        // No specific request — full novelty/trending bonuses ("recomiéndame algo")
-        if (item.sources.includes("watchlist")) score += quickPick ? 10 : 20;
-        if (item.sources.includes("trakt_recommended")) score += 28;
-        if (item.sources.includes("trakt_trending")) score += 18;
-        if (item.sources.includes("trakt_anticipated")) score += 18;
-        if (item.sources.includes("trakt_popular")) score += 8;
-        if (item.sources.includes("tmdb_now_playing")) score += 24;
-        if (item.sources.includes("tmdb_upcoming")) score += 18;
-        if (item.sources.includes("tmdb_on_the_air")) score += 22;
-        if (item.sources.includes("tmdb_airing_today")) score += 18;
-        if (item.sources.includes("tmdb_weekly_trending")) score += 20;
-        if (item.sources.includes("tmdb_fallback")) score += 5;
-        if (isRecentRelease) score += item.mediaType === "movie" ? 18 : 12;
-        if (isNearRelease) score += 8;
-      } else {
-        // Specific request — suppress novelty bonuses so intent-matching content wins.
-        // Only keep watchlist/personal signals.
-        if (item.sources.includes("watchlist")) score += 20;
-        if (item.sources.includes("trakt_recommended")) score += 10;
-        // Small recency bonus so recent content in the right category still shows
-        if (isRecentRelease && !yearIntent) score += item.mediaType === "movie" ? 6 : 4;
-      }
-
-      if (item.voteAverage) score += item.voteAverage * (wantsQuality ? 3 : 1.7);
-      if (item.popularity) score += Math.min(16, Math.log10(item.popularity + 1) * 7);
-
-      if (wantedType && item.mediaType === wantedType) score += 30;
-      if (wantedType && item.mediaType !== wantedType) score -= 40;
-
-      // Genre matching — strong signal when user has asked for specific genres
-      for (const id of wantedGenres) {
-        if (genreIds.has(id)) score += hasSpecificIntent ? 35 : 18;
-      }
-
-      // Year/decade matching — strongly boost items from requested period
-      if (yearIntent) {
-        const itemYear = parseInt(item.year, 10);
-        if (!isNaN(itemYear)) {
-          if (yearIntent.specificYear) {
-            if (itemYear === yearIntent.specificYear) score += 60;
-            else score -= Math.min(80, Math.abs(itemYear - yearIntent.specificYear) * 8);
-          } else {
-            if (itemYear >= yearIntent.yearMin && itemYear <= yearIntent.yearMax) score += 40;
-            else score -= 30;
-          }
-        }
-      }
-
-      for (const id of profileGenres) {
-        if (genreIds.has(id)) score += 5;
-      }
-      if (wantsShort && item.mediaType === "movie") score += 10;
-      if (recentKeySet?.has(key)) score -= quickPick ? 110 : 85;
-      if (watchedSet.has(key) && !allowWatched) {
-        score -= item.sources.includes("watchlist") ? 75 : 150;
-      }
-      if (watchedSet.has(key) && allowWatched) score += 15;
-
-      return { ...item, score };
-    })
-    .sort((a, b) => b.score - a.score);
 }
 
 function primarySource(item) {
@@ -702,20 +627,13 @@ function titleLooksTooSimilar(a, b) {
 function diversifyRecommendations({
   candidates,
   limit,
-  message,
+  intent,
   recentKeySet,
   quickPick = false,
 }) {
-  const wantedType = getWantedMediaType(message);
-  const allowWatched = wantsRewatch(message);
+  const wantedType = intent.mediaType;
   const selected = [];
-  const pool = safeArray(candidates)
-    .filter((item) => item?.id && item?.mediaType)
-    .filter((item) => {
-      if (wantedType && item.mediaType !== wantedType) return false;
-      if (!allowWatched && item.score < -80) return false;
-      return true;
-    });
+  const pool = safeArray(candidates).filter((item) => item?.id && item?.mediaType);
 
   const sourceCounts = new Map();
   const typeCounts = new Map();
@@ -732,15 +650,20 @@ function diversifyRecommendations({
 
       if (recentKeySet?.has(key)) penalty += quickPick ? 95 : 70;
       if (!wantedType) penalty += (typeCounts.get(item.mediaType) || 0) * 10;
-      penalty += (sourceCounts.get(source) || 0) * 8;
+      // Con criterios concretos, que todo venga de la misma búsqueda no es
+      // un defecto: la variedad de origen pesa poco.
+      penalty += (sourceCounts.get(source) || 0) * (intent.hasConstraints ? 2 : 8);
 
       for (const picked of selected) {
-        penalty += genreSimilarity(item, picked) * 20;
-        if (titleLooksTooSimilar(item, picked)) penalty += 55;
+        // Si pidió un género, que se repita es lo esperado.
+        penalty += genreSimilarity(item, picked) * (intent.genres.length ? 6 : 20);
+        // Misma saga («Narcos» y «Narcos: México»): casi nunca las dos.
+        if (titleLooksTooSimilar(item, picked)) penalty += 400;
         if (item.year && picked.year && item.year === picked.year) penalty += 3;
       }
 
-      const relevance = Number(item.score || 0);
+      // Lo que no cumple todos los criterios (relajado) va siempre detrás.
+      const relevance = Number(item.score || 0) - (item.relaxedLevel || 0) * 400;
       const finalScore = relevance * 0.72 - penalty * 0.28;
       if (finalScore > bestScore) {
         bestScore = finalScore;
@@ -756,66 +679,69 @@ function diversifyRecommendations({
     typeCounts.set(picked.mediaType, (typeCounts.get(picked.mediaType) || 0) + 1);
   }
 
-  if (selected.length >= limit) return selected;
-
-  for (const item of safeArray(candidates)) {
-    if (selected.length >= limit) break;
-    const key = itemKey(item);
-    if (selected.some((picked) => itemKey(picked) === key)) continue;
-    if (wantedType && item.mediaType !== wantedType) continue;
-    selected.push(item);
-  }
-
   return selected.slice(0, limit);
 }
 
-function buildReason(item, message, source = "ranking") {
-  const bits = [];
-  if (item.sources.includes("tmdb_now_playing")) {
-    bits.push("es una novedad reciente de cine");
+function genreLabelsOf(item) {
+  const labels = [];
+  for (const def of Object.values(GENRES)) {
+    if ((def[item.mediaType] || []).some((id) => (item.genreIds || []).includes(id))) labels.push(def.label);
   }
-  if (item.sources.includes("tmdb_on_the_air") || item.sources.includes("tmdb_airing_today")) {
-    bits.push("está entre las series activas ahora mismo");
-  }
-  if (item.sources.includes("tmdb_weekly_trending") || item.sources.includes("trakt_trending")) {
-    bits.push("está funcionando muy bien en tendencia");
-  }
-  if (item.sources.includes("tmdb_upcoming") || item.sources.includes("trakt_anticipated")) {
-    bits.push("aparece entre los próximos estrenos más relevantes");
-  }
-  if (item.sources.includes("trakt_recommended")) {
-    bits.push("también aparece entre recomendaciones de Trakt");
-  }
-  if (item.sources.includes("watchlist")) {
-    bits.push("además ya la tienes pendiente");
-  }
-  if (item.voteAverage && item.voteAverage >= 7.5) {
-    bits.push(`tiene una valoración sólida (${item.voteAverage.toFixed(1)})`);
-  }
-  if (getWantedMediaType(message) === item.mediaType) {
-    bits.push(`encaja con que te apetece ${item.mediaType === "movie" ? "una película" : "una serie"}`);
-  }
-  if (!bits.length) bits.push("equilibra afinidad con tu perfil y popularidad actual");
-
-  return `${bits.slice(0, 2).join(" y ")}.`;
+  return [...new Set(labels)];
 }
 
-function serializeRecommendation(item, message, source = "ranking") {
-  const sourceTags = item.sources.map((s) => {
-    if (s === "watchlist") return "Pendiente";
-    if (s === "trakt_recommended") return "Trakt";
-    if (s === "trakt_trending") return "Tendencia";
-    if (s === "trakt_anticipated") return "Esperada";
-    if (s === "trakt_popular") return "Popular";
-    if (s === "tmdb_now_playing") return "Novedad";
-    if (s === "tmdb_upcoming") return "Estreno";
-    if (s === "tmdb_on_the_air") return "En emisión";
-    if (s === "tmdb_airing_today") return "Hoy";
-    if (s === "tmdb_weekly_trending") return "Tendencia";
-    if (s === "tmdb_fallback") return "TMDb";
-    if (s === "tmdb_discovery") return "TMDb";
-    return s;
-  });
+function providerLabelsOf(item, intent) {
+  const ids = new Set(item.providerIds || []);
+  return (intent.providers || [])
+    .filter((p) => (item.verified || []).includes("providers") || p.ids.some((id) => ids.has(id)))
+    .map((p) => p.label);
+}
+
+// Motivo de cada título a partir de lo que encaja con la petición (lo que
+// cumple), no de su origen.
+function buildReason(item, intent) {
+  const bits = [];
+  const wanted = genreIdsFor(intent.genres, item.mediaType);
+  const genreHits = Object.entries(GENRES)
+    .filter(([key, def]) => intent.genres.includes(key) && (def[item.mediaType] || []).some((id) => item.genreIds.includes(id)))
+    .map(([, def]) => def.label);
+  if (genreHits.length) bits.push(genreHits.join(" y "));
+  else if (wanted.length === 0 && genreLabelsOf(item).length) bits.push(genreLabelsOf(item).slice(0, 2).join(" y "));
+  const minutes = item.mediaType === "tv" ? item.episodeRuntime : item.runtime;
+  if (Number.isFinite(minutes) && minutes > 0) {
+    bits.push(item.mediaType === "tv" ? `episodios de ${minutes} min` : `${minutes} min`);
+  }
+  const providers = providerLabelsOf(item, intent);
+  if (providers.length) bits.push(`en ${providers.join(" y ")}`);
+  if (intent.inCinemas) bits.push("en cartelera");
+  if (item.voteAverage) bits.push(`nota ${Number(item.voteAverage).toFixed(1)}`);
+  if (item.sources.includes("similar") && intent.similar?.seedTitle) bits.push(`en la línea de ${intent.similar.seedTitle}`);
+  if (item.sources.includes("similar_favorites")) bits.push("en la línea de tus favoritas");
+  if (item.sources.includes("watchlist")) bits.push("la tienes en Pendientes");
+  if (!intent.hasIntent) {
+    if (item.sources.includes("tmdb_now_playing")) bits.push("recién estrenada en cines");
+    else if (item.sources.includes("tmdb_on_the_air")) bits.push("en emisión");
+    else if (item.sources.some((s) => s.includes("trending"))) bits.push("en tendencia");
+  }
+  if (!bits.length) bits.push("encaja con tu perfil");
+  const text = bits.slice(0, 4).join(" · ");
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`;
+}
+
+function serializeRecommendation(item, intent) {
+  const tags = [];
+  if (item.sources.includes("watchlist")) tags.push("Pendiente");
+  const genreHits = Object.entries(GENRES)
+    .filter(([key, def]) => intent.genres.includes(key) && (def[item.mediaType] || []).some((id) => item.genreIds.includes(id)))
+    .map(([, def]) => def.label);
+  for (const label of genreHits.length ? genreHits : genreLabelsOf(item).slice(0, 1)) {
+    tags.push(label.charAt(0).toUpperCase() + label.slice(1));
+  }
+  for (const label of providerLabelsOf(item, intent)) tags.push(label);
+  if (intent.inCinemas || item.sources.includes("tmdb_now_playing")) tags.push("En cines");
+  if (item.sources.includes("tmdb_on_the_air")) tags.push("En emisión");
+  if (!intent.hasIntent && item.sources.some((s) => s.includes("trending"))) tags.push("Tendencia");
+  if (item.voteAverage >= 7.5 && (item.voteCount == null || item.voteCount >= 200)) tags.push("Valoración alta");
 
   return {
     id: item.id,
@@ -826,47 +752,52 @@ function serializeRecommendation(item, message, source = "ranking") {
     backdropPath: item.backdropPath,
     voteAverage: item.voteAverage,
     href: `/details/${item.mediaType}/${item.id}`,
-    reason: item.reason || buildReason(item, message, source),
-    matchTags: item.matchTags || Array.from(new Set(sourceTags)).slice(0, 3),
+    reason: item.reason || buildReason(item, intent),
+    matchTags: item.matchTags || [...new Set(tags)].slice(0, 3),
   };
 }
 
-function buildFallbackReply({ message, ranked, contextSummary }) {
-  const hasPersonal =
-    contextSummary.watchlistCount ||
-    contextSummary.favoritesCount ||
-    contextSummary.historyCount ||
-    contextSummary.ratedCount;
-  const intro = hasPersonal
-    ? "He cruzado lo que te apetece con novedades, tendencias y tu perfil, sin limitarme a tus pendientes."
-    : "No tengo mucho contexto personal todavía, así que he priorizado novedades, tendencias y opciones fuertes.";
-  const mood = String(message || "").trim()
-    ? ` Para "${String(message).trim()}", empezaría por estas opciones.`
-    : " Estas son buenas candidatas para decidir rápido.";
-  return `${intro}${mood}`;
-}
+// Qué criterio no se pudo cumplir del todo, dicho para el usuario.
+const RELAXED_LABELS = {
+  rating: "la nota mínima",
+  years: "la época",
+  runtime: "la duración exacta",
+  genres: "el género",
+  keywords: "el tema concreto",
+  similar: "el parecido",
+};
 
-function buildSelectionReply({ message, selected, contextSummary, quickPick }) {
+function buildSelectionReply({ intent, selected, contextSummary, quickPick, relaxed, watchlistHits, seedTitle, emptyReason }) {
   const count = safeArray(selected).length;
+  if (emptyReason) return emptyReason;
   if (quickPick) {
-    return `He elegido ${count || 3} opciones variadas para decidir rápido, penalizando lo que ya te recomendé hace poco.`;
+    return `He elegido ${count || 3} opciones variadas para decidir rápido, evitando lo que ya te recomendé hace poco.`;
   }
 
-  if (String(message || "").trim()) {
-    const hasSpecificIntent =
-      extractYearIntent(message) ||
-      getWantedGenreIds(message).length > 0 ||
-      getWantedMediaType(message);
-    if (hasSpecificIntent) {
-      const personal = contextSummary.traktConnected || contextSummary.tmdbConnected
-        ? " y tus señales personales"
-        : "";
-      return `He priorizado títulos que encajan con "${String(message).trim()}"${personal}, evitando repetirte lo recomendado hace poco.`;
-    }
-    return buildFallbackReply({ message, ranked: selected, contextSummary });
+  const parts = [];
+  if (intent.hasIntent) {
+    const criteria = describeIntent({ ...intent, similar: seedTitle ? { title: seedTitle } : intent.similar });
+    parts.push(`He buscado ${criteria}.`);
+  } else {
+    parts.push(
+      contextSummary.watchlistCount || contextSummary.favoritesCount || contextSummary.historyCount
+        ? "He combinado tus pendientes y tus gustos con novedades y tendencias."
+        : "Sin mucho contexto tuyo todavía, he tirado de novedades, tendencias y títulos muy bien valorados.",
+    );
   }
-
-  return "He elegido opciones variadas combinando tendencias, novedades y señales de tu perfil.";
+  if (watchlistHits > 0 && !intent.onlyWatchlist) {
+    parts.push(
+      watchlistHits === 1
+        ? "Una de ellas la tienes en Pendientes."
+        : `${watchlistHits} de ellas las tienes en Pendientes.`,
+    );
+  }
+  if (relaxed?.length) {
+    parts.push(
+      `No había suficientes que lo cumplieran todo, así que en alguna he relajado ${relaxed.map((r) => RELAXED_LABELS[r] || r).join(" y ")}.`,
+    );
+  }
+  return parts.join(" ");
 }
 
 function extractOutputText(json) {
@@ -895,91 +826,56 @@ function parseJsonLoose(text) {
   }
 }
 
-function isNoveltyCandidate(item) {
-  return safeArray(item?.sources).some((source) =>
-    [
-      "tmdb_now_playing",
-      "tmdb_upcoming",
-      "tmdb_on_the_air",
-      "tmdb_airing_today",
-      "tmdb_weekly_trending",
-      "trakt_trending",
-      "trakt_anticipated",
-    ].includes(source),
-  );
-}
-
-function selectCandidatesForAi(candidates) {
-  const selected = new Map();
-  const add = (items, limit) => {
-    for (const item of safeArray(items)) {
-      if (selected.size >= limit) break;
-      selected.set(itemKey(item), item);
-    }
-  };
-
-  add(candidates.slice(0, 18), 36);
-  add(candidates.filter(isNoveltyCandidate).slice(0, 18), 36);
-  add(candidates.filter((item) => item.sources.includes("watchlist")).slice(0, 6), 36);
-  add(candidates, 36);
-
-  return [...selected.values()];
-}
-
-function compactCandidatesForAi(candidates) {
-  return selectCandidatesForAi(candidates).map((item) => ({
+function compactCandidatesForAi(candidates, intent) {
+  return safeArray(candidates).slice(0, 30).map((item) => ({
     key: itemKey(item),
-    id: item.id,
-    mediaType: item.mediaType,
     title: item.title,
+    type: item.mediaType === "tv" ? "serie" : "película",
     year: item.year,
+    genres: genreLabelsOf(item),
     voteAverage: item.voteAverage,
-    releaseDate: item.releaseDate,
-    sources: item.sources,
-    overview: item.overview ? item.overview.slice(0, 280) : "",
-    score: Math.round(item.score),
+    votes: item.voteCount,
+    minutes: (item.mediaType === "tv" ? item.episodeRuntime : item.runtime) || undefined,
+    onPlatforms: providerLabelsOf(item, intent),
+    inWatchlist: item.sources.includes("watchlist") || undefined,
+    // Cumple solo parte de lo pedido (se relajó algún criterio).
+    partialMatch: item.relaxedLevel ? true : undefined,
+    overview: item.overview ? item.overview.slice(0, 220) : "",
   }));
 }
 
 function buildAiSystemPrompt() {
   return [
-    "Eres un recomendador experto de cine y series para The Show Verse. Tu misión es seleccionar exactamente entre 4 y 6 títulos de la lista de candidatos.",
+    "Eres un recomendador experto de cine y series para The Show Verse. Tu misión es elegir exactamente entre 4 y 6 títulos de la lista de candidatos.",
     "REGLAS ESTRICTAS:",
-    "1. Elige ÚNICAMENTE títulos que aparezcan en la lista 'candidates' con su campo 'key' exacto.",
-    "2. NO inventes títulos ni uses IDs de tu memoria. Solo los candidatos provistos.",
-    "3. Prioriza novedades recientes, estrenos, series en emisión y tendencias cuando el usuario lo pide.",
-    "4. Usa el historial, favoritos, valoraciones y watchlist ÚNICAMENTE como señales de afinidad personal.",
-    "5. Selecciona variedad: mezcla películas y series salvo que el usuario pida explícitamente un tipo.",
-    "6. El campo 'reason' debe ser específico, máximo 2 frases, explicando POR QUÉ ese título encaja con lo que pide el usuario.",
-    "7. 'matchTags' deben ser 2-3 etiquetas cortas en español (ej: 'Tendencia', 'Sci-Fi', 'Valoración alta', 'En emisión', 'Tu perfil').",
-    "8. El campo 'reply' es una frase de 1-2 oraciones en español explicando el criterio general de selección.",
+    "1. Elige ÚNICAMENTE títulos de 'candidates', con su 'key' exacta. No inventes títulos ni claves.",
+    "2. Los candidatos ya cumplen los criterios de 'criteria' (género, duración, nota, plataforma, época…). Ordénalos por lo bien que encajan con la intención del usuario, incluido el tono o el ánimo que pide (ligero, para llorar, que dé miedo, para pensar…), usando la sinopsis.",
+    "3. Evita los que tengan 'partialMatch' salvo que no haya suficientes que encajen del todo.",
+    "4. Si un candidato tiene 'inWatchlist' y encaja tan bien como otro, prefiérelo: el usuario ya quería verlo.",
+    "5. Mezcla películas y series solo si el usuario no pidió un tipo concreto. Evita títulos casi iguales o de la misma saga.",
+    "6. 'reason': máximo 2 frases, en español, explicando por qué encaja con LO QUE PIDE el usuario.",
+    "7. 'matchTags': 2-3 etiquetas cortas en español (ej: 'Comedia', 'En Netflix', 'Valoración alta', 'Pendiente').",
+    "8. 'reply': 1-2 frases en español con el criterio general.",
     "FORMATO DE RESPUESTA (JSON estricto):",
     '{"reply":"string","recommendations":[{"key":"movie:123","reason":"string","matchTags":["string"]}]}',
-    "Todo debe estar en español.",
   ].join(" ");
 }
 
-function buildAiUserPayload({ message, candidates, contextSummary }) {
-  const compactCandidates = compactCandidatesForAi(candidates);
-  const userContext = [
-    contextSummary.traktConnected || contextSummary.tmdbConnected
-      ? `El usuario tiene ${contextSummary.historyCount} títulos en historial, ${contextSummary.favoritesCount} favoritos, ${contextSummary.watchlistCount} pendientes y ${contextSummary.ratedCount} valorados.`
-      : "No hay datos personales del usuario disponibles.",
-    message
-      ? `PETICIÓN DEL USUARIO: "${message}". Prioriza candidatos que cumplan esta petición.`
-      : "El usuario no especificó preferencias concretas.",
-    `Hay ${compactCandidates.length} candidatos disponibles. Selecciona entre 4 y 6.`,
-  ].join(" ");
-
+function buildAiUserPayload({ message, candidates, contextSummary, intent }) {
+  const compactCandidates = compactCandidatesForAi(candidates, intent);
   return JSON.stringify({
     userRequest: message,
-    context: userContext,
-    contextSummary,
+    criteria: intent?.hasIntent ? describeIntent(intent) : "sin criterios concretos: variedad, novedades y afinidad",
+    moods: intent?.moods || [],
+    user:
+      contextSummary.backendConnected || contextSummary.traktConnected || contextSummary.tmdbConnected
+        ? `${contextSummary.historyCount} títulos vistos, ${contextSummary.favoritesCount} favoritos, ${contextSummary.watchlistCount} pendientes, ${contextSummary.ratedCount} valorados.`
+        : "sin datos personales",
     candidates: compactCandidates,
   });
 }
 
-function normalizeAiSelection({ parsed, candidates, message }) {
+function normalizeAiSelection({ parsed, candidates }) {
   if (!parsed?.recommendations?.length) return null;
 
   const byKey = new Map(candidates.map((item) => [itemKey(item), item]));
@@ -1020,7 +916,7 @@ function normalizeAiSelection({ parsed, candidates, message }) {
       const aiTags = safeArray(rec.matchTags).slice(0, 4);
       return {
         ...item,
-        reason: String(rec.reason || "").trim() || buildReason(item, message, "ai"),
+        reason: String(rec.reason || "").trim() || null,
         // Si el proveedor no aporta etiquetas (p. ej. el path keys-only de Ollama),
         // se deja undefined para que serializeRecommendation derive las de origen.
         matchTags: aiTags.length ? aiTags : undefined,
@@ -1061,7 +957,7 @@ function openAiRequestBody(input) {
   return body;
 }
 
-async function getOpenAiRecommendation({ message, candidates, contextSummary }) {
+async function getOpenAiRecommendation({ message, candidates, contextSummary, intent }) {
   if (!OPENAI_API_KEY) return null;
 
   const res = await fetch("https://api.openai.com/v1/responses", {
@@ -1078,7 +974,7 @@ async function getOpenAiRecommendation({ message, candidates, contextSummary }) 
         },
         {
           role: "user",
-          content: buildAiUserPayload({ message, candidates, contextSummary }),
+          content: buildAiUserPayload({ message, candidates, contextSummary, intent }),
         },
       ]),
     ),
@@ -1098,13 +994,7 @@ async function getOpenAiRecommendation({ message, candidates, contextSummary }) 
   if (!normalized) return null;
 
   return {
-    reply:
-      normalized.reply ||
-      buildFallbackReply({
-        message,
-        ranked: normalized.recommendations,
-        contextSummary,
-      }),
+    reply: normalized.reply || null,
     recommendations: normalized.recommendations,
     provider: "openai",
   };
@@ -1129,7 +1019,7 @@ function extractGeminiText(json) {
   return text;
 }
 
-async function getGeminiRecommendation({ message, candidates, contextSummary }) {
+async function getGeminiRecommendation({ message, candidates, contextSummary, intent }) {
   if (!GEMINI_API_KEY) return null;
 
   const model = encodeURIComponent(GEMINI_MODEL);
@@ -1169,6 +1059,7 @@ async function getGeminiRecommendation({ message, candidates, contextSummary }) 
                     message,
                     candidates,
                     contextSummary,
+                    intent,
                   }),
                 },
               ],
@@ -1218,13 +1109,7 @@ async function getGeminiRecommendation({ message, candidates, contextSummary }) 
   }
 
   return {
-    reply:
-      normalized.reply ||
-      buildFallbackReply({
-        message,
-        ranked: normalized.recommendations,
-        contextSummary,
-      }),
+    reply: normalized.reply || null,
     recommendations: normalized.recommendations,
     provider: "gemini",
   };
@@ -1232,30 +1117,36 @@ async function getGeminiRecommendation({ message, candidates, contextSummary }) 
 
 // Prompt LEAN para Ollama: el modelo solo tiene que SELECCIONAR keys. Nada de
 // reglas de formato de reply/reason/matchTags (se generan en el server), así el
-// prompt es corto (menos prefill) y el foco del modelo es la relevancia.
-function buildOllamaMessages({ message, candidates }) {
+// prompt es corto (menos prefill) y el foco del modelo es la relevancia. Los
+// candidatos ya cumplen los criterios; el modelo decide cuáles encajan mejor
+// con el tono de la petición.
+function buildOllamaMessages({ message, candidates, intent }) {
   const slim = candidates.map((item) => ({
     key: itemKey(item),
     title: item.title,
     year: item.year || null,
     type: item.mediaType === "tv" ? "serie" : "pelicula",
+    genres: genreLabelsOf(item).slice(0, 3),
+    pending: item.sources.includes("watchlist") || undefined,
+    partial: item.relaxedLevel ? true : undefined,
   }));
   const system = [
     "Eres un recomendador de cine y series para The Show Verse.",
     "Tu ÚNICA tarea: elegir ENTRE 4 Y 6 títulos de la lista 'candidates' que mejor encajen con la petición del usuario.",
     "Devuelve solo sus 'key' EXACTAS (tal cual aparecen). No inventes claves ni títulos.",
-    "Prioriza lo que pide el usuario; ante igualdad, mezcla películas y series y favorece novedades y tendencias.",
+    "Los candidatos ya cumplen los criterios; elige los que mejor encajen con el tono que pide. Evita 'partial' si hay otros. Ante igualdad, prefiere 'pending' (el usuario ya quería verlos).",
   ].join(" ");
   const user = [
     message
       ? `Petición del usuario: "${message}".`
       : "Sin petición concreta: elige una selección variada y actual.",
+    intent?.hasIntent ? `Criterios: ${describeIntent(intent)}.` : "",
     `candidates: ${JSON.stringify(slim)}`,
-  ].join(" ");
+  ].filter(Boolean).join(" ");
   return { system, user };
 }
 
-async function getOllamaRecommendation({ message, candidates }) {
+async function getOllamaRecommendation({ message, candidates, intent }) {
   // Se muestran al modelo solo los N mejores candidatos (menos prefill = más
   // rápido en CPU). La selección se valida luego contra TODA la lista.
   const aiCandidates = candidates.slice(0, OLLAMA_MAX_CANDIDATES);
@@ -1276,7 +1167,7 @@ async function getOllamaRecommendation({ message, candidates }) {
     required: ["keys"],
   };
 
-  const { system, user } = buildOllamaMessages({ message, candidates: aiCandidates });
+  const { system, user } = buildOllamaMessages({ message, candidates: aiCandidates, intent });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
 
@@ -1338,7 +1229,7 @@ async function getOllamaRecommendation({ message, candidates }) {
   };
 }
 
-async function getAiRecommendation({ message, candidates, contextSummary }) {
+async function getAiRecommendation({ message, candidates, contextSummary, intent }) {
   const providers = String(WATCH_NEXT_AI_PROVIDER)
     .split(",")
     .map((provider) => provider.trim().toLowerCase())
@@ -1361,18 +1252,21 @@ async function getAiRecommendation({ message, candidates, contextSummary }) {
               message,
               candidates,
               contextSummary,
+              intent,
             })
           : provider === "gemini"
             ? await getGeminiRecommendation({
                 message,
                 candidates,
                 contextSummary,
+                intent,
               })
             : provider === "ollama"
               ? await getOllamaRecommendation({
                   message,
                   candidates,
                   contextSummary,
+                  intent,
                 })
               : null;
     } catch (error) {
@@ -1389,6 +1283,12 @@ async function getAiRecommendation({ message, candidates, contextSummary }) {
   return null;
 }
 
+// Cuántas fichas se piden como mucho para comprobar duración o plataforma de
+// candidatos que no salieron de una búsqueda que ya lo garantice.
+const MAX_FACT_LOOKUPS = 36;
+
+const EMPTY_NOVELTY = { nowPlaying: [], upcoming: [], onTheAir: [], airingToday: [], weeklyTrending: [] };
+
 export async function POST(request) {
   const cookieStore = await cookies();
   const body = await request.json().catch(() => ({}));
@@ -1399,15 +1299,22 @@ export async function POST(request) {
   )
     .trim()
     .slice(0, 800);
-  const limit = clampRecommendationLimit(body?.limit, quickPick ? 3 : 5);
+  const today = new Date();
+  const intent = parseWatchIntent(message, { now: today });
+  // «Dame dos pelis…»: el número del mensaje manda sobre el de la petición.
+  const limit = clampRecommendationLimit(
+    !quickPick && intent.count ? intent.count : body?.limit,
+    quickPick ? 3 : 5,
+  );
   const recentKeys = normalizeRecentKeys(body?.recentKeys);
   const recentKeySet = new Set(recentKeys);
 
-  // Check whether the user is requesting specific year/decade content upfront
-  // so we know whether to skip novelty sources and focus on discovery
-  const yearIntentForPool = extractYearIntent(message);
+  // Sin criterios (o con estrenos / cines) cuentan las fuentes de novedad y
+  // tendencia. Con criterios concretos casi nunca cumplen: no se piden.
+  const wantsNovelty = !intent.hasConstraints || intent.years?.recent || intent.inCinemas;
 
   const [
+    library,
     tmdbContext,
     traktContext,
     baseRecommended,
@@ -1416,81 +1323,155 @@ export async function POST(request) {
     popular,
     tmdbNovelty,
     tmdbFallback,
-    tmdbDiscovery,
-  ] =
-    await Promise.all([
-      getTmdbContext(cookieStore),
-      getTraktContext(cookieStore),
-      getTraktRecommended(30).catch(() => []),
-      getTraktTrending(24).catch(() => []),
-      getTraktAnticipated(24).catch(() => []),
-      getTraktPopular(24).catch(() => []),
-      // Skip novelty sources when user explicitly requests a specific year/decade
-      yearIntentForPool
-        ? Promise.resolve({ nowPlaying: [], upcoming: [], onTheAir: [], airingToday: [], weeklyTrending: [] })
-        : getTmdbNoveltyCandidates(36).catch(() => ({
-            nowPlaying: [],
-            upcoming: [],
-            onTheAir: [],
-            airingToday: [],
-            weeklyTrending: [],
-          })),
-      getTmdbFallbackCandidates(30).catch(() => []),
-      // Always fetch discovery candidates filtered by message intent (year, decade, genre)
-      getTmdbDiscoveryCandidates(message, 40).catch(() => []),
-    ]);
+    discoverResults,
+    nowPlayingCinema,
+  ] = await Promise.all([
+    getBackendLibrary(request).catch(() => ({ connected: false, watchlist: [], favorites: [], rated: [], historyKeys: new Set() })),
+    getTmdbContext(cookieStore),
+    getTraktContext(cookieStore),
+    getTraktRecommended(30).catch(() => []),
+    wantsNovelty ? getTraktTrending(24).catch(() => []) : [],
+    wantsNovelty && !intent.inCinemas ? getTraktAnticipated(24).catch(() => []) : [],
+    wantsNovelty ? getTraktPopular(24).catch(() => []) : [],
+    wantsNovelty ? getTmdbNoveltyCandidates(36).catch(() => EMPTY_NOVELTY) : EMPTY_NOVELTY,
+    intent.hasConstraints ? [] : getTmdbFallbackCandidates(30).catch(() => []),
+    runDiscoverQueries(intent, today).catch(() => []),
+    intent.inCinemas
+      ? Promise.all([
+          tmdbList("/movie/now_playing", { page: 1, region: "ES" }).catch(() => []),
+          tmdbList("/movie/now_playing", { page: 2, region: "ES" }).catch(() => []),
+        ]).then((pages) => pages.flat())
+      : [],
+  ]);
 
-  const watchedSet = new Set(
-    safeArray(traktContext.history).map((item) => itemKey(item)),
-  );
+  // Pendientes, favoritos y notas: los de la app (backend); si no hay sesión
+  // del backend, los de TMDb.
+  const watchlist = library.connected ? library.watchlist : tmdbContext.watchlist;
+  const favorites = library.connected ? library.favorites : tmdbContext.favorites;
+  const rated = library.connected ? library.rated : tmdbContext.rated;
+  const similar = await getSimilarCandidates(intent, favorites).catch(() => ({ seeds: [], lists: [] }));
+  const seedTitle = similar.seeds.find((seed) => seed.source === "similar")?.title || null;
+  const seedKeys = new Set(similar.seeds.map((seed) => `${seed.mediaType}:${Number(seed.id)}`));
+
+  const watchedSet = new Set([
+    ...library.historyKeys,
+    ...safeArray(traktContext.history).map((item) => itemKey(item)),
+  ]);
   const profileGenres = inferFavoriteGenres({
-    favorites: tmdbContext.favorites,
-    rated: tmdbContext.rated,
+    favorites,
+    rated,
     traktRatings: traktContext.ratings,
   });
 
   const candidateMap = new Map();
-  addCandidates(candidateMap, safeArray(tmdbNovelty.nowPlaying), "tmdb_now_playing", 24);
-  addCandidates(candidateMap, safeArray(tmdbNovelty.upcoming), "tmdb_upcoming", 18);
-  addCandidates(candidateMap, safeArray(tmdbNovelty.onTheAir), "tmdb_on_the_air", 22);
-  addCandidates(candidateMap, safeArray(tmdbNovelty.airingToday), "tmdb_airing_today", 18);
-  addCandidates(
-    candidateMap,
-    safeArray(tmdbNovelty.weeklyTrending),
-    "tmdb_weekly_trending",
-    20,
-  );
-  addCandidates(candidateMap, tmdbContext.watchlist, "watchlist", 18);
-  addCandidates(candidateMap, baseRecommended, "trakt_recommended", 22);
-  addCandidates(candidateMap, trending, "trakt_trending", 18);
-  addCandidates(candidateMap, anticipated, "trakt_anticipated", 18);
-  addCandidates(candidateMap, popular, "trakt_popular", 10);
-  addCandidates(candidateMap, tmdbFallback, "tmdb_fallback", 6);
-  // Discovery candidates get a strong base score whenever there is specific user intent
-  // (year, decade, genre, or type) so they can compete with generic trending content.
-  const hasAnyIntent = !!(
-    yearIntentForPool ||
-    getWantedGenreIds(message).length > 0 ||
-    getWantedMediaType(message)
-  );
-  addCandidates(candidateMap, tmdbDiscovery, "tmdb_discovery", hasAnyIntent ? 35 : 8);
+  addCandidates(candidateMap, watchlist, "watchlist");
+  if (!intent.onlyWatchlist) {
+    addCandidates(candidateMap, safeArray(tmdbNovelty.nowPlaying), "tmdb_now_playing", 0, { mediaType: "movie", verified: ["cinema"] });
+    addCandidates(candidateMap, nowPlayingCinema, "tmdb_now_playing", 0, { mediaType: "movie", verified: ["cinema"] });
+    addCandidates(candidateMap, safeArray(tmdbNovelty.upcoming), "tmdb_upcoming", 0, { mediaType: "movie" });
+    addCandidates(candidateMap, safeArray(tmdbNovelty.onTheAir), "tmdb_on_the_air", 0, { mediaType: "tv" });
+    addCandidates(candidateMap, safeArray(tmdbNovelty.airingToday), "tmdb_airing_today", 0, { mediaType: "tv" });
+    addCandidates(candidateMap, safeArray(tmdbNovelty.weeklyTrending), "tmdb_weekly_trending");
+    addCandidates(candidateMap, baseRecommended, "trakt_recommended");
+    addCandidates(candidateMap, trending, "trakt_trending");
+    addCandidates(candidateMap, anticipated, "trakt_anticipated");
+    addCandidates(candidateMap, popular, "trakt_popular");
+    addCandidates(candidateMap, tmdbFallback, "tmdb_fallback");
+    for (const { query, items } of safeArray(discoverResults)) {
+      addCandidates(candidateMap, items, query.verifies.includes("cinema") ? "tmdb_now_playing" : "tmdb_discovery", 0, {
+        mediaType: query.mediaType,
+        verified: query.verifies,
+        genreMatch: query.genreMatch,
+      });
+    }
+    for (const { seed, items } of similar.lists) {
+      addCandidates(candidateMap, items, seed.source, 0, { mediaType: seed.mediaType });
+    }
+  }
+  // El título de referencia («parecida a Dark») no se recomienda a sí mismo.
+  for (const key of seedKeys) candidateMap.delete(key);
+  // Con similares de sobra, «parecida a…» solo admite similares (se relaja si
+  // con los demás criterios no llegan).
+  const similarCount = [...candidateMap.values()].filter((item) =>
+    item.sources.some((source) => source === "similar" || source === "similar_favorites"),
+  ).length;
+  if (similar.seeds.length && similarCount >= limit + 2) intent.requireSimilar = true;
 
-  const ranked = scoreCandidates({
-    candidates: [...candidateMap.values()],
-    message,
-    profileGenres,
-    watchedSet,
-    recentKeySet,
-    quickPick,
+  // Duración, plataforma o país no vienen en los listados: para los
+  // candidatos que no salieron de una búsqueda que lo garantice (Pendientes,
+  // similares, tendencias…) se pide su ficha. Primero los que más prometen.
+  const needsFacts = (item) => {
+    const verified = new Set(item.verified || []);
+    const range = runtimeRange(intent, item.mediaType);
+    return (
+      ((range.min != null || range.max != null) && !verified.has("runtime")) ||
+      ((intent.providers.length || intent.free) && !verified.has("providers")) ||
+      (intent.origin && !verified.has("origin") && !item.originalLanguage)
+    );
+  };
+  const preliminary = [...candidateMap.values()]
+    .filter((item) => needsFacts(item))
+    .filter((item) => checkCandidate(item, intent, { today, level: 2 }).missing.every((m) => ["runtime", "providers", "origin"].includes(m)))
+    .map((item) => ({
+      item,
+      priority:
+        (item.sources.includes("watchlist") ? 1000 : 0) +
+        (item.sources.some((s) => s.startsWith("similar")) ? 500 : 0) +
+        scoreCandidate(item, intent, { profileGenres, watchedSet, recentKeySet, quickPick, today }),
+    }))
+    .sort((a, b) => b.priority - a.priority)
+    .slice(0, MAX_FACT_LOOKUPS)
+    .map(({ item }) => item);
+  const facts = await mapLimit(preliminary, 8, (item) => getTitleFacts(item));
+  preliminary.forEach((item, index) => {
+    const f = facts[index];
+    if (!f) return;
+    item.runtime = f.runtime;
+    item.episodeRuntime = f.episodeRuntime;
+    item.providerIds = f.providerIds;
+    item.originalLanguage = f.originalLanguage || item.originalLanguage;
+    if (f.originCountry.length) item.originCountry = f.originCountry;
+    if (f.genreIds.length) item.genreIds = [...new Set([...item.genreIds, ...f.genreIds])];
+    item.voteCount = item.voteCount ?? f.voteCount;
+    item.voteAverage = item.voteAverage ?? f.voteAverage;
+    item.releaseDate = item.releaseDate || f.releaseDate;
   });
 
+  // FILTRO por niveles: primero lo que lo cumple todo; si no llega, lo que
+  // cumple lo importante (tipo, excluidos, plataforma, cines, pendientes) con
+  // menos exigencia en nota, época, duración y, al final, género.
+  const scoreCtx = { profileGenres, watchedSet, recentKeySet, quickPick, today };
+  const all = [...candidateMap.values()];
+  const byLevel = [0, 1, 2].map((level) =>
+    all.filter((item) => checkCandidate(item, intent, { today, level }).ok),
+  );
+  const ranked = [];
+  const taken = new Set();
+  const usedLevels = [];
+  for (let level = 0; level < 3; level++) {
+    const fresh = byLevel[level].filter((item) => !taken.has(itemKey(item)));
+    if (!fresh.length) continue;
+    // Con lo estricto ya hay de sobra para elegir y variar: no se relaja.
+    if (level > 0 && ranked.length >= limit + 3) break;
+    if (level > 0) usedLevels.push(level);
+    for (const item of fresh) {
+      taken.add(itemKey(item));
+      ranked.push({ ...item, relaxedLevel: level, score: scoreCandidate(item, intent, scoreCtx) });
+    }
+  }
+  ranked.sort((a, b) => a.relaxedLevel - b.relaxedLevel || b.score - a.score);
+  // Lo visto se queda fuera (salvo «rever»), igual que lo recomendado hace
+  // nada si hay alternativas.
+  const pool = ranked.filter((item) => intent.rewatch || !watchedSet.has(itemKey(item)) || item.sources.includes("watchlist"));
+
   const contextSummary = {
+    backendConnected: library.connected,
     tmdbConnected: tmdbContext.connected,
     traktConnected: traktContext.connected,
-    historyCount: traktContext.history.length,
-    favoritesCount: tmdbContext.favorites.length,
-    watchlistCount: tmdbContext.watchlist.length,
-    ratedCount: tmdbContext.rated.length + traktContext.ratings.length,
+    historyCount: library.historyKeys.size || traktContext.history.length,
+    favoritesCount: favorites.length,
+    watchlistCount: watchlist.length,
+    ratedCount: rated.length + traktContext.ratings.length,
     aiEnabled: !!(GEMINI_API_KEY || OPENAI_API_KEY || OLLAMA_ENABLED),
     aiProviders: {
       gemini: !!GEMINI_API_KEY,
@@ -1499,41 +1480,72 @@ export async function POST(request) {
     },
     quickPick,
     recentKeysCount: recentKeys.length,
+    intent: intent.hasIntent ? describeIntent(intent) : null,
+    candidatesStrict: byLevel[0].length,
+    candidatesTotal: pool.length,
   };
 
-  const ai = await getAiRecommendation({
-    message,
-    candidates: ranked,
-    contextSummary,
-  }).catch(() => null);
+  // La IA elige entre los candidatos ya filtrados (los estrictos primero): no
+  // puede saltarse los criterios.
+  const strictCount = pool.filter((item) => item.relaxedLevel === 0).length;
+  const aiCandidates = strictCount >= limit + 2 ? pool.filter((item) => item.relaxedLevel === 0) : pool;
+  const ai = aiCandidates.length >= 4
+    ? await getAiRecommendation({
+        message,
+        candidates: aiCandidates,
+        contextSummary,
+        intent,
+      }).catch(() => null)
+    : null;
 
   const aiRanked = ai?.recommendations?.length
     ? [
-        ...ai.recommendations,
-        ...ranked.filter(
-          (item) =>
-            !ai.recommendations.some(
-              (recommended) => itemKey(recommended) === itemKey(item),
-            ),
+        // Lo que eligió la IA, delante (manteniendo su nivel de encaje).
+        ...ai.recommendations.map((rec, index) => ({ ...rec, score: (rec.score || 0) + 200 - index * 5 })),
+        ...pool.filter(
+          (item) => !ai.recommendations.some((recommended) => itemKey(recommended) === itemKey(item)),
         ),
       ]
-    : ranked;
+    : pool;
   const selected = diversifyRecommendations({
     candidates: aiRanked,
     limit,
-    message,
+    intent,
     recentKeySet,
     quickPick,
   });
+
+  const relaxed = new Set();
+  for (const item of selected) {
+    if (!item.relaxedLevel) continue;
+    for (const missing of checkCandidate(item, intent, { today, level: 0 }).missing) {
+      if (Object.values(RELAXED_AT_LEVEL).flat().includes(missing)) relaxed.add(missing);
+    }
+  }
+  const watchlistHits = selected.filter((item) => item.sources.includes("watchlist")).length;
+
+  let emptyReason = null;
+  if (!selected.length) {
+    emptyReason = intent.onlyWatchlist
+      ? watchlist.length
+        ? "No he encontrado en tus Pendientes nada que encaje con eso. Prueba a quitar algún criterio o pídemelo fuera de tus pendientes."
+        : "No tienes títulos en Pendientes todavía, así que no puedo elegir entre ellos."
+      : `No he encontrado títulos que encajen con ${describeIntent(intent)}. Prueba a quitar algún criterio.`;
+  }
+
   const payload = {
     reply: buildSelectionReply({
-      message,
+      intent,
       selected,
       contextSummary,
       quickPick,
+      relaxed: [...relaxed],
+      watchlistHits,
+      seedTitle,
+      emptyReason,
     }),
     recommendations: selected.map((item) =>
-      serializeRecommendation(item, message, ai ? "ai" : "ranking"),
+      serializeRecommendation(item, { ...intent, similar: intent.similar ? { ...intent.similar, seedTitle } : null }),
     ),
     contextSummary,
     mode: ai ? "ai" : "ranking",
@@ -1549,6 +1561,9 @@ export async function POST(request) {
   }
   if (traktContext.shouldClear) {
     clearTraktCookies(res);
+  }
+  if (library.authResult) {
+    setBackendAuthCookies(res, library.authResult, { secure: request.nextUrl?.protocol === "https:" });
   }
   return res;
 }

@@ -109,7 +109,7 @@ Todas son *route handlers* (`route.js`) que actúan de BFF: normalizan/cachean r
 | `api/lists/**` | `route`, `[id]` | Listas propias en el backend. |
 | `api/user/export` | — | Exportación de la biblioteca (CSV, JSON, Letterboxd). |
 | `api/dashboard/**` | `[surface]`, `sections/[section]` | Motor de filas/recomendaciones que consumen los dashboards de Inicio/Películas/Series (`useEngineRows`). |
-| `api/ai/**` | `watch-next`, `health` | Asistente (`WatchNextAssistant`, página `/assistant`). |
+| `api/ai/**` | `watch-next`, `health` | Asistente (`WatchNextAssistant`, página `/assistant`): interpreta el mensaje (`lib/ai/watchNextIntent.js`), busca y filtra candidatos con esos criterios (`lib/ai/watchNextCandidates.js`), usa Pendientes, favoritos, notas e historial del backend y deja elegir a la IA entre los ya filtrados. Ver [[asistente]]. |
 | `api/calendar/**` | `upcoming-episodes`, `episodes-range` | Próximos episodios para `/calendar` (rango de fechas) y `DashboardCalendarSection`; proxy de `/v1/calendar/episodes`. |
 | `api/streaming/detections`, `api/streaming/device` | — | Detecciones de streaming (web y app Android). |
 | `api/streaming/**` | `route`, `episode-links` | Enlaces de streaming/plataformas por título y episodio (JustWatch, ver [[JUSTWATCH_INTEGRATION]]). `route` devuelve además `cinema` (cadenas de cine y estreno en España) para películas con `tmdbId`. |
