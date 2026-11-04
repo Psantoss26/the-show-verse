@@ -98,7 +98,15 @@ function dedupeItems(items) {
     return out
 }
 
-function computeHasMore(list, loadedCount) {
+// ¿Queda otra página? Lo dice el backend (`hasMore`, leyendo una fila de
+// más). `item_count` es el recuento de Trakt y puede superar con mucho lo
+// guardado: solo se usa si la respuesta no trae `hasMore`, y una página vacía
+// cierra la lista en cualquier caso (antes el botón «Cargar más» seguía ahí
+// sin hacer nada).
+function computeHasMore(json, list, loadedCount) {
+    const pageItems = Array.isArray(json?.items) ? json.items.length : 0
+    if (!pageItems) return false
+    if (typeof json?.hasMore === 'boolean') return json.hasMore
     const total = Number(list?.item_count || 0)
     return total > 0 && Number(loadedCount || 0) < total
 }
@@ -209,7 +217,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                         page: 1,
                         // El endpoint {list, items} no trae paginación: la
                         // derivamos de list.item_count vs. lo ya cargado.
-                        hasMore: computeHasMore(json?.list, items.length),
+                        hasMore: computeHasMore(json, json?.list, items.length),
                     }
 
                     writeDetailsCache(listId, nextState)
@@ -282,7 +290,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                             : p.imdbRatingItems,
                     items,
                     page: nextPage,
-                    hasMore: computeHasMore(json?.list || p.list, items.length),
+                    hasMore: computeHasMore(json, json?.list || p.list, items.length),
                 }
                 writeDetailsCache(listId, nextState)
                 return nextState

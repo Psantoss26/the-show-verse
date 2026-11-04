@@ -648,11 +648,16 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50, view
   const offset = (Math.max(Number(page) || 1, 1) - 1) * safeLimit;
   // Una lectura local de todos los ids/puntuaciones, nunca peticiones TMDb.
   // Sirve para que la media sea de la lista completa aunque su grid pagine.
-  const [items, allRatingRows] = await readCommunityListItemsWithRatings({
+  // Se lee una fila de más para saber si queda otra página: `item_count` es
+  // el recuento de Trakt y puede ser mucho mayor que lo guardado (1466 frente
+  // a 154), y la ficha seguía ofreciendo «Cargar más» con páginas vacías.
+  const [pageRows, allRatingRows] = await readCommunityListItemsWithRatings({
     listId: id,
-    limit: safeLimit,
+    limit: safeLimit + 1,
     offset,
   });
+  const hasMore = pageRows.length > safeLimit;
+  const items = hasMore ? pageRows.slice(0, safeLimit) : pageRows;
   // Solo en las listas importadas de Trakt se borran de verdad los títulos sin
   // póster: las de usuario reflejan su lista personal y ahí solo se ocultan.
   const hydrated = await hydrateListItemPosters(items, { allowDelete: list.source === 'trakt' });
@@ -671,5 +676,6 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50, view
     // La muestra para IMDb es deliberadamente ligera: permite una media más
     // representativa que la primera página sin enviar/renderizar más tarjetas.
     imdbRatingItems: selectCommunityImdbSummarySample(allRatingRows),
+    hasMore,
   };
 }
