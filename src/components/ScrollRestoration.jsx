@@ -251,6 +251,11 @@ export default function ScrollRestoration() {
       clearRestorationComplete();
       endHistoryRestore();
       navigationModeRef.current = "push";
+      // Tras un empuje, un `replaceState` ya no es el de Next al volver: la
+      // vista previa móvil (MobileTitlePeek) empuja su entrada y va a la ficha
+      // con `router.replace`, que se tomaba por vuelta atrás si se había
+      // vuelto hacía menos de 30 s (la ficha restauraba un scroll viejo).
+      historyNavigationUntilRef.current = 0;
       const result = originalPushState.apply(this, args);
       syncHistoryPage();
       return result;
