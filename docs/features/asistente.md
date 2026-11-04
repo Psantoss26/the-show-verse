@@ -12,19 +12,20 @@ El intérprete (`src/lib/ai/watchNextIntent.js`, puro y con pruebas) convierte e
 
 | Criterio | Ejemplos | Cómo se aplica |
 |---|---|---|
-| Tipo | «una peli», «una serie», «miniserie», «en cines» | Solo películas o solo series. Si se dan minutos sin tipo («de menos de 90 minutos»), es una película. |
+| Tipo | «una peli», «una serie», «miniserie», «en cines» | Solo películas o solo series. Si se dan minutos sin tipo («de menos de 90 minutos»), es una película. Una condición («en caso de ser serie…», «si es peli…») NO fija el tipo: vale para ese tipo y deja pasar el otro. |
 | Géneros | «comedia», «terror», «ciencia ficción», «crimen», «bélica»… | Géneros de TMDb por tipo. Las series no tienen terror ni romance: se buscan por palabra clave (`horror`, `romance`) y se comprueban con el género más cercano. Varios géneros: primero todos a la vez («comedia romántica») y luego cualquiera. |
 | Excluidos | «sin terror», «nada de romance», «que no sea de miedo ni drama» | `without_genres` y fuera del resultado, en cualquier nivel. |
 | Ánimo | «ligera», «para reír», «para llorar», «que me haga pensar», «con tensión», «en pareja», «con niños» | Favorece unos géneros y aparta otros (no los exige). «Con niños» sí exige familiar o animación y quita el terror. |
 | Temas | «hechos reales», «atracos», «viajes en el tiempo», «zombis», «navideña», «superhéroes», «distopía» | Palabras clave de TMDb. |
 | Duración | «menos de 90 minutos», «hora y media», «de 2 horas», «más de 150 min», «corta», «capítulos cortos» | `with_runtime` de TMDb; en series, la duración del episodio. «Serie corta» favorece miniseries. |
-| Nota | «buena nota», «bien valorada», «obra maestra», «más de 7», «nota de 7,5» | Nota mínima de TMDb con un mínimo de votos para que sea fiable; el orden usa una media ponderada por votos. |
+| Temporadas | «sin más de 4 temporadas», «de menos de 3 temporadas», «de una sola temporada», «con al menos 5 temporadas» | Solo afecta a las series; el número sale de la ficha de TMDb. |
+| Nota | «buena nota», «bien valorada», «los mejores», «obra maestra», «más de 7», «nota de 7,5» (no «más de 4 temporadas» ni «más de 90 minutos») | Nota mínima de TMDb con un mínimo de votos para que sea fiable; el orden usa una media ponderada por votos. |
 | Plataforma | Netflix, Prime Video, Disney+, HBO Max, Apple TV, Movistar Plus+, Filmin, SkyShowtime, Rakuten TV, Atresplayer, RTVE Play, FlixOlé, MUBI, Crunchyroll, Pluto TV; «gratis» | Disponibilidad en España (`watch_region=ES`, suscripción, gratis o con anuncios). «Que no esté en Netflix» no cuenta como pedir Netflix. |
 | Cines | «qué hay en cines», «cartelera», «ir al cine» | Cartelera de España (`now_playing` y estrenos en salas de las últimas semanas). |
 | Época | «de 1996», «de los 80», «entre 2010 y 2015», «estrenos», «de este año», «clásicos» | Fechas de estreno. Nunca se recomienda algo sin estrenar salvo que pida próximos estrenos. |
 | Origen | «coreana», «japonesa», «anime», «española», «francesa», «nórdica», «Bollywood» | Idioma original (y país cuando hace falta). |
 | Parecida a | «parecida a "Dark"», «si me gustó Breaking Bad», «algo como Dark», «parecido a mis favoritas» | Busca el título en TMDb y usa sus recomendaciones y similares (o las de tus últimas favoritas). Con similares de sobra, solo cuentan esos. |
-| Pendientes | «de mis pendientes», «de mi lista» | Solo títulos de Pendientes. |
+| Pendientes | «de mis pendientes», «que tenga en pendientes», «de mi lista» | Solo títulos de Pendientes. |
 | Otros | «rever», «próximos estrenos», «dame 2 pelis» | Permite lo ya visto, solo lo que está por estrenar, número de títulos. |
 
 ## Cómo se eligen
@@ -36,7 +37,10 @@ El intérprete (`src/lib/ai/watchNextIntent.js`, puro y con pruebas) convierte e
    - Cartelera, «parecida a…» y los Pendientes del usuario.
    - Novedades y tendencias de TMDb y Trakt solo cuando no hay criterios concretos (o se piden estrenos o cines).
 2. **Datos del usuario.** Pendientes, favoritos, valoraciones e historial salen del backend de la app (`/v1/watchlist`, `/v1/favorites`, `/v1/ratings`, `/v1/history`); sin sesión del backend, de TMDb y Trakt. Lo ya visto queda fuera salvo que se pida «rever».
-3. **Comprobación.** Duración, plataforma y país no vienen en los listados: de los candidatos que no salieron de una búsqueda que lo garantice (Pendientes incluidos) se pide la ficha de TMDb, como mucho 36.
+3. **Comprobación.**
+   - Duración, plataforma, país y temporadas no vienen en los listados. Se pide la ficha de TMDb de los candidatos que no salieron de una búsqueda que lo garantice: como mucho 36 (48 si se piden temporadas).
+   - Hasta 16 de esas fichas se reservan para los Pendientes que más prometen (todas con «de mis pendientes»). Así ni se quedan sin comprobar ni se comen todas las consultas.
+   - Los votos desconocidos (Pendientes) no cuentan como cero votos.
 4. **Filtro por niveles.**
    - Primero lo que cumple todo.
    - Si no llega, se deja de exigir la nota, la época y la duración exacta (15 min de margen) y, al final, el género, el tema y el parecido.
@@ -52,7 +56,8 @@ El intérprete (`src/lib/ai/watchNextIntent.js`, puro y con pruebas) convierte e
 6. **IA.**
    - El modelo (Gemini, OpenAI u Ollama) elige entre los candidatos YA filtrados, con los criterios en el mensaje. Así decide el tono, pero no puede saltarse lo pedido.
    - Se varía el resultado: tipos y orígenes distintos, y nunca dos de la misma saga.
-7. **Respuesta.** Resume los criterios aplicados («He buscado películas de comedia, de 90 min como mucho, nota de 7 o más, en Netflix»), cuántos títulos están en Pendientes y lo relajado. Cada título lleva etiquetas de lo que cumple (género, plataforma, «Pendiente», «En cines»).
+7. **Comprobación final.** El filtro de duración de `/discover` de TMDb no es fiable: con «hasta 90 min» devuelve películas de 110. Por eso, con criterios de duración, plataforma o temporadas, se mira la ficha de cada título elegido. Lo que no cumple se sustituye por el siguiente candidato que sí, en hasta 3 tandas.
+8. **Respuesta.** Resume los criterios aplicados («He buscado películas de comedia, de 90 min como mucho, nota de 7 o más, en Netflix»), cuántos títulos están en Pendientes y lo relajado. Cada título lleva etiquetas de lo que cumple (género, plataforma, «Pendiente», «En cines»).
 
 Los identificadores de géneros, plataformas y palabras clave de TMDb se comprobaron contra su API (región ES) el 2026-11-04.
 

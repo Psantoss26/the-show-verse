@@ -139,3 +139,24 @@ test("la descripción resume los criterios", () => {
     "títulos de comedia, para reír, sin drama ni terror",
   );
 });
+
+test("«sin más de 4 temporadas» no es nota, y «en caso de ser serie» no fija el tipo", () => {
+  const i = parse("los mejores títulos de comedia que tenga en pendientes entre 2010 y 2015 y en caso de ser serie sin más de 4 temporadas");
+  assert.equal(i.mediaType, null);
+  assert.equal(i.rating.min, 7, "«los mejores» pide bien valoradas");
+  assert.deepEqual([i.seasons.min, i.seasons.max], [null, 4]);
+  assert.equal(i.onlyWatchlist, true);
+  assert.equal(
+    describeIntent(i),
+    "títulos de comedia, bien valoradas, si es serie, de 4 temporadas como mucho, de 2010 a 2015, de tus pendientes",
+  );
+});
+
+test("temporadas en sus distintas formas", () => {
+  assert.equal(parse("una serie de menos de 3 temporadas").seasons.max, 2);
+  assert.equal(parse("serie de una sola temporada").seasons.max, 1);
+  assert.equal(parse("series con al menos 5 temporadas").seasons.min, 5);
+  assert.equal(parse("series de más de 3 temporadas").seasons.min, 4);
+  assert.equal(parse("con más de 3 capítulos").rating, null);
+  assert.equal(parse("que tengo en pendientes").onlyWatchlist, true);
+});

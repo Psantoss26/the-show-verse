@@ -158,3 +158,19 @@ test("«parecida a…»: solo similares y Pendientes que no se parecen suman poc
   const similarOnly = scoreCandidate({ ...base, sources: ["similar_favorites"] }, intent, ctx);
   assert.ok(similarOnly > pendingOnly);
 });
+
+test("Pendientes sin votos conocidos no se descartan por la nota", () => {
+  const intent = parse("los mejores títulos de comedia que tenga en pendientes entre 2010 y 2015 y en caso de ser serie sin más de 4 temporadas");
+  const movie = { ...base, genreIds: [14, 35, 10749], voteAverage: 7.5, voteCount: null, releaseDate: "2011-05-11", sources: ["watchlist"] };
+  assert.equal(checkCandidate(movie, intent, { today: TODAY }).ok, true);
+});
+
+test("temporadas: solo en series y con su ficha", () => {
+  const intent = parse("los mejores títulos de comedia que tenga en pendientes entre 2010 y 2015 y en caso de ser serie sin más de 4 temporadas");
+  const show = { ...base, mediaType: "tv", genreIds: [16, 35], voteAverage: 8.5, voteCount: null, releaseDate: "2011-04-06", sources: ["watchlist"] };
+  assert.ok(checkCandidate(show, intent, { today: TODAY }).missing.includes("seasons"), "sin ficha no se sabe");
+  assert.equal(checkCandidate({ ...show, numberOfSeasons: 1 }, intent, { today: TODAY }).ok, true);
+  assert.ok(checkCandidate({ ...show, numberOfSeasons: 8 }, intent, { today: TODAY, level: 1 }).missing.includes("seasons"));
+  // Al relajar, una de margen.
+  assert.equal(checkCandidate({ ...show, numberOfSeasons: 5 }, intent, { today: TODAY, level: 1 }).ok, true);
+});

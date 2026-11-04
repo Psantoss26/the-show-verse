@@ -396,6 +396,21 @@ async function getTitleFacts(item) {
   };
 }
 
+function applyTitleFacts(item, f) {
+  if (!item || !f) return;
+  item.runtime = f.runtime;
+  item.episodeRuntime = f.episodeRuntime;
+  item.providerIds = f.providerIds;
+  item.originalLanguage = f.originalLanguage || item.originalLanguage;
+  if (f.originCountry.length) item.originCountry = f.originCountry;
+  if (f.genreIds.length) item.genreIds = [...new Set([...item.genreIds, ...f.genreIds])];
+  item.voteCount = item.voteCount ?? f.voteCount;
+  item.voteAverage = item.voteAverage ?? f.voteAverage;
+  item.releaseDate = item.releaseDate || f.releaseDate;
+  item.numberOfSeasons = f.numberOfSeasons;
+  item.factsChecked = true;
+}
+
 // Pendientes, favoritos, valoraciones e historial del backend propio (lo que
 // el usuario ve en la app). Sin sesión del backend, `connected: false` y se
 // usan los de TMDb/Trakt.
@@ -711,6 +726,9 @@ function buildReason(item, intent) {
   if (Number.isFinite(minutes) && minutes > 0) {
     bits.push(item.mediaType === "tv" ? `episodios de ${minutes} min` : `${minutes} min`);
   }
+  if (item.mediaType === "tv" && Number.isFinite(item.numberOfSeasons) && item.numberOfSeasons > 0) {
+    bits.push(item.numberOfSeasons === 1 ? "1 temporada" : `${item.numberOfSeasons} temporadas`);
+  }
   const providers = providerLabelsOf(item, intent);
   if (providers.length) bits.push(`en ${providers.join(" y ")}`);
   if (intent.inCinemas) bits.push("en cartelera");
@@ -764,6 +782,7 @@ const RELAXED_LABELS = {
   runtime: "la duración exacta",
   genres: "el género",
   keywords: "el tema concreto",
+  seasons: "el número de temporadas",
   similar: "el parecido",
 };
 
@@ -836,6 +855,7 @@ function compactCandidatesForAi(candidates, intent) {
     voteAverage: item.voteAverage,
     votes: item.voteCount,
     minutes: (item.mediaType === "tv" ? item.episodeRuntime : item.runtime) || undefined,
+    seasons: item.mediaType === "tv" ? item.numberOfSeasons || undefined : undefined,
     onPlatforms: providerLabelsOf(item, intent),
     inWatchlist: item.sources.includes("watchlist") || undefined,
     // Cumple solo parte de lo pedido (se relajó algún criterio).
@@ -1406,36 +1426,35 @@ export async function POST(request) {
     return (
       ((range.min != null || range.max != null) && !verified.has("runtime")) ||
       ((intent.providers.length || intent.free) && !verified.has("providers")) ||
-      (intent.origin && !verified.has("origin") && !item.originalLanguage)
+      (intent.origin && !verified.has("origin") && !item.originalLanguage) ||
+      (intent.seasons && item.mediaType === "tv" && !Number.isFinite(item.numberOfSeasons))
     );
   };
-  const preliminary = [...candidateMap.values()]
+  // Reparto de las fichas: hasta 16 para los Pendientes que más prometen (todas
+  // con «de mis pendientes») y el resto para los mejores de las búsquedas. Sin
+  // ese cupo, o los Pendientes se comían todas las consultas o no recibían
+  // ninguna y quedaban fuera por no poder comprobarlos.
+  const lookupCap = intent.seasons ? MAX_FACT_LOOKUPS + 12 : MAX_FACT_LOOKUPS;
+  const rankedForFacts = [...candidateMap.values()]
     .filter((item) => needsFacts(item))
-    .filter((item) => checkCandidate(item, intent, { today, level: 2 }).missing.every((m) => ["runtime", "providers", "origin"].includes(m)))
+    .filter((item) => checkCandidate(item, intent, { today, level: 2 }).missing.every((m) => ["runtime", "providers", "origin", "seasons"].includes(m)))
     .map((item) => ({
       item,
       priority:
-        (item.sources.includes("watchlist") ? 1000 : 0) +
         (item.sources.some((s) => s.startsWith("similar")) ? 500 : 0) +
         scoreCandidate(item, intent, { profileGenres, watchedSet, recentKeySet, quickPick, today }),
     }))
     .sort((a, b) => b.priority - a.priority)
-    .slice(0, MAX_FACT_LOOKUPS)
     .map(({ item }) => item);
+  const pendingForFacts = rankedForFacts
+    .filter((item) => item.sources.includes("watchlist"))
+    .slice(0, intent.onlyWatchlist ? lookupCap : 16);
+  const preliminary = [
+    ...pendingForFacts,
+    ...rankedForFacts.filter((item) => !pendingForFacts.includes(item)),
+  ].slice(0, lookupCap);
   const facts = await mapLimit(preliminary, 8, (item) => getTitleFacts(item));
-  preliminary.forEach((item, index) => {
-    const f = facts[index];
-    if (!f) return;
-    item.runtime = f.runtime;
-    item.episodeRuntime = f.episodeRuntime;
-    item.providerIds = f.providerIds;
-    item.originalLanguage = f.originalLanguage || item.originalLanguage;
-    if (f.originCountry.length) item.originCountry = f.originCountry;
-    if (f.genreIds.length) item.genreIds = [...new Set([...item.genreIds, ...f.genreIds])];
-    item.voteCount = item.voteCount ?? f.voteCount;
-    item.voteAverage = item.voteAverage ?? f.voteAverage;
-    item.releaseDate = item.releaseDate || f.releaseDate;
-  });
+  preliminary.forEach((item, index) => applyTitleFacts(item, facts[index]));
 
   // FILTRO por niveles: primero lo que lo cumple todo; si no llega, lo que
   // cumple lo importante (tipo, excluidos, plataforma, cines, pendientes) con
@@ -1507,13 +1526,51 @@ export async function POST(request) {
         ),
       ]
     : pool;
-  const selected = diversifyRecommendations({
+  let selected = diversifyRecommendations({
     candidates: aiRanked,
     limit,
     intent,
     recentKeySet,
     quickPick,
   });
+
+  // COMPROBACIÓN FINAL con la ficha de cada elegido. El filtro de duración de
+  // /discover de TMDb no es fiable (con «hasta 90 min» devuelve películas de
+  // 110), así que duración, plataforma y temporadas se confirman con la ficha
+  // de lo que se va a enseñar; lo que no cumple se cambia por el siguiente
+  // candidato que sí, en hasta 3 tandas.
+  const needsFinalCheck =
+    intent.runtime?.min != null ||
+    intent.runtime?.max != null ||
+    !!intent.runtime?.episodes ||
+    intent.providers.length > 0 ||
+    intent.free ||
+    !!intent.seasons;
+  if (needsFinalCheck && selected.length) {
+    const confirmed = [];
+    const considered = new Set();
+    let batch = selected;
+    for (let round = 0; round < 3 && batch.length && confirmed.length < limit; round++) {
+      batch.forEach((item) => considered.add(itemKey(item)));
+      const toFetch = batch.filter((item) => !item.factsChecked);
+      const fetched = await mapLimit(toFetch, 8, (item) => getTitleFacts(item));
+      toFetch.forEach((item, index) => applyTitleFacts(item, fetched[index]));
+      for (const item of batch) {
+        if (confirmed.length >= limit) break;
+        // Con la ficha en la mano, manda la ficha y no lo que «garantizaba»
+        // la búsqueda.
+        const factual = item.factsChecked
+          ? { ...item, verified: (item.verified || []).filter((v) => v !== "runtime" && v !== "providers") }
+          : item;
+        if (checkCandidate(factual, intent, { today, level: item.relaxedLevel || 0 }).ok) confirmed.push(item);
+      }
+      const missingCount = limit - confirmed.length;
+      if (missingCount <= 0) break;
+      const rest = aiRanked.filter((item) => !considered.has(itemKey(item)) && !confirmed.some((c) => titleLooksTooSimilar(c, item)));
+      batch = diversifyRecommendations({ candidates: rest, limit: missingCount + 2, intent, recentKeySet, quickPick });
+    }
+    selected = confirmed;
+  }
 
   const relaxed = new Set();
   for (const item of selected) {

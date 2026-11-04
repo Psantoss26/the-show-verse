@@ -322,11 +322,25 @@ export function checkCandidate(item, intent, { today = new Date(), level = 0 } =
     if (!ok) missing.push("runtime");
   }
 
+  // Temporadas: solo afectan a las series («en caso de ser serie, sin más de
+  // 4 temporadas»). El número no viene en los listados: hace falta la ficha
+  // (`item.numberOfSeasons`). Al relajar, una temporada de margen.
+  if (intent.seasons && type === "tv") {
+    const seasons = Number(item?.numberOfSeasons);
+    const margin = level >= 1 ? 1 : 0;
+    const ok = Number.isFinite(seasons) && seasons > 0 &&
+      (intent.seasons.max == null || seasons <= intent.seasons.max + margin) &&
+      (intent.seasons.min == null || seasons >= intent.seasons.min - margin);
+    if (!ok) missing.push("seasons");
+  }
+
   if (level < 1 && intent.rating?.min != null) {
     const vote = Number(item?.voteAverage);
-    const votes = Number(item?.voteCount);
+    // Votos desconocidos (los Pendientes del backend no los traen) no son
+    // «0 votos»: `Number(null)` es 0 y los descartaba todos.
+    const votes = item?.voteCount == null ? null : Number(item.voteCount);
     const minVotes = intent.rating.minVotes ?? (type === "tv" ? 40 : 80);
-    const enoughVotes = !Number.isFinite(votes) || votes >= minVotes || verified.has("rating");
+    const enoughVotes = votes == null || !Number.isFinite(votes) || votes >= minVotes || verified.has("rating");
     if (!(Number.isFinite(vote) && vote >= intent.rating.min && enoughVotes)) missing.push("rating");
   }
 
@@ -343,7 +357,7 @@ export function checkCandidate(item, intent, { today = new Date(), level = 0 } =
 
 // Lo que se deja de exigir en cada nivel (para contarlo en la respuesta).
 export const RELAXED_AT_LEVEL = {
-  1: ["rating", "years", "runtime"],
+  1: ["rating", "years", "runtime", "seasons"],
   2: ["genres", "keywords", "similar"],
 };
 

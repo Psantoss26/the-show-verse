@@ -235,13 +235,17 @@ function parseRuntime(text) {
 // ---------------------------------------------------------------------------
 // Nota mínima.
 
+// Lo que sigue a un número y NO lo hace una nota: «más de 4 temporadas», «más
+// de 90 minutos», «más de 3 capítulos».
+const NOT_A_RATING = "(?!\\s*(?:horas?|h\\b|minutos?|mins?|temporadas?|capitulos?|episodios?|anos|titulos?|pelis?|peliculas?|series?|veces|partes|entregas))";
+
 function parseRating(text) {
   // Numérica: «más de 7», «nota de 8», «al menos un 7,5», «por encima de 6.5»,
   // «con un 8 en imdb», «7+».
   const numeric =
-    text.match(/\b(?:mas de|minimo|al menos|por encima de|superior a|desde|con mas de)\s+(?:un\s+|una nota de\s+)?(\d(?:[.,]\d)?)\b(?!\s*(?:horas?|h\b|minutos?|mins?))/) ||
+    text.match(new RegExp(`\\b(?:mas de|minimo|al menos|por encima de|superior a|desde|con mas de)\\s+(?:un\\s+|una nota de\\s+)?(\\d(?:[.,]\\d)?)\\b${NOT_A_RATING}`)) ||
     text.match(/\bnota (?:de |minima de |mayor de |superior a )?(\d(?:[.,]\d)?)\b/) ||
-    text.match(/\bcon (?:un|una) (\d(?:[.,]\d)?)\b(?!\s*(?:horas?|h\b|minutos?|mins?))/) ||
+    text.match(new RegExp(`\\bcon (?:un|una) (\\d(?:[.,]\\d)?)\\b${NOT_A_RATING}`)) ||
     text.match(/\b(\d(?:[.,]\d)?) ?\+(?!\w)/) ||
     text.match(/\b(\d(?:[.,]\d)?) (?:o mas|para arriba|en imdb|en tmdb|de nota|sobre 10)\b/);
   if (numeric) {
@@ -251,7 +255,7 @@ function parseRating(text) {
   if (/\b(obras? maestras?|imprescindibles?|de las mejores|lo mejor de lo mejor|joyas?|10 de 10|top de todos los tiempos|cine de culto)\b/.test(text)) {
     return { min: 7.8, minVotes: 800, label: "de las mejor valoradas" };
   }
-  if (/\b(buena nota|buenas notas|bien valoradas?|bien valorados?|aclamadas?|aclamados?|nota alta|notaza|muy buenas?|de calidad|con buenas criticas|buenas criticas|premiadas?|premiados?|que valga la pena|que merezca la pena)\b/.test(text)) {
+  if (/\b(buena nota|buenas notas|los mejores|las mejores|lo mejor|mejor valoradas?|mejor valorados?|bien valoradas?|bien valorados?|aclamadas?|aclamados?|nota alta|notaza|muy buenas?|de calidad|con buenas criticas|buenas criticas|premiadas?|premiados?|que valga la pena|que merezca la pena)\b/.test(text)) {
     return { min: 7, label: "bien valoradas" };
   }
   return null;
@@ -358,8 +362,48 @@ function parseSimilar(original, text) {
 }
 
 // ---------------------------------------------------------------------------
+// Número de temporadas (solo series): «sin más de 4 temporadas», «de menos de
+// 3 temporadas», «como mucho 2 temporadas», «de una sola temporada», «con al
+// menos 3 temporadas».
+
+const SEASON_NUM = "(\\d+|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)";
+
+function parseSeasons(text) {
+  const max = text.match(new RegExp(`\\b(?:sin mas de|no mas de|que no tenga mas de|como mucho|como maximo|maximo|max|hasta|de hasta|como mucho de)\\s+${SEASON_NUM}\\s+temporadas?\\b`));
+  if (max) {
+    const n = toNumber(max[1]);
+    if (n) return { min: null, max: n, label: `${n === 1 ? "de una temporada" : `de ${n} temporadas como mucho`}` };
+  }
+  const less = text.match(new RegExp(`\\b(?:menos de|de menos de|por debajo de)\\s+${SEASON_NUM}\\s+temporadas?\\b`));
+  if (less) {
+    const n = toNumber(less[1]);
+    if (n && n > 1) return { min: null, max: n - 1, label: `de menos de ${n} temporadas` };
+  }
+  const more = text.match(new RegExp(`\\b(?:mas de|con mas de|al menos|minimo|como minimo|por lo menos)\\s+${SEASON_NUM}\\s+temporadas?\\b`));
+  if (more) {
+    const n = toNumber(more[1]);
+    if (n) {
+      const min = /\bmas de\b/.test(more[0]) ? n + 1 : n;
+      return { min, max: null, label: `de ${min} temporadas o más` };
+    }
+  }
+  if (/\b(?:de )?(?:una|1) (?:sola )?temporada\b/.test(text)) return { min: null, max: 1, label: "de una temporada" };
+  const exact = text.match(new RegExp(`\\b(?:de|con)\\s+${SEASON_NUM}\\s+temporadas\\b`));
+  if (exact) {
+    const n = toNumber(exact[1]);
+    if (n) return { min: null, max: n, label: `de ${n} temporadas como mucho` };
+  }
+  return null;
+}
+
+// «En caso de ser serie», «si es serie»: es una CONDICIÓN para cuando sea
+// serie, no un «solo series». Se quita antes de decidir el tipo.
+// Se quita la condición ENTERA hasta la siguiente coma o punto: en «en caso de
+// ser serie sin más de 4 temporadas», «temporadas» tampoco debe fijar «serie».
+const CONDITIONAL_TYPE = /\b(?:en caso de (?:que sea|que sean|ser)|si (?:es|son|fuera|fueran|se trata de)|cuando sea|cuando sean)\s+(?:una |un |unas |unos )?(?:series?|peliculas?|pelis?)\b[^,.;]*/g;
 
 function parseMediaType(text) {
+  text = text.replace(CONDITIONAL_TYPE, " ");
   const movie = /\b(peliculas?|pelis?|films?|largometrajes?|cine)\b/.test(text);
   const tv = /\b(series?|miniseries?|serie de tv|temporadas?|capitulos?|episodios?|docuseries?|k ?dramas?|sitcoms?)\b/.test(text);
   if (movie && tv) return null;
@@ -468,7 +512,8 @@ export function parseWatchIntent(message, { now = new Date() } = {}) {
   const origin = originEntry || (/\banime\b/.test(text) ? ORIGINS.find((o) => o.language === "ja") : null);
   const similar = parseSimilar(original, text);
 
-  const onlyWatchlist = /\b(de mis pendientes|de mi lista|de mi watchlist|que tengo pendientes?|que tenga pendientes?|de lo que tengo pendiente|de las que tengo guardadas|de los que tengo guardados|de mi lista de pendientes|entre mis pendientes|en mis pendientes|de pendientes)\b/.test(text);
+  const onlyWatchlist = /\b(de mis pendientes|de mi lista|de mi watchlist|que tengo pendientes?|que tenga pendientes?|que (?:tenga|tengo) en (?:mis )?pendientes|(?:tenga|tengo) en (?:mis )?pendientes|que (?:tenga|tengo) guardad[oa]s?|de lo que tengo pendiente|de las que tengo guardadas|de los que tengo guardados|de mi lista de pendientes|entre mis pendientes|en mis pendientes|de pendientes|en pendientes|de mi watch ?list)\b/.test(text);
+  const seasons = parseSeasons(text);
   const rewatch = /\b(rever|revisionar|volver a ver|rewatch|repetir|otra vez|ya vist[ao]s?|que ya haya visto)\b/.test(text);
   const future = /\b(proxim[oa]s? estrenos?|que vayan a salir|que salgan pronto|futur[oa]s?|cuando salga|mas esperad[oa]s?|esperad[oa]s?|por estrenar)\b/.test(text);
   const free = /\b(gratis|gratuitas?|gratuitos?|sin pagar|sin suscripcion)\b/.test(text);
@@ -492,6 +537,8 @@ export function parseWatchIntent(message, { now = new Date() } = {}) {
     origin,
     similar,
     onlyWatchlist,
+    // Solo para series: { min, max, label }.
+    seasons,
     rewatch,
     future,
     free,
@@ -518,6 +565,7 @@ export function hasHardConstraints(intent) {
     intent.years ||
     intent.origin ||
     intent.onlyWatchlist ||
+    intent.seasons ||
     intent.free
   );
 }
@@ -592,6 +640,7 @@ export function describeIntent(intent) {
   else if (rt.max != null) parts.push(`de ${rt.max} min como mucho`);
   else if (rt.min != null) parts.push(`de más de ${rt.min} min`);
   if (intent.rating) parts.push(intent.rating.label);
+  if (intent.seasons) parts.push(intent.mediaType === "tv" ? intent.seasons.label : `si es serie, ${intent.seasons.label}`);
   if (intent.years) parts.push(intent.years.label);
   if (intent.inCinemas) parts.push("en cartelera");
   if (intent.providers.length) parts.push(`en ${joinList(intent.providers.map((p) => p.label), "o")}`);
