@@ -545,15 +545,23 @@ export default function WatchNextAssistant() {
       />
 
       {/* Barra de conversaciones (escritorio): PANEL INDEPENDIENTE que flota
-          en la zona izquierda, separado de la barra lateral de la app (1.5rem)
-          y de la superior (1.5rem), con las cuatro esquinas redondeadas.
+          en la zona izquierda, separado de la barra lateral de la app (2.5rem)
+          y de la superior, con las cuatro esquinas redondeadas.
           Antes iba pegado a la esquina de la pantalla y por debajo de las dos
           barras: así las tapaba y no se veía el fondo de color detrás de ellas.
           El cristal es el de la barra lateral (LIQUID_GLASS_BAR), así que se
-          lee como pieza de la misma familia y deja pasar el color del fondo. */}
+          lee como pieza de la misma familia y deja pasar el color del fondo.
+          ALTO SEGÚN LA PANTALLA, CENTRADO: el 90% del hueco de la página, con
+          un tope de 50rem (78% y 42rem quedaba demasiado corto y aislado en el
+          centro), en vez de estirarse de arriba abajo. 2.5rem a la izquierda
+          (`ml-10`): con 1.5rem iba demasiado pegado a la barra lateral. Va centrado
+          con `self-center` y sube 2rem (`-top-8`, la mitad de la barra
+          superior): así su centro coincide con el de la ventana, que es donde
+          está la barra lateral de la app. `max-h` le guarda al menos 1.5rem
+          arriba tras ese desplazamiento; si no cabe todo, desplaza la lista. */}
       <aside
         aria-label="Conversaciones"
-        className={`relative isolate z-10 my-6 ml-6 hidden w-72 shrink-0 flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_BAR} transform-gpu desktop:flex`}
+        className={`relative -top-8 isolate z-10 ml-10 hidden h-[min(50rem,90%)] max-h-[calc(100%-7rem)] w-72 shrink-0 flex-col self-center overflow-hidden rounded-[2rem] ${LIQUID_GLASS_BAR} transform-gpu desktop:flex`}
       >
         <div className="flex items-center gap-3 px-4 pb-4 pt-5">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-300/10 text-cyan-100">

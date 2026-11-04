@@ -65,9 +65,15 @@ test("la barra de conversaciones es un panel independiente, separado de las barr
   const assistant = await readFile(assistantPath, "utf8");
   const aside = assistant.match(/<aside[\s\S]*?>/)?.[0];
   assert.ok(aside, "no se localiza la barra de conversaciones");
-  // Separada 1.5rem de la barra lateral y de la superior, y del borde inferior,
+  // Separada 2.5rem de la barra lateral,
   // con las cuatro esquinas redondeadas y el cristal de la barra lateral.
-  assert.match(aside, /my-6 ml-6/);
+  assert.match(aside, /ml-10/);
+  // Alto según la pantalla (90% con tope de 50rem), centrado a la altura de la
+  // barra lateral de la app en vez de estirado de arriba abajo.
+  assert.match(aside, /h-\[min\(50rem,90%\)\] max-h-\[calc\(100%-7rem\)\]/);
+  assert.match(aside, /self-center/);
+  assert.match(aside, /-top-8/);
+  assert.doesNotMatch(aside, /my-6/);
   assert.match(aside, /rounded-\[2rem\]/);
   assert.match(aside, /\$\{LIQUID_GLASS_BAR\}/);
   // Ya no se cuela bajo las barras de la app: así no les tapa el fondo.
