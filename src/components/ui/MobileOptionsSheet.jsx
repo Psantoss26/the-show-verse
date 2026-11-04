@@ -390,7 +390,10 @@ export function SheetOptionGroup({ label, icon: Icon, children, layout = "wrap",
 // Una opción: píldora de cristal; la elegida, en blanco con su marca.
 // `count`: cuántos elementos deja ese filtro, en una insignia propia junto a
 // la etiqueta (no «Inglés (43)» dentro del texto).
-export function SheetOption({ active, onClick, children, icon: Icon, count = null, disabled = false, className = "" }) {
+// `media`: imagen delante de la etiqueta (p. ej. el logo de una plataforma),
+// como hermana del texto y no dentro: dentro de la línea de texto se alineaba
+// a la línea base y empujaba logo y texto ~3 px por encima del centro.
+export function SheetOption({ active, onClick, children, icon: Icon, media = null, count = null, disabled = false, className = "" }) {
   const accent = useContext(OptionsSheetContext);
   return (
     <button
@@ -407,6 +410,7 @@ export function SheetOption({ active, onClick, children, icon: Icon, count = nul
       {Icon ? (
         <Icon className={`h-4 w-4 shrink-0 ${active ? "text-zinc-950" : ACCENTS[accent] || ACCENTS.zinc}`} aria-hidden="true" />
       ) : null}
+      {media ? <span className="flex shrink-0" aria-hidden="true">{media}</span> : null}
       <span className="min-w-0 truncate">{children}</span>
       {count != null ? (
         // `pt-px`: las cifras de PT Sans quedan 1 px por encima del centro de

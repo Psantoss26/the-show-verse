@@ -719,6 +719,35 @@ html:not([data-avatar-boot]) .alerts-boot {
   }
 }
 
+/* Tiradores de las barras de rango de los filtros avanzados (RangeBar): dos
+   <input type="range"> superpuestos; solo el tirador recibe el puntero. */
+.sv-range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--sv-range-accent, #ef4444);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45);
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.sv-range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--sv-range-accent, #ef4444);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45);
+  cursor: pointer;
+}
+
+.sv-range-thumb:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid rgb(255 255 255 / 0.8);
+  outline-offset: 2px;
+}
+
 @media (min-width: 640px) {
   .sv-options-sheet-side.sv-options-sheet-in {
     animation-name: sv-options-side-in;

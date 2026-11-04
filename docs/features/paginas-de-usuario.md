@@ -73,6 +73,42 @@ El resumen del Perfil (`/u/[username]`, `ProfileClient`) entra con la misma core
 
 Las tarjetas en modo **backdrop** hacen lo mismo con el kind `cardBackdrop`, que se elige en la pestaña «Backdrop» de «Portadas y fondos» (escritorio, vista lateral móvil y vista teléfono del panel; backdrops con idioma en español e inglés y, si no hay, los de otros idiomas o todos: `buildArtworkSheetTabs`). Es también la portada de la ficha de escritorio en modo backdrop (`posterBackdropFallback`: elegido propio, luego el más votado, luego la escalera de idiomas). La leen `useOwnCardBackdrop` y `useOwnCardImage(type, id, mode)` (`lib/hooks/useOwnCardPoster.js`) en `SmartPoster` de Favoritos y Pendientes, `SmartBackdrop` de En progreso/Completadas, `Backdrop` de Historial, `SmartImage` de Continuar viendo, `PosterImage` de las secciones del dashboard, `useItemBackdrop` de `DashboardBackdropRow` (filas backdrop del inicio, Películas y Series, también su vista previa al pasar el ratón), el Top 10 móvil de Películas y Series y `ActivityBackdropImage` (Actividad del Perfil y Social en «Lista con backdrop»). El elegido no se guarda en las cachés del backdrop automático, así que al quitarlo vuelve el automático.
 
+## Filtros avanzados de las páginas de usuario
+
+Favoritos, Pendientes, Historial y En progreso (también Completadas) tienen **filtros avanzados** además de sus filtros, orden y agrupación. En el ordenador se abren con el botón «Filtros» de la barra (con el número de filtros activos), en un panel lateral a la derecha (`MobileOptionsSheet placement="side"`) con un pie para restablecer y cerrar («Ver N títulos»). En el móvil van dentro de la misma hoja de filtros de la página, justo después de Tipo, y el botón de filtros lleva también el contador.
+
+- **Puntuación:** barras de dos tiradores para mi nota, IMDb y TMDb (0–10). Al restringir una, los títulos sin esa nota quedan fuera. La de IMDb pide las notas que falten (`useImdbScoreLoader`).
+- **Año:** barra entre el año más antiguo y el más reciente de la lista.
+- **Géneros:** los de la lista, con cuántos títulos tiene cada uno; basta con uno de los elegidos.
+- **Disponibilidad:** Netflix, Prime Video, HBO Max, Crunchyroll, Movistar +, Disney +, Plex y «Sin plataforma». Al usarlo se piden las plataformas de toda la lista; los títulos aparecen según llegan.
+- **Visto:** Todo, Vistos, Sin ver y Vistos varias veces (solo películas: en series el historial cuenta episodios). No se aplica hasta tener el historial.
+
+- **Votos en TMDb:** barra de un tirador con el mínimo (escalones de 0 a 25.000, `VOTE_STEPS`) y atajos Cualquiera, 100+, 1.000+ y 10.000+, para quitar títulos casi desconocidos con nota inflada.
+- **Estado de la serie:** En emisión, Finalizada, Cancelada y Próximamente (`status` de TMDb). Deja fuera las películas.
+- **Duración:** de la película o, en series, de un episodio: barra de 0 a 4 h (el tope cuenta como «4 h o más») y atajos para cinco tramos (menos de 30 min … más de 2 h) que colocan la barra; el atajo se marca cuando la barra coincide con él.
+- **Idioma original:** los de la lista, con cuántos títulos tiene cada uno (nombre con `Intl.DisplayNames`).
+- **Nota de Trakt** (Favoritos y Pendientes): cuarta barra de puntuación.
+- **Visto por última vez** (Favoritos y En progreso): esta semana, este mes, últimos 6 meses o hace más de 6 meses.
+- **Estreno** (Pendientes): ya estrenados o sin estrenar (sin fecha cuenta como sin estrenar).
+- **Progreso y episodios que faltan** (En progreso, no en Completadas): barra de 0 a 100 % y tramos 1–3, 4–10 y más de 10. Si están puestos, Completadas los ignora.
+- **Día de la semana y franja horaria** (Historial): Madrugada (0–6 h), Mañana (6–14 h), Tarde (14–20 h) y Noche (20–24 h). Siguen la regla de las fechas importadas de `yearInReviewCore.js` (`getWatchTimeParts`): un visionado a las 00:00 o 12:00 UTC exactas cuenta solo por su día (UTC), una hora en punto exacta no tiene hora, y los marcados en bloque (≥3 visionados en el mismo instante) no cuentan para ninguno de los dos.
+
+Idioma, votos, duración y estado salen de la ficha de cada título por lotes (`/api/tmdb/title-meta`, que devuelve ahora también `voteCount`, `originalLanguage` y `status`) cuando la lista no los trae: se piden al abrir los filtros (para ofrecer los idiomas) o con alguno activo. Favoritos y Pendientes ya traen la duración (`runtimeMins`) y el estado; En progreso, el estado (`tmdb_status`). Las entradas del Historial y las series de En progreso no traen `media_type`, así que la página lo indica (`getMediaType`).
+
+**Orden del panel:** primero lo que se elige con botones (estado, géneros, idioma, disponibilidad, visto, estreno, última vez, episodios que faltan, día y franja), con las barras de año, duración, progreso y votos repartidas entre ellos, cada una en su grupo; las de puntuación (mi nota, IMDb, TMDb, Trakt) van todas juntas al final.
+
+Las barras aplican el filtro al soltar el tirador, no en cada paso. Un rango completo no cuenta como filtro activo. Se guardan por página en `localStorage` (`showverse:favorites:advancedFilters:v1`, `showverse:watchlist:advancedFilters:v1`). Con la lista vacía por los filtros, el aviso ofrece «Quitar filtros avanzados».
+
+**Agrupar por veces vista** (`watch_count`, también como subagrupación): películas por número de visionados («Vista 3 veces»…), series con algo visto en «Series vistas» y el resto en «Sin ver», al final. Pendientes no tiene el historial para pintarse: los visionados y mis notas se piden solo al abrir los filtros, con alguno guardado o al agrupar así (`useLazyWatchCountsAndRatings`).
+
+**Historial:** las entradas solo traen el año, así que los géneros y la nota TMDb salen de `/api/tmdb/title-meta` por lotes (`useTitleMetaMap`, que ahora devuelve también `genreIds` y `voteAverage`), y mis notas de `useLazyWatchCountsAndRatings`; se piden al abrir los filtros o con alguno activo. Filtra por título (la película o la serie, no el episodio) y sobre lo ya cargado: el historial sigue llegando de 200 en 200 al bajar. Con filtros activos, la cabecera cuenta la lista en vez de usar los totales del servidor. No hay selector de visto ni agrupación por veces vista: todo está visto y la página agrupa por fecha.
+
+**En progreso y Completadas:** año, nota TMDb, géneros (por nombre, pasados al español con `translateGenre`) y mi nota llegan con cada serie; IMDb y plataformas se piden solo al filtrar por ellas. Tampoco hay selector de visto. Los filtros son los mismos en las dos pestañas.
+
+Las plataformas de Historial y En progreso salen de `src/lib/userLists/canonicalProviders.js` (`useCanonicalProviders`), con la misma caché que Favoritos y Pendientes (`showverse:watch-providers:ES:v3`). Claves guardadas: `showverse:history:advancedFilters:v1` y `showverse:inprogress:advancedFilters:v1`.
+
+La lógica es pura y está en `src/lib/userLists/advancedFilters.js` (test al lado); los grupos, la barra y el panel, en `src/components/userLists/AdvancedFilters.jsx`.
+
 ## Menú de filtros en el móvil
 
 En el móvil, el botón de filtros de la barra de Favoritos, Pendientes, Historial, Biblioteca, Calendario, Continuar viendo, En progreso, Listas, Social, las secciones del dashboard, el detalle de lista, las secciones del Perfil (también la vista neuronal), y las películas y series de una persona abre una **hoja inferior** (`MobileOptionsSheet`) en vez de un desplegable. Lleva todos los filtros, el orden, la agrupación, los modos de vista y las acciones de la página, en ese orden y con todas las opciones a la vista como píldoras. Elegir una opción no cierra la hoja (se ve el resultado detrás y se pueden combinar filtros); las acciones que cambian de modo o abren otra cosa (Añadir título, Borrar registros, Crear lista, Volver a hoy…) sí la cierran. En escritorio la barra sigue con sus desplegables. «Portadas y fondos» de la ficha no tiene botones en la fila del título en el móvil ni en la vista teléfono del panel: sus pestañas, filtros y Restaurar están en su vista lateral, y la fila enseña la portada sin idioma. Las vistas laterales de la ficha («Portadas y fondos») y de una persona (Películas, Series y Filmografía, donde el rol y el tipo de título dejan de ser pestañas) abren sus filtros en la misma hoja, en cualquier ancho: desde 640px sube dentro del panel lateral.

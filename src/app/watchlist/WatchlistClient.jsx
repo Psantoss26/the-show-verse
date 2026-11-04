@@ -94,6 +94,30 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import MobileOptionsSheet, { SheetOption, SheetOptionBreak, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
+import {
+  AdvancedFilterGroups,
+  AdvancedFiltersBadge,
+  AdvancedFiltersButton,
+  AdvancedFiltersPanel,
+} from "@/components/userLists/AdvancedFilters";
+import {
+  applyAdvancedFilters,
+  buildWatchCountGroupMeta,
+  collectGenreOptions,
+  collectLanguageOptions,
+  createDefaultAdvancedFilters,
+  getAdvancedFilterNeeds,
+  getYearBounds,
+  listActiveAdvancedFilters,
+  readAdvancedFilters,
+  sortWatchCountGroups,
+  writeAdvancedFilters,
+} from "@/lib/userLists/advancedFilters";
+import { useTitleMetaMap } from "@/lib/tmdb/titleMetaBatch";
+import {
+  useLazyWatchCountsAndRatings,
+  userTitleKey,
+} from "@/lib/hooks/useUserTitleStates";
 import useUserDetailsSequenceSource from "@/lib/navigation/useUserDetailsSequenceSource";
 import { useOwnCardImage } from "@/lib/hooks/useOwnCardPoster";
 
@@ -235,6 +259,8 @@ const PROVIDER_CACHE_KEY = "showverse:watch-providers:ES:v3";
 const PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PLEX_LIBRARY_INDEX_CACHE_KEY = "showverse:plex-library-index:v1";
 const PLEX_LIBRARY_INDEX_CACHE_TTL_MS = 30 * 60 * 1000;
+
+const WATCHLIST_ADVANCED_FILTERS_KEY = "showverse:watchlist:advancedFilters:v1";
 
 const TARGET_PROVIDER_ORDER = new Map([
   ["netflix", 1],
@@ -378,6 +404,7 @@ const WATCHLIST_GROUP_OPTIONS = [
   { key: "tmdb_rating", label: "TMDb", itemLabel: "Puntuación TMDb" },
   { key: "imdb_rating", label: "IMDb", itemLabel: "Puntuación IMDb" },
   { key: "trakt_rating", label: "Trakt", itemLabel: "Puntuación Trakt" },
+  { key: "watch_count", label: "Veces vista", itemLabel: "Por veces vista" },
 ];
 
 function getGroupOptionLabel(key) {
@@ -404,6 +431,7 @@ function getCompactGroupOptionLabel(key) {
     tmdb_rating: "TMDb",
     imdb_rating: "IMDb",
     trakt_rating: "Trakt",
+    watch_count: "Vist",
   };
   return labels[key] || getGroupOptionLabel(key);
 }
@@ -444,11 +472,21 @@ function buildWatchlistGroupMetas(
     imdbScores,
     traktScores,
     providersByItem,
+    watchCounts,
     ratingStep = 0.5,
     ratingOffset = 0,
   },
 ) {
   if (groupBy === "none") return [];
+
+  if (groupBy === "watch_count") {
+    return [
+      buildWatchCountGroupMeta(
+        item,
+        watchCounts?.get(userTitleKey(resolveItemType(item), item.id)) || 0,
+      ),
+    ];
+  }
 
   if (groupBy === "genre") {
     const type = item.media_type || (item.title ? "movie" : "tv");
@@ -586,6 +624,8 @@ function sortWatchlistGroups(groupsArray, groupBy) {
       if (b.key === "no_genre") return -1;
       return a.label.localeCompare(b.label);
     });
+  } else if (groupBy === "watch_count") {
+    sortWatchCountGroups(groupsArray);
   } else if (groupBy === "provider") {
     groupsArray.sort((a, b) => {
       const aSpecial = ["loading_providers", "no_provider"].includes(a.key);
@@ -1938,6 +1978,33 @@ export default function WatchlistClient() {
 
   const [q, setQ] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Filtros avanzados (notas, año, géneros, plataformas, visto): panel lateral
+  // en escritorio, dentro de la hoja de filtros en móvil.
+  const [advancedFilters, setAdvancedFiltersState] = useState(() =>
+    readAdvancedFilters(WATCHLIST_ADVANCED_FILTERS_KEY),
+  );
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const setAdvancedFilters = useCallback((next) => {
+    setAdvancedFiltersState(next);
+    writeAdvancedFilters(WATCHLIST_ADVANCED_FILTERS_KEY, next);
+  }, []);
+  const advancedNeeds = getAdvancedFilterNeeds(advancedFilters);
+  // Pendientes no pinta visionados ni notas propias: se piden solo para los
+  // filtros avanzados (al abrirlos o si hay alguno guardado) y para agrupar
+  // por veces vista.
+  const {
+    watchCounts,
+    ratings: userRatings,
+    ready: watchCountsReady,
+  } = useLazyWatchCountsAndRatings({
+    enabled:
+      advancedFiltersOpen ||
+      mobileFiltersOpen ||
+      advancedNeeds.watch ||
+      advancedNeeds.userRatings ||
+      groupBy === "watch_count" ||
+      subGroupBy === "watch_count",
+  });
   const filtersRef = useRef(null);
   const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
   const tmdbLogoutInFlightRef = useRef(false);
@@ -1950,12 +2017,14 @@ export default function WatchlistClient() {
 
   // La vista de lista enseña la nota de IMDb en cada fila (TitleRow).
   const needsImdbScores =
+    advancedNeeds.imdb ||
     viewMode === "list" ||
     groupBy === "imdb_rating" ||
     subGroupBy === "imdb_rating" ||
     sortBy === "rating-asc" ||
     sortBy === "rating-desc";
   const needsTraktScores =
+    advancedNeeds.trakt ||
     groupBy === "trakt_rating" ||
     subGroupBy === "trakt_rating";
 
@@ -2292,7 +2361,7 @@ export default function WatchlistClient() {
 
   // Filter and sort. También por el nombre en inglés y en español (llegan al escribir).
   const titleNamesVersion = useTitleNameSearch(items, q);
-  const filtered = useMemo(() => {
+  const searchFiltered = useMemo(() => {
     const needle = normText(q);
     return items.filter((item) => {
       const type = item.media_type || (item.title ? "movie" : "tv");
@@ -2306,6 +2375,88 @@ export default function WatchlistClient() {
     // titleNamesVersion: recalcular al llegar los nombres en inglés y español.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, q, typeFilter, titleNamesVersion]);
+
+  // Límites de la barra de año y géneros: de toda la lista, no de lo filtrado,
+  // para que elegir un filtro no encoja los demás.
+  const advancedYearBounds = useMemo(() => getYearBounds(items), [items]);
+  const advancedGenreOptions = useMemo(() => collectGenreOptions(items), [items]);
+  // Idioma original y votos no vienen en la lista (duración y estado sí, casi
+  // siempre): salen de la ficha de cada título (title-meta por lotes), al
+  // abrir los filtros para ofrecer los idiomas o con alguno activo.
+  const advancedTitleKeys = useMemo(
+    () => items.map((item) => getScoreItemKey(item)),
+    [items],
+  );
+  const { metaByKey: titleMetaByKey, pending: titleMetaPending } =
+    useTitleMetaMap(advancedTitleKeys, {
+      enabled:
+        advancedFiltersOpen || mobileFiltersOpen ||
+        advancedNeeds.titleMeta ||
+        advancedNeeds.languages ||
+        advancedNeeds.votes,
+    });
+  const advancedLanguageOptions = useMemo(
+    () =>
+      collectLanguageOptions(
+        items,
+        (item) =>
+          item.original_language ||
+          titleMetaByKey.get(getScoreItemKey(item))?.originalLanguage,
+      ),
+    [items, titleMetaByKey],
+  );
+  const activeAdvancedFilters = useMemo(
+    () =>
+      listActiveAdvancedFilters(advancedFilters, {
+        yearBounds: advancedYearBounds,
+      }),
+    [advancedFilters, advancedYearBounds],
+  );
+
+  // Lo que comparten el panel lateral y la hoja móvil.
+  const advancedGroupProps = {
+    yearBounds: advancedYearBounds,
+    genreOptions: advancedGenreOptions,
+    languageOptions: advancedLanguageOptions,
+    showTrakt: true,
+    showRelease: true,
+    loadingProviders: advancedNeeds.providers && loadingProviders,
+    loadingTitleMeta: titleMetaPending,
+  };
+
+  const filtered = useMemo(() => {
+    const titleKey = (item) => userTitleKey(resolveItemType(item), item.id);
+    return applyAdvancedFilters(searchFiltered, advancedFilters, {
+      yearBounds: advancedYearBounds,
+      getUserRating: (item) => userRatings.get(titleKey(item)),
+      getImdbRating: (item) => layoutImdbScores.get(getScoreItemKey(item)),
+      getProviders: (item) =>
+        layoutProvidersByItem.get(getProviderMediaKey(item)),
+      getWatchCount: (item) => watchCounts.get(titleKey(item)),
+      watchReady: watchCountsReady,
+      getTraktRating: (item) => layoutTraktScores.get(getScoreItemKey(item)),
+      getRuntime: (item) =>
+          item.runtimeMins ?? titleMetaByKey.get(getScoreItemKey(item))?.runtime,
+      getSeriesStatus: (item) =>
+        item.status || titleMetaByKey.get(getScoreItemKey(item))?.status,
+      getOriginalLanguage: (item) =>
+        item.original_language ||
+        titleMetaByKey.get(getScoreItemKey(item))?.originalLanguage,
+      getVoteCount: (item) =>
+        item.vote_count ?? titleMetaByKey.get(getScoreItemKey(item))?.voteCount,
+    });
+  }, [
+    searchFiltered,
+    advancedFilters,
+    advancedYearBounds,
+    userRatings,
+    layoutImdbScores,
+    layoutProvidersByItem,
+    watchCounts,
+    watchCountsReady,
+    layoutTraktScores,
+    titleMetaByKey,
+  ]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -2344,10 +2495,16 @@ export default function WatchlistClient() {
     return arr;
   }, [filtered, sortBy, layoutImdbScores]);
 
+  // Plataformas: para agrupar por ellas o filtrar por disponibilidad. Al
+  // filtrar se piden las de toda la búsqueda (no solo lo ya filtrado): un
+  // título sin plataformas conocidas no pasa el filtro y nunca se pediría.
+  const providerSourceItems = advancedNeeds.providers ? searchFiltered : sorted;
   useEffect(() => {
     if (
-      (groupBy !== "provider" && subGroupBy !== "provider") ||
-      sorted.length === 0
+      (groupBy !== "provider" &&
+        subGroupBy !== "provider" &&
+        !advancedNeeds.providers) ||
+      providerSourceItems.length === 0
     )
       return;
 
@@ -2357,7 +2514,7 @@ export default function WatchlistClient() {
       const cachedProviders = readProvidersCache();
       const providerMap = new Map(cachedProviders);
 
-      const itemsToFetch = sorted.filter(
+      const itemsToFetch = providerSourceItems.filter(
         (item) => !providerMap.has(getProviderMediaKey(item)),
       );
 
@@ -2426,7 +2583,7 @@ export default function WatchlistClient() {
     return () => {
       cancelled = true;
     };
-  }, [groupBy, subGroupBy, sorted]);
+  }, [groupBy, subGroupBy, advancedNeeds.providers, providerSourceItems]);
 
   const stats = useMemo(() => {
     let movies = 0;
@@ -2448,6 +2605,7 @@ export default function WatchlistClient() {
       imdbScores: layoutImdbScores,
       traktScores: layoutTraktScores,
       providersByItem: layoutProvidersByItem,
+      watchCounts,
     };
 
     for (const item of sorted) {
@@ -2520,6 +2678,7 @@ export default function WatchlistClient() {
     layoutImdbScores,
     layoutTraktScores,
     layoutProvidersByItem,
+    watchCounts,
     loadingProviders,
   ]);
 
@@ -2689,8 +2848,6 @@ export default function WatchlistClient() {
         ? "Actualizando puntuaciones de IMDb..."
         : "Actualizando puntuaciones de Trakt...";
 
-  const resolveItemType = (item) =>
-    item?.media_type || (item?.title ? "movie" : "tv");
   const getMediaKey = (item) => `${resolveItemType(item)}-${item.id}`;
   const getItemsGridClass = (withTopMargin = false) => {
     const hoverBleedSpace = withTopMargin
@@ -2924,13 +3081,22 @@ export default function WatchlistClient() {
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+              aria-label="Filtros y vista"
+              className={`relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                 mobileFiltersOpen
                   ? "text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
                   : "text-zinc-200 hover:bg-black/30"
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
+              {activeAdvancedFilters.length ? (
+                <span className="absolute -right-1 -top-1">
+                  <AdvancedFiltersBadge
+                    count={activeAdvancedFilters.length}
+                    accent="blue"
+                  />
+                </span>
+              ) : null}
             </button>
           </div>
 
@@ -2982,6 +3148,13 @@ export default function WatchlistClient() {
                 </>
               )}
             </InlineDropdown>
+            <AdvancedFilterGroups
+              filters={advancedFilters}
+              onChange={setAdvancedFilters}
+              accent="blue"
+              {...advancedGroupProps}
+              showReset={activeAdvancedFilters.length > 0}
+            />
             <InlineDropdown
               label="Orden"
               valueLabel={
@@ -3258,6 +3431,13 @@ export default function WatchlistClient() {
               )}
             </InlineDropdown>
 
+            <AdvancedFiltersButton
+              open={advancedFiltersOpen}
+              onClick={() => setAdvancedFiltersOpen(true)}
+              count={activeAdvancedFilters.length}
+              accent="blue"
+            />
+
             <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
                 onClick={() => setViewMode("list")}
@@ -3316,6 +3496,17 @@ export default function WatchlistClient() {
           </div>
         </motion.div>
 
+        <AdvancedFiltersPanel
+          open={advancedFiltersOpen}
+          onClose={() => setAdvancedFiltersOpen(false)}
+          accent="blue"
+          activeFilters={activeAdvancedFilters}
+          resultCount={loading ? null : filtered.length}
+          filters={advancedFilters}
+          onChange={setAdvancedFilters}
+          {...advancedGroupProps}
+        />
+
         {/* Scores load silently in background - no loading indicator */}
 
         {/* Content */}
@@ -3336,6 +3527,16 @@ export default function WatchlistClient() {
                 className="mt-4 text-blue-500 text-sm font-bold hover:underline"
               >
                 Limpiar búsqueda
+              </button>
+            )}
+            {activeAdvancedFilters.length > 0 && (
+              <button
+                onClick={() =>
+                  setAdvancedFilters(createDefaultAdvancedFilters())
+                }
+                className="mt-4 ml-4 text-blue-500 text-sm font-bold hover:underline"
+              >
+                Quitar filtros avanzados
               </button>
             )}
           </motion.div>

@@ -74,6 +74,30 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
+import {
+  AdvancedFilterGroups,
+  AdvancedFiltersBadge,
+  AdvancedFiltersButton,
+  AdvancedFiltersPanel,
+} from "@/components/userLists/AdvancedFilters";
+import {
+  applyAdvancedFilters,
+  collectGenreOptions,
+  collectLanguageOptions,
+  findBulkWatchInstants,
+  getWatchTimeParts,
+  createDefaultAdvancedFilters,
+  getAdvancedFilterNeeds,
+  getYearBounds,
+  listActiveAdvancedFilters,
+  readAdvancedFilters,
+  writeAdvancedFilters,
+} from "@/lib/userLists/advancedFilters";
+import { useCanonicalProviders } from "@/lib/userLists/canonicalProviders";
+import { useLazyWatchCountsAndRatings } from "@/lib/hooks/useUserTitleStates";
+import { useTitleMetaMap } from "@/lib/tmdb/titleMetaBatch";
+import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
+import { readScoreCache } from "@/lib/userLists/listScoreCache";
 import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
@@ -339,6 +363,16 @@ function formatWatchedBadgeDate(value) {
     day,
     label: `${day} ${monthLong}`,
   };
+}
+
+const HISTORY_ADVANCED_FILTERS_KEY = "showverse:history:advancedFilters:v1";
+
+// Clave del TÍTULO de una entrada ("movie:603" / "tv:1396"): los filtros
+// avanzados miran la película o la serie, no el episodio.
+function getHistoryTitleKey(entry) {
+  const id = getTmdbId(entry);
+  if (!id) return null;
+  return `${getItemType(entry) === "movie" ? "movie" : "tv"}:${id}`;
 }
 
 function getItemType(entry) {
@@ -3137,6 +3171,18 @@ export default function HistoryClient() {
     }
   });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Filtros avanzados (notas, año, géneros, plataformas): panel lateral en
+  // escritorio, dentro de la hoja de filtros en móvil. Todo lo del historial
+  // está visto, así que aquí no hay selector de visto.
+  const [advancedFilters, setAdvancedFiltersState] = useState(() =>
+    readAdvancedFilters(HISTORY_ADVANCED_FILTERS_KEY),
+  );
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const setAdvancedFilters = useCallback((next) => {
+    setAdvancedFiltersState(next);
+    writeAdvancedFilters(HISTORY_ADVANCED_FILTERS_KEY, next);
+  }, []);
+  const advancedNeeds = getAdvancedFilterNeeds(advancedFilters);
   const filtersRef = useRef(null);
   const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
   const [showCalendarView, setShowCalendarView] = useState(false);
@@ -3647,7 +3693,105 @@ export default function HistoryClient() {
   // También por el nombre en inglés y en español de la película o la serie
   // (llegan al escribir).
   const titleNamesVersion = useTitleNameSearch(raw, q);
-  const filtered = useMemo(() => {
+
+  // Datos por TÍTULO para los filtros avanzados: las entradas solo traen el
+  // año. Géneros y nota TMDb (title-meta por lotes), IMDb, mis notas y
+  // plataformas se piden solo al abrir los filtros o con alguno activo.
+  const advancedPanelShown = advancedFiltersOpen || mobileFiltersOpen;
+  const historyTitleKeys = useMemo(() => {
+    const keys = new Set();
+    for (const entry of raw || []) {
+      const key = getHistoryTitleKey(entry);
+      if (key) keys.add(key);
+    }
+    return [...keys];
+  }, [raw]);
+  const historyScoreItems = useMemo(
+    () =>
+      historyTitleKeys.map((key) => {
+        const [type, id] = key.split(":");
+        return { id: Number(id), media_type: type };
+      }),
+    [historyTitleKeys],
+  );
+  const { metaByKey: titleMetaByKey, pending: titleMetaPending } = useTitleMetaMap(
+    historyTitleKeys,
+    {
+      enabled:
+        advancedPanelShown ||
+        advancedNeeds.genres ||
+        advancedNeeds.tmdb ||
+        advancedNeeds.titleMeta ||
+        advancedNeeds.languages ||
+        advancedNeeds.votes,
+    },
+  );
+  const { ratings: userRatings } = useLazyWatchCountsAndRatings({
+    enabled: advancedPanelShown || advancedNeeds.userRatings,
+  });
+  const { providersByKey, loading: loadingProviders } = useCanonicalProviders(
+    historyTitleKeys,
+    { enabled: advancedNeeds.providers },
+  );
+  const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
+  useImdbScoreLoader({
+    items: historyScoreItems,
+    enabled: advancedNeeds.imdb,
+    frozen: false,
+    setImdbScores,
+    setLoading: () => {},
+  });
+  const getEntryYear = useCallback(
+    (entry) => {
+      const year = Number(
+        entry?.year || titleMetaByKey.get(getHistoryTitleKey(entry))?.year,
+      );
+      return Number.isFinite(year) && year > 0 ? year : null;
+    },
+    [titleMetaByKey],
+  );
+  const advancedYearBounds = useMemo(
+    () => getYearBounds(raw || [], getEntryYear),
+    [raw, getEntryYear],
+  );
+  // Un título cuenta una vez por género, aunque tenga muchos visionados.
+  const advancedGenreOptions = useMemo(
+    () =>
+      collectGenreOptions(
+        historyTitleKeys,
+        (key) => titleMetaByKey.get(key)?.genreIds,
+      ),
+    [historyTitleKeys, titleMetaByKey],
+  );
+  const advancedLanguageOptions = useMemo(
+    () =>
+      collectLanguageOptions(
+        historyTitleKeys,
+        (key) => titleMetaByKey.get(key)?.originalLanguage,
+      ),
+    [historyTitleKeys, titleMetaByKey],
+  );
+  // Día y hora de cada visionado; los marcados en bloque no cuentan.
+  const bulkWatchInstants = useMemo(() => findBulkWatchInstants(raw || []), [raw]);
+  const activeAdvancedFilters = useMemo(
+    () =>
+      listActiveAdvancedFilters(advancedFilters, {
+        yearBounds: advancedYearBounds,
+      }),
+    [advancedFilters, advancedYearBounds],
+  );
+  // Lo que comparten el panel lateral y la hoja móvil.
+  const advancedGroupProps = {
+    yearBounds: advancedYearBounds,
+    genreOptions: advancedGenreOptions,
+    languageOptions: advancedLanguageOptions,
+    showWatched: false,
+    showWatchTime: true,
+    loadingProviders: advancedNeeds.providers && loadingProviders,
+    loadingTitleMeta: titleMetaPending,
+  };
+
+  const searchFiltered = useMemo(() => {
     const needle = normalizeSearchText(q);
     return (raw || []).filter((e) => {
       const t = getItemType(e);
@@ -3664,6 +3808,46 @@ export default function HistoryClient() {
     // titleNamesVersion: recalcular al llegar los nombres en inglés y español.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raw, q, typeFilter, selectedDay, titleNamesVersion]);
+
+  const filtered = useMemo(
+    () =>
+      applyAdvancedFilters(searchFiltered, advancedFilters, {
+        yearBounds: advancedYearBounds,
+        getYear: getEntryYear,
+        getGenres: (entry) =>
+          titleMetaByKey.get(getHistoryTitleKey(entry))?.genreIds,
+        getTmdbRating: (entry) =>
+          titleMetaByKey.get(getHistoryTitleKey(entry))?.voteAverage,
+        getUserRating: (entry) => userRatings.get(getHistoryTitleKey(entry)),
+        getImdbRating: (entry) => imdbScores.get(getHistoryTitleKey(entry)),
+        getProviders: (entry) => providersByKey.get(getHistoryTitleKey(entry)),
+        getRuntime: (entry) =>
+          titleMetaByKey.get(getHistoryTitleKey(entry))?.runtime,
+        getSeriesStatus: (entry) =>
+          titleMetaByKey.get(getHistoryTitleKey(entry))?.status,
+        getOriginalLanguage: (entry) =>
+          titleMetaByKey.get(getHistoryTitleKey(entry))?.originalLanguage,
+        getVoteCount: (entry) =>
+          titleMetaByKey.get(getHistoryTitleKey(entry))?.voteCount,
+        getMediaType: (entry) =>
+          getItemType(entry) === "movie" ? "movie" : "tv",
+        getWatchParts: (entry) =>
+          getWatchTimeParts(entry?.watched_at, {
+            bulk: bulkWatchInstants.has(entry?.watched_at),
+          }),
+      }),
+    [
+      searchFiltered,
+      advancedFilters,
+      advancedYearBounds,
+      getEntryYear,
+      titleMetaByKey,
+      userRatings,
+      imdbScores,
+      providersByKey,
+      bulkWatchInstants,
+    ],
+  );
 
   const sorted = useMemo(() => {
     const items = [...filtered];
@@ -3699,7 +3883,13 @@ export default function HistoryClient() {
   const stats = useMemo(() => {
     // Con páginas sin cargar, la cabecera usa los totales del backend; con todo
     // cargado (o con búsqueda o día elegido) cuenta la lista.
-    if (historyTotals && hasMoreHistory && !normalizeSearchText(q) && !selectedDay) {
+    if (
+      historyTotals &&
+      hasMoreHistory &&
+      !normalizeSearchText(q) &&
+      !selectedDay &&
+      !activeAdvancedFilters.length
+    ) {
       if (typeFilter === "movies") {
         return {
           plays: historyTotals.movies,
@@ -3735,7 +3925,15 @@ export default function HistoryClient() {
       uniqSet.add(String(id));
     }
     return { plays, unique: uniqSet.size, movies, shows };
-  }, [filtered, historyTotals, hasMoreHistory, q, selectedDay, typeFilter]);
+  }, [
+    filtered,
+    historyTotals,
+    hasMoreHistory,
+    q,
+    selectedDay,
+    typeFilter,
+    activeAdvancedFilters.length,
+  ]);
 
   // Tarjetas de la cabecera. Llegando desde Continuar viendo, su primer
   // pintado son las de allí y se relevan, animadas, por estas
@@ -4101,13 +4299,22 @@ export default function HistoryClient() {
                   <button
                     type="button"
                     onClick={() => setMobileFiltersOpen((v) => !v)}
-                    className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                    aria-label="Filtros y vista"
+                    className={`relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                       mobileFiltersOpen
                         ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                         : "text-zinc-200 hover:bg-black/30"
                     }`}
                   >
                     <SlidersHorizontal className="w-4 h-4" />
+                    {activeAdvancedFilters.length ? (
+                      <span className="absolute -right-1 -top-1">
+                        <AdvancedFiltersBadge
+                          count={activeAdvancedFilters.length}
+                          accent="emerald"
+                        />
+                      </span>
+                    ) : null}
                   </button>
                   </div>
                 </div>
@@ -4160,6 +4367,13 @@ export default function HistoryClient() {
                       </>
                     )}
                   </InlineDropdown>
+                  <AdvancedFilterGroups
+                    filters={advancedFilters}
+                    onChange={setAdvancedFilters}
+                    accent="emerald"
+                    {...advancedGroupProps}
+                    showReset={activeAdvancedFilters.length > 0}
+                  />
                   <InlineDropdown
                     label="Ordenar"
                     valueLabel={
@@ -4287,6 +4501,16 @@ export default function HistoryClient() {
                     </SheetAction>
                   </SheetOptionGroup>
                 </MobileOptionsSheet>
+                <AdvancedFiltersPanel
+                  open={advancedFiltersOpen}
+                  onClose={() => setAdvancedFiltersOpen(false)}
+                  accent="emerald"
+                  activeFilters={activeAdvancedFilters}
+                  resultCount={null}
+                  filters={advancedFilters}
+                  onChange={setAdvancedFilters}
+                  {...advancedGroupProps}
+                />
                 </div>
 
                 {/* Desktop: Una sola fila con todo */}
@@ -4469,6 +4693,12 @@ export default function HistoryClient() {
                     )}
                   </InlineDropdown>
 
+                  <AdvancedFiltersButton
+                    open={advancedFiltersOpen}
+                    onClick={() => setAdvancedFiltersOpen(true)}
+                    count={activeAdvancedFilters.length}
+                    accent="emerald"
+                  />
 
                   <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                     <button
@@ -4592,6 +4822,16 @@ export default function HistoryClient() {
                     className="mt-4 text-emerald-500 text-sm font-bold hover:underline"
                   >
                     Limpiar búsqueda
+                  </button>
+                )}
+                {activeAdvancedFilters.length > 0 && (
+                  <button
+                    onClick={() =>
+                      setAdvancedFilters(createDefaultAdvancedFilters())
+                    }
+                    className="mt-4 ml-4 text-emerald-500 text-sm font-bold hover:underline"
+                  >
+                    Quitar filtros avanzados
                   </button>
                 )}
               </motion.div>

@@ -143,3 +143,39 @@ export default function useUserTitleStates() {
 
   return { watchCounts, ratings, favorites, watchlist, signedIn };
 }
+
+// Solo visionados y notas, y solo cuando `enabled` (p. ej. al abrir los filtros
+// avanzados de Pendientes, que no los necesita para pintarse). Una vez pedidos
+// no se vuelven a pedir aunque `enabled` pase a false. `ready`: ya llegaron
+// los visionados (hasta entonces el filtro de visto no se aplica).
+export function useLazyWatchCountsAndRatings({ enabled }) {
+  const { session, account, hydrated } = useAuth();
+  const [state, setState] = useState({ watchCounts: EMPTY_MAP, ratings: EMPTY_MAP, ready: false });
+  const [requested, setRequested] = useState(false);
+  const accountId = account?.id ?? null;
+  const isShowverse = session === "showverse" || account?.provider === "showverse";
+  const signedIn = Boolean(hydrated && session && accountId);
+
+  useEffect(() => {
+    if (enabled) setRequested(true);
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!requested || !signedIn) return undefined;
+    const controller = new AbortController();
+    const { signal } = controller;
+    loadWatchCounts(signal)
+      .then((watchCounts) => {
+        if (!signal.aborted) setState((prev) => ({ ...prev, watchCounts, ready: true }));
+      })
+      .catch(() => {});
+    loadRatings({ isShowverse, accountId, session, signal })
+      .then((ratings) => {
+        if (!signal.aborted) setState((prev) => ({ ...prev, ratings }));
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [requested, signedIn, session, accountId, isShowverse]);
+
+  return state;
+}

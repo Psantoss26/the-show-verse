@@ -58,6 +58,28 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
+import {
+  AdvancedFilterGroups,
+  AdvancedFiltersBadge,
+  AdvancedFiltersButton,
+  AdvancedFiltersPanel,
+} from "@/components/userLists/AdvancedFilters";
+import {
+  applyAdvancedFilters,
+  collectGenreOptions,
+  collectLanguageOptions,
+  createDefaultAdvancedFilters,
+  getAdvancedFilterNeeds,
+  getYearBounds,
+  listActiveAdvancedFilters,
+  readAdvancedFilters,
+  writeAdvancedFilters,
+} from "@/lib/userLists/advancedFilters";
+import { useCanonicalProviders } from "@/lib/userLists/canonicalProviders";
+import { translateGenre } from "@/lib/details/formatters";
+import { useTitleMetaMap } from "@/lib/tmdb/titleMetaBatch";
+import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
+import { readScoreCache } from "@/lib/userLists/listScoreCache";
 import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
@@ -70,6 +92,16 @@ const POSTER_CARD_SIZE = "w780";
 // ----------------------------
 // HELPERS
 // ----------------------------
+const IN_PROGRESS_ADVANCED_FILTERS_KEY = "showverse:inprogress:advancedFilters:v1";
+
+// Los géneros llegan por nombre y a veces en inglés («Sci-Fi & Fantasy»):
+// en español, para que el mismo género no salga dos veces.
+function getInProgressGenres(item) {
+  return (Array.isArray(item?.genres) ? item.genres : [])
+    .map((genre) => translateGenre(typeof genre === "string" ? genre : genre?.name))
+    .filter((genre) => typeof genre === "string" && genre);
+}
+
 function formatLastWatched(iso) {
   if (!iso) return "Desconocido";
   const d = new Date(iso);
@@ -1322,6 +1354,19 @@ export default function InProgressClient({
   const [q, setQ] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Filtros avanzados (notas, año, géneros, plataformas): panel lateral en
+  // escritorio, dentro de la hoja de filtros en móvil. Todo son series ya
+  // empezadas, así que no hay selector de visto. Los mismos para En progreso y
+  // Completadas.
+  const [advancedFilters, setAdvancedFiltersState] = useState(() =>
+    readAdvancedFilters(IN_PROGRESS_ADVANCED_FILTERS_KEY),
+  );
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const setAdvancedFilters = useCallback((next) => {
+    setAdvancedFiltersState(next);
+    writeAdvancedFilters(IN_PROGRESS_ADVANCED_FILTERS_KEY, next);
+  }, []);
+  const advancedNeeds = getAdvancedFilterNeeds(advancedFilters);
   const filtersRef = useRef(null);
   const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
   const [uiReady, setUiReady] = useState(false);
@@ -1735,6 +1780,87 @@ export default function InProgressClient({
     [activeTab],
   );
 
+  // Datos de los filtros avanzados: año, nota TMDb y géneros (por nombre)
+  // llegan con cada serie; IMDb y plataformas se piden solo si se filtra por
+  // ellas.
+  const advancedTitleKeys = useMemo(
+    () => currentItems.map((item) => (item?.tmdbId ? `tv:${item.tmdbId}` : null)),
+    [currentItems],
+  );
+  const advancedScoreItems = useMemo(
+    () =>
+      currentItems
+        .filter((item) => item?.tmdbId)
+        .map((item) => ({ id: Number(item.tmdbId), media_type: "tv" })),
+    [currentItems],
+  );
+  const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
+  useImdbScoreLoader({
+    items: advancedScoreItems,
+    enabled: advancedNeeds.imdb,
+    frozen: false,
+    setImdbScores,
+    setLoading: () => {},
+  });
+  const { providersByKey, loading: loadingProviders } = useCanonicalProviders(
+    advancedTitleKeys,
+    { enabled: advancedNeeds.providers },
+  );
+  // Idioma, duración y votos salen de la ficha (title-meta por lotes): al
+  // abrir los filtros (para ofrecer los idiomas) o con alguno activo.
+  const { metaByKey: titleMetaByKey, pending: titleMetaPending } = useTitleMetaMap(
+    advancedTitleKeys,
+    {
+      enabled:
+        advancedFiltersOpen ||
+        mobileFiltersOpen ||
+        advancedNeeds.titleMeta ||
+        advancedNeeds.languages ||
+        advancedNeeds.votes,
+    },
+  );
+  const advancedLanguageOptions = useMemo(
+    () =>
+      collectLanguageOptions(
+        currentItems,
+        (item) => titleMetaByKey.get(`tv:${item?.tmdbId}`)?.originalLanguage,
+      ),
+    [currentItems, titleMetaByKey],
+  );
+  const advancedYearBounds = useMemo(() => getYearBounds(currentItems), [currentItems]);
+  const advancedGenreOptions = useMemo(
+    () => collectGenreOptions(currentItems, getInProgressGenres),
+    [currentItems],
+  );
+  // Progreso y episodios que faltan no aplican en Completadas (todas al
+  // 100 %): ahí se ignoran aunque estén puestos desde En progreso.
+  const effectiveAdvancedFilters = useMemo(
+    () =>
+      activeTab === "completed"
+        ? { ...advancedFilters, progress: [0, 100], remaining: [] }
+        : advancedFilters,
+    [activeTab, advancedFilters],
+  );
+  const activeAdvancedFilters = useMemo(
+    () =>
+      listActiveAdvancedFilters(effectiveAdvancedFilters, {
+        yearBounds: advancedYearBounds,
+      }),
+    [effectiveAdvancedFilters, advancedYearBounds],
+  );
+  // Lo que comparten el panel lateral y la hoja móvil.
+  const advancedGroupProps = {
+    yearBounds: advancedYearBounds,
+    genreOptions: advancedGenreOptions,
+    languageOptions: advancedLanguageOptions,
+    showWatched: false,
+    showLastWatched: true,
+    showProgress: activeTab !== "completed",
+    showRemaining: activeTab !== "completed",
+    loadingProviders: advancedNeeds.providers && loadingProviders,
+    loadingTitleMeta: titleMetaPending,
+  };
+
   // Filter + Sort. La búsqueda mira también el nombre en inglés y en español.
   const titleNamesVersion = useTitleNameSearch(currentItems, q);
   const filtered = useMemo(() => {
@@ -1747,6 +1873,26 @@ export default function InProgressClient({
         return titleMatchesQuery(x, query);
       });
     }
+
+    list = applyAdvancedFilters(list, effectiveAdvancedFilters, {
+      getMediaType: () => "tv",
+      yearBounds: advancedYearBounds,
+      getGenres: getInProgressGenres,
+      getUserRating: (item) => item?.user_rating ?? item?.rating,
+      getImdbRating: (item) => imdbScores.get(`tv:${item?.tmdbId}`),
+      getProviders: (item) => providersByKey.get(`tv:${item?.tmdbId}`),
+      getSeriesStatus: (item) =>
+        item?.tmdb_status || titleMetaByKey.get(`tv:${item?.tmdbId}`)?.status,
+      getRuntime: (item) => titleMetaByKey.get(`tv:${item?.tmdbId}`)?.runtime,
+      getOriginalLanguage: (item) =>
+        item?.original_language ||
+        titleMetaByKey.get(`tv:${item?.tmdbId}`)?.originalLanguage,
+      getVoteCount: (item) =>
+        item?.vote_count ?? titleMetaByKey.get(`tv:${item?.tmdbId}`)?.voteCount,
+      getLastWatchedAt: (item) => item?.lastWatchedAt,
+      getProgress: (item) => getProgressPct(item),
+      getRemaining: (item) => getEpisodeProgress(item).remaining,
+    });
 
     // Sort
     switch (sortBy) {
@@ -1796,7 +1942,17 @@ export default function InProgressClient({
     return list;
     // titleNamesVersion: recalcular al llegar los nombres en inglés y español.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentItems, q, sortBy, titleNamesVersion]);
+  }, [
+    currentItems,
+    q,
+    sortBy,
+    titleNamesVersion,
+    effectiveAdvancedFilters,
+    advancedYearBounds,
+    imdbScores,
+    providersByKey,
+    titleMetaByKey,
+  ]);
 
   const allSortLabels = {
     recent: "Recientes",
@@ -2212,13 +2368,22 @@ export default function InProgressClient({
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+              aria-label="Filtros y vista"
+              className={`relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                 mobileFiltersOpen
                   ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                   : "text-zinc-200 hover:bg-black/30"
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
+              {activeAdvancedFilters.length ? (
+                <span className="absolute -right-1 -top-1">
+                  <AdvancedFiltersBadge
+                    count={activeAdvancedFilters.length}
+                    accent="emerald"
+                  />
+                </span>
+              ) : null}
             </button>
           </div>
 
@@ -2227,6 +2392,13 @@ export default function InProgressClient({
             onClose={() => setMobileFiltersOpen(false)}
             accent="emerald"
           >
+            <AdvancedFilterGroups
+              filters={advancedFilters}
+              onChange={setAdvancedFilters}
+              accent="emerald"
+              {...advancedGroupProps}
+              showReset={activeAdvancedFilters.length > 0}
+            />
             <InlineDropdown
               label="Ordenar"
               valueLabel={sortLabels[sortBy]}
@@ -2286,6 +2458,16 @@ export default function InProgressClient({
               <ImageModeSheetGroup value={posterImageMode} onChange={setPosterImageMode} />
             )}
           </MobileOptionsSheet>
+          <AdvancedFiltersPanel
+            open={advancedFiltersOpen}
+            onClose={() => setAdvancedFiltersOpen(false)}
+            accent="emerald"
+            activeFilters={activeAdvancedFilters}
+            resultCount={contentPending ? null : filtered.length}
+            filters={advancedFilters}
+            onChange={setAdvancedFilters}
+            {...advancedGroupProps}
+          />
           </div>
 
           {/* Desktop: Single row */}
@@ -2355,6 +2537,12 @@ export default function InProgressClient({
               )}
             </InlineDropdown>
 
+            <AdvancedFiltersButton
+              open={advancedFiltersOpen}
+              onClick={() => setAdvancedFiltersOpen(true)}
+              count={activeAdvancedFilters.length}
+              accent="emerald"
+            />
 
             {/* View mode */}
             <div className="flex gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
@@ -2417,7 +2605,7 @@ export default function InProgressClient({
               )}
             </div>
             <h3 className="text-lg font-bold text-zinc-400 mb-2">
-              {q
+              {q || activeAdvancedFilters.length
                 ? "Sin resultados"
                 : activeTab === "completed"
                   ? "No tienes series completadas"
@@ -2426,10 +2614,20 @@ export default function InProgressClient({
             <p className="text-sm text-zinc-600 max-w-sm">
               {q
                 ? `No se encontraron series que coincidan con "${q}"`
-                : activeTab === "completed"
-                  ? "Completa una serie en Trakt para verla aquí."
-                  : "Empieza a ver una serie y márcala en Trakt para verla aquí."}
+                : activeAdvancedFilters.length
+                  ? "Ninguna serie cumple los filtros avanzados."
+                  : activeTab === "completed"
+                    ? "Completa una serie en Trakt para verla aquí."
+                    : "Empieza a ver una serie y márcala en Trakt para verla aquí."}
             </p>
+            {activeAdvancedFilters.length > 0 && (
+              <button
+                onClick={() => setAdvancedFilters(createDefaultAdvancedFilters())}
+                className="mt-4 text-emerald-500 text-sm font-bold hover:underline"
+              >
+                Quitar filtros avanzados
+              </button>
+            )}
           </motion.div>
         )}
 

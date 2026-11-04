@@ -4,7 +4,7 @@
 // que montan a la vez se agrupan en POSTs de hasta MAX_PER_REQUEST títulos,
 // como el arte (artworkBatch). Solo se recuerda lo que llega bien.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { titleMetaKey } from "./titleMeta.js";
 
@@ -82,4 +82,60 @@ export function useTitleMeta(mediaType, id, { enabled = true } = {}) {
   }, [key]);
 
   return { meta: current || null, pending: Boolean(key) && current === undefined };
+}
+
+/**
+ * Metadatos de MUCHOS títulos (filtros avanzados de Historial): Map
+ * "movie:603" -> meta, que crece según llegan los lotes. Con `enabled: false`
+ * no pide nada (lo ya resuelto en esta visita sí se devuelve). `pending`:
+ * quedan títulos por llegar.
+ */
+export function useTitleMetaMap(keys, { enabled = true } = {}) {
+  const signature = useMemo(
+    () => [...new Set((keys || []).filter(Boolean))].sort().join(","),
+    [keys],
+  );
+  const [version, setVersion] = useState(0);
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !signature) return undefined;
+    const missing = signature.split(",").filter((key) => !resolved.has(key));
+    if (!missing.length) {
+      setPending(false);
+      return undefined;
+    }
+    let alive = true;
+    setPending(true);
+    // Se repinta como mucho una vez por fotograma aunque lleguen varios lotes.
+    let frame = 0;
+    const bump = () => {
+      if (!alive || frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (alive) setVersion((v) => v + 1);
+      });
+    };
+    Promise.all(missing.map((key) => requestKey(key).then(bump))).then(() => {
+      if (alive) setPending(false);
+    });
+    return () => {
+      alive = false;
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [enabled, signature]);
+
+  const map = useMemo(() => {
+    const out = new Map();
+    if (!signature) return out;
+    for (const key of signature.split(",")) {
+      const meta = resolved.get(key);
+      if (meta) out.set(key, meta);
+    }
+    return out;
+    // version: se recalcula al llegar cada lote.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature, version]);
+
+  return { metaByKey: map, pending };
 }
