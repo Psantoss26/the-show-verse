@@ -82,7 +82,6 @@ import {
 } from "@/lib/plex/client";
 import DetailOpenSettings from "@/components/settings/DetailOpenSettings";
 import { isSoundtrackAutoplayOn, withSoundtrackAutoplay } from "@/lib/soundtrack/autoplayPreference";
-import PerformanceModeSetting from "@/components/settings/PerformanceModeSetting";
 
 const GLASS_SURFACE =
   "relative overflow-hidden border border-white/[0.08] bg-black/40 shadow-2xl shadow-black/40 backdrop-blur-xl before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-br before:from-white/[0.08] before:via-white/[0.02] before:to-transparent";
@@ -2517,7 +2516,6 @@ function ProfileSettingsClient() {
                     t={t}
                     onChange={(uiSettings) => updatePreference({ uiSettings })}
                   />
-                  <PerformanceModeSetting panelClassName={GLASS_PANEL} t={t} />
                   <div className="space-y-4">
                     <ToggleRow
                       icon={Eye}

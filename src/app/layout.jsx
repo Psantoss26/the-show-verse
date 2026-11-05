@@ -7,8 +7,6 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_TITLE_SHORT } from "@/lib/pageTitle";
 import PwaManager from "@/components/PwaManager";
-import PerformanceModeManager from "@/components/PerformanceModeManager";
-import { PERF_BOOT_SCRIPT } from "@/lib/ui/performanceMode";
 import InAppNotifications from "@/components/notifications/InAppNotifications";
 import AndroidSessionClaim from "@/components/android/AndroidSessionClaim";
 import OfflineManager from "@/components/OfflineManager";
@@ -62,6 +60,11 @@ export const viewport = {
   viewportFit: "cover",
 };
 
+// El antiguo modo ligero (`sv-perf-mode`, `sv-perf-probe-v1`) ya no existe:
+// todos los dispositivos van con la calidad completa.
+const LEGACY_PERF_CLEANUP_SCRIPT =
+  'try{localStorage.removeItem("sv-perf-mode");localStorage.removeItem("sv-perf-probe-v1")}catch(e){}';
+
 const ANDROID_APP_BOOT_SCRIPT =
   'if(navigator.userAgent.indexOf("TheShowVerseApp/")!==-1){var d=document.documentElement;d.setAttribute("data-android-app","");try{var b=window.TSVAndroidBridge,h=b&&b.statusBarHeight&&b.statusBarHeight(),n=b&&b.navigationBarHeight&&b.navigationBarHeight();if(h>0)d.style.setProperty("--sv-android-top",h+"px");if(n>0)d.style.setProperty("--sv-android-bottom",n+"px")}catch(e){}}';
 
@@ -94,12 +97,12 @@ export default function RootLayout({ children, overlay }) {
           id="android-app-boot"
           dangerouslySetInnerHTML={{ __html: ANDROID_APP_BOOT_SCRIPT }}
         />
-        {/* Modo ligero (`data-sv-lite`, sin cristal) en los dispositivos que
-            lo tienen elegido o ya han demostrado ir a tirones, antes del
-            primer pintado (ver src/lib/ui/performanceMode.js). */}
+        {/* Limpieza del antiguo modo ligero (retirado en noviembre de 2026):
+            borra lo que guardó en este dispositivo. Se puede quitar cuando
+            ya no queden navegadores con esas claves. */}
         <script
-          id="perf-mode-boot"
-          dangerouslySetInnerHTML={{ __html: PERF_BOOT_SCRIPT }}
+          id="perf-mode-cleanup"
+          dangerouslySetInnerHTML={{ __html: LEGACY_PERF_CLEANUP_SCRIPT }}
         />
       </head>
       <body
@@ -147,7 +150,6 @@ export default function RootLayout({ children, overlay }) {
             </MobileUserPageSwipeNavigation>
             <OutsideEmbed>
               <PwaManager />
-              <PerformanceModeManager />
               {/* Vista previa al mantener pulsada una tarjeta (móvil). */}
               <MobileTitlePeek />
               <InAppNotifications />
