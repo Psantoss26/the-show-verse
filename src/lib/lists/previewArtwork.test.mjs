@@ -133,8 +133,8 @@ test("grid replica las tarjetas de DetailsClient y lista muestra cinco posters c
     listsPage.indexOf("function ListPreviewPosterStrip"),
     listsPage.indexOf("function Dropdown"),
   );
-  // El colage de backdrops sigue cubierto para el perfil; la cuadrícula de
-  // /lists se valida aparte como pila de pósteres.
+  // La cuadrícula de /lists y la sección Listas del Perfil comparten la
+  // tarjeta de pila de pósteres.
   const profileSection = readFileSync(
     new URL("../../app/u/[username]/ProfileSection.jsx", import.meta.url),
     "utf8",
@@ -157,19 +157,29 @@ test("grid replica las tarjetas de DetailsClient y lista muestra cinco posters c
   // Portada elegida o más votada y, sin ellas, la de la vista previa.
   assert.match(posterStrip, /listItemPosterPath\(item\)/);
   assert.match(listsPage, /getOwnCardPoster\(mediaType, item\?\.id\) \|\|\s*item\?\._listPreviewPoster/);
-  assert.match(posterStrip, /object-contain/);
+  assert.match(posterStrip, /object-cover/);
   assert.match(listMode, /<ListPreviewPosterStrip/);
 
-  assert.match(gridMode, /<PosterStack[\s\S]*posters={previewPosters}/);
-  assert.match(gridMode, /preventNavigation={false}/);
-  assert.match(gridMode, /LIQUID_GLASS_CARD/);
-  assert.match(gridMode, /<LiquidGlassOpticalLayers/);
-  assert.match(gridMode, /rounded-3xl/);
-  assert.match(gridMode, /h-52/);
-  assert.doesNotMatch(gridMode, /<ListCoverBackdropCollage/);
+  // La tarjeta de la cuadrícula es compartida (ListShowcaseCard) con la
+  // sección Listas del Perfil.
+  const showcaseCard = readFileSync(
+    new URL("../../components/lists/ListShowcaseCard.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(gridMode, /<ListShowcaseCard/);
+  assert.match(gridMode, /posters={previewPosters}/);
+  assert.match(showcaseCard, /<PosterStack[\s\S]*preventNavigation={false}/);
+  assert.match(showcaseCard, /<PosterRow/);
+  assert.match(showcaseCard, /LIQUID_GLASS_CARD/);
+  assert.match(showcaseCard, /<LiquidGlassOpticalLayers/);
+  assert.match(showcaseCard, /rounded-3xl/);
+  assert.match(showcaseCard, /h-52/);
+  assert.doesNotMatch(showcaseCard, /<ListCoverBackdropCollage/);
   assert.match(
     listsPage,
     /grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4/,
   );
-  assert.match(profileSection, /<ListCoverBackdropCollage/);
+  assert.match(profileSection, /<ListShowcaseCard/);
+  assert.match(profileSection, /breakpoint="detail-page"/);
+  assert.doesNotMatch(profileSection, /<ListCoverBackdropCollage/);
 });

@@ -8,6 +8,8 @@ export default function PosterStack({
     posters = [],
     alt = "Poster",
     preventNavigation = true,
+    // false: pila fija, sin abanico al pasar el ratón (sección Listas del Perfil).
+    interactive = true,
 }) {
     const [hovered, setHovered] = useState(null)
 
@@ -47,9 +49,9 @@ export default function PosterStack({
                             transformOrigin: 'bottom center',
                             bottom: isHover ? 4 : 0,
                         }}
-                        onMouseEnter={() => setHovered(idx)}
+                        onMouseEnter={interactive ? () => setHovered(idx) : undefined}
                         onClick={(e) => {
-                            if (!preventNavigation) return
+                            if (!preventNavigation || !interactive) return
                             e.preventDefault()
                             setHovered(h => (h === idx ? null : idx))
                         }}

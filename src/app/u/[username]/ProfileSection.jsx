@@ -31,13 +31,15 @@ import {
   ThumbsUp,
   UserPlus,
   X,
+  ListVideo,
 } from "lucide-react";
-import ListCoverBackdropCollage from "@/components/lists/ListCoverBackdropCollage";
+import ListShowcaseCard, { listShowcasePosterUrls } from "@/components/lists/ListShowcaseCard";
+import { requestListArtwork } from "@/lib/tmdb/artworkBatch";
+import { useOwnCardPostersVersion } from "@/lib/hooks/useOwnCardPoster";
 import { getListDetails } from "@/lib/api/backendLists";
 import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
 import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
 import { hasActivityBackdropArtwork, isPortraitActivity, isUserActivity } from "@/lib/profile/activityBackdrops";
-import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import MemberRow from "@/components/social/MemberRow";
 import PosterTile from "@/components/social/PosterTile";
 import Stars from "@/components/social/Stars";
@@ -1132,18 +1134,17 @@ function ReviewCard({ item }) {
 }
 
 // ===================== SECCIÓN LISTAS: TARJETA DE PORTADA =====================
-// La MISMA tarjeta que la vista de cuadrícula de /lists: colage de hasta cuatro
-// backdrops, píldora con el nº de títulos y, debajo, nombre y descripción. El
-// colage se comparte de verdad (`ListCoverBackdropCollage`), no se reimplementa.
+// La MISMA tarjeta que la vista «Cuadrícula» de /lists (`ListShowcaseCard`):
+// pósters en abanico con hover en escritorio, fila compacta de cinco pósters en
+// móvil, nombre, descripción y pie con el dueño y el nº de títulos.
 //
 // La API del perfil entrega cada lista con nombre, descripción y nº de títulos,
-// pero SIN los títulos que la componen y sin backdrops. Hacen falta las dos
-// cosas: los items se piden por lista con el mismo endpoint que usa /lists
-// (`GET /lists/:id`, que sirve también las listas públicas de otro usuario) y su
-// artwork se resuelve con `enrichListPreviewArtwork`, porque el backend guarda
-// el póster de cada item pero no su backdrop. Ambas cosas ocurren solo cuando la
-// tarjeta se acerca a la pantalla, y quedan cacheadas para que volver a la
-// sección no repita ninguna petición.
+// pero SIN los títulos que la componen. Los items se piden por lista con el
+// mismo endpoint que usa /lists (`GET /lists/:id`, que sirve también las listas
+// públicas de otro usuario) y sus pósters se eligen con la escalera de idioma
+// por el lote de /api/tmdb/artwork (`requestListArtwork`), igual que en /lists.
+// Ocurre solo cuando la tarjeta se acerca a la pantalla y queda cacheado para
+// que volver a la sección no repita ninguna petición.
 const profileListItemsCache = new Map();
 
 function useInViewOnce(rootMargin = "320px 0px") {
@@ -1189,11 +1190,11 @@ function useProfileListPreview(listId) {
     setItems(null);
     getListDetails({ listId: key })
       .then((detail) =>
-        // Cuatro backdrops es lo que pinta el colage; pedir más artwork sería
+        // Cinco pósters es lo que pinta la tarjeta; pedir más artwork sería
         // gastar peticiones en imágenes que no se ven.
         enrichListPreviewArtwork(
           Array.isArray(detail?.items) ? detail.items : [],
-          { resolveImages: fetchTmdbImages, limit: 4 },
+          { resolvePicks: requestListArtwork, limit: 5 },
         ),
       )
       .then((next) => {
@@ -1202,8 +1203,8 @@ function useProfileListPreview(listId) {
       })
       .catch(() => {
         // Una lista que el visitante no puede abrir (privada, borrada) no debe
-        // dejar la portada girando para siempre: se resuelve vacía y el colage
-        // enseña su marcador.
+        // dejar la portada latiendo para siempre: se resuelve vacía y la
+        // tarjeta enseña su marcador.
         profileListItemsCache.set(key, []);
         if (alive) setItems([]);
       });
@@ -1216,42 +1217,32 @@ function useProfileListPreview(listId) {
   return [ref, items];
 }
 
-function ProfileListCard({ item }) {
+function ProfileListCard({ item, actor }) {
   const [ref, previewItems] = useProfileListPreview(item.id);
+  // Elección propia o más votada de cada título: al cambiar, se recalcula.
+  useOwnCardPostersVersion();
   const loading = previewItems === null;
-  const total = Number(item?.itemCount ?? item?.item_count ?? 0);
+  const posters = listShowcasePosterUrls(previewItems || []);
+  const ownerLabel = actor?.displayName || actor?.username || "";
 
   return (
-    <div ref={ref} className="h-full">
-      <Link href={`/lists/${item.id}`} className="group block h-full">
-        <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/5 bg-zinc-900/40 transition-all @[768px]/detail-page:hover:border-white/10 @[768px]/detail-page:hover:bg-zinc-900/60">
-          <div className="relative aspect-video w-full overflow-hidden bg-zinc-950 transition-opacity @[768px]/detail-page:group-hover:opacity-90">
-            {loading ? (
-              <div className="h-full w-full animate-pulse bg-zinc-900/40" />
-            ) : (
-              <ListCoverBackdropCollage items={previewItems} alt={item.name} />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-60" />
-
-            <div className="absolute bottom-3 right-3 flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">
-              <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-              {total} items
-            </div>
-          </div>
-
-          <div className="flex flex-1 flex-col p-4">
-            <h3 className="line-clamp-1 text-lg font-bold leading-tight text-white transition-colors @[768px]/detail-page:group-hover:text-purple-400">
-              {item.name}
-            </h3>
-            <p className="mt-1 line-clamp-2 flex-1 text-sm leading-relaxed text-zinc-400">
-              {item.description || (
-                <span className="italic opacity-50">Sin descripción</span>
-              )}
-            </p>
-          </div>
-        </div>
-      </Link>
-    </div>
+    <ListShowcaseCard
+      cardRef={ref}
+      href={`/lists/${item.id}`}
+      source="profile"
+      name={item.name || "Lista"}
+      description={item.description}
+      posters={posters}
+      loading={loading}
+      pending={loading}
+      itemCount={Number(item?.itemCount ?? item?.item_count ?? 0)}
+      likes={Number(item?.likes || 0)}
+      ownerLabel={ownerLabel}
+      ownerAvatar={actor?.avatarUrl || null}
+      ownerIcon={ownerLabel ? null : ListVideo}
+      breakpoint="detail-page"
+      hoverEffects={false}
+    />
   );
 }
 
@@ -2275,10 +2266,10 @@ function ProfileContentSection({ username, section, actor }) {
                   breakpoints la tarjeta sale EXACTAMENTE del mismo tamaño en las
                   dos páginas, con cuatro por fila a partir de `xl`. */}
               {config.layout === "lists" ? (
-                <div className="grid grid-cols-1 gap-6 @[640px]/detail-page:grid-cols-2 @[1024px]/detail-page:grid-cols-3 @[1280px]/detail-page:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 @[640px]/detail-page:grid-cols-2 @[640px]/detail-page:gap-6 @[1024px]/detail-page:grid-cols-3 @[1280px]/detail-page:grid-cols-4">
                   {group.items.map((item, index) => (
                     <ProfileEntrance key={item.id} index={index} total={group.items.length} animateWithin={entranceCount}>
-                      <ProfileListCard item={item} />
+                      <ProfileListCard item={item} actor={actor} />
                     </ProfileEntrance>
                   ))}
                 </div>

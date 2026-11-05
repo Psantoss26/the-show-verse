@@ -38,21 +38,17 @@ import {
 } from "@/lib/lists/collectionLikesCache";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
-import Avatar from "@/components/ui/Avatar";
-import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import PosterStack from "@/components/details/PosterStack";
 import {
   titleStateKey,
   useViewerTitleStates,
 } from "@/components/social/useViewerTitleStates";
-import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { resolveListItemIndicator } from "@/lib/lists/listItemHoverIndicator";
 import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import { requestListArtwork } from "@/lib/tmdb/artworkBatch";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import { prefetchListDetails } from "@/lib/lists/detailsPrefetch";
-import { stripHtml } from "@/lib/details/formatters";
 
 import {
   Loader2,
@@ -87,6 +83,7 @@ import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
 import ListPosterCard from "@/components/lists/ListPosterCard";
 import ListCountPills from "@/components/lists/ListCountPills";
+import ListShowcaseCard from "@/components/lists/ListShowcaseCard";
 import FlipReorder from "@/components/ui/FlipReorder";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
@@ -1565,52 +1562,6 @@ function ListEntrance({ index = 0, className = "", instant = false, flipKey, chi
   );
 }
 
-// Pósters de la tarjeta en MÓVIL: en fila, todos del mismo tamaño y sin girar
-// (el abanico de PosterStack ocupa el doble de alto), sin marco alrededor de
-// cada póster. Cinco huecos fijos: la fila mide lo mismo tenga la lista los
-// títulos que tenga.
-const ROW_POSTER_SLOTS = 5;
-
-function PosterRow({ posters, loading, pulse, alt }) {
-  if (loading) {
-    return (
-      <div className="flex justify-center gap-1.5">
-        {Array.from({ length: ROW_POSTER_SLOTS }, (_, index) => (
-          <div
-            key={index}
-            className={`aspect-[2/3] w-[calc((100%-4*0.375rem)/5)] rounded-lg bg-white/[0.06] ${pulse ? "animate-pulse" : ""}`}
-          />
-        ))}
-      </div>
-    );
-  }
-  if (!posters.length) {
-    return (
-      <div className="flex aspect-[5/1.6] items-center justify-center opacity-10">
-        <ListVideo className="h-12 w-12" />
-      </div>
-    );
-  }
-  return (
-    <div className="flex justify-center gap-1.5">
-      {posters.slice(0, ROW_POSTER_SLOTS).map((src, index) => (
-        <div
-          key={`${src}-${index}`}
-          className="relative aspect-[2/3] w-[calc((100%-4*0.375rem)/5)] overflow-hidden rounded-lg"
-        >
-          {/* Solo la imagen: sin marco, fondo ni sombra que dibujen un borde. */}
-          <OptimizedImage
-            src={src}
-            alt={`${alt}: título ${index + 1}`}
-            loading="lazy"
-            className="block h-full w-full object-cover"
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 const GridListCard = memo(function GridListCard({
   list,
   itemsState,
@@ -1623,7 +1574,6 @@ const GridListCard = memo(function GridListCard({
     if (inView) ensureListItems(cacheKey);
   }, [inView, ensureListItems, cacheKey]);
 
-  const isLoading = itemsState == null;
   // El hueco solo late mientras la petición está EN CURSO (`null`), no mientras
   // aún no se ha pedido (`undefined`, la tarjeta lejos de la pantalla; se pide
   // 320px antes de entrar, así que a la vista ya late). Con todas latiendo, en
@@ -1631,22 +1581,11 @@ const GridListCard = memo(function GridListCard({
   // compositor, pero en cuanto el hilo principal anima algo (el desplegable del
   // menú móvil, que anima la altura) cada fotograma recalculaba el estilo de
   // todos ellos: 57-75 ms por fotograma con CPU x4, frente a 14-18 en Comunidad.
-  const isPending = itemsState === null;
   const items = Array.isArray(itemsState) ? itemsState : [];
   // Elección propia o más votada de cada título: al cambiar, se recalcula.
   useOwnCardPostersVersion();
   const previewPosters = getPosterStackUrls(items);
-  const description = stripHtml(list?.description);
-  const itemCount = Number(list?.item_count || 0);
-  const likes = Number(list?.likes || 0);
   const username = list?.user?.username || list?.user?.name || null;
-  const avatar = list?.user?.images?.avatar?.full || null;
-  const SourceIcon =
-    list?.source === "collections"
-      ? Layers
-      : list?.source === "trakt"
-        ? Users
-        : ListVideo;
   const sourceLabel =
     list?.source === "collections"
       ? "Colección TMDb"
@@ -1655,81 +1594,24 @@ const GridListCard = memo(function GridListCard({
         : "Mi lista";
 
   return (
-    <div ref={ref} className="group/card relative h-full">
-      <ListNavWrapper
-        list={list}
-        className="group block h-full rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-400"
-      >
-        <article
-          data-list-showcase-card={list?.source || "unknown"}
-          className={`relative isolate flex h-full flex-col overflow-hidden rounded-3xl transform-gpu transition-all duration-500 ${LIQUID_GLASS_CARD} hover:brightness-110 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(168,85,247,0.92)]`}
-        >
-          <LiquidGlassOpticalLayers />
-
-          {/* Móvil: fila compacta. */}
-          <div className="relative z-10 w-full bg-gradient-to-b from-white/5 to-transparent px-3 pb-2 pt-3 sm:hidden">
-            <PosterRow posters={previewPosters} loading={isLoading} pulse={isPending} alt={list?.name || "Lista"} />
-          </div>
-
-          <div className="relative z-10 hidden h-52 w-full overflow-visible bg-gradient-to-b from-white/5 to-transparent p-6 sm:block">
-            {isLoading ? (
-              <div className="flex h-full w-full items-center justify-center">
-                <div
-                  className={`h-40 w-56 rounded-2xl bg-white/[0.06] ${isPending ? "animate-pulse" : ""}`}
-                />
-              </div>
-            ) : previewPosters.length > 0 ? (
-              <div className="flex h-full w-full items-center justify-center overflow-visible">
-                <PosterStack
-                  posters={previewPosters}
-                  alt={list?.name || "Lista"}
-                  preventNavigation={false}
-                />
-              </div>
-            ) : (
-              <div className="flex h-full items-center justify-center opacity-10">
-                <ListVideo className="h-20 w-20" />
-              </div>
-            )}
-          </div>
-
-          <div className="relative z-10 flex flex-1 flex-col justify-between bg-black/25 px-4 pb-3 pt-3 sm:p-5">
-            <div>
-              <h3 className="line-clamp-1 text-base font-bold leading-tight text-white transition-colors group-hover:text-indigo-400 sm:text-lg">
-                {list?.name || "Lista"}
-              </h3>
-              {description && (
-                <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-zinc-400 sm:mt-2 sm:line-clamp-2">
-                  {description}
-                </p>
-              )}
-            </div>
-
-            {/* `@container`: en tarjetas estrechas (rejilla de 4 columnas) las
-                píldoras de items y me gusta no dejan sitio al nombre, que se
-                quedaba en «T…»; entonces solo va el avatar (nombre en `title`). */}
-            <footer className="@container mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-3 sm:mt-4 sm:pt-4">
-              <div className="flex min-w-0 items-center gap-2" title={sourceLabel}>
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[10px] font-black text-white ring-1 ring-white/20">
-                  {list?.source === "trakt" ? (
-                    <Avatar src={avatar} name={sourceLabel} />
-                  ) : (
-                    <SourceIcon aria-hidden="true" className="h-3.5 w-3.5" />
-                  )}
-                </span>
-                <span className="hidden max-w-[120px] truncate text-xs font-medium text-zinc-300 transition-colors group-hover:text-white @[17.5rem]:inline">
-                  {sourceLabel}
-                </span>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2">
-                <ListCountPills itemCount={itemCount} likes={likes} />
-              </div>
-            </footer>
-          </div>
-        </article>
-      </ListNavWrapper>
-    </div>
+    <ListShowcaseCard
+      cardRef={ref}
+      href={list?.internalUrl || null}
+      externalHref={list?.externalUrl || null}
+      source={list?.source || "unknown"}
+      name={list?.name || "Lista"}
+      description={list?.description}
+      posters={previewPosters}
+      loading={itemsState == null}
+      pending={itemsState === null}
+      itemCount={Number(list?.item_count || 0)}
+      likes={Number(list?.likes || 0)}
+      ownerLabel={sourceLabel}
+      ownerAvatar={list?.user?.images?.avatar?.full || null}
+      ownerIcon={
+        list?.source === "collections" ? Layers : list?.source === "trakt" ? null : ListVideo
+      }
+    />
   );
 });
 
