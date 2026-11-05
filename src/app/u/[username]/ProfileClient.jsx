@@ -2,7 +2,7 @@
 
 import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
@@ -67,26 +67,42 @@ import {
 const ChartLoading = ({ className = "h-[280px]" }) => (
   <div className={`${className} w-full animate-pulse rounded-2xl bg-white/[0.035]`} />
 );
-const MonthlyActivityChart = dynamic(
+// Mientras la cabecera hace su morph (entrar o salir de Neuronal), las gráficas
+// no se montan: llega su módulo (recharts) a mitad del viaje y montar las seis
+// de golpe bloqueaba ~250 ms el hilo principal, con la cabecera congelada a
+// medio camino. Durante el morph se pinta su hueco y se adelanta el módulo; al
+// terminar se montan.
+const DeferChartsContext = createContext(false);
+function deferrableChart(Chart, loadingClassName) {
+  function DeferrableChart(props) {
+    const defer = useContext(DeferChartsContext);
+    useEffect(() => {
+      if (defer) loadProfileCharts().catch(() => {});
+    }, [defer]);
+    return defer ? <ChartLoading className={loadingClassName} /> : <Chart {...props} />;
+  }
+  return DeferrableChart;
+}
+const MonthlyActivityChart = deferrableChart(dynamic(
   () => loadProfileCharts().then((module) => module.MonthlyActivityChart),
   { ssr: false, loading: () => <ChartLoading /> },
-);
-const TimeDistributionChart = dynamic(
+));
+const TimeDistributionChart = deferrableChart(dynamic(
   () => loadProfileCharts().then((module) => module.TimeDistributionChart),
   { ssr: false, loading: () => <ChartLoading className="h-[250px]" /> },
-);
-const HourOfDayChart = dynamic(
+), "h-[250px]");
+const HourOfDayChart = deferrableChart(dynamic(
   () => loadProfileCharts().then((module) => module.HourOfDayChart),
   { ssr: false, loading: () => <ChartLoading /> },
-);
-const DayOfWeekChart = dynamic(
+));
+const DayOfWeekChart = deferrableChart(dynamic(
   () => loadProfileCharts().then((module) => module.DayOfWeekChart),
   { ssr: false, loading: () => <ChartLoading /> },
-);
-const GenreRadarChart = dynamic(
+));
+const GenreRadarChart = deferrableChart(dynamic(
   () => loadProfileCharts().then((module) => module.GenreRadarChart),
   { ssr: false, loading: () => <ChartLoading /> },
-);
+));
 // Vista neuronal: carga diferida (canvas, d3-force y su worker). Mientras se
 // descarga se muestra su esqueleto, con el mismo tamaño que el lienzo. El
 // código se precarga en reposo (ver `preloadNeuralView`), así que al abrir la
@@ -97,10 +113,10 @@ function preloadNeuralView(username) {
   loadNeuralView().catch(() => {});
   if (username) prefetchNeuralGraph(username);
 }
-const RatingsBarChart = dynamic(
+const RatingsBarChart = deferrableChart(dynamic(
   () => loadProfileCharts().then((module) => module.RatingsBarChart),
   { ssr: false, loading: () => <ChartLoading /> },
-);
+));
 
 // Conserva la última ficha durante la vida de la pestaña. Al volver desde una
 // ficha de título el perfil se pinta de inmediato y se refresca en segundo
@@ -846,6 +862,15 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   // Cualquier cambio de la cabecera (botón o cambio de pestaña) se anima como
   // un morph entre las dos cabeceras (ver `morphProfileHeader`). En efecto de
   // layout: el DOM ya está en el estado final y se anima ANTES de pintarlo.
+  // `headerMorphing`: verdadero desde el render que cambia la cabecera hasta
+  // que acaba su morph (ver DeferChartsContext). Se marca en el propio render
+  // para que las gráficas no lleguen a montarse en ese primer commit.
+  const [morphedCompact, setMorphedCompact] = useState(compactHeader);
+  const [headerMorphing, setHeaderMorphing] = useState(false);
+  if (morphedCompact !== compactHeader) {
+    setMorphedCompact(compactHeader);
+    setHeaderMorphing(true);
+  }
   const previousCompactRef = useRef(compactHeader);
   const headerBoxRef = useRef(null);
   const compactLayerRef = useRef(null);
@@ -859,12 +884,15 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
     const box = headerBoxRef.current;
     const compactLayer = compactLayerRef.current;
     const fullLayer = fullLayerRef.current;
-    if (!box || !compactLayer || !fullLayer) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (!box || !compactLayer || !fullLayer || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setHeaderMorphing(false);
+      return;
+    }
     cancelHeaderMorphRef.current = morphProfileHeader({
       box,
       incoming: compactHeader ? compactLayer : fullLayer,
       outgoing: compactHeader ? fullLayer : compactLayer,
+      onFinish: () => setHeaderMorphing(false),
     });
   }, [compactHeader]);
   useEffect(() => () => cancelHeaderMorphRef.current?.(), []);
@@ -1291,7 +1319,9 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
             <ProGate feature="stats">
             {isSelf ? <RecapPromoBanner className="mb-6" /> : null}
             {resolvedAnalytics ? (
-              <ProfileAnalytics analytics={resolvedAnalytics} />
+              <DeferChartsContext.Provider value={headerMorphing}>
+                <ProfileAnalytics analytics={resolvedAnalytics} />
+              </DeferChartsContext.Provider>
             ) : (
               <section className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.02] px-6 text-center">
                 <Activity className="h-7 w-7 text-emerald-400/70" />

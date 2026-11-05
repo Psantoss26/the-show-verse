@@ -55,8 +55,9 @@ const IDENTITY = "translate(0px, 0px) scale(1)";
 
 // Anima el cambio. `incoming` es la cabecera que acaba de pasar a ocupar
 // sitio, `outgoing` la que ya está absoluta encima; el DOM ya refleja el estado
-// final. Devuelve una función que cancela la animación en curso.
-export function morphProfileHeader({ box, incoming, outgoing }) {
+// final. `onFinish` se llama solo si la animación termina sola (no al
+// cancelarla). Devuelve una función que cancela la animación en curso.
+export function morphProfileHeader({ box, incoming, outgoing, onFinish }) {
   const oldHeight = outgoing.offsetHeight;
   const newHeight = incoming.offsetHeight;
   const from = pieces(outgoing);
@@ -100,7 +101,10 @@ export function morphProfileHeader({ box, incoming, outgoing }) {
     done = true;
     box.style.overflow = "";
   };
-  animations[0].finished.then(finish, finish);
+  animations[0].finished.then(() => {
+    finish();
+    onFinish?.();
+  }, finish);
   return () => {
     for (const animation of animations) animation.cancel();
     finish();
