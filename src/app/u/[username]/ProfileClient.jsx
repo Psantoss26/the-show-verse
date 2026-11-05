@@ -41,6 +41,7 @@ import NeuralPreviewCard from "@/components/profile/neural/NeuralPreviewCard";
 import ProGate from "@/components/billing/ProGate";
 import PlanBadge from "@/components/billing/PlanBadge";
 import PageStatCard from "@/components/ui/PageStatCard";
+import { useSlidingSectionIndicator } from "@/components/ui/useSlidingSectionIndicator";
 import { getOwnCardPoster } from "@/lib/artworkApi";
 import { useOwnCardPostersVersion } from "@/lib/hooks/useOwnCardPoster";
 import {
@@ -1495,6 +1496,11 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   );
 }
 
+// Subrayado de la pestaña activa, dibujado en el ::after de la caja que mueve
+// useSlidingSectionIndicator (misma caja que la pestaña).
+const PROFILE_TAB_UNDERLINE =
+  "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-emerald-400 after:content-['']";
+
 // Barra de pestañas del perfil. "Perfil" = resumen; el resto muestra su conteo
 // y carga su sección bajo demanda.
 function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact = false }) {
@@ -1513,6 +1519,15 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
     { id: "lists", label: "Listas", count: sections?.lists },
     { id: "social", label: "Social" },
   ];
+  // El subrayado de la pestaña activa se desliza de una a otra, como el del
+  // menú Detalles · Producción · Sinopsis de la ficha. Vive dentro del nav con
+  // scroll horizontal (se mide por offsetLeft), así que acompaña al scroll.
+  const { ready: indicatorReady, indicator } = useSlidingSectionIndicator({
+    navRef,
+    activeKey: tab,
+    groupId: "profile-tabs",
+    className: PROFILE_TAB_UNDERLINE,
+  });
 
   useEffect(() => {
     const activeTab = navRef.current?.querySelector("[data-profile-tab-active='true']");
@@ -1534,10 +1549,11 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
       // Con la cabecera compacta, el margen superior se iguala al hueco de
       // encima para que la fila compacta quede centrada entre la barra de
       // navegación y las pestañas.
-      className={`flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain transition-[margin] duration-(--sv-header-morph-ms) ease-(--sv-header-morph-easing) [scrollbar-width:none] [-ms-overflow-style:none] motion-reduce:transition-none [&::-webkit-scrollbar]:hidden ${
+      className={`relative flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain transition-[margin] duration-(--sv-header-morph-ms) ease-(--sv-header-morph-easing) [scrollbar-width:none] [-ms-overflow-style:none] motion-reduce:transition-none [&::-webkit-scrollbar]:hidden ${
         compact ? "mt-1.5" : "mt-3 @[640px]/detail-page:mt-8"
       }`}
     >
+      {indicator}
       {items.map((it) => {
         const active = tab === it.id;
         const handleNavigate = (event) => {
@@ -1573,7 +1589,8 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
               : {})}
             data-offline-local-nav="true"
             data-profile-tab-active={active || undefined}
-            className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 @[640px]/detail-page:w-auto @[640px]/detail-page:justify-start @[640px]/detail-page:px-3.5 @[640px]/detail-page:text-xs @[640px]/detail-page:tracking-widest ${
+            data-section-key={it.id}
+            className={`relative z-10 flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 @[640px]/detail-page:w-auto @[640px]/detail-page:justify-start @[640px]/detail-page:px-3.5 @[640px]/detail-page:text-xs @[640px]/detail-page:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
@@ -1583,7 +1600,9 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
                 {it.count}
               </span>
             )}
-            {active && (
+            {/* Hasta medir (HTML del servidor, primer render) la pestaña
+                activa pinta su propio subrayado. */}
+            {active && !indicatorReady && (
               <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-emerald-400" />
             )}
           </Link>
