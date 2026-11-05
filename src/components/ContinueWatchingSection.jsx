@@ -82,7 +82,6 @@ import { fadeInUp, scaleIn } from "@/lib/motion/revealVariants";
 import {
   rowSwiperKeySuffix,
   rowSwiperScrollProps,
-  rowSwiperTouchClass,
   useTouchRowScroll,
 } from "@/lib/ui/rowSwiperTouch";
 
@@ -2129,7 +2128,7 @@ function ContinueWatchingSection({
             // el título de la sección siguiente —«Recomendaciones» tras
             // Continuar viendo, «Más esperadas» tras el Calendario— y el toque
             // no llegaba a abrir su página.
-            className={`group relative ${rowSwiperTouchClass(nativeTouch)} ${
+            className={`group relative ${
               isMobile
                 ? ""
                 : "!pt-14 sm:!pt-16 md:!pt-44 !pb-44 sm:!pb-56 md:!pb-80 !-mt-14 sm:!-mt-16 md:!-mt-44 !-mb-44 sm:!-mb-56 md:!-mb-80 pointer-events-none"

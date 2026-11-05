@@ -133,7 +133,6 @@ import { fadeInUp, staggerContainer, scaleIn } from "@/lib/motion/revealVariants
 import {
   rowSwiperKeySuffix,
   rowSwiperScrollProps,
-  rowSwiperTouchClass,
   useTouchRowScroll,
 } from "@/lib/ui/rowSwiperTouch";
 
@@ -2980,7 +2979,7 @@ export function Row({
             preventClicksPropagation={true}
             {...rowSwiperScrollProps(nativeTouch, isMobile)}
             modules={[Navigation, FreeMode]}
-            className={`group relative ${rowSwiperTouchClass(nativeTouch)} ${
+            className={`group relative ${
               previewKind === "anticipated"
                 ? "!py-3 sm:!py-24 md:!py-28 !-my-3 sm:!-my-24 md:!-my-28"
                 : hasActivePreview || animatingOutId
@@ -3330,7 +3329,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
           {...rowSwiperScrollProps(nativeTouch, isMobile)}
           modules={[Navigation, FreeMode]}
           breakpoints={breakpointsRow}
-          className={`group relative ${rowSwiperTouchClass(nativeTouch)}`}
+          className="group relative"
         >
             {items.map((m) => {
               const type = m?.media_type || "movie";
@@ -3840,7 +3839,7 @@ function TopRatedHero({
                   : false
               }
               modules={[Navigation, Autoplay, FreeMode]}
-              className={`group relative ${rowSwiperTouchClass(nativeTouch)}`}
+              className="group relative"
               breakpoints={{
                 0: { slidesPerView: 1, spaceBetween: 12 },
                 1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 },

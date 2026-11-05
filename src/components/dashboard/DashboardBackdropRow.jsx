@@ -106,7 +106,6 @@ import { fadeInUp, scaleIn } from "@/lib/motion/revealVariants";
 import {
   rowSwiperKeySuffix,
   rowSwiperScrollProps,
-  rowSwiperTouchClass,
   useTouchRowScroll,
 } from "@/lib/ui/rowSwiperTouch";
 
@@ -1671,7 +1670,7 @@ export default function DashboardBackdropRow({
             // hover/clic a las filas vecinas; las tarjetas los reactivan.
             className={`group relative !pt-3 sm:!pt-16 md:!pt-44 !pb-2 sm:!pb-52 md:!pb-72 !-mt-3 sm:!-mt-16 md:!-mt-44 !-mb-2 sm:!-mb-52 md:!-mb-72 ${
               isMobile ? "" : "pointer-events-none"
-            } ${rowSwiperTouchClass(nativeTouch)}`}
+            }`}
             wrapperClass="flex items-center"
             breakpoints={breakpoints}
           >

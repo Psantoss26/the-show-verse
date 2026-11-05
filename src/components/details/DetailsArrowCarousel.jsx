@@ -17,6 +17,11 @@ import { FreeMode } from "swiper/modules";
 import { motion, AnimatePresence } from "framer-motion";
 import "swiper/swiper-bundle.css";
 import { onDrawerResize } from "@/lib/ui/drawerResizeEvents";
+import {
+  rowSwiperKeySuffix,
+  rowSwiperScrollProps,
+  useTouchRowScrollImmediate,
+} from "@/lib/ui/rowSwiperTouch";
 
 export { SwiperSlide };
 
@@ -38,6 +43,12 @@ export default function DetailsArrowCarousel({
   ...swiperProps
 }) {
   const swiperRef = useRef(null);
+  // Táctil: desplazamiento nativo, como las filas de los dashboards
+  // (lib/ui/rowSwiperTouch.js). Un carrusel con el gesto apagado
+  // (`allowTouchMove={false}`, p. ej. los de carga) se queda como está.
+  const touchDevice = useTouchRowScrollImmediate();
+  const nativeTouch = touchDevice && swiperProps.allowTouchMove !== false;
+  const touchScrollProps = nativeTouch ? rowSwiperScrollProps(true) : null;
   const [isHovered, setIsHovered] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
@@ -157,18 +168,29 @@ export default function DetailsArrowCarousel({
     >
       <div style={{ overflowX: "clip", overflowY: "visible" }}>
         <Swiper
+          key={`arrow-carousel${rowSwiperKeySuffix(nativeTouch)}`}
           {...swiperProps}
+          {...(touchScrollProps
+            ? {
+                cssMode: true,
+                threshold: touchScrollProps.threshold,
+                touchRatio: touchScrollProps.touchRatio,
+              }
+            : null)}
           observer={swiperProps.observer ?? true}
           observeParents={swiperProps.observeParents ?? true}
           resizeObserver={swiperProps.resizeObserver ?? true}
           simulateTouch={swiperProps.simulateTouch ?? true}
           allowTouchMove={swiperProps.allowTouchMove ?? true}
           freeMode={
-            swiperProps.freeMode ?? {
-              enabled: true,
-              momentum: true,
-              momentumRatio: 0.55,
-            }
+            swiperProps.freeMode ??
+            (nativeTouch
+              ? touchScrollProps.freeMode
+              : {
+                  enabled: true,
+                  momentum: true,
+                  momentumRatio: 0.55,
+                })
           }
           modules={
             swiperProps.modules

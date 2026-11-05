@@ -88,7 +88,6 @@ import useOwnCardPoster, { useCardArtworkState, useOwnCardBackdrop } from "@/lib
 import {
   rowSwiperKeySuffix,
   rowSwiperScrollProps,
-  rowSwiperTouchClass,
   useTouchRowScroll,
 } from "@/lib/ui/rowSwiperTouch";
 
@@ -1382,7 +1381,7 @@ function Row({
           preventClicksPropagation={true}
           {...rowSwiperScrollProps(nativeTouch, true)}
           modules={[Navigation, FreeMode]}
-          className={`group relative ${rowSwiperTouchClass(nativeTouch)}`}
+          className="group relative"
         >
           {safeItems.map((m, i) => (
             <SwiperSlide key={m.id} className="select-none">
@@ -1530,7 +1529,7 @@ function Row({
           preventClicksPropagation={true}
           {...rowSwiperScrollProps(nativeTouch, isMobile)}
           modules={[Navigation, FreeMode]}
-          className={`group relative ${rowSwiperTouchClass(nativeTouch)} ${hasActivePreview ? "!overflow-visible" : ""} ${
+          className={`group relative ${hasActivePreview ? "!overflow-visible" : ""} ${
             isTop10
               ? "!pt-3 sm:!pt-16 md:!pt-44 !pb-2 sm:!pb-52 md:!pb-72 !-mt-3 sm:!-mt-16 md:!-mt-44 !-mb-2 sm:!-mb-52 md:!-mb-72"
               : ""

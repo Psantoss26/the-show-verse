@@ -256,18 +256,18 @@ body {
 
 }
 
-/* Filas de los dashboards en pantallas táctiles: desplazamiento NATIVO
+/* Filas (dashboards, ficha, persona) en pantallas táctiles: desplazamiento NATIVO
    (cssMode de Swiper, ver src/lib/ui/rowSwiperTouch.js).
    - Swiper pone `touch-action: pan-y` en los carruseles horizontales para
      hacer él el gesto; aquí el gesto es del navegador, que decide solo si el
      dedo va en horizontal (fila) o en vertical (página).
    - Al llegar al final de la fila el gesto no se encadena a la página (ni al
      «atrás» del navegador ni a la navegación por deslizamiento). */
-.swiper.sv-touch-row {
+.swiper.swiper-css-mode.swiper-horizontal {
   touch-action: auto;
 }
 
-.swiper.sv-touch-row > .swiper-wrapper {
+.swiper.swiper-css-mode.swiper-horizontal > .swiper-wrapper {
   touch-action: manipulation;
   overscroll-behavior-x: contain;
 }

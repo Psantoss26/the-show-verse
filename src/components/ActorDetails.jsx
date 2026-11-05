@@ -93,6 +93,11 @@ import useCardPoster from "@/lib/hooks/useCardPoster";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import useActorLike from "@/hooks/useActorLike";
 import ListLikeButton from "@/components/community/ListLikeButton";
+import {
+  rowSwiperKeySuffix,
+  rowSwiperScrollProps,
+  useTouchRowScrollImmediate,
+} from "@/lib/ui/rowSwiperTouch";
 
 /* --- CONFIG & UTILS --- */
 // Cabecera móvil (ver el ajuste en ActorDetails): hueco del pie de los
@@ -1165,6 +1170,8 @@ function ActorRowCarousel({ children, variant = "poster" }) {
           1280: { slidesPerView: 6, spaceBetween: 20 },
         };
 
+  const nativeTouch = useTouchRowScrollImmediate();
+
   const updateNav = useCallback((swiper) => {
     if (!swiper) return;
     const hasOverflow = !swiper.isLocked;
@@ -1249,6 +1256,7 @@ function ActorRowCarousel({ children, variant = "poster" }) {
           style={{ overflowX: "clip", overflowY: "visible" }}
         >
           <Swiper
+            key={`actor-row${rowSwiperKeySuffix(nativeTouch)}`}
             slidesPerView={isPages ? 1 : 3}
             spaceBetween={8}
             onSwiper={handleSwiper}
@@ -1262,10 +1270,15 @@ function ActorRowCarousel({ children, variant = "poster" }) {
             grabCursor
             simulateTouch
             allowTouchMove
+            {...(nativeTouch ? rowSwiperScrollProps(true) : null)}
+            // Las páginas (isPages) van de una en una, con imán; en táctil el
+            // imán es el scroll-snap nativo.
             freeMode={
               isPages
                 ? false
-                : { enabled: true, momentum: true, momentumRatio: 0.55 }
+                : nativeTouch
+                  ? { enabled: true }
+                  : { enabled: true, momentum: true, momentumRatio: 0.55 }
             }
             modules={[FreeMode]}
             className="!overflow-visible pb-8"

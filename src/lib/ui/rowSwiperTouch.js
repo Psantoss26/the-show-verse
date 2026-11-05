@@ -15,8 +15,11 @@
 // horizontal (fila) o vertical (página). Sin imán entre tarjetas (`freeMode`).
 //
 // Con ratón/trackpad se mantiene el arrastre de Swiper de siempre.
+//
+// Lo usan las filas de los dashboards, el carrusel de la ficha
+// (DetailsArrowCarousel) y las filas de ActorDetails.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 const TOUCH_QUERY = "(hover: none) and (pointer: coarse)";
 
@@ -46,7 +49,8 @@ export function useTouchRowScroll() {
  * - `isMobile`: layout estrecho (umbral/ratio del arrastre con ratón).
  *
  * `cssMode` no se puede cambiar en caliente: incluye `nativeTouch` en la `key`
- * del Swiper (con `rowSwiperKeySuffix`) y añade `rowSwiperTouchClass`.
+ * del Swiper (con `rowSwiperKeySuffix`). El CSS (globals.css) va por
+ * `.swiper-css-mode`, la clase que pone Swiper.
  */
 export function rowSwiperScrollProps(nativeTouch, isMobile) {
   if (nativeTouch) {
@@ -65,8 +69,29 @@ export function rowSwiperScrollProps(nativeTouch, isMobile) {
   };
 }
 
-/** Clase extra del `<Swiper>` (overscroll contenido, ver globals.css). */
-export const rowSwiperTouchClass = (nativeTouch) =>
-  nativeTouch ? "sv-touch-row" : "";
+const subscribeTouch = (onChange) => {
+  if (typeof window.matchMedia !== "function") return () => {};
+  const mq = window.matchMedia(TOUCH_QUERY);
+  mq.addEventListener?.("change", onChange);
+  return () => mq.removeEventListener?.("change", onChange);
+};
+const getTouchSnapshot = () =>
+  typeof window.matchMedia === "function" &&
+  window.matchMedia(TOUCH_QUERY).matches;
+const getServerTouchSnapshot = () => false;
+
+/**
+ * Variante que acierta ya en el PRIMER render en cliente (navegación dentro
+ * de la app): la ficha y la página de persona montan muchos carruseles y un
+ * cambio de `cssMode` tras montar los remontaría todos. Solo al hidratar
+ * arranca en `false` y se corrige justo después.
+ */
+export function useTouchRowScrollImmediate() {
+  return useSyncExternalStore(
+    subscribeTouch,
+    getTouchSnapshot,
+    getServerTouchSnapshot,
+  );
+}
 
 export const rowSwiperKeySuffix = (nativeTouch) => (nativeTouch ? "-t" : "");
