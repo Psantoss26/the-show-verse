@@ -103,6 +103,12 @@ import {
 } from "@/lib/dashboard/media";
 import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 import { fadeInUp, scaleIn } from "@/lib/motion/revealVariants";
+import {
+  rowSwiperKeySuffix,
+  rowSwiperScrollProps,
+  rowSwiperTouchClass,
+  useTouchRowScroll,
+} from "@/lib/ui/rowSwiperTouch";
 
 /* =================== CONSTANTES / VARIANTES =================== */
 const EMPTY_ARRAY = [];
@@ -1360,6 +1366,7 @@ export default function DashboardBackdropRow({
   // Primera sección tras el FeaturedHero (ver Row de MainDashboardClient).
   replayRevealAtTop = false,
 }) {
+  const nativeTouch = useTouchRowScroll();
   const reduceMotion = useReducedMotion();
   const { openDetailModal } = useDetailModal();
   const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
@@ -1578,7 +1585,7 @@ export default function DashboardBackdropRow({
 
   const swiperKey = `backdrop-row-${hydrated ? "h" : "s"}-${
     isMobile ? "m" : "d"
-  }`;
+  }${rowSwiperKeySuffix(nativeTouch)}`;
 
   const Header = (
     <motion.div
@@ -1653,9 +1660,7 @@ export default function DashboardBackdropRow({
             allowTouchMove={true}
             preventClicks={true}
             preventClicksPropagation={true}
-            threshold={isMobile ? 2 : 5}
-            touchRatio={isMobile ? 1.5 : 1}
-            freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
+            {...rowSwiperScrollProps(nativeTouch, isMobile)}
             modules={[Navigation, FreeMode]}
             // Padding vertical amplio (con margen negativo que lo compensa, así
             // el espaciado entre filas no cambia) para reservar el hueco de la
@@ -1666,7 +1671,7 @@ export default function DashboardBackdropRow({
             // hover/clic a las filas vecinas; las tarjetas los reactivan.
             className={`group relative !pt-3 sm:!pt-16 md:!pt-44 !pb-2 sm:!pb-52 md:!pb-72 !-mt-3 sm:!-mt-16 md:!-mt-44 !-mb-2 sm:!-mb-52 md:!-mb-72 ${
               isMobile ? "" : "pointer-events-none"
-            }`}
+            } ${rowSwiperTouchClass(nativeTouch)}`}
             wrapperClass="flex items-center"
             breakpoints={breakpoints}
           >

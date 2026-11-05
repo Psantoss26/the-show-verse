@@ -79,6 +79,12 @@ import PosterImage from "@/components/dashboard/DashboardPosterImage";
 import { getMobileCardsPerRow } from "@/lib/ui/mobileCardsPerRow";
 import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 import { fadeInUp, scaleIn } from "@/lib/motion/revealVariants";
+import {
+  rowSwiperKeySuffix,
+  rowSwiperScrollProps,
+  rowSwiperTouchClass,
+  useTouchRowScroll,
+} from "@/lib/ui/rowSwiperTouch";
 
 const EMPTY_ARRAY = [];
 const MAX_ITEMS = 20;
@@ -1638,6 +1644,7 @@ function ContinueWatchingSection({
   externalShows = null,
   mode = "continue",
 }) {
+  const nativeTouch = useTouchRowScroll();
   const reduceMotion = useReducedMotion();
   const { authenticated, hydrated: authReady, preferences } = useAuth();
   // En móvil, mismas tarjetas por fila que las demás filas de pósters.
@@ -2048,7 +2055,7 @@ function ContinueWatchingSection({
       };
   const desktopSlideWidthClass = "!w-[300px] xl:!w-[340px]";
 
-  const swiperKey = `${mode}-landscape-${hydrated ? "h" : "s"}-${isMobile ? `m${mobileCardsPerRow}` : "d"}`;
+  const swiperKey = `${mode}-landscape-${hydrated ? "h" : "s"}-${isMobile ? `m${mobileCardsPerRow}` : "d"}${rowSwiperKeySuffix(nativeTouch)}`;
 
   return (
     <motion.div
@@ -2102,12 +2109,9 @@ function ContinueWatchingSection({
             allowTouchMove={true}
             preventClicks={true}
             preventClicksPropagation={true}
-            threshold={isMobile ? 2 : 5}
-            touchRatio={isMobile ? 1.5 : 1}
-            // Mantener el arrastre libre también en móvil. Calendario reutiliza
-            // esta fila, así que ambos carruseles responden al gesto táctil con
-            // la misma inercia fluida que las filas de ActorDetails.
-            freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
+            // Arrastre libre también en móvil (Calendario reutiliza esta fila).
+            // En táctil, desplazamiento nativo: ver lib/ui/rowSwiperTouch.js.
+            {...rowSwiperScrollProps(nativeTouch, isMobile)}
             modules={[Navigation, FreeMode]}
             // En escritorio el padding vertical amplio crea el espacio para que
             // la vista previa NUNCA se recorte (el truco padding + -margin no
@@ -2125,7 +2129,7 @@ function ContinueWatchingSection({
             // el título de la sección siguiente —«Recomendaciones» tras
             // Continuar viendo, «Más esperadas» tras el Calendario— y el toque
             // no llegaba a abrir su página.
-            className={`group relative ${
+            className={`group relative ${rowSwiperTouchClass(nativeTouch)} ${
               isMobile
                 ? ""
                 : "!pt-14 sm:!pt-16 md:!pt-44 !pb-44 sm:!pb-56 md:!pb-80 !-mt-14 sm:!-mt-16 md:!-mt-44 !-mb-44 sm:!-mb-56 md:!-mb-80 pointer-events-none"

@@ -85,6 +85,12 @@ import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
 import useOwnCardPoster, { useCardArtworkState, useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
+import {
+  rowSwiperKeySuffix,
+  rowSwiperScrollProps,
+  rowSwiperTouchClass,
+  useTouchRowScroll,
+} from "@/lib/ui/rowSwiperTouch";
 
 const INITIAL_VISIBLE_ROWS = 6;
 const ROW_REVEAL_BATCH_SIZE = 4;
@@ -1185,6 +1191,7 @@ function Row({
   posterCacheRef,
   replayRevealAtTop = false,
 }) {
+  const nativeTouch = useTouchRowScroll();
   const reduceMotion = useReducedMotion();
   // Tarjetas por fila en móvil (ajuste de usuario): NO afecta a filas
   // destacadas (isSpotlight) ni a Top10 en móvil (diseño de backdrop propio).
@@ -1363,6 +1370,7 @@ function Row({
           </h3>
         </div>
         <Swiper
+          key={`top10-m${rowSwiperKeySuffix(nativeTouch)}`}
           slidesPerView={1}
           spaceBetween={14}
           loop={false}
@@ -1372,11 +1380,9 @@ function Row({
           grabCursor={false}
           preventClicks={true}
           preventClicksPropagation={true}
-          threshold={2}
-          touchRatio={1.5}
-          freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
+          {...rowSwiperScrollProps(nativeTouch, true)}
           modules={[Navigation, FreeMode]}
-          className="group relative"
+          className={`group relative ${rowSwiperTouchClass(nativeTouch)}`}
         >
           {safeItems.map((m, i) => (
             <SwiperSlide key={m.id} className="select-none">
@@ -1507,7 +1513,7 @@ function Row({
         }}
       >
         <Swiper
-          key={`row-${rowKey || title}-${isMobile ? "m" : "d"}-${mobileCardsPerRow}`}
+          key={`row-${rowKey || title}-${isMobile ? "m" : "d"}-${mobileCardsPerRow}${rowSwiperKeySuffix(nativeTouch)}`}
           slidesPerView={isSpotlight ? 2 : mobileCardsPerRow}
           spaceBetween={isSpotlight ? 14 : isTop10 ? 16 : 12}
           onSwiper={handleSwiper}
@@ -1522,11 +1528,9 @@ function Row({
           allowTouchMove={true}
           preventClicks={true}
           preventClicksPropagation={true}
-          threshold={isMobile ? 2 : 5}
-          touchRatio={isMobile ? 1.5 : 1}
-          freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
+          {...rowSwiperScrollProps(nativeTouch, isMobile)}
           modules={[Navigation, FreeMode]}
-          className={`group relative ${hasActivePreview ? "!overflow-visible" : ""} ${
+          className={`group relative ${rowSwiperTouchClass(nativeTouch)} ${hasActivePreview ? "!overflow-visible" : ""} ${
             isTop10
               ? "!pt-3 sm:!pt-16 md:!pt-44 !pb-2 sm:!pb-52 md:!pb-72 !-mt-3 sm:!-mt-16 md:!-mt-44 !-mb-2 sm:!-mb-52 md:!-mb-72"
               : ""

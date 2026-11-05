@@ -130,6 +130,12 @@ import {
   preparePreviewBackdrop,
 } from "@/lib/dashboard/media";
 import { fadeInUp, staggerContainer, scaleIn } from "@/lib/motion/revealVariants";
+import {
+  rowSwiperKeySuffix,
+  rowSwiperScrollProps,
+  rowSwiperTouchClass,
+  useTouchRowScroll,
+} from "@/lib/ui/rowSwiperTouch";
 
 // Constantes para evitar recreación de referencias
 const EMPTY_ARRAY = [];
@@ -2518,6 +2524,7 @@ export function Row({
   // todo (en móvil asoma tras la navbar inferior) y se reproduce al volver.
   replayRevealAtTop = false,
 }) {
+  const nativeTouch = useTouchRowScroll();
   const reduceMotion = useReducedMotion();
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
   const hasItems = normalizedItems.length > 0;
@@ -2880,7 +2887,7 @@ export function Row({
   // No incluimos `hydrated` en la key: hacerlo remonta el Swiper al hidratar y
   // bloquea el primer desliz. La config solo cambia con el layout (móvil/desktop)
   // y con el ajuste de tarjetas por fila.
-  const swiperKey = `${title}-${isMobile ? "m" : "d"}-${mobileCardsPerRow}`;
+  const swiperKey = `${title}-${isMobile ? "m" : "d"}-${mobileCardsPerRow}${rowSwiperKeySuffix(nativeTouch)}`;
 
   return (
     <motion.div
@@ -2971,11 +2978,9 @@ export function Row({
             allowTouchMove={true}
             preventClicks={true}
             preventClicksPropagation={true}
-            threshold={isMobile ? 2 : 5}
-            touchRatio={isMobile ? 1.5 : 1}
-            freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
+            {...rowSwiperScrollProps(nativeTouch, isMobile)}
             modules={[Navigation, FreeMode]}
-            className={`group relative ${
+            className={`group relative ${rowSwiperTouchClass(nativeTouch)} ${
               previewKind === "anticipated"
                 ? "!py-3 sm:!py-24 md:!py-28 !-my-3 sm:!-my-24 md:!-my-28"
                 : hasActivePreview || animatingOutId
@@ -3252,6 +3257,7 @@ export function Row({
 }
 
 function TraktMixedRow({ title, items, isMobile, hydrated }) {
+  const nativeTouch = useTouchRowScroll();
   const { openDetailModal } = useDetailModal();
   const { preferences } = useAuth();
   const mobileCardsPerRow = getMobileCardsPerRow(preferences);
@@ -3274,7 +3280,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
 
   const heightClassDesktop = "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
-  const swiperKey = `trakt-${title}-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}-${mobileCardsPerRow}`;
+  const swiperKey = `trakt-${title}-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}-${mobileCardsPerRow}${rowSwiperKeySuffix(nativeTouch)}`;
 
   const formatMeta = (m) => {
     const year = (m?.release_date || m?.first_air_date || "").slice(0, 4);
@@ -3321,12 +3327,10 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
           allowTouchMove={true}
           preventClicks={true}
           preventClicksPropagation={true}
-          threshold={isMobile ? 2 : 5}
-          touchRatio={isMobile ? 1.5 : 1}
-          freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
+          {...rowSwiperScrollProps(nativeTouch, isMobile)}
           modules={[Navigation, FreeMode]}
           breakpoints={breakpointsRow}
-          className="group relative"
+          className={`group relative ${rowSwiperTouchClass(nativeTouch)}`}
         >
             {items.map((m) => {
               const type = m?.media_type || "movie";
@@ -3626,6 +3630,7 @@ function TopRatedHero({
   hydrated,
   backdropOverrides,
 }) {
+  const nativeTouch = useTouchRowScroll();
   const { openDetailModal } = useDetailModal();
   const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
@@ -3764,7 +3769,7 @@ function TopRatedHero({
 
   // Sin `hydrated` en la key: remontaría el Swiper al hidratar y bloquearía el
   // primer desliz. La clasificación ya es una única lista mixta estable.
-  const heroKey = `hero-mixed-${isMobile ? "m" : "d"}`;
+  const heroKey = `hero-mixed-${isMobile ? "m" : "d"}${rowSwiperKeySuffix(nativeTouch)}`;
 
   const handleTopRatedCardEnter = (movie) => {
     if (isMobile) return;
@@ -3824,15 +3829,18 @@ function TopRatedHero({
               allowTouchMove={true}
               preventClicks={true}
               preventClicksPropagation={true}
-              threshold={isMobile ? 2 : 5}
-              touchRatio={isMobile ? 1.5 : 1}
+              {...rowSwiperScrollProps(nativeTouch, isMobile)}
+              // En móvil la clasificación va por páginas (una tarjeta con imán);
+              // en táctil el imán lo pone el navegador (scroll-snap nativo).
               freeMode={
                 !isMobile
-                  ? { enabled: true, momentum: true, momentumRatio: 0.5 }
+                  ? nativeTouch
+                    ? { enabled: true }
+                    : { enabled: true, momentum: true, momentumRatio: 0.5 }
                   : false
               }
               modules={[Navigation, Autoplay, FreeMode]}
-              className="group relative"
+              className={`group relative ${rowSwiperTouchClass(nativeTouch)}`}
               breakpoints={{
                 0: { slidesPerView: 1, spaceBetween: 12 },
                 1024: { slidesPerView: isMobile ? 1 : 3, spaceBetween: 16 },
