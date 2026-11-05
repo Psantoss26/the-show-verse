@@ -255,6 +255,10 @@ function ProfilePosterGrid({
   // filas forman una sola cascada); `null` = sin entrada (al volver atrás).
   entranceStart = null,
 }) {
+  // Móvil: desplazamiento nativo LIBRE, sin imán entre pósters, como las filas
+  // de los dashboards y de la ficha (lib/ui/rowSwiperTouch.js): sigue al dedo y
+  // frena con la inercia del sistema. Antes `snap-mandatory` la hacía saltar de
+  // póster en póster al soltar.
   return (
     <div
       data-profile-horizontal-scroll
@@ -269,12 +273,12 @@ function ProfilePosterGrid({
         twoRows
           ? "grid grid-flow-col grid-rows-2 auto-cols-[calc((100%_-_1.5rem)_/_3)] @[640px]/detail-page:grid-flow-row @[640px]/detail-page:grid-rows-none @[640px]/detail-page:auto-cols-auto"
           : "flex"
-      } gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden @[640px]/detail-page:grid @[640px]/detail-page:grid-cols-5 @[640px]/detail-page:overflow-visible @[640px]/detail-page:pb-0`}
+      } gap-3 overflow-x-auto pb-1 touch-manipulation overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden @[640px]/detail-page:grid @[640px]/detail-page:grid-cols-5 @[640px]/detail-page:overflow-visible @[640px]/detail-page:pb-0`}
     >
       {items.map((item, index) => (
         <div
           key={`${item.mediaType}:${item.tmdbId}`}
-          className={`${twoRows ? "min-w-0" : "w-[calc((100%_-_1.5rem)_/_3)] shrink-0"} snap-start @[640px]/detail-page:w-auto${
+          className={`${twoRows ? "min-w-0" : "w-[calc((100%_-_1.5rem)_/_3)] shrink-0"} @[640px]/detail-page:w-auto${
             entranceStart == null ? "" : " sv-section-card-grow"
           }`}
           style={entranceStart == null ? undefined : profileEntranceDelay(entranceStart + index)}
