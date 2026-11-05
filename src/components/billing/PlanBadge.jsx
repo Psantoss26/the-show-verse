@@ -7,7 +7,8 @@ import usePixelSnappedTop from "@/hooks/usePixelSnappedTop";
 // Insignia del plan de un usuario, junto a su nombre: logo y nombre del plan
 // con los colores de las tarjetas de /planes (planVisuals). El backend envía
 // siempre el plan público (`publicPlanBadge`: el que se paga o 'free'),
-// también con la facturación apagada.
+// también con la facturación apagada, o 'vip' para las cuentas del equipo
+// (no es un plan de /planes: su nombre viene de planVisuals).
 //
 // `showFree`: el plan Gratis solo se enseña donde se pide (cabecera del
 // perfil); en las listas de miembros llevaría insignia casi todo el mundo y
@@ -30,21 +31,21 @@ export default function PlanBadge({ plan, size = "sm", collapse = false, showFre
   const snapRef = usePixelSnappedTop({ enabled: snap && shown, observe: "header" });
   if (!shown) return null;
   const Icon = visuals.icon;
-  const name = planName(plan);
+  const name = visuals.name || planName(plan);
   const sizes = SIZES[size];
   // Plegada: en el móvil queda solo la medalla, sin píldora.
   const pill = collapse ? `h-5 text-[10px] sm:gap-1 sm:pl-0.5 sm:pr-2 ${visuals.pillSm}` : `${sizes.pill} ${visuals.pill}`;
   return (
     <span
       ref={snapRef}
-      title={`Plan ${name}`}
+      title={plan === "vip" ? "Cuenta VIP" : `Plan ${name}`}
       className={`inline-flex shrink-0 items-center rounded-full font-bold uppercase leading-none tracking-wider ${pill} ${className}`}
       {...rest}
     >
       <span className={`flex shrink-0 items-center justify-center rounded-full ${collapse ? SIZES.sm.medal : sizes.medal} ${visuals.medal}`}>
         <Icon className={`shrink-0 ${collapse ? SIZES.sm.glyph : sizes.glyph}`} />
       </span>
-      <span className="sr-only">Plan </span>
+      <span className="sr-only">{plan === "vip" ? "Cuenta " : "Plan "}</span>
       <span className={`${collapse ? "sr-only sm:not-sr-only" : ""} ${visuals.label}`}>{name}</span>
     </span>
   );

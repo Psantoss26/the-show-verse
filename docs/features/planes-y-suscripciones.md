@@ -55,10 +55,17 @@ desde el lanzamiento.
   tarjetas de `/planes`): bajo el nombre del perfil, junto al
   `@usuario` (y en la cabecera compacta) para **todos** los planes, Gratis
   incluido; en las filas de miembros (seguidores, seguidos, pestaña Social,
-  `/members`) solo Sin anuncios y Pro. El backend envía siempre el plan
+  `/members`) solo Sin anuncios, Pro y VIP. El backend envía siempre el plan
   público (`publicPlanBadge`: la suscripción en vigor o `free`), también con
   la facturación apagada; la gracia de lanzamiento no cuenta. Ver
   [[social-y-perfiles]].
+- Insignia **VIP**: no es un plan (no sale en `/planes` ni da derechos), es la
+  insignia de las cuentas del equipo. `publicPlanBadge` devuelve `vip` para
+  los usuarios de `VIP_USERNAMES` (en `backend/src/lib/billing/plans.js`, hoy
+  `pablosantos`) y para los de la variable de entorno `VIP_USERNAMES`
+  (separados por comas, sin distinguir mayúsculas), pase lo que pase con su
+  suscripción. Se pinta dorada, con corona, un difuminado dorado hacia dentro (sin borde marcado) y más brillo que
+  Pro (`VipPlanIcon` y `PLAN_VISUALS.vip`, que trae su propio nombre).
 - Anuncios (`AdSlot`): cada 4 filas del dashboard y al final de la ficha. No
   pintan nada salvo que el plan lleve anuncios **y** haya red configurada
   (`NEXT_PUBLIC_ADSENSE_CLIENT` y el slot de la unidad);

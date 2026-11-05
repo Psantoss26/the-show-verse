@@ -111,7 +111,24 @@ export function getEntitlements(user, { now = new Date(), env = process.env } = 
 // miembros): el que paga de verdad o, si no paga, 'free'. No depende de
 // BILLING_ENABLED, para que la insignia se vea ya con los pagos apagados, y la
 // gracia de lanzamiento no cuenta (es un regalo, no un plan contratado).
-export function publicPlanBadge(user, { now = new Date() } = {}) {
+//
+// Excepción: las cuentas VIP (el equipo de la app) llevan la insignia 'vip'
+// pase lo que pase con su plan. Solo cambia la insignia, no los derechos.
+// VIP_USERNAMES (separados por comas) añade más cuentas sin desplegar código.
+export const VIP_USERNAMES = ['pablosantos'];
+
+export function isVipUser(user, env = process.env) {
+  const username = String(user?.username || '').trim().toLowerCase();
+  if (!username) return false;
+  const extra = String(env.VIP_USERNAMES || '')
+    .split(',')
+    .map((name) => name.trim().toLowerCase())
+    .filter(Boolean);
+  return VIP_USERNAMES.includes(username) || extra.includes(username);
+}
+
+export function publicPlanBadge(user, { now = new Date(), env = process.env } = {}) {
+  if (isVipUser(user, env)) return 'vip';
   return paidPlanOf(user, now) || 'free';
 }
 

@@ -46,3 +46,17 @@ export function ProPlanIcon({ className }) {
     </PlanGlyph>
   );
 }
+
+// VIP: una corona con una gema calada en el centro y la banda debajo.
+export function VipPlanIcon({ className }) {
+  return (
+    <PlanGlyph className={className}>
+      <path
+        fillRule="evenodd"
+        d="M3.4 8.2 7.6 11.6 12 5.2l4.4 6.4 4.2-3.4-1.5 9.3H4.9L3.4 8.2Zm8.6 3.3a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Z"
+      />
+      <path d="M3 5.6a1.35 1.35 0 1 1 0 2.7 1.35 1.35 0 0 1 0-2.7Zm9-2.9a1.35 1.35 0 1 1 0 2.7 1.35 1.35 0 0 1 0-2.7Zm9 2.9a1.35 1.35 0 1 1 0 2.7 1.35 1.35 0 0 1 0-2.7Z" />
+      <path d="M5.4 18.9h13.2a1 1 0 0 1 0 2H5.4a1 1 0 0 1 0-2Z" opacity=".55" />
+    </PlanGlyph>
+  );
+}

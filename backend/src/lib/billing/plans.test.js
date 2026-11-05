@@ -69,3 +69,11 @@ test('la insignia pública es el plan que se paga o Gratis', () => {
   // Con la facturación apagada se enseña igual.
   assert.equal(publicPlanBadge({ plan: 'pro', planExpiresAt: '2027-03-01' }, { now }), 'pro');
 });
+
+test('las cuentas VIP llevan la insignia VIP sea cual sea su plan', () => {
+  assert.equal(publicPlanBadge({ username: 'pablosantos', plan: 'free' }, { now, env: {} }), 'vip');
+  assert.equal(publicPlanBadge({ username: 'PabloSantos', plan: 'pro', planExpiresAt: '2027-03-01' }, { now, env: {} }), 'vip');
+  assert.equal(publicPlanBadge({ username: 'otra', plan: 'free' }, { now, env: {} }), 'free');
+  // VIP_USERNAMES añade cuentas.
+  assert.equal(publicPlanBadge({ username: 'otra', plan: 'free' }, { now, env: { VIP_USERNAMES: ' Otra , mas' } }), 'vip');
+});
