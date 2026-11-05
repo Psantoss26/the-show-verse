@@ -290,6 +290,18 @@ function alertsButtonClass({ variant }) {
     : "relative grid h-10 w-10 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
 }
 
+// Campana del botón. En la barra móvil va dentro de `.sv-topbar-icon` (un
+// envoltorio HTML, no el <svg>: ver globals.css) para recuperar tamaño al
+// compactarse sincronizada con el grupo.
+function AlertsBellIcon({ variant }) {
+  if (variant !== "mobile") return <Bell className="h-6 w-6" strokeWidth={2} aria-hidden="true" />;
+  return (
+    <span className="sv-topbar-icon" aria-hidden="true">
+      <Bell className="h-6 w-6" strokeWidth={2.2} />
+    </span>
+  );
+}
+
 /**
  * La campana YA PINTADA EN EL PRIMER FOTOGRAMA, mientras la sesión arranca.
  *
@@ -304,7 +316,7 @@ export function AlertsMenuBoot({ variant = "desktop", heroNavMode = false }) {
   return (
     <div className="alerts-boot relative" aria-hidden="true">
       <span className={alertsButtonClass({ variant, heroNavMode })}>
-        <Bell className={`h-6 w-6${variant === "mobile" ? " sv-topbar-icon" : ""}`} strokeWidth={variant === "mobile" ? 2.2 : 2} />
+        <AlertsBellIcon variant={variant} />
       </span>
     </div>
   );
@@ -615,7 +627,7 @@ export default function AlertsMenu({
         title={label}
         className={buttonClass}
       >
-        <Bell className={`h-6 w-6${variant === "mobile" ? " sv-topbar-icon" : ""}`} strokeWidth={variant === "mobile" ? 2.2 : 2} aria-hidden="true" />
+        <AlertsBellIcon variant={variant} />
         {unread > 0 ? (
           <span
             aria-hidden="true"

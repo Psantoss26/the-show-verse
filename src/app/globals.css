@@ -2535,8 +2535,15 @@ html[data-sv-lite] .sv-topbar-glass {
    las fichas; ver `mobileTopControlScaleClass` en Navbar) y los iconos quedaban
    en ~20px. Aquí recuperan parte de ese tamaño (~22px) sin tocar el logo, el
    avatar ni las áreas de toque, con la misma curva que el compactado. En
-   tablet la barra apenas encoge (0,95) y no hace falta. */
+   tablet la barra apenas encoge (0,95) y no hace falta.
+   `.sv-topbar-icon` es un ENVOLTORIO HTML del icono, nunca el <svg>: Chrome no
+   lleva al compositor las animaciones de elementos SVG. Con la contra-escala en
+   el <svg>, al volver a la barra normal mientras la página carga (hilo
+   principal ocupado) el grupo llegaba a 1 en el compositor y el icono seguía en
+   1,14: se veía más grande hasta que terminaba la carga. Las dos animaciones
+   van ahora en elementos HTML, juntas en el compositor. */
 .sv-topbar-icon {
+  display: grid;
   transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 @media (max-width: 767.98px) {
