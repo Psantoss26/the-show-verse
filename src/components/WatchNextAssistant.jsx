@@ -86,7 +86,7 @@ const COMPOSER_MAX_HEIGHT = 160;
 function providerLabel(provider) {
   if (provider === "gemini") return "Gemini";
   if (provider === "openai") return "OpenAI";
-  if (provider === "ollama") return "Ollama";
+  if (provider === "nvidia") return "NVIDIA";
   return provider;
 }
 

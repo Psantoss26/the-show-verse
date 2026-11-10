@@ -12,7 +12,6 @@ Stack de **producción** en el NAS (UGREEN DXP 4800 Plus, UGOS + Docker), defini
 | `postgres` | `postgres:18` | interno | Datos (usuario `tsv`, BBDD `theshowverse`). El volumen se monta en `/var/lib/postgresql` (layout PG18+). |
 | `redis` | `redis:7-alpine` | interno | Caché (persistencia ligera). |
 | `cloudflared` | `cloudflare/cloudflared` | saliente | Túnel a Cloudflare. |
-| `ollama` | `ollama/ollama` | `11434` | LLM local (IA). |
 | `github-runner` | `myoung34/github-runner` | — | CI/CD self-hosted. |
 
 La `web` tiene un **alias de red** `the-show-verse` para que una ruta de túnel
@@ -24,18 +23,20 @@ Cloudflare.
 ```
 pgdata       (local)     → datos de Postgres
 redisdata    (local)     → datos de Redis
-ollama-data  (EXTERNO)   → showverse-ollama-data        (modelos ya descargados)
 runner-data  (EXTERNO)   → the-show-verse_runner-data   (registro del runner)
 ```
 
-Los volúmenes **externos** se reutilizan del stack anterior para no perder los
-modelos de Ollama ni el registro del runner. Deben existir antes del primer `up`
-(si vienes de otro stack ya existen). Para crearlos manualmente:
+El volumen **externo** se reutiliza del stack anterior para no perder el
+registro del runner. Debe existir antes del primer `up` (si vienes de otro stack
+ya existe). Para crearlo manualmente:
 
 ```bash
-docker volume create showverse-ollama-data
 docker volume create the-show-verse_runner-data
 ```
+
+La IA ya no corre en el NAS (usa la API de NVIDIA). El volumen
+`showverse-ollama-data` de la etapa con Ollama ya no lo usa nada; se puede borrar
+con `docker volume rm showverse-ollama-data` cuando ya no haga falta.
 
 ## Ficheros de entorno (en el NAS, NO en el repo)
 
@@ -53,8 +54,8 @@ cp deploy/nas/runner.env.example   deploy/nas/runner.env
 | Fichero | Para qué |
 |---|---|
 | `deploy/nas/.env` | `${VARS}` que **interpola** el compose: `POSTGRES_PASSWORD`, `NEXT_PUBLIC_TMDB_API_KEY`, `CF_TUNNEL_TOKEN`. |
-| `deploy/nas/backend.env` | Entorno del `backend` (DATABASE_URL a `postgres:5432`, JWT, TMDB…). |
-| `deploy/nas/web.env` | Entorno de runtime de la `web` (`BACKEND_API_BASE_URL=http://backend:3001`, OAuth…). |
+| `deploy/nas/backend.env` | Entorno del `backend` (DATABASE_URL a `postgres:5432`, JWT, TMDB, `NVIDIA_API_KEY`…). |
+| `deploy/nas/web.env` | Entorno de runtime de la `web` (`BACKEND_API_BASE_URL=http://backend:3001`, OAuth, `NVIDIA_API_KEY` para el asistente…). |
 | `deploy/nas/runner.env` | Registro del self-hosted runner (ver [05](./05-github-actions-cicd.md)). |
 
 > ⚠️ La contraseña de Postgres debe coincidir entre `deploy/nas/.env`
@@ -79,7 +80,7 @@ ver [04](./04-cloudflare-tunnel.md)).
 cd /volume4/docker/theshowverse
 git pull            # o rsync del código (lo hace el CI, ver 05)
 docker compose -f deploy/nas/docker-compose.yml up -d --build \
-  postgres redis backend web cloudflared ollama
+  postgres redis backend web cloudflared
 docker image prune -f
 ```
 

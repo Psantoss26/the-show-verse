@@ -138,19 +138,6 @@ services:
       postgres:
         condition: service_healthy
 
-  # Ollama — LLM local para las funciones de IA (reutiliza los modelos ya bajados).
-  ollama:
-    image: ollama/ollama:latest
-    restart: unless-stopped
-    environment:
-      OLLAMA_HOST: 0.0.0.0:11434
-      OLLAMA_KEEP_ALIVE: 24h
-      OLLAMA_NUM_PARALLEL: 1
-    volumes:
-      - ollama-data:/root/.ollama
-    ports:
-      - "11434:11434"
-
   # GitHub Actions self-hosted runner (CI/CD del repo). Mantiene el registro
   # existente (volumen runner-data) y despliega en la carpeta NUEVA (/nas-deploy).
   github-runner:
@@ -166,11 +153,8 @@ services:
 volumes:
   pgdata:
   redisdata:
-  # Volúmenes existentes del stack antiguo, reutilizados como externos para no
-  # perder los modelos de Ollama ni el registro del runner.
-  ollama-data:
-    external: true
-    name: showverse-ollama-data
+  # Volumen existente del stack antiguo, reutilizado como externo para no perder
+  # el registro del runner.
   runner-data:
     external: true
     name: the-show-verse_runner-data

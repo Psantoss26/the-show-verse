@@ -51,9 +51,11 @@ Verifica en GitHub → *Settings → Actions → Runners* que aparece *Idle*.
    - **rsync** del código a `/nas-deploy`, **excluyendo** `.git`, `node_modules` y
      los ficheros `deploy/nas/.env` / `deploy/nas/*.env` (los secretos persistentes
      del NAS **no** se tocan).
-   - `docker compose up -d --build` **listando los servicios** (`postgres redis
-     backend web cloudflared ollama`) para **no** recrear el propio `github-runner`
+   - `docker compose up -d --build` **listando los servicios** (`postgres pg-backup
+     redis backend web cloudflared`) para **no** recrear el propio `github-runner`
      mientras ejecuta el job.
+   - Borra el contenedor `ollama` si sigue en el NAS de un despliegue anterior
+     (la IA usa ahora la API de NVIDIA). Su volumen de modelos no se toca.
    - `docker image prune -f`.
 
 ```yaml

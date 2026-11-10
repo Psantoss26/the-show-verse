@@ -37,7 +37,7 @@ GitHub Actions.
    │                  ▼        ▼                    │
    │            postgres:5432  redis:6379          │
    │                                               │
-   │  ollama:11434 (IA local)   github-runner (CI) │
+   │  github-runner (CI)                           │
    └──────────────────────────────────────────────┘
 ```
 
@@ -48,7 +48,9 @@ GitHub Actions.
   dashboards). Datos en Postgres; caché opcional en Redis.
 - **postgres / redis**: datos y caché. No se exponen a Internet.
 - **cloudflared**: túnel saliente a Cloudflare; publica la web sin port-forwarding.
-- **ollama**: LLM local para funciones de IA.
+- **IA**: no corre en el NAS. El asistente y el sentimiento de comunidad usan la
+  API de modelos de NVIDIA (`NVIDIA_API_KEY` en `web.env` y `backend.env`; ver
+  [asistente](../features/asistente.md#modelo-de-ia)).
 - **github-runner**: runner self-hosted que ejecuta el CI/CD del repo en el NAS.
 
 ## Mapa de ficheros de configuración

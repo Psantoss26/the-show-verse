@@ -1,4 +1,6 @@
-// backend/src/community/sentiment.js  (pure parts; generateSentiment added in Step 5)
+// backend/src/community/sentiment.js
+import { extractJsonText, nvidiaChat, nvidiaEnabled } from '../lib/nvidia.js';
+
 const POS_PATTERNS = [
   { re: /\b(masterpiece|obra maestra)\b/i, es: 'Considerada una obra maestra' },
   { re: /\b(best|mejor|amazing|incre[ií]ble|brilliant|genial)\b/i, es: 'Valoración entusiasta de la comunidad' },
@@ -83,34 +85,31 @@ export function sentimentRowToApi(row, commentCount = 0) {
   return { good: map(row?.good), bad: map(row?.bad), comment_count: Number(commentCount) || 0 };
 }
 
-// ── generator (append to backend/src/community/sentiment.js) ──
-const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://ollama:11434').replace(/\/+$/, '');
-const OLLAMA_MODEL = process.env.OLLAMA_SENTIMENT_MODEL || process.env.OLLAMA_MODEL || 'llama3.1:8b';
-const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_SENTIMENT_TIMEOUT_MS) || 30000;
+// ── generador con la API de modelos de NVIDIA ──
+// Va en segundo plano (el heurístico ya se ha servido), así que admite esperar
+// a la reserva, que es más lenta.
+const NVIDIA_SENTIMENT_TIMEOUT_MS = Number(process.env.NVIDIA_SENTIMENT_TIMEOUT_MS) || 60000;
 
-async function ollamaSentiment({ system, user }) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal, cache: 'no-store',
-      body: JSON.stringify({
-        model: OLLAMA_MODEL, stream: false, keep_alive: '24h', format: 'json',
-        options: { temperature: 0.3, num_predict: 400 },
-        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-      }),
-    });
-    if (!res.ok) return null;
-    const json = await res.json().catch(() => null);
-    return parseSentimentResponse(json?.message?.content);
-  } catch { return null; } finally { clearTimeout(timer); }
-}
-
-// Returns { good, bad, provider, model } or null. Comments = [{ body }].
-export async function generateSentiment({ comments, title }) {
+// Returns { good, bad, provider, model } or null (el llamador se queda con el heurístico).
+// Comments = [{ body }].
+export async function generateSentiment({ comments, title }, { env = process.env, fetchImpl } = {}) {
   if (!Array.isArray(comments) || comments.length === 0) return null;
+  if (!nvidiaEnabled(env)) return null;
   const prompt = buildSentimentPrompt({ comments, title });
-  const viaOllama = await ollamaSentiment(prompt);
-  if (viaOllama) return { ...viaOllama, provider: 'ollama', model: OLLAMA_MODEL };
-  return null; // caller keeps the heuristic
+  try {
+    const { content, model } = await nvidiaChat({
+      ...prompt,
+      temperature: 0.3,
+      maxTokens: 800,
+      timeoutMs: NVIDIA_SENTIMENT_TIMEOUT_MS,
+      totalTimeoutMs: NVIDIA_SENTIMENT_TIMEOUT_MS * 2,
+      env,
+      ...(fetchImpl ? { fetchImpl } : {}),
+    });
+    const parsed = parseSentimentResponse(extractJsonText(content));
+    return parsed ? { ...parsed, provider: 'nvidia', model } : null;
+  } catch (err) {
+    console.warn('[sentiment] NVIDIA sin respuesta:', err?.kind || err?.name || 'error');
+    return null;
+  }
 }

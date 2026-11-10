@@ -31,6 +31,7 @@ import {
   runtimeRange,
   scoreCandidate,
 } from "@/lib/ai/watchNextCandidates";
+import { extractJsonText, nvidiaChat, nvidiaEnabled } from "@/lib/ai/nvidia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,35 +50,26 @@ const GEMINI_MODEL =
   process.env.GEMINI_WATCH_NEXT_MODEL ||
   process.env.GEMINI_MODEL ||
   "gemini-2.5-flash";
-// IA LOCAL (Ollama del NAS): proveedor por DEFECTO cuando no hay claves cloud, para
-// recomendaciones privadas sin coste. En el compose del NAS el contenedor web
-// alcanza el servicio en `http://ollama:11434`; en dev local se apunta por LAN vía
-// .env.local (OLLAMA_BASE_URL=http://192.168.1.126:11434).
-const OLLAMA_BASE_URL = (
-  process.env.OLLAMA_BASE_URL || "http://ollama:11434"
-).replace(/\/+$/, "");
-const OLLAMA_MODEL =
-  process.env.OLLAMA_WATCH_NEXT_MODEL ||
-  process.env.OLLAMA_MODEL ||
-  "qwen2.5:1.5b";
-const OLLAMA_TIMEOUT_MS =
-  Number(process.env.OLLAMA_WATCH_NEXT_TIMEOUT_MS) || 45000;
-// El modelo local corre por CPU (~8 tok/s). Dos costes dominan la latencia:
-// (1) el prefill del prompt y (2) la generación. Por eso: pocos candidatos (menos
-// prefill) y una salida MÍNIMA — solo las `keys` elegidas; el reply, el motivo y
-// las etiquetas se generan localmente (buildSelectionReply/buildReason/tags de
-// origen), que además salen de mayor calidad que la prosa del modelo 1.5b.
-const OLLAMA_MAX_CANDIDATES =
-  Number(process.env.OLLAMA_WATCH_NEXT_MAX_CANDIDATES) || 10;
+// API de modelos de NVIDIA (formato OpenAI): proveedor por DEFECTO cuando está
+// NVIDIA_API_KEY. Modelos en NVIDIA_MODEL (lista con reserva, ver
+// src/lib/ai/nvidia.js). Con el razonamiento al mínimo el primero responde en
+// ~4 s; la reserva tarda bastante más, y el tope total le deja el resto.
+const NVIDIA_ENABLED = nvidiaEnabled();
+const NVIDIA_TIMEOUT_MS =
+  Number(process.env.NVIDIA_WATCH_NEXT_TIMEOUT_MS) || 20000;
+const NVIDIA_TOTAL_TIMEOUT_MS =
+  Number(process.env.NVIDIA_WATCH_NEXT_TOTAL_TIMEOUT_MS) || 45000;
+const AI_PROVIDERS = ["nvidia", "gemini", "openai"];
+const DEFAULT_AI_PROVIDER = NVIDIA_ENABLED
+  ? "nvidia"
+  : GEMINI_API_KEY
+    ? "gemini"
+    : OPENAI_API_KEY
+      ? "openai"
+      : "";
 const WATCH_NEXT_AI_PROVIDER =
-  process.env.WATCH_NEXT_AI_PROVIDER ||
-  (GEMINI_API_KEY ? "gemini" : OPENAI_API_KEY ? "openai" : "ollama");
-// Ollama no tiene "clave": se considera IA disponible si está en la lista de
-// proveedores (no depende de una key como openai/gemini).
-const OLLAMA_ENABLED = String(WATCH_NEXT_AI_PROVIDER)
-  .toLowerCase()
-  .split(",")
-  .some((p) => p.trim() === "ollama");
+  process.env.WATCH_NEXT_AI_PROVIDER || DEFAULT_AI_PROVIDER;
+const AI_ENABLED = !!(NVIDIA_ENABLED || GEMINI_API_KEY || OPENAI_API_KEY);
 
 const WATCH_NEXT_RESPONSE_FORMAT = {
   type: "json_schema",
@@ -937,8 +929,7 @@ function normalizeAiSelection({ parsed, candidates }) {
       return {
         ...item,
         reason: String(rec.reason || "").trim() || null,
-        // Si el proveedor no aporta etiquetas (p. ej. el path keys-only de Ollama),
-        // se deja undefined para que serializeRecommendation derive las de origen.
+        // Si el proveedor no aporta etiquetas, se deja undefined para que serializeRecommendation derive las de origen.
         matchTags: aiTags.length ? aiTags : undefined,
       };
     })
@@ -1135,117 +1126,43 @@ async function getGeminiRecommendation({ message, candidates, contextSummary, in
   };
 }
 
-// Prompt LEAN para Ollama: el modelo solo tiene que SELECCIONAR keys. Nada de
-// reglas de formato de reply/reason/matchTags (se generan en el server), así el
-// prompt es corto (menos prefill) y el foco del modelo es la relevancia. Los
-// candidatos ya cumplen los criterios; el modelo decide cuáles encajan mejor
-// con el tono de la petición.
-function buildOllamaMessages({ message, candidates, intent }) {
-  const slim = candidates.map((item) => ({
-    key: itemKey(item),
-    title: item.title,
-    year: item.year || null,
-    type: item.mediaType === "tv" ? "serie" : "pelicula",
-    genres: genreLabelsOf(item).slice(0, 3),
-    pending: item.sources.includes("watchlist") || undefined,
-    partial: item.relaxedLevel ? true : undefined,
-  }));
-  const system = [
-    "Eres un recomendador de cine y series para The Show Verse.",
-    "Tu ÚNICA tarea: elegir ENTRE 4 Y 6 títulos de la lista 'candidates' que mejor encajen con la petición del usuario.",
-    "Devuelve solo sus 'key' EXACTAS (tal cual aparecen). No inventes claves ni títulos.",
-    "Los candidatos ya cumplen los criterios; elige los que mejor encajen con el tono que pide. Evita 'partial' si hay otros. Ante igualdad, prefiere 'pending' (el usuario ya quería verlos).",
-  ].join(" ");
-  const user = [
-    message
-      ? `Petición del usuario: "${message}".`
-      : "Sin petición concreta: elige una selección variada y actual.",
-    intent?.hasIntent ? `Criterios: ${describeIntent(intent)}.` : "",
-    `candidates: ${JSON.stringify(slim)}`,
-  ].filter(Boolean).join(" ");
-  return { system, user };
-}
-
-async function getOllamaRecommendation({ message, candidates, intent }) {
-  // Se muestran al modelo solo los N mejores candidatos (menos prefill = más
-  // rápido en CPU). La selección se valida luego contra TODA la lista.
-  const aiCandidates = candidates.slice(0, OLLAMA_MAX_CANDIDATES);
-  if (aiCandidates.length < 4) return null;
-
-  // Salida mínima: solo las keys elegidas, con `enum` para que el modelo pequeño
-  // no pueda inventar claves. Menos tokens de salida = mucho menos tiempo en CPU.
-  const format = {
-    type: "object",
-    properties: {
-      keys: {
-        type: "array",
-        minItems: 4,
-        maxItems: 6,
-        items: { type: "string", enum: aiCandidates.map((c) => itemKey(c)) },
-      },
-    },
-    required: ["keys"],
-  };
-
-  const { system, user } = buildOllamaMessages({ message, candidates: aiCandidates, intent });
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
-
-  let res;
+// NVIDIA: mismo prompt completo que Gemini/OpenAI (el modelo escribe también
+// reply, motivos y etiquetas). Sin `response_format` (algunos modelos se
+// cuelgan con él): el JSON se pide en el prompt y se valida contra los
+// candidatos con normalizeAiSelection.
+async function getNvidiaRecommendation({ message, candidates, contextSummary, intent }) {
+  if (!NVIDIA_ENABLED) return null;
+  let content;
   try {
-    res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        stream: false,
-        format,
-        // Mantener el modelo cargado (respeta el OLLAMA_KEEP_ALIVE del contenedor):
-        // así solo la primera petición paga la carga; las siguientes van ~13-16s.
-        keep_alive: "24h",
-        options: { temperature: 0.4, num_predict: 120 },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      }),
-      cache: "no-store",
-      signal: controller.signal,
-    });
+    ({ content } = await nvidiaChat({
+      system: buildAiSystemPrompt(),
+      user: buildAiUserPayload({ message, candidates, contextSummary, intent }),
+      temperature: 0.4,
+      maxTokens: 2048,
+      timeoutMs: NVIDIA_TIMEOUT_MS,
+      totalTimeoutMs: NVIDIA_TOTAL_TIMEOUT_MS,
+    }));
   } catch (err) {
-    console.warn("[watch-next] Ollama fallback:", {
-      error: err?.name === "AbortError" ? "timeout" : "network_error",
+    console.warn("[watch-next] NVIDIA fallback:", {
+      kind: err?.kind || err?.name || "error",
+      attempts: err?.attempts,
     });
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 
-  if (!res.ok) {
-    console.warn("[watch-next] Ollama fallback:", { status: res.status });
+  const parsed = parseJsonLoose(extractJsonText(content));
+  const normalized = normalizeAiSelection({ parsed, candidates, message });
+  if (!normalized) {
+    console.warn("[watch-next] NVIDIA invalid selection:", {
+      rawText: String(content || "").slice(0, 200),
+    });
     return null;
   }
-
-  const json = await safeJson(res);
-  const parsed = parseJsonLoose(json?.message?.content);
-  const keys = safeArray(parsed?.keys)
-    .map((k) => String(k || "").trim())
-    .filter(Boolean);
-  if (!keys.length) return null;
-
-  // La IA solo elige keys; reply, motivo y etiquetas se generan localmente aguas
-  // abajo (buildSelectionReply / serializeRecommendation) con mayor calidad.
-  const uniqueKeys = [...new Set(keys)];
-  const normalized = normalizeAiSelection({
-    parsed: { recommendations: uniqueKeys.map((key) => ({ key })) },
-    candidates,
-    message,
-  });
-  if (!normalized) return null;
 
   return {
+    reply: normalized.reply || null,
     recommendations: normalized.recommendations,
-    provider: "ollama",
+    provider: "nvidia",
   };
 }
 
@@ -1253,16 +1170,11 @@ async function getAiRecommendation({ message, candidates, contextSummary, intent
   const providers = String(WATCH_NEXT_AI_PROVIDER)
     .split(",")
     .map((provider) => provider.trim().toLowerCase())
-    .filter(
-      (provider) =>
-        provider === "openai" ||
-        provider === "gemini" ||
-        provider === "ollama",
-    );
+    .filter((provider) => AI_PROVIDERS.includes(provider));
 
   const orderedProviders = providers.length
     ? providers
-    : [GEMINI_API_KEY ? "gemini" : OPENAI_API_KEY ? "openai" : "ollama"];
+    : [DEFAULT_AI_PROVIDER].filter(Boolean);
   for (const provider of orderedProviders) {
     let result = null;
     try {
@@ -1281,8 +1193,8 @@ async function getAiRecommendation({ message, candidates, contextSummary, intent
                 contextSummary,
                 intent,
               })
-            : provider === "ollama"
-              ? await getOllamaRecommendation({
+            : provider === "nvidia"
+              ? await getNvidiaRecommendation({
                   message,
                   candidates,
                   contextSummary,
@@ -1491,11 +1403,11 @@ export async function POST(request) {
     favoritesCount: favorites.length,
     watchlistCount: watchlist.length,
     ratedCount: rated.length + traktContext.ratings.length,
-    aiEnabled: !!(GEMINI_API_KEY || OPENAI_API_KEY || OLLAMA_ENABLED),
+    aiEnabled: AI_ENABLED,
     aiProviders: {
+      nvidia: NVIDIA_ENABLED,
       gemini: !!GEMINI_API_KEY,
       openai: !!OPENAI_API_KEY,
-      ollama: OLLAMA_ENABLED,
     },
     quickPick,
     recentKeysCount: recentKeys.length,

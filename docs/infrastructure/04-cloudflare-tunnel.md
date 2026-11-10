@@ -64,7 +64,7 @@ apunten a ese dominio público (no a `localhost` ni a `web:3000`):
 
 ## Buenas prácticas
 
-- **No** publiques `postgres`, `redis`, `backend` ni `ollama` como hostnames del
+- **No** publiques `postgres`, `redis` ni `backend` como hostnames del
   túnel: solo la `web`. El resto queda en la red interna.
 - Activa en Cloudflare las protecciones estándar (WAF, *Always Use HTTPS*,
   *Bot Fight Mode* si procede).

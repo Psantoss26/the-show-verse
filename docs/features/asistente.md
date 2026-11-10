@@ -54,17 +54,32 @@ El intérprete (`src/lib/ai/watchNextIntent.js`, puro y con pruebas) convierte e
    - **Novedad:** solo sin criterios.
    - **Penalizaciones:** lo recomendado en los últimos 14 días.
 6. **IA.**
-   - El modelo (Gemini, OpenAI u Ollama) elige entre los candidatos YA filtrados, con los criterios en el mensaje. Así decide el tono, pero no puede saltarse lo pedido.
+   - El modelo elige entre los candidatos YA filtrados, con los criterios en el mensaje. Así decide el tono, pero no puede saltarse lo pedido. Escribe también la frase de respuesta, el motivo y las etiquetas de cada título.
+   - Proveedor: la API de modelos de NVIDIA (ver «Modelo de IA» más abajo); Gemini u OpenAI si se configuran con `WATCH_NEXT_AI_PROVIDER`. Sin ninguno, o si fallan, se devuelven los mejores del orden sin IA.
    - Se varía el resultado: tipos y orígenes distintos, y nunca dos de la misma saga.
 7. **Comprobación final.** El filtro de duración de `/discover` de TMDb no es fiable: con «hasta 90 min» devuelve películas de 110. Por eso, con criterios de duración, plataforma o temporadas, se mira la ficha de cada título elegido. Lo que no cumple se sustituye por el siguiente candidato que sí, en hasta 3 tandas.
 8. **Respuesta.** Resume los criterios aplicados («He buscado películas de comedia, de 90 min como mucho, nota de 7 o más, en Netflix»), cuántos títulos están en Pendientes y lo relajado. Cada título lleva etiquetas de lo que cumple (género, plataforma, «Pendiente», «En cines»).
 
 Los identificadores de géneros, plataformas y palabras clave de TMDb se comprobaron contra su API (región ES) el 2026-11-04.
 
+## Modelo de IA
+
+Cliente en `src/lib/ai/nvidia.js` (copia en `backend/src/lib/nvidia.js` para el sentimiento de comunidad). Es el mismo esquema que usa Jarvis.
+
+- **API:** `https://integrate.api.nvidia.com/v1/chat/completions`, en formato OpenAI. Clave en `NVIDIA_API_KEY` (`nvapi-…`, de build.nvidia.com). Sin clave, el asistente funciona solo con el orden, sin IA.
+- **Modelos:** `NVIDIA_MODEL`, lista separada por comas que se prueba en orden. Por defecto, `nvidia/nemotron-3.5-lightning-30b-a3b` (~4 s con el prompt del asistente) y, de reserva, `mistralai/mistral-large-4-1t-a52b` (bastante más lento, de 3 a 45 s según la carga).
+- **Fallos:** con 404/410/429/5xx, respuesta vacía o tiempo agotado se pasa al siguiente modelo. Con 401/403 se para (la clave no vale). Tope por modelo de 20 s y total de 45 s (`NVIDIA_WATCH_NEXT_TIMEOUT_MS`, `NVIDIA_WATCH_NEXT_TOTAL_TIMEOUT_MS`).
+- **Razonamiento al mínimo:** se manda `reasoning_effort: "low"` y `chat_template_kwargs.enable_thinking: false` (cada modelo entiende uno; los dos aceptan ambos). Con el razonamiento libre, nemotron gastaba ~1 800 tokens pensando, tardaba 25 s y la respuesta salía cortada; así responde en ~4 s.
+- **JSON:** sin `response_format` (algunos modelos gratuitos se cuelgan o dan 502 con él). El formato se pide en el prompt y la respuesta se limpia (razonamiento `<think>`, bloques ```) y se valida contra los candidatos.
+- **Estado:** `GET /api/ai/health` comprueba la clave y qué modelos de la lista ofrece la cuenta (`GET /v1/models`, sin gastar tokens).
+
+Sustituye al Ollama que corría en el NAS (retirado el 2026-11-10).
+
 ## Pruebas
 
 - `src/lib/ai/watchNextIntent.test.mjs`: interpretación de mensajes (tipo, géneros y negación, ánimo, duración, nota, plataformas, época, origen, «parecida a», pendientes).
 - `src/lib/ai/watchNextCandidates.test.mjs`: consultas de TMDb, filtro por niveles y orden.
+- `src/lib/ai/nvidia.test.mjs`: cliente de NVIDIA (petición, reserva de modelos, clave rechazada, tiempo agotado, limpieza del JSON y estado).
 
 ## Relacionado
 - [[Features]]

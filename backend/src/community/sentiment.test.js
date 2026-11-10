@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildHeuristicSentiment, parseSentimentResponse, sentimentRowToApi, buildSentimentPrompt,
+  buildHeuristicSentiment, parseSentimentResponse, sentimentRowToApi, buildSentimentPrompt, generateSentiment,
 } from './sentiment.js';
 
 test('heuristic finds a positive and a negative theme', () => {
@@ -44,4 +44,34 @@ test('buildSentimentPrompt includes the title and comments', () => {
   assert.match(system, /positiv/i);
   assert.match(user, /Heat/);
   assert.match(user, /Great film/);
+});
+
+test('generateSentiment: sin NVIDIA_API_KEY no llama a nadie', async () => {
+  let called = false;
+  const r = await generateSentiment({ comments: [{ body: 'great' }], title: 'X' }, { env: {}, fetchImpl: async () => { called = true; } });
+  assert.equal(r, null);
+  assert.equal(called, false);
+});
+
+test('generateSentiment: usa el modelo de NVIDIA que responde', async () => {
+  const content = '<think>analizo</think>```json\n{"good":[{"text_es":"Gran reparto"}],"bad":[]}\n```';
+  const models = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    models.push(body.model);
+    if (models.length === 1) return { ok: false, status: 502, text: async () => 'bad gateway' };
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content } }] }) };
+  };
+  const r = await generateSentiment(
+    { comments: [{ body: 'great cast' }], title: 'X' },
+    { env: { NVIDIA_API_KEY: 'nvapi-test', NVIDIA_MODEL: 'a/uno,b/dos' }, fetchImpl },
+  );
+  assert.deepEqual(r, { good: [{ text_es: 'Gran reparto' }], bad: [], provider: 'nvidia', model: 'b/dos' });
+  assert.deepEqual(models, ['a/uno', 'b/dos']);
+});
+
+test('generateSentiment: si NVIDIA falla devuelve null', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 401, text: async () => '' });
+  const r = await generateSentiment({ comments: [{ body: 'x' }] }, { env: { NVIDIA_API_KEY: 'k' }, fetchImpl });
+  assert.equal(r, null);
 });

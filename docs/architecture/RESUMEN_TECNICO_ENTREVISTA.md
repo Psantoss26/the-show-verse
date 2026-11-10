@@ -51,13 +51,13 @@ Es una arquitectura de tres capas: clientes, una web Next.js que hace de BFF (Ba
   │  ┌──────────────────────────────────────────────┐  │   │ TMDB            │
   │  │ web · Next.js 16 (SSR + BFF)                 │──┼──►│ Trakt           │
   │  │ páginas, 172 rutas /api, middleware, OG      │  │   │ OMDb (IMDb, RT) │
-  │  └───────────┬──────────────────────┬───────────┘  │   │ Plex            │
-  │              ▼                      ▼              │   │ Spotify         │
-  │  ┌──────────────────────────┐  ┌──────────────┐    │   │ JustWatch       │
-  │  │ backend · Fastify 5      │  │ Ollama       │    │   │ Letterboxd      │
-  │  │ ~130 endpoints REST, JWT │  │ LLM local    │    │   │ FilmAffinity    │
-  │  │ Zod, Drizzle, web-push   │  │ (asistente)  │    │   │ Gemini / OpenAI │
-  │  └──────┬─────────────┬─────┘  └──────────────┘    │   └─────────────────┘
+  │  └───────────┬──────────────────────────────────┘  │   │ Plex            │
+  │              ▼                                     │   │ Spotify         │
+  │  ┌──────────────────────────┐                      │   │ JustWatch       │
+  │  │ backend · Fastify 5      │                      │   │ Letterboxd      │
+  │  │ ~130 endpoints REST, JWT │                      │   │ FilmAffinity    │
+  │  │ Zod, Drizzle, web-push   │                      │   │ NVIDIA (IA)     │
+  │  └──────┬─────────────┬─────┘                      │   └─────────────────┘
   │         ▼             ▼                            │
   │  ┌────────────┐ ┌──────────────┐                   │
   │  │ PostgreSQL │ │ Redis        │                   │
@@ -99,7 +99,7 @@ Cada tecnología está elegida para un trabajo concreto; esta tabla es la respue
 | Docs de API | @fastify/swagger + Swagger UI, API Blueprint + Dredd | Contrato OpenAPI navegable y pruebas de contrato |
 | Notificaciones | web-push (VAPID) + Service Worker | Avisos push de estrenos, actividad social y logros |
 | Email | Resend | Verificación de email y cambio de correo |
-| IA | Ollama (LLM local), con Gemini u OpenAI como alternativa | Asistente "¿qué veo ahora?" con explicaciones en lenguaje natural |
+| IA | API de modelos de NVIDIA (nemotron, con mistral de reserva), con Gemini u OpenAI como alternativa | Asistente "¿qué veo ahora?" con explicaciones en lenguaje natural |
 | Infraestructura | Docker Compose en un NAS + Cloudflare Tunnel | Producción autoalojada sin abrir puertos, con TLS y WAF de Cloudflare |
 | CI/CD | GitHub Actions con runner self-hosted | Build y despliegue automático al NAS en cada push |
 | Tests | node:test (nativo) | Tests unitarios y de integración sin frameworks extra |
@@ -167,7 +167,7 @@ Cada bloque resume qué hace la funcionalidad y la decisión técnica que merece
 
 ### Asistente de IA "¿Qué veo ahora?"
 
-- Una ruta de Next.js combina candidatos de tu biblioteca y recomendaciones con un LLM. El LLM puede ser Ollama local (un modelo pequeño por CPU), Gemini u OpenAI, configurable por variables de entorno.
+- Una ruta de Next.js combina candidatos de tu biblioteca y recomendaciones con un LLM. El LLM es la API de modelos de NVIDIA (una lista de modelos que se prueba en orden), o Gemini u OpenAI, configurable por variables de entorno.
 - Para reducir la latencia, el LLM solo elige y explica; las sinopsis y los datos salen de TMDB.
 
 ## Integraciones externas
@@ -184,7 +184,7 @@ The Show Verse combina más de 10 fuentes externas, pero los datos del usuario v
 | Plex | Biblioteca del servidor Plex del usuario, abrir un título y sincronizar lo visto | Auth JWT de Plex firmado con clave propia (JWK) + API del servidor |
 | Spotify | Banda sonora en la ficha y música del recap | OAuth (login / callback) |
 | Netflix y otras plataformas | Registrar automáticamente lo que se ve | Extensión MV3 + app Android → `/api/netflix/*` → Fastify |
-| Ollama / Gemini / OpenAI | Asistente de IA | Proveedor elegido por variables de entorno |
+| NVIDIA / Gemini / OpenAI | Asistente de IA | Proveedor elegido por variables de entorno |
 | Google | Login social | OAuth en `/api/auth/google` |
 | Resend | Emails transaccionales | SDK en el backend |
 

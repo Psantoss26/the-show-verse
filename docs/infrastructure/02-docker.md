@@ -11,7 +11,6 @@ Imágenes, Dockerfiles y contextos de build del proyecto.
 | `postgres` | `postgres:18` | — (oficial) | — |
 | `redis` | `redis:7-alpine` | — (oficial) | — |
 | `cloudflared` | `cloudflare/cloudflared:latest` | — (oficial) | — |
-| `ollama` | `ollama/ollama:latest` | — (oficial) | — |
 | `github-runner` | `myoung34/github-runner:latest` | — (oficial) | — |
 
 ## Web — `deploy/nas/Dockerfile.web`

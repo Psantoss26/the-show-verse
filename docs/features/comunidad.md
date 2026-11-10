@@ -16,7 +16,7 @@ Comentarios y reseñas en las fichas, resumen de sentimiento, listas de la comun
 
 ## Sentimiento
 
-`GET /v1/community/{type}/{tmdbId}/sentiment` devuelve temas a favor y en contra. Se calcula en el sembrado: si Trakt tiene temas oficiales para el título, se traducen al español (`translate.js`); si no, se usa una heurística sobre los comentarios guardados (`buildHeuristicSentiment` en `sentiment.js`). En `sentiment.js` hay también un generador con un LLM local vía Ollama (`generateSentiment`), pero hoy no se llama desde ningún sitio.
+`GET /v1/community/{type}/{tmdbId}/sentiment` devuelve temas a favor y en contra. Se calcula en el sembrado: si Trakt tiene temas oficiales para el título, se traducen al español (`translate.js`); si no, se usa una heurística sobre los comentarios guardados (`buildHeuristicSentiment` en `sentiment.js`). En `sentiment.js` hay también un generador con la API de modelos de NVIDIA (`generateSentiment`, `provider: 'nvidia'`; necesita `NVIDIA_API_KEY` en el backend), pero hoy no se llama desde ningún sitio.
 
 ## Listas de la comunidad
 

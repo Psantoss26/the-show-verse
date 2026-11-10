@@ -543,7 +543,7 @@ curl -sS -X POST http://localhost:3001/v1/auth/refresh \
 
 ## Community content (Trakt migration)
 - [ ] GET /v1/community/movie/155/comments → first call state:"seeding", after ~5s state:"ready" with items.
-- [ ] GET /v1/community/movie/155/sentiment → good/bad non-empty (heuristic or Ollama), comment_count>0.
+- [ ] GET /v1/community/movie/155/sentiment → good/bad non-empty (heuristic or NVIDIA), comment_count>0.
 - [ ] GET /v1/community/movie/155/lists → up to 3 lists with previewPosters.
 - [ ] GET /v1/community/lists/discover?sort=likes_desc → accumulated lists.
 - [ ] POST a native comment (auth) → visible in Recientes tab; PATCH/DELETE own works; cannot edit others (404).

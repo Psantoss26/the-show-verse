@@ -54,7 +54,12 @@ jobs:
           # Se listan los servicios EXPLÍCITAMENTE para NO recrear el propio
           # github-runner (que está ejecutando este job).
           docker compose up -d --build \
-            postgres pg-backup redis backend web cloudflared ollama
+            postgres pg-backup redis backend web cloudflared
+          # La IA usa la API de NVIDIA: el contenedor de Ollama ya no forma
+          # parte del stack. Si sigue en el NAS de un despliegue anterior, se
+          # para y se borra (su volumen de modelos no se toca).
+          old=$(docker ps -aq --filter label=com.docker.compose.project=theshowverse --filter label=com.docker.compose.service=ollama)
+          if [ -n "$old" ]; then docker rm -f $old; fi
 
       - name: Limpiar imágenes huérfanas
         run: docker image prune -f
