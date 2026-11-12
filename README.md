@@ -7,6 +7,10 @@
 <br>
 <br>
 
+[English](README.en.md) · **Español**
+
+<br>
+
 **Descubre, sigue y comparte todo lo que ves.**<br>
 Películas, series, temporadas y episodios en un solo sitio, con tus listas, tu historial, tu comunidad y tus plataformas de streaming sincronizadas.
 
@@ -15,6 +19,7 @@ Películas, series, temporadas y episodios en un solo sitio, con tus listas, tu 
 [![Web](https://img.shields.io/badge/🌐_theshowverse.com-Abrir_la_app-e8b64a?style=for-the-badge&labelColor=111111)](https://theshowverse.com)
 [![Docs](https://img.shields.io/badge/📚_Documentación-docs/-1f6feb?style=for-the-badge&labelColor=111111)](docs/README.md)
 [![Changelog](https://img.shields.io/badge/📝_Changelog-novedades-2ea043?style=for-the-badge&labelColor=111111)](CHANGELOG.md)
+[![Licencia](https://img.shields.io/badge/Licencia-AGPL--3.0-a855f7?style=for-the-badge&labelColor=111111)](LICENSE)
 
 <br>
 
@@ -570,12 +575,22 @@ El estado al día está en [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## 🤝 Contribuir
 
-1. Haz un fork y crea una rama: `git checkout -b feature/mi-mejora`.
+Las contribuciones son bienvenidas, en castellano o en inglés. La guía completa (instalación, comprobaciones y qué documentar) está en [CONTRIBUTING.md](CONTRIBUTING.md). En resumen:
+
+1. Haz un fork y crea una rama desde `develop`: `git checkout -b feature/mi-mejora`.
 2. Sigue ESLint y el estilo del código que tocas.
 3. Si cambias algo visible, añade una línea al [`CHANGELOG.md`](CHANGELOG.md) y actualiza su documento de `docs/` en el mismo PR (ver [`AGENTS.md`](AGENTS.md)).
-4. Abre un Pull Request con capturas si hay cambios visuales.
+4. Abre un Pull Request contra `develop` con capturas si hay cambios visuales.
 
-¿Un fallo o una idea? Abre un [issue](../../issues).
+¿Un fallo o una idea? Abre un [issue](../../issues/new/choose). Para empezar, busca los marcados como [`good first issue`](../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22). Todo el que participa sigue el [código de conducta](CODE_OF_CONDUCT.md), y los fallos de seguridad se comunican en privado según [SECURITY.md](SECURITY.md).
+
+---
+
+## 📄 Licencia
+
+El código se publica bajo la [GNU Affero General Public License v3.0 o posterior](LICENSE). Puedes usarlo, estudiarlo, modificarlo y compartirlo; si ofreces una versión modificada como servicio público, debes publicar tus cambios con la misma licencia.
+
+Los logos, nombres y datos de servicios de terceros (TMDb, Trakt, IMDb, plataformas de streaming…) pertenecen a sus dueños y no entran en esta licencia.
 
 ---
 

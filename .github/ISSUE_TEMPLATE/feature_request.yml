@@ -1,0 +1,29 @@
+name: Feature request / Proponer una mejora
+description: An idea for something new or better. / Una idea para algo nuevo o mejor.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve? / ¿Qué problema resuelve?
+      description: Describe the situation, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal / Propuesta
+      description: How you imagine it working. Mock-ups or examples from other apps help.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives / Alternativas
+      description: Other ways you considered, or how you work around it today.
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing / Contribuir
+      options:
+        - label: I'd like to work on this myself. / Me gustaría implementarlo yo.

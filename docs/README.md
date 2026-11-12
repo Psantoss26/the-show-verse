@@ -11,6 +11,7 @@
 
 - **[Arranque local (guía exacta)](./infrastructure/ARRANQUE-LOCAL.md)** — levantar el proyecto completo en tu máquina.
 - **[Infraestructura (índice)](./infrastructure/README.md)** — despliegue, Docker, NAS, Cloudflare, CI/CD.
+- **[Cómo contribuir](../CONTRIBUTING.md)** — preparar el entorno, abrir un PR y qué documentar. Ver también el [código de conducta](../CODE_OF_CONDUCT.md), la [política de seguridad](../SECURITY.md) y la [licencia AGPL-3.0](../LICENSE).
 
 ## 🆕 Al día
 

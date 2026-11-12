@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability / Vulnerabilidad de seguridad
+    url: https://github.com/Psantoss26/the-show-verse/security/advisories/new
+    about: Report it privately, never in a public issue. / Infórmala en privado, nunca en un issue público.
+  - name: Documentation / Documentación
+    url: https://github.com/Psantoss26/the-show-verse/tree/main/docs
+    about: How each part of the app works. / Cómo funciona cada parte de la app.

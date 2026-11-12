@@ -1,3 +1,5 @@
+<!-- Guía / Guide: CONTRIBUTING.md. Puedes escribir en castellano o en inglés. / Spanish or English are both fine. -->
+
 ## Qué cambia
 
 <!-- Resumen del cambio desde el punto de vista del usuario. -->

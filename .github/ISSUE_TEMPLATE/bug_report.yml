@@ -1,0 +1,49 @@
+name: Bug report / Informar de un fallo
+description: Something doesn't work as expected. / Algo no funciona como debería.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! You can write in English or Spanish. / ¡Gracias! Puedes escribir en castellano o en inglés.
+        Security problems go through [SECURITY.md](https://github.com/Psantoss26/the-show-verse/blob/main/SECURITY.md), not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / ¿Qué ha pasado?
+      description: What you saw, and what you expected to see instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / Pasos para reproducirlo
+      placeholder: |
+        1. Open /details/movie/550
+        2. Tap «Pendientes»
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where? / ¿Dónde?
+      options:
+        - Web (desktop) / Web (ordenador)
+        - Web (mobile or tablet) / Web (móvil o tablet)
+        - Installed PWA / PWA instalada
+        - Browser extension / Extensión de navegador
+        - Android app / App Android
+        - Backend API
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Device and browser / Dispositivo y navegador
+      placeholder: Pixel 8, Chrome 142 · Windows 11, Firefox 145
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshots or logs / Capturas o registros
+      description: Drag images or videos here. Remove any personal data first.
