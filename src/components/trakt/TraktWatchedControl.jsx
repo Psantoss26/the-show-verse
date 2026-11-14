@@ -1,7 +1,7 @@
 // src/components/trakt/TraktWatchedControl.jsx
 "use client";
 
-import { Eye, EyeOff, MonitorPlay } from "lucide-react";
+import { Eye, EyeOff, Hourglass } from "lucide-react";
 import LiquidButton from "../LiquidButton";
 
 export default function TraktWatchedControl({
@@ -18,7 +18,7 @@ export default function TraktWatchedControl({
   // del episodio/película concretos en el propio botón de visionado.
   progressOverride,
   // Porcentaje (1-99) si el contenido está AHORA en "Continuar viendo". El botón
-  // adopta la identidad de "en curso" —icono MonitorPlay y color ÁMBAR, el mismo
+  // adopta la identidad de "en curso" —icono Hourglass (no MonitorPlay, que es «serie») y color ÁMBAR, el mismo
   // con el que el modal de episodios vistos marca un episodio a medias— y
   // se llena como una batería hasta ese punto. Tiene prioridad sobre "visto":
   // es el estado actual (también en un revisionado de algo ya visto).
@@ -85,7 +85,7 @@ export default function TraktWatchedControl({
         fillPercentage={fillPercentage}
       >
         {isContinueWatching ? (
-          <MonitorPlay className="w-6 h-6" />
+          <Hourglass className="w-6 h-6" />
         ) : visibleWatched ? (
           <Eye className="w-6 h-6" />
         ) : (

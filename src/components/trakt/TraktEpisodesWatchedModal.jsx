@@ -65,7 +65,7 @@ import {
   CalendarDays,
   CalendarClock,
   Loader2,
-  MonitorPlay,
+  Hourglass,
   X,
   Search,
   List,
@@ -882,7 +882,7 @@ export default function TraktEpisodesWatchedModal({
 
   // Progreso de reproduccion local ("Continuar viendo") por episodio de ESTA
   // serie: "S{n}E{m}" -> % (1..99). Un episodio con progreso se pinta como
-  // "en curso" (MonitorPlay + ámbar, el acento de Continuar viendo) en lugar
+  // "en curso" (Hourglass + ámbar, el acento de Continuar viendo) en lugar
   // de visto / no visto. Se refresca en cada apertura del modal.
   // Valor: { pct, id } — `id` es la fila de watch_progress, necesaria para
   // quitar el episodio de "Continuar viendo" (DELETE /api/progress?id=).
@@ -2039,7 +2039,7 @@ export default function TraktEpisodesWatchedModal({
 
                             {inProgress ? (
                               <div className="absolute inset-0 flex items-center justify-center bg-amber-500/20 backdrop-blur-[1px]">
-                                <MonitorPlay className="w-7 h-7 text-amber-300 drop-shadow-md" />
+                                <Hourglass className="w-7 h-7 text-amber-300 drop-shadow-md" />
                               </div>
                             ) : watched && (
                               <div
@@ -2143,7 +2143,7 @@ export default function TraktEpisodesWatchedModal({
                                 {busy ? (
                                   <Loader2 className="w-5 h-5 animate-spin" />
                                 ) : inProgress ? (
-                                  <MonitorPlay className="w-5 h-5" />
+                                  <Hourglass className="w-5 h-5" />
                                 ) : watched ? (
                                   <EyeOff className="w-5 h-5" />
                                 ) : (
@@ -2738,7 +2738,7 @@ export default function TraktEpisodesWatchedModal({
                   aria-hidden="true"
                 >
                   {shownPending.kind === "progress" ? (
-                    <MonitorPlay className="h-5 w-5" />
+                    <Hourglass className="h-5 w-5" />
                   ) : (
                     <EyeOff className="h-5 w-5" />
                   )}

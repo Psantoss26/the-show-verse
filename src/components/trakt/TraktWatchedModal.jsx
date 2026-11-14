@@ -27,7 +27,7 @@ import {
   Clock,
   History,
   Eye,
-  MonitorPlay,
+  Hourglass,
 } from "lucide-react";
 
 // --- Helpers de Fecha (Mismos que tenías) ---
@@ -116,7 +116,7 @@ function ProgressEntry({ progress, busy, disabled, error, onComplete, onRemove }
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-200 backdrop-blur-md">
-            <MonitorPlay className="h-5 w-5" aria-hidden="true" />
+            <Hourglass className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <div className="text-base font-extrabold leading-tight tracking-tight text-white sm:text-lg">
@@ -371,7 +371,7 @@ export default function TraktWatchedModal({
               </span>
               {progress && (
                 <span className="flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200 backdrop-blur-md">
-                  <MonitorPlay className="h-3 w-3" aria-hidden="true" />
+                  <Hourglass className="h-3 w-3" aria-hidden="true" />
                   En curso
                 </span>
               )}
