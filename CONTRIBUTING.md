@@ -58,7 +58,8 @@ The web app runs on http://localhost:3000 and the API on http://localhost:3001. 
 
    ```bash
    npm run lint
-   node --test path/to/changed.test.mjs   # frontend tests live next to the code they test
+   npm test                               # all frontend tests (runs `node --test`, skips the `*.browser.test.mjs` files)
+   node --test path/to/changed.test.mjs   # or just one file; frontend tests live next to the code they test
    npm --prefix backend test              # needs the local Postgres from `npm run db:up`
    ```
 
