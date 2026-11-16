@@ -89,6 +89,13 @@ services:
     restart: unless-stopped
     env_file:
       - ./web.env
+    # El NAS tiene 8 GB compartidos con todo lo demás. Sin tope, V8 se reserva
+    # hasta ~2,2 GB de heap y casi nunca libera: la web acababa con ~700 MB
+    # (la mayoría en swap). Con 384 MB de heap el GC recoge antes; el límite
+    # del contenedor deja margen para buffers y memoria nativa.
+    environment:
+      NODE_OPTIONS: --max-old-space-size=384
+    mem_limit: 768m
     depends_on:
       - backend
     ports:

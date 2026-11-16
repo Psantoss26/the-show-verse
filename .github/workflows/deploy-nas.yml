@@ -61,8 +61,12 @@ jobs:
           old=$(docker ps -aq --filter label=com.docker.compose.project=theshowverse --filter label=com.docker.compose.service=ollama)
           if [ -n "$old" ]; then docker rm -f $old; fi
 
-      - name: Limpiar imágenes huérfanas
-        run: docker image prune -f
+      - name: Limpiar imágenes huérfanas y caché de build antigua
+        # La caché de BuildKit llegó a 200 GB y su índice (3 GB) vivía en la
+        # RAM de dockerd. Se conserva solo la de los últimos 3 días.
+        run: |
+          docker image prune -f
+          docker builder prune -f --filter until=72h
 
       # Purga el caché de Cloudflare tras desplegar.
       #
