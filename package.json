@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test": "node --test \"src/**/!(*.browser).test.mjs\" \"netflix-extension/**/!(*.browser).test.mjs\" \"scripts/**/!(*.browser).test.mjs\"",
     "mw:search": "modern-web-guidance search",
     "mw:retrieve": "modern-web-guidance retrieve",
     "db:up": "docker compose -f deploy/local/docker-compose.yml up -d --wait --wait-timeout 90",
