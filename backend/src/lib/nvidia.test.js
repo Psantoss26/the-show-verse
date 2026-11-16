@@ -106,7 +106,11 @@ test("tiempo agotado y error de red cuentan como fallo del modelo", async () => 
       init.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
     });
   const fetchImpl = fakeFetch([hang, () => Promise.reject(new TypeError("fetch failed"))]);
-  await assert.rejects(nvidiaChat({ user: "x", env: ENV, fetchImpl, timeoutMs: 20 }), (err) => {
+  // El tope total va holgado a propósito: con el de por defecto (2 × 20 ms), un
+  // runner cargado retrasa el aborto del primer intento y el segundo modelo ni
+  // se prueba (sale «deadline» en vez de «network_error»).
+  const opts = { user: "x", env: ENV, fetchImpl, timeoutMs: 20, totalTimeoutMs: 10_000 };
+  await assert.rejects(nvidiaChat(opts), (err) => {
     assert.equal(err.kind, "all_failed");
     assert.deepEqual(err.attempts.map((a) => a.error), ["timeout", "network_error"]);
     return true;
