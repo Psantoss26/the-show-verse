@@ -136,37 +136,62 @@ class AccessibilityStreamingService : AccessibilityService() {
         val texts = ArrayList<String>()
         e.contentDescription?.toString()?.let { texts.add(it) }
         e.text?.forEach { t -> t?.toString()?.let { texts.add(it) } }
+        val levels = ArrayList<ScreenHeuristics.ClickLevel>()
+        // La tarjeta pulsada (lo más alto antes de la fila) y su ventana, por si su
+        // título no cuelga de ella (ver titleInsideCard); y su forma, para el registro.
+        var cardNode: AccessibilityNodeInfo? = null
+        var cardRoot: AccessibilityNodeInfo? = null
+        val shape = StringBuilder()
         try {
-            e.source?.let { source ->
-                val queue = ArrayDeque<AccessibilityNodeInfo>()
-                queue.add(source)
-                var visited = 0
-                while (queue.isNotEmpty() && visited < MAX_CLICK_NODES) {
-                    val node = queue.removeFirst()
-                    visited++
-                    (node.text ?: node.contentDescription)?.toString()?.trim()
-                        ?.takeIf { it.isNotEmpty() && it !in texts }?.let { texts.add(it) }
-                    for (i in 0 until node.childCount) node.getChild(i)?.let { queue.add(it) }
+            val source = e.source
+            if (source != null) {
+                cardNode = source
+                cardRoot = source.window?.root
+                shape.append(shortClass(source))
+                subtreeTexts(source, texts)
+                levels.add(ScreenHeuristics.ClickLevel(texts.toList()))
+                // Subiendo hasta la tarjeta (ver ScreenHeuristics.clickedCard): el
+                // título puede estar en otro hijo de la tarjeta, no en lo pulsado.
+                if (ScreenHeuristics.clickedTitle(texts) == null) {
+                    val screenHeight = resources.displayMetrics.heightPixels
+                    var parent = source.parent
+                    var depth = 0
+                    while (parent != null && depth < MAX_CLICK_PARENTS) {
+                        val list = isListNode(parent)
+                        val parentTexts = if (list) emptyList() else subtreeTexts(parent, ArrayList())
+                        levels.add(
+                            ScreenHeuristics.ClickLevel(
+                                parentTexts,
+                                isList = list,
+                                isRow = list && isRowNode(parent, screenHeight),
+                            ),
+                        )
+                        shape.append(" > ").append(shortClass(parent))
+                            .append(if (list) (if (levels.last().isRow) "[fila]" else "[lista]") else "")
+                            .append(if (parentTexts.isEmpty()) "" else "(${parentTexts.size})")
+                        if (list) break
+                        cardNode = parent
+                        parent = parent.parent
+                        depth++
+                    }
                 }
+            } else {
+                levels.add(ScreenHeuristics.ClickLevel(texts.toList()))
             }
         } catch (_: Exception) {
             /* el nodo puede desaparecer con la pulsación */
+            if (levels.isEmpty()) levels.add(ScreenHeuristics.ClickLevel(texts.toList()))
         }
-        // La tarjeta de Netflix puede ser solo una imagen sin texto dentro del
-        // elemento pulsado: el título va en la descripción de su contenedor.
-        if (ScreenHeuristics.clickedTitle(texts) == null) {
-            try {
-                var parent = e.source?.parent
-                var depth = 0
-                while (parent != null && depth < MAX_CLICK_PARENTS) {
-                    (parent.contentDescription ?: parent.text)?.toString()?.trim()
-                        ?.takeIf { it.isNotEmpty() && it !in texts }?.let { texts.add(it) }
-                    parent = parent.parent
-                    depth++
-                }
-            } catch (_: Exception) {
-                /* idem */
-            }
+        val card = ScreenHeuristics.clickedCard(levels)
+        // Sin título en la tarjeta subiendo por ella: lo que hay DENTRO de su
+        // recuadro en pantalla (hay apps que pintan el título en una capa aparte).
+        val boundsTitle = if (card.title == null && card.insideRow) {
+            try { titleInsideCard(cardNode, cardRoot) } catch (_: Exception) { null }
+        } else null
+        // Lo pulsado y lo que hay en su tarjeta, para el episodio («T2:E7») de la
+        // portada. En la ficha solo vale lo pulsado: subir podría coger otro episodio.
+        val cardTexts = ArrayList(texts).apply {
+            levels.drop(1).forEach { l -> l.texts.forEach { if (it !in this) add(it) } }
         }
         // La pantalla se mira AHORA, no en la última lectura: se puede pulsar una
         // tarjeta antes de que la lectura con retardo de la portada llegue, y la
@@ -176,17 +201,28 @@ class AccessibilityStreamingService : AccessibilityService() {
         if (kind != ScreenKind.DETAIL) {
             // En la portada no hay ficha de la que fiarse: el título sale de la
             // tarjeta pulsada (y el episodio, si su descripción lo trae).
-            val title = ScreenHeuristics.clickedTitle(texts)
-                ?: billboardTitle[pkg]?.takeIf { texts.any { ScreenHeuristics.isPlayLabel(it) } }
-            val browseChoice = EpisodeChoice.parse(texts, null)
+            // «Reproducir» del DESTACADO no trae el título: el suyo. Nunca dentro de
+            // una fila de tarjetas: el «primer título de la portada» sería entonces
+            // el de la primera tarjeta de la fila, no el de la pulsada.
+            // Solo si la subida llegó a la lista VERTICAL de la portada: sin llegar a
+            // ninguna lista no se sabe si era una fila, y el destacado sería otra serie.
+            val fromBillboard = card.title == null && boundsTitle == null &&
+                card.reachedList && !card.insideRow &&
+                levels.firstOrNull()?.texts.orEmpty().any { ScreenHeuristics.isPlayLabel(it) }
+            val title = card.title ?: boundsTitle ?: billboardTitle[pkg]?.takeIf { fromBillboard }
+            val browseChoice = EpisodeChoice.parse(cardTexts, null)
             RecentDetail.rememberBrowseClick(pkg, title, browseChoice)
             // Lo leído en la portada (el destacado, las filas) no es de lo que va a
             // sonar: fuera de los candidatos que viajan con el episodio.
             ScreenTexts.forget(pkg)
             p.addLog(
                 "Pulsado fuera de una ficha en ${Platforms.nameFor(pkg)}: " +
-                    (title?.let { "«$it»" } ?: "sin título") +
-                    (browseChoice?.let { " T${it.season ?: "?"}:E${it.episode}" } ?: ""),
+                    (title?.let { "«$it»" + if (fromBillboard) " (destacado)" else "" } ?: "sin título") +
+                    (browseChoice?.let { " T${it.season ?: "?"}:E${it.episode}" } ?: "") +
+                    // Sin título, cómo era lo pulsado: para saber qué no se lee.
+                    (if (title == null) {
+                        " · $shape · " + cardTexts.take(6).joinToString(" | ") { "\"${it.take(40)}\"" }
+                    } else ""),
             )
             return
         }
@@ -196,6 +232,74 @@ class AccessibilityStreamingService : AccessibilityService() {
             "Episodio elegido en ${Platforms.nameFor(pkg)}: T${choice.season ?: "?"}:E${choice.episode}" +
                 (choice.name?.let { " «$it»" } ?: ""),
         )
+    }
+
+    /** Añade a [out] los textos del subárbol de [root] (acotado) y lo devuelve. */
+    private fun subtreeTexts(root: AccessibilityNodeInfo, out: ArrayList<String>): ArrayList<String> {
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        var visited = 0
+        while (queue.isNotEmpty() && visited < MAX_CLICK_NODES) {
+            val node = queue.removeFirst()
+            visited++
+            (node.text ?: node.contentDescription)?.toString()?.trim()
+                ?.takeIf { it.isNotEmpty() && it !in out }?.let { out.add(it) }
+            for (i in 0 until node.childCount) node.getChild(i)?.let { queue.add(it) }
+        }
+        return out
+    }
+
+    private fun shortClass(node: AccessibilityNodeInfo): String =
+        node.className?.toString()?.substringAfterLast('.')?.take(24) ?: "?"
+
+    /**
+     * El título de la tarjeta [card] buscándolo por SITIO en su ventana [root]:
+     * los textos de los nodos que caen dentro de su recuadro, cuelguen o no de ella.
+     * Solo vale si hay uno: más de uno es que el recuadro abarca otras tarjetas.
+     */
+    private fun titleInsideCard(card: AccessibilityNodeInfo?, root: AccessibilityNodeInfo?): String? {
+        if (card == null || root == null) return null
+        val box = android.graphics.Rect()
+        card.getBoundsInScreen(box)
+        if (box.isEmpty) return null
+        val texts = ArrayList<String>()
+        val r = android.graphics.Rect()
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        var visited = 0
+        while (queue.isNotEmpty() && visited < MAX_BOUNDS_NODES) {
+            val node = queue.removeFirst()
+            visited++
+            node.getBoundsInScreen(r)
+            if (!android.graphics.Rect.intersects(r, box)) continue
+            if (box.contains(r)) {
+                (node.text ?: node.contentDescription)?.toString()?.trim()
+                    ?.takeIf { it.isNotEmpty() && it !in texts }?.let { texts.add(it) }
+            }
+            for (i in 0 until node.childCount) node.getChild(i)?.let { queue.add(it) }
+        }
+        return ScreenHeuristics.singleTitle(texts)
+    }
+
+    /** ¿Es una lista que se desplaza (fila de tarjetas o la portada)? */
+    private fun isListNode(node: AccessibilityNodeInfo): Boolean {
+        if (node.isScrollable || node.collectionInfo != null) return true
+        val cls = node.className?.toString() ?: return false
+        return cls.endsWith("RecyclerView") || cls.endsWith("ListView") ||
+            cls.endsWith("ScrollView") || cls.endsWith("ViewPager") || cls.endsWith("GridView")
+    }
+
+    /** ¿Es una FILA horizontal de tarjetas y no la lista vertical de la portada? */
+    private fun isRowNode(node: AccessibilityNodeInfo, screenHeight: Int): Boolean {
+        node.collectionInfo?.let { info ->
+            if (info.rowCount > 1 && info.columnCount <= 1) return false
+            if (info.columnCount > 1 && info.rowCount <= 1) return true
+        }
+        if ((node.className?.toString() ?: "").endsWith("HorizontalScrollView")) return true
+        val r = android.graphics.Rect()
+        node.getBoundsInScreen(r)
+        // Una fila es baja (una tarjeta de alto); la portada ocupa casi la pantalla.
+        return r.height() in 1 until screenHeight / 2
     }
 
     /** Qué pantalla de [pkg] hay ahora mismo (null si no se puede leer). */
@@ -636,7 +740,8 @@ class AccessibilityStreamingService : AccessibilityService() {
         private const val MAX_WINDOWS = 6
         private const val MAX_PLAYER_NODES = 600
         private const val MAX_CLICK_NODES = 25
-        private const val MAX_CLICK_PARENTS = 3
+        private const val MAX_CLICK_PARENTS = 10
+        private const val MAX_BOUNDS_NODES = 600
         // Lecturas espaciadas (ver spacedUntil): una cada SPACED_READ_MS, durante
         // SPACED_WINDOW_MS desde la última vez que se vio el reproductor.
         private const val SPACED_READ_MS = 5_000L

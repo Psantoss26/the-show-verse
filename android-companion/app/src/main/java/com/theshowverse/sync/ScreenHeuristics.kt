@@ -491,11 +491,78 @@ object ScreenHeuristics {
     fun clickedTitle(texts: List<String>): String? {
         for (text in texts) {
             for (part in text.split(CLICK_SEPARATORS)) {
-                val clean = part.trim().replace(CLICK_PREFIX, "").trim()
+                val clean = withoutEpisodeTail(part.trim().replace(CLICK_PREFIX, "").trim())
                 if (isLikelyTitle(clean) && !isBrowseSignal(clean)) return clean
             }
         }
         return null
+    }
+
+    // Donde empieza el episodio o el progreso dentro de la descripción de una
+    // tarjeta: «Outlander T2:E7 La batalla», «Outlander: Temporada 2 Episodio 7»,
+    // «Dark Quedan 34 min».
+    private val EPISODE_TAIL = Regex(
+        "(?:^|[\\s:,(\\-–—])(?:(?:t|s)\\s*\\d{1,3}\\s*[:·.]?\\s*e(?:p\\.?)?\\s*\\d{1,4}\\b|" +
+            "(?:temporada|season|episodio|episode|cap[ií]tulo|chapter|ep\\.?)\\s*\\d{1,4}\\b|" +
+            "quedan\\s+\\d|\\d{1,3}\\s*(?:h\\s*\\d{1,2}\\s*)?min\\b|\\d{1,3}\\s*%)",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /**
+     * Lo que va ANTES del episodio o el progreso en la descripción de una tarjeta:
+     * su título. Sin esto, «Outlander T2:E7 La batalla» no pasaba por título (y la
+     * tarjeta quedaba sin serie). Si el texto empieza ya por el episodio, se deja
+     * entero (es una fila de episodio, no un título).
+     */
+    fun withoutEpisodeTail(text: String): String {
+        val m = EPISODE_TAIL.find(text) ?: return text
+        val head = text.substring(0, m.range.first).trimEnd(' ', ':', ',', '-', '–', '—', '(', '·')
+        return if (head.length >= 2) head else text
+    }
+
+    /**
+     * El único título entre [texts] (los de todo lo que ocupa la tarjeta pulsada en
+     * pantalla), o null si no hay ninguno o hay varios: varios es que la zona es
+     * más que una tarjeta, y entonces cualquiera podría ser de otra.
+     */
+    fun singleTitle(texts: List<String>): String? {
+        val titles = texts.mapNotNull { clickedTitle(listOf(it)) }.distinctBy { it.lowercase() }
+        return titles.singleOrNull()
+    }
+
+    /**
+     * Un nivel de lo pulsado: el propio elemento (el primero) o uno de sus
+     * antecesores, con los textos de su subárbol. [isList]: es una lista que se
+     * desplaza (una fila de tarjetas, la portada entera); [isRow]: y es una FILA
+     * horizontal de tarjetas, no la lista vertical de la portada.
+     */
+    data class ClickLevel(val texts: List<String>, val isList: Boolean = false, val isRow: Boolean = false)
+
+    /** [title] de la tarjeta pulsada; [insideRow]: la pulsación fue dentro de una fila. */
+    data class ClickedCard(val title: String?, val insideRow: Boolean, val reachedList: Boolean = false)
+
+    // Más títulos distintos que esto en un antecesor que no se declara lista: lo es.
+    private const val MAX_TITLES_IN_CARD = 2
+
+    /**
+     * El título de la TARJETA pulsada, subiendo desde lo pulsado hasta la tarjeta
+     * y nunca más allá. El botón de reproducir de una tarjeta de «Seguir viendo»
+     * solo dice «Reproducir»: el título está en otro hijo de la tarjeta. Pero por
+     * encima de la tarjeta está la fila, con los títulos de TODAS sus tarjetas, y
+     * el primero de la fila (Breaking Bad) no es el pulsado (Outlander, la 4.ª).
+     * Así que la subida se detiene en la primera lista; si hasta ahí no hay
+     * título, no hay título (mejor ninguno que el de otra tarjeta).
+     */
+    fun clickedCard(levels: List<ClickLevel>): ClickedCard {
+        for ((i, level) in levels.withIndex()) {
+            if (i > 0 && level.isList) return ClickedCard(null, insideRow = level.isRow, reachedList = true)
+            val titles = level.texts.mapNotNull { clickedTitle(listOf(it)) }
+                .distinctBy { it.lowercase() }
+            // Un antecesor con muchos títulos es una lista aunque no lo diga.
+            if (i > 0 && titles.size > MAX_TITLES_IN_CARD) return ClickedCard(null, insideRow = true, reachedList = true)
+            titles.firstOrNull()?.let { return ClickedCard(it, insideRow = false) }
+        }
+        return ClickedCard(null, insideRow = false)
     }
 
     /**

@@ -316,4 +316,87 @@ class ScreenHeuristicsTest {
         assertNull(ScreenHeuristics.clickedTitle(listOf("Más información")))
         assertNull(ScreenHeuristics.clickedTitle(emptyList()))
     }
+
+    private fun level(vararg texts: String, list: Boolean = false, row: Boolean = false) =
+        ScreenHeuristics.ClickLevel(texts.toList(), isList = list, isRow = row)
+
+    @Test
+    fun clickedCardTakesTheTitleFromTheTappedCardNotTheRow() {
+        // Botón de reproducir de la 4.ª tarjeta de «Seguir viendo»: el título está
+        // en otro hijo de la tarjeta; la fila de encima empieza por Breaking Bad.
+        val card = ScreenHeuristics.clickedCard(
+            listOf(
+                level("Reproducir"),
+                level("Outlander", "T2:E7", "Reproducir"),
+                level(list = true, row = true),
+            ),
+        )
+        assertEquals("Outlander", card.title)
+    }
+
+    @Test
+    fun clickedCardStopsAtTheRowWithoutTakingAnotherCard() {
+        val card = ScreenHeuristics.clickedCard(
+            listOf(level("Reproducir"), level(), level(list = true, row = true)),
+        )
+        assertNull(card.title)
+        assertTrue(card.insideRow)
+    }
+
+    @Test
+    fun clickedCardTreatsAnAncestorWithManyTitlesAsAList() {
+        val card = ScreenHeuristics.clickedCard(
+            listOf(level("Reproducir"), level("Breaking Bad", "One Piece", "Dark", "Outlander")),
+        )
+        assertNull(card.title)
+        assertTrue(card.insideRow)
+    }
+
+    @Test
+    fun clickedCardOnTheBillboardIsNotInsideARow() {
+        // «Reproducir» del destacado: sube hasta la lista vertical de la portada.
+        val card = ScreenHeuristics.clickedCard(
+            listOf(level("Reproducir"), level("Mi lista", "Más información"), level(list = true)),
+        )
+        assertNull(card.title)
+        assertFalse(card.insideRow)
+    }
+
+    @Test
+    fun clickedCardKeepsTheTitleOfTheTappedElement() {
+        val card = ScreenHeuristics.clickedCard(listOf(level("Breaking Bad, T5:E3, Reanudar")))
+        assertEquals("Breaking Bad", card.title)
+    }
+
+    @Test
+    fun clickedTitleCutsTheEpisodeAndProgressOffTheCardDescription() {
+        assertEquals("Outlander", ScreenHeuristics.clickedTitle(listOf("Outlander T2:E7 La batalla")))
+        assertEquals("Outlander", ScreenHeuristics.clickedTitle(listOf("Outlander: Temporada 2 Episodio 7")))
+        assertEquals("Dark", ScreenHeuristics.clickedTitle(listOf("Dark Quedan 34 min")))
+        assertEquals("The Office", ScreenHeuristics.clickedTitle(listOf("Reanudar The Office S3 E5")))
+        assertEquals("Breaking Bad", ScreenHeuristics.clickedTitle(listOf("Breaking Bad (T2:E7)")))
+        // Un texto que empieza por el episodio no es un título.
+        assertNull(ScreenHeuristics.clickedTitle(listOf("T2:E7 La batalla")))
+        // Números que son parte del título se quedan.
+        assertEquals("The 100", ScreenHeuristics.clickedTitle(listOf("The 100")))
+    }
+
+    @Test
+    fun singleTitleOnlyWhenTheCardAreaHasOne() {
+        assertEquals("Outlander", ScreenHeuristics.singleTitle(listOf("Reproducir", "Outlander", "T2:E7")))
+        assertNull(ScreenHeuristics.singleTitle(listOf("Outlander", "Breaking Bad")))
+        assertNull(ScreenHeuristics.singleTitle(listOf("Reproducir", "34 min")))
+    }
+
+    @Test
+    fun clickedCardWithoutReachingAListDoesNotKnowItIsOutsideARow() {
+        // Subida cortada antes de llegar a ninguna lista: ni fila ni portada
+        // confirmadas, así que el título del destacado no vale.
+        val card = ScreenHeuristics.clickedCard(listOf(level("Reproducir"), level(), level()))
+        assertNull(card.title)
+        assertFalse(card.reachedList)
+        val billboard = ScreenHeuristics.clickedCard(listOf(level("Reproducir"), level(list = true)))
+        assertTrue(billboard.reachedList)
+        assertFalse(billboard.insideRow)
+    }
 }

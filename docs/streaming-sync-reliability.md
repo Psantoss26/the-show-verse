@@ -207,6 +207,28 @@ reprodujera después desde «Seguir viendo»: se registraba *One Piece* en vez d
   Ahora se clasifica la pantalla en el momento de pulsar, y cuenta cualquier
   pulsación fuera de una ficha (portada, búsqueda, Mi lista). Si la tarjeta es solo
   una imagen, el título se toma de la descripción de su contenedor.
+- **Solo cuenta la tarjeta pulsada.** Si lo pulsado solo dice «Reproducir», el
+  título se busca subiendo desde ahí hasta su tarjeta (`ScreenHeuristics.clickedCard`),
+  sin pasar de la primera lista: más arriba están las demás tarjetas de la fila.
+  Antes se tomaba el primer título de la pantalla, que con la fila desplazada era
+  la primera tarjeta (*Breaking Bad* al reproducir la cuarta, *Outlander* T2E7), y
+  el servidor lo aceptaba porque esa serie también tiene un T2E7. El título del
+  destacado solo se usa cuando la subida llega a la lista vertical de la portada
+  sin pasar por una fila (si no llega a ninguna lista, no se sabe y no se usa), y
+  el registro lo marca como «(destacado)». El episodio de la tarjeta sale de sus
+  propios textos; en una ficha, solo de lo pulsado.
+- **El título, aunque venga pegado al episodio.** La descripción de una tarjeta
+  puede traer el episodio o el progreso detrás del título («Outlander T2:E7 La
+  batalla», «Dark Quedan 34 min»): se corta ahí (`ScreenHeuristics.withoutEpisodeTail`).
+  Antes el texto entero no pasaba por título y la tarjeta se quedaba sin serie.
+- **Y si no cuelga de la tarjeta, por su sitio.** Si subiendo no aparece ningún
+  título, se buscan los textos de la ventana que caen dentro del recuadro de la
+  tarjeta en pantalla. Solo vale si hay exactamente uno (`singleTitle`): más de
+  uno es que el recuadro abarca otras tarjetas.
+- **Sin título, el registro dice cómo era.** La línea «Pulsado fuera de una
+  ficha… sin título» añade las clases de lo pulsado hasta la fila y sus primeros
+  textos, para ver qué no se lee. Entonces la serie solo se registra si el servidor
+  la prueba con el episodio que suena; si no, no se registra nada (nunca otra).
 - **Los textos de la portada no viajan.** El destacado y las filas no se guardan
   entre los textos de pantalla (`ScreenTexts`) que acompañan al episodio sin
   serie, y una pulsación fuera de la ficha olvida los ya guardados: el servidor
