@@ -710,7 +710,18 @@ const ProgressCard = memo(function ProgressCard({
   const title = item.title || "Sin título";
   const href = detailsHref(item);
   const previewClick = usePreviewOpen();
-  const onPreviewClick = previewClick(item, { mediaType: mediaTypeOf(item) });
+  // Con episodio en curso, la vista previa abre ese episodio, no la serie.
+  const onPreviewClick = previewClick(item, {
+    mediaType: mediaTypeOf(item),
+    episode: epCode(item)
+      ? {
+          showId: item.id,
+          seasonNumber: Number(item.season),
+          episodeNumber: Number(item.episode),
+          showName: item.title ?? null,
+        }
+      : undefined,
+  });
   const pct = clampPct(item.pct);
   const colors = getProgressColor(pct);
   const code = epCode(item);

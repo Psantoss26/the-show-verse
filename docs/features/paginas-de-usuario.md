@@ -24,6 +24,8 @@ Las tres comparten navegación (`WatchingSectionNav` en En progreso y Completada
 
 **Vistas de `/continue-watching`:** Tarjetas, Portadas y Lista (filas compactas, `viewMode="compact"`); en el móvil se eligen en la hoja de filtros con esos nombres.
 
+**Al pulsar una serie** con episodio en curso, la ficha rápida (DetailModal o vista lateral) abre ese **episodio**, no la serie: en `/continue-watching` con la opción `episode` de `usePreviewOpen`, y en la fila «Continuar viendo» del inicio (tarjeta, vista previa al pasar el ratón y su botón de visionado) con `previewItemFor` de `ContinueWatchingSection`. Las películas, y las series sin episodio, abren el título; el Calendario, que comparte el componente, sigue abriendo la serie.
+
 **Progreso manual:** se puede añadir una entrada eligiendo plataforma (Netflix, Prime Video, Max, Disney+, Apple TV, Movistar, Crunchyroll o Plex), porcentaje (como mucho 89 %) y, en series, el episodio. A partir del 90 % el progreso automático ya lo da por visto y lo saca de la fila. Backend: `/v1/progress`.
 
 **Marcar como finalizado:** la barra de `/continue-watching` tiene dos modos excluyentes junto a «+»: el ✓ («Marcar títulos como finalizados») y la papelera («Quitar títulos»); en móvil van en la primera fila del desplegable, en el orden «+», ✓, papelera (✓ y papelera juntos en un segmentado, para que el bloque mida lo mismo que los de las otras filas). En el modo ✓ cada tarjeta lleva un botón verde ✓ en el sitio de la papelera. Tras confirmar, la entrada sale de la fila y se apunta en el historial con el episodio que tuviera, igual que el completado automático (`POST /v1/progress/{id}/complete`).

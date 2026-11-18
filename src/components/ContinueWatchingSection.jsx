@@ -288,6 +288,36 @@ function titlePeekCardAttrs(show, mode) {
   return titlePeekAttrs(show, mediaTypeOf(show));
 }
 
+// Lo que abre la vista previa (DetailModal o vista lateral) al pulsar: en
+// Continuar viendo, el episodio en curso; en el Calendario y en películas, el
+// título tal cual.
+function previewItemFor(show, mode) {
+  const ep = show?.nextEpisode;
+  const season = Number(ep?.season);
+  const number = Number(ep?.number);
+  if (
+    mode !== "calendar" &&
+    mediaTypeOf(show) === "tv" &&
+    show?.id != null &&
+    Number.isFinite(season) &&
+    season > 0 &&
+    Number.isFinite(number) &&
+    number > 0
+  ) {
+    return {
+      media_type: "episode",
+      id: show.id,
+      showId: show.id,
+      seasonNumber: season,
+      episodeNumber: number,
+      name: ep?.name ?? null,
+      still_path: ep?.still_path ?? null,
+      showName: show?.name ?? show?.title ?? null,
+    };
+  }
+  return show;
+}
+
 function nextEpisodeHref(show) {
   if (mediaTypeOf(show) === "movie") {
     return `/details/movie/${show.id}`;
@@ -1193,7 +1223,7 @@ function ContinueWatchingPreviewCard({
       // van en la capa de cristal (que `usePreviewMorph` recorta) y la sombra en
       // su hermana, que un recorte de la carcasa cortaría.
       className={`absolute top-1/2 ${alignmentClass} rounded-xl text-white cursor-pointer z-50 flex flex-col`}
-      onClick={() => openDetailModal?.(show)}
+      onClick={() => openDetailModal?.(previewItemFor(show, mode))}
       onMouseEnter={(event) => {
         onPreviewMouseEnter?.(event);
         prefetchHref();
@@ -1412,7 +1442,7 @@ function ContinueWatchingPreviewCard({
               loading: traktInfo.loading,
               onOpen: (e) => {
                 e?.stopPropagation?.();
-                openDetailModal?.(show);
+                openDetailModal?.(previewItemFor(show, mode));
               },
             }}
             rate={{
@@ -2174,7 +2204,7 @@ function ContinueWatchingSection({
                     <div
                       data-preview-tile-art=""
                       className="h-full w-full cursor-pointer"
-                      onClick={() => openDetailModal?.(show)}
+                      onClick={() => openDetailModal?.(previewItemFor(show, mode))}
                       {...titlePeekCardAttrs(show, mode)}
                     >
                       {isMobile ? (
