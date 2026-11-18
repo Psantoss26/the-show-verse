@@ -290,6 +290,9 @@ class ScreenHeuristicsTest {
         assertFalse(ScreenHeuristics.isDetailSignal("Más información"))
         assertTrue(ScreenHeuristics.isBrowseScreen(browseSignals = 2, strongDetailSignals = 0))
         assertTrue(ScreenHeuristics.isBrowseScreen(browseSignals = 1, strongDetailSignals = 1))
+        // Portada con varias filas cuyas tarjetas traen «Compartir» o «Episodios».
+        assertTrue(ScreenHeuristics.isBrowseSignal("Episodios e información"))
+        assertTrue(ScreenHeuristics.isBrowseScreen(browseSignals = 3, strongDetailSignals = 2))
     }
 
     @Test

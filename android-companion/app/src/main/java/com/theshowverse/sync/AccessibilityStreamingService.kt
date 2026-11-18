@@ -152,15 +152,39 @@ class AccessibilityStreamingService : AccessibilityService() {
         } catch (_: Exception) {
             /* el nodo puede desaparecer con la pulsación */
         }
-        if (screenKind[pkg] == ScreenKind.BROWSE) {
+        // La tarjeta de Netflix puede ser solo una imagen sin texto dentro del
+        // elemento pulsado: el título va en la descripción de su contenedor.
+        if (ScreenHeuristics.clickedTitle(texts) == null) {
+            try {
+                var parent = e.source?.parent
+                var depth = 0
+                while (parent != null && depth < MAX_CLICK_PARENTS) {
+                    (parent.contentDescription ?: parent.text)?.toString()?.trim()
+                        ?.takeIf { it.isNotEmpty() && it !in texts }?.let { texts.add(it) }
+                    parent = parent.parent
+                    depth++
+                }
+            } catch (_: Exception) {
+                /* idem */
+            }
+        }
+        // La pantalla se mira AHORA, no en la última lectura: se puede pulsar una
+        // tarjeta antes de que la lectura con retardo de la portada llegue, y la
+        // última lectura sería todavía la del reproductor o la de la ficha anterior.
+        val kind = classifyNow(pkg) ?: screenKind[pkg]
+        if (kind == ScreenKind.PLAYER) return
+        if (kind != ScreenKind.DETAIL) {
             // En la portada no hay ficha de la que fiarse: el título sale de la
             // tarjeta pulsada (y el episodio, si su descripción lo trae).
             val title = ScreenHeuristics.clickedTitle(texts)
                 ?: billboardTitle[pkg]?.takeIf { texts.any { ScreenHeuristics.isPlayLabel(it) } }
             val browseChoice = EpisodeChoice.parse(texts, null)
             RecentDetail.rememberBrowseClick(pkg, title, browseChoice)
+            // Lo leído en la portada (el destacado, las filas) no es de lo que va a
+            // sonar: fuera de los candidatos que viajan con el episodio.
+            ScreenTexts.forget(pkg)
             p.addLog(
-                "Pulsado en la portada de ${Platforms.nameFor(pkg)}: " +
+                "Pulsado fuera de una ficha en ${Platforms.nameFor(pkg)}: " +
                     (title?.let { "«$it»" } ?: "sin título") +
                     (browseChoice?.let { " T${it.season ?: "?"}:E${it.episode}" } ?: ""),
             )
@@ -172,6 +196,38 @@ class AccessibilityStreamingService : AccessibilityService() {
             "Episodio elegido en ${Platforms.nameFor(pkg)}: T${choice.season ?: "?"}:E${choice.episode}" +
                 (choice.name?.let { " «$it»" } ?: ""),
         )
+    }
+
+    /** Qué pantalla de [pkg] hay ahora mismo (null si no se puede leer). */
+    private fun classifyNow(pkg: String): ScreenKind? {
+        return try {
+            val roots = candidateRoots(pkg)
+            if (roots.isEmpty()) return null
+            // Misma elección de ventana que processCurrent: en Prime puede haber
+            // detrás el inicio y no debe mandar sobre la ficha de delante.
+            var best: ScreenAnalysis? = null
+            for (r in roots) {
+                val a = analyzeScreen(r)
+                val prev = best
+                if (prev == null || ScreenHeuristics.isBetterDetail(
+                        a.looksLikeDetail, a.detailSignals, a.candidates.size,
+                        prev.looksLikeDetail, prev.detailSignals, prev.candidates.size,
+                    )
+                ) best = a
+            }
+            val a = best ?: return null
+            when {
+                a.playerControls >= ScreenHeuristics.MIN_PLAYER_CONTROLS -> ScreenKind.PLAYER
+                a.browse -> {
+                    a.candidates.firstOrNull()?.let { billboardTitle[pkg] = it }
+                    ScreenKind.BROWSE
+                }
+                a.looksLikeDetail -> ScreenKind.DETAIL
+                else -> ScreenKind.OTHER
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun processCurrent() {
@@ -220,7 +276,9 @@ class AccessibilityStreamingService : AccessibilityService() {
 
         // Textos de ESTA pantalla, sea o no una ficha: durante la reproducción es
         // la barra del reproductor, que suele nombrar la serie. Ver ScreenTexts.
-        ScreenTexts.record(pkg, analysis.candidates)
+        // La portada no: su destacado se colaba como serie del episodio que se
+        // reproducía desde «Seguir viendo».
+        if (!analysis.browse) ScreenTexts.record(pkg, analysis.candidates)
 
         // El reproductor no es una ficha (Netflix): lo que resolviera —«Brillo»
         // era una película— se recordaría como la serie que se está viendo y el
@@ -578,6 +636,7 @@ class AccessibilityStreamingService : AccessibilityService() {
         private const val MAX_WINDOWS = 6
         private const val MAX_PLAYER_NODES = 600
         private const val MAX_CLICK_NODES = 25
+        private const val MAX_CLICK_PARENTS = 3
         // Lecturas espaciadas (ver spacedUntil): una cada SPACED_READ_MS, durante
         // SPACED_WINDOW_MS desde la última vez que se vio el reproductor.
         private const val SPACED_READ_MS = 5_000L

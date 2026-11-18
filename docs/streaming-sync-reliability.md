@@ -201,6 +201,16 @@ reprodujera después desde «Seguir viendo»: se registraba *One Piece* en vez d
   mucho 2 minutos antes de reproducir (`HintFreshness.browseClickWins`), la serie
   es la de la tarjeta. «Reproducir» en el propio destacado usa el título del
   destacado. Reproducir desde una ficha abierta funciona como antes.
+- **La pantalla se mira al pulsar.** La lectura de la portada llega con retardo,
+  y al tocar una tarjeta de «Seguir viendo» enseguida la última lectura podía ser
+  todavía la del reproductor o la de la ficha anterior: la pulsación no contaba.
+  Ahora se clasifica la pantalla en el momento de pulsar, y cuenta cualquier
+  pulsación fuera de una ficha (portada, búsqueda, Mi lista). Si la tarjeta es solo
+  una imagen, el título se toma de la descripción de su contenedor.
+- **Los textos de la portada no viajan.** El destacado y las filas no se guardan
+  entre los textos de pantalla (`ScreenTexts`) que acompañan al episodio sin
+  serie, y una pulsación fuera de la ficha olvida los ya guardados: el servidor
+  probaba con ellos y registraba la serie del destacado.
 
 ### Episodio sin serie
 

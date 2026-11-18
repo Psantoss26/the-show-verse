@@ -424,6 +424,8 @@ object ScreenHeuristics {
         "nuevo y popular", "new & hot", "new and hot", "novedades más vistas",
         "novedades mas vistas", "explorar por idiomas", "browse by languages",
         "mi netflix", "my netflix", "juegos", "games",
+        "episodios e información", "episodios e informacion", "episodes & info",
+        "episodes and info", "categorías", "categorias", "categories",
     )
     private val BROWSE_PREFIXES = listOf(
         "seguir viendo para ", "continuar viendo para ", "continue watching for ",
@@ -467,7 +469,10 @@ object ScreenHeuristics {
      * pestañas de la app, sus propias señales la siguen reconociendo.
      */
     fun isBrowseScreen(browseSignals: Int, strongDetailSignals: Int): Boolean =
-        browseSignals >= 1 && strongDetailSignals < 2
+        (browseSignals >= 1 && strongDetailSignals < 2) ||
+            // Varias filas y pestañas de portada: las tarjetas de «Seguir viendo»
+            // traen su propio «Episodios e información» o «Compartir».
+            (browseSignals >= 2 && strongDetailSignals < 3)
 
     private val CLICK_SEPARATORS = Regex("\\s*(?:[,·•|\\n]|\\s-\\s)\\s*")
     private val CLICK_PREFIX = Regex(

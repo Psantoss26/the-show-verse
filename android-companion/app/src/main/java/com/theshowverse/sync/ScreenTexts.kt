@@ -39,6 +39,12 @@ object ScreenTexts {
         list.removeAll { now - it.atMs > RETENTION_MS }
     }
 
+    /** Olvida lo leído en [pkg] (lo pulsado en la portada: nada de eso va a sonar). */
+    @Synchronized
+    fun forget(pkg: String) {
+        byPackage.remove(pkg)
+    }
+
     /** Textos de [pkg] vistos desde [sinceMs] (elapsedRealtime), más recientes primero. */
     @Synchronized
     fun recent(pkg: String, sinceMs: Long, limit: Int = 8): List<String> {
