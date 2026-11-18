@@ -35,7 +35,12 @@ test("los dos destinos comparten la transición y solo uno marca el apretón de 
   // atrás al tocar la animación.
   assert.match(source, /const goToDetailsRoute = async \(href, transitionKey\)/);
   assert.match(source, /const goToFullDetails = \(\) =>\s*goToDetailsRoute\(/);
-  assert.match(source, /const goToSeasonDetails = \(\) => goToDetailsRoute\(seasonHref\)/);
+  // Desde «Continuar viendo» la temporada va a su ficha completa; en el resto,
+  // al panel de la temporada.
+  assert.match(
+    source,
+    /const goToSeasonDetails = \(\) =>\s*fromContinueWatching\s*\? goToDetailsRoute\(seasonHref\)\s*: openDetailModal\?\.\(\{ media_type: "season"/,
+  );
 
   // `DETAILS_ROUTE_TRANSITION_KEY` lo consume DetailsClient para reconocer que
   // viene del modal. La temporada NO participa, así que no debe escribirlo:
@@ -59,4 +64,44 @@ test("los controles superiores se agrupan para no solaparse al expandirse", asyn
   );
   // Y ninguno de los dos conserva su propio anclaje absoluto.
   assert.doesNotMatch(source, /absolute right-4 top-4 z-30 group flex/);
+});
+
+test("desde Continuar viendo, el episodio ofrece «Ver serie» en el mismo panel", async () => {
+  const source = await readFile(modalPath, "utf8");
+
+  assert.match(
+    source,
+    /const fromContinueWatching =\s*isEpisode && item\?\.previewSource === "continue-watching";/,
+  );
+  // La serie se APILA (drill): Atrás vuelve al episodio, y el provider decide
+  // si va centrada o en el lateral según la configuración.
+  assert.match(
+    source,
+    /openDetailModal\?\.\(\s*\{ media_type: "tv", id: episodeMeta\.showId \},\s*\{ drill: true \},?\s*\)/,
+  );
+  assert.match(source, /\{openSeriesPreview && \(/);
+  assert.match(source, /aria-label="Ver serie"/);
+});
+
+test("la fila Continuar viendo marca sus episodios y el Calendario no", async () => {
+  const source = await readFile(
+    new URL("../../components/ContinueWatchingSection.jsx", import.meta.url),
+    "utf8",
+  );
+  const helper = source.match(/function previewItemFor\(show, mode\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(helper, "no se localiza previewItemFor");
+  assert.match(helper, /mode !== "calendar"/);
+  assert.match(helper, /previewSource: "continue-watching"/);
+});
+
+test("en la vista teléfono, la temporada del episodio de Continuar viendo va a la ficha completa", async () => {
+  const source = await readFile(
+    new URL("../../components/dashboard/SubrouteDetailsPanel.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /next\?\.media_type === "season" && item\.previewSource === "continue-watching"\) openRouteFromFrame\(url\.pathname\)/,
+  );
+  assert.match(source, /const goToFullDetails = \(\) => goToDetailsRoute\(href\);/);
 });

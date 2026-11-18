@@ -313,6 +313,8 @@ function previewItemFor(show, mode) {
       name: ep?.name ?? null,
       still_path: ep?.still_path ?? null,
       showName: show?.name ?? show?.title ?? null,
+      // DetailModal: «Ver temporada» a la ficha completa y botón «Ver serie».
+      previewSource: "continue-watching",
     };
   }
   return show;

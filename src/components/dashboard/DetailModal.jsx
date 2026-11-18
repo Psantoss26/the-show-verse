@@ -2491,7 +2491,25 @@ export default function DetailModal({
       ? `/details/tv/${episodeMeta.showId}/season/${episodeMeta.seasonNumber}`
       : null;
 
-  const goToSeasonDetails = () => openDetailModal?.({ media_type: "season", id: episodeMeta.showId, showId: episodeMeta.showId, seasonNumber: episodeMeta.seasonNumber }, { drill: true });
+  // Episodio abierto desde «Continuar viendo» del dashboard: «Ver temporada»
+  // va a la ficha completa de la temporada (no al panel) y «Ver serie» apila
+  // la serie en este mismo panel, con su presentación (centrado o lateral).
+  const fromContinueWatching =
+    isEpisode && item?.previewSource === "continue-watching";
+
+  const goToSeasonDetails = () =>
+    fromContinueWatching
+      ? goToDetailsRoute(seasonHref)
+      : openDetailModal?.({ media_type: "season", id: episodeMeta.showId, showId: episodeMeta.showId, seasonNumber: episodeMeta.seasonNumber }, { drill: true });
+
+  const openSeriesPreview =
+    fromContinueWatching && episodeMeta?.showId != null
+      ? () =>
+          openDetailModal?.(
+            { media_type: "tv", id: episodeMeta.showId },
+            { drill: true },
+          )
+      : null;
 
   /* --------------------------------- derivados --------------------------------- */
   // Las pestañas (estado activo + cuerpos) las gestiona <DetailsInfoTabs>.
@@ -3889,6 +3907,24 @@ export default function DetailModal({
                 </div>
                 <span className={`max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 ${mobileDetails ? "hidden" : "group-hover:max-w-[104px] group-hover:opacity-100"} translate-y-[1px]`}>
                   Ver temporada
+                </span>
+              </button>
+            )}
+            {/* La serie del episodio, en el mismo panel: solo desde
+                «Continuar viendo» del dashboard. */}
+            {openSeriesPreview && (
+              <button
+                type="button"
+                onClick={openSeriesPreview}
+                disabled={navigatingToFullDetails}
+                className={`group flex h-10 w-10 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out ${mobileDetails ? "" : "hover:w-[124px] hover:gap-1.5 hover:px-3"} ${DETAIL_MODAL_GLASS_CONTROL}`}
+                aria-label="Ver serie"
+              >
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                  <MonitorPlay className="h-5 w-5 shrink-0" />
+                </div>
+                <span className={`max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 ${mobileDetails ? "hidden" : "group-hover:max-w-[80px] group-hover:opacity-100"} translate-y-[1px]`}>
+                  Ver serie
                 </span>
               </button>
             )}

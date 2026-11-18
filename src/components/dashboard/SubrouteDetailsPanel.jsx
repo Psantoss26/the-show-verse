@@ -376,14 +376,14 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
 
   // A la ficha completa con la misma transición que DetailModal. También al
   // pulsar la portada de la ficha (mensaje `open-full` del iframe).
-  const goToFullDetails = async () => {
-    if (navigating || !href) return;
+  const goToDetailsRoute = async (target) => {
+    if (navigating || !target) return;
     if (!isServerReachable()) {
-      await openSavedRoute(href);
+      await openSavedRoute(target);
       return;
     }
     if (reducedMotion) {
-      router.push(href);
+      router.push(target);
       return;
     }
     const routeTransition = startFullDetailsTransition(panelRef.current, right ? "right" : "center", {
@@ -391,17 +391,21 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
     });
     setNavigating(true);
     if (routeTransition) await nextAnimationFrame();
-    router.push(href);
+    router.push(target);
     if (routeTransition) {
       Promise.all([waitForDetailsRoot(), wait(DETAILS_ROUTE_REVEAL_MIN_MS)])
         .catch(() => {})
         .finally(routeTransition.reveal);
     }
   };
+  const goToFullDetails = () => goToDetailsRoute(href);
 
   // La portada del iframe pide la ficha completa (ver EmbeddedDetailsBridge).
   const openFullFromFrame = useEffectEvent(() => {
     goToFullDetails();
+  });
+  const openRouteFromFrame = useEffectEvent((target) => {
+    goToDetailsRoute(target);
   });
 
   useEffect(() => {
@@ -418,7 +422,10 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
       try { url = canonicalDetailsHref(destination, window.location.origin); } catch { return; }
       if (url.origin !== window.location.origin) return;
       const next = detailPreviewFromHref(url.href, window.location.origin);
-      if (next) onOpenDetail(next, { drill: true });
+      // Episodio abierto desde «Continuar viendo» del dashboard: la temporada
+      // va a su ficha completa; la serie sigue apilándose en el panel.
+      if (next?.media_type === "season" && item.previewSource === "continue-watching") openRouteFromFrame(url.pathname);
+      else if (next) onOpenDetail(next, { drill: true });
       else router.push(`${url.pathname}${url.search}${url.hash}`);
     };
     window.addEventListener("message", receive);
