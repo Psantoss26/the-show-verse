@@ -273,7 +273,9 @@ object ScreenHeuristics {
         "añadir a mi lista", "agregar a mi lista", "add to watchlist", "add to my list",
         "mi lista", "my list", "descargar", "download", "tráiler", "trailer",
         "ver tráiler", "watch trailer", "episodios", "episodes", "temporadas",
-        "seasons", "más información", "mas informacion", "more info", "detalles",
+        // Sin «Más información»: es el botón del DESTACADO de la portada (ver
+        // isBrowseSignal), no de la ficha.
+        "seasons", "detalles",
         "details", "sinopsis", "synopsis", "reparto", "reparto y equipo", "cast",
         "títulos similares", "titulos similares", "more like this", "también te puede gustar",
         "compartir", "share", "valorar", "rate", "me gusta", "no me gusta",
@@ -409,6 +411,86 @@ object ScreenHeuristics {
      */
     fun looksLikeDetail(sawPlay: Boolean, detailSignals: Int): Boolean {
         return sawPlay || detailSignals >= MIN_DETAIL_SIGNALS
+    }
+
+    // PORTADA (inicio, Series, Películas…). Su destacado lleva «Reproducir», «Mi
+    // lista», «7 temporadas», el año y la edad: pasaba por la ficha de ese título
+    // sin haberla abierto, y esa serie se prestaba después al episodio que se
+    // reprodujera desde «Seguir viendo» (Netflix registraba One Piece en vez de
+    // Breaking Bad). Estos textos solo salen en la portada.
+    private val BROWSE_EXACT = setOf(
+        "más información", "mas informacion", "más info", "mas info", "more info",
+        "more information", "información", "informacion", "info",
+        "nuevo y popular", "new & hot", "new and hot", "novedades más vistas",
+        "novedades mas vistas", "explorar por idiomas", "browse by languages",
+        "mi netflix", "my netflix", "juegos", "games",
+    )
+    private val BROWSE_PREFIXES = listOf(
+        "seguir viendo para ", "continuar viendo para ", "continue watching for ",
+        "keep watching for ", "seguir viendo contenido de ", "continuar viendo contenido de ",
+        "tendencias", "trending now", "populares en ",
+        "popular on ", "top 10 ", "porque has visto", "because you watched",
+        "los millennials ", "mi lista de ", "solo en netflix", "only on netflix",
+    )
+
+    /** ¿El texto solo sale en la PORTADA (destacado, filas, pestañas)? */
+    fun isBrowseSignal(text: String?): Boolean {
+        val n = text?.let { norm(it) } ?: return false
+        if (n.isEmpty()) return false
+        return n in BROWSE_EXACT || BROWSE_PREFIXES.any { n.startsWith(it) }
+    }
+
+    // Lo que SOLO tiene la ficha abierta, nunca el destacado de la portada: la
+    // pestaña de episodios, el selector de temporada, similares, tráileres,
+    // descargar, compartir, valorar, el reparto.
+    private val STRONG_DETAIL_EXACT = setOf(
+        "episodios", "episodes", "más títulos similares", "mas titulos similares",
+        "títulos similares", "titulos similares", "more like this", "más como esto",
+        "mas como esto", "tráiler y más", "trailer y mas", "tráileres y más",
+        "trailers & more", "trailers and more", "descargar", "download", "compartir",
+        "share", "valorar", "calificar", "rate", "reparto", "reparto y equipo", "cast",
+        "sinopsis", "synopsis", "x-ray", "rayos x", "más detalles", "mas detalles",
+        "tráiler", "trailer", "ver tráiler", "ver trailer", "watch trailer",
+    )
+
+    /** ¿El texto solo sale en una ficha abierta? (ver [isBrowseScreen]). */
+    fun isStrongDetailSignal(text: String?): Boolean {
+        val n = text?.let { norm(it) } ?: return false
+        if (n.isEmpty()) return false
+        return n in STRONG_DETAIL_EXACT || SEASON_LABEL_RE.containsMatchIn(n) ||
+            n.startsWith("descargar t") || n.startsWith("download s")
+    }
+
+    /**
+     * ¿Es la PORTADA y no una ficha? Hay algo que solo sale en la portada y menos
+     * de dos cosas que solo tiene la ficha: si la ficha deja a la vista la barra de
+     * pestañas de la app, sus propias señales la siguen reconociendo.
+     */
+    fun isBrowseScreen(browseSignals: Int, strongDetailSignals: Int): Boolean =
+        browseSignals >= 1 && strongDetailSignals < 2
+
+    private val CLICK_SEPARATORS = Regex("\\s*(?:[,·•|\\n]|\\s-\\s)\\s*")
+    private val CLICK_PREFIX = Regex(
+        "^(?:reproducir|reanudar|seguir viendo|continuar viendo|continuar|ver|play|resume|watch|continue watching)\\s+",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /**
+     * El título de la tarjeta pulsada FUERA de una ficha (la portada, «Seguir
+     * viendo», la búsqueda): Netflix reproduce el episodio al tocar la tarjeta, sin
+     * pasar por la ficha, y esto es lo único que dice de qué serie es. [texts]:
+     * primero el de lo pulsado, luego los de sus hijos. La descripción puede venir
+     * entera («Breaking Bad, T5:E3, Reanudar»), así que se trocea. Null si nada
+     * parece un título.
+     */
+    fun clickedTitle(texts: List<String>): String? {
+        for (text in texts) {
+            for (part in text.split(CLICK_SEPARATORS)) {
+                val clean = part.trim().replace(CLICK_PREFIX, "").trim()
+                if (isLikelyTitle(clean) && !isBrowseSignal(clean)) return clean
+            }
+        }
+        return null
     }
 
     /**

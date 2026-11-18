@@ -47,6 +47,34 @@ object RecentDetail {
     @Volatile private var choice: EpisodeChoice.Choice? = null
     @Volatile private var choiceAtMs: Long = 0L
 
+    // Última pulsación en la PORTADA de la app (ver rememberBrowseClick).
+    @Volatile private var browsePkg: String? = null
+    @Volatile private var browseTitle: String? = null
+    @Volatile private var browseChoice: EpisodeChoice.Choice? = null
+    @Volatile private var browseAtMs: Long = 0L
+
+    /**
+     * El usuario pulsó algo en la PORTADA de [pkg] (una tarjeta de «Seguir
+     * viendo», el destacado…), con el título [title] de la tarjeta si se pudo leer
+     * y el episodio [choice] si su descripción lo traía. Netflix reproduce así sin
+     * abrir ninguna ficha, y la última ficha vista ya no es de lo que va a sonar:
+     * desde ahora no se presta (ver [HintFreshness.browseClickWins]).
+     */
+    @Synchronized
+    fun rememberBrowseClick(pkg: String, title: String?, choice: EpisodeChoice.Choice?) {
+        browsePkg = pkg
+        browseTitle = title?.trim()?.takeIf { it.isNotEmpty() }
+        browseChoice = choice
+        browseAtMs = SystemClock.elapsedRealtime()
+    }
+
+    /** ¿Una pulsación en la portada de [pkg] dejó sin valor la ficha recordada? */
+    private fun browseWins(pkg: String, playbackStartedAt: Long, now: Long): Boolean {
+        if (pkg != browsePkg) return false
+        val detailAt = if (pkg == this.pkg) atMs else 0L
+        return HintFreshness.browseClickWins(browseAtMs, detailAt, playbackStartedAt, now)
+    }
+
     /** El usuario pulsó en la ficha de [pkg] algo que reproduce [choice]. */
     @Synchronized
     fun rememberEpisode(pkg: String, choice: EpisodeChoice.Choice) {
@@ -63,8 +91,9 @@ object RecentDetail {
      */
     @Synchronized
     fun episodeFor(pkg: String, playbackStartedAt: Long): EpisodeChoice.Choice? {
-        if (pkg != choicePkg || pkg != this.pkg) return null
         val now = SystemClock.elapsedRealtime()
+        if (browseWins(pkg, playbackStartedAt, now)) return browseChoice
+        if (pkg != choicePkg || pkg != this.pkg) return null
         if (choiceAtMs < atMs - CHOICE_BEFORE_DETAIL_MS) return null
         if (!HintFreshness.usable(Source.DETAIL, choiceAtMs, playbackStartedAt, now)) return null
         return choice
@@ -99,6 +128,10 @@ object RecentDetail {
         choicePkg = null
         choice = null
         choiceAtMs = 0L
+        browsePkg = null
+        browseTitle = null
+        browseChoice = null
+        browseAtMs = 0L
     }
 
     /**
@@ -125,6 +158,7 @@ object RecentDetail {
     fun detailFor(pkg: String, playbackStartedAt: Long): SyncedInfo? {
         if (pkg != this.pkg) return null
         val now = SystemClock.elapsedRealtime()
+        if (browseWins(pkg, playbackStartedAt, now)) return null
         if (!HintFreshness.usable(source, atMs, playbackStartedAt, now)) return null
         return synced
     }
@@ -143,6 +177,9 @@ object RecentDetail {
         ) {
             confirmedTitle?.let { return it }
         }
+        // Reproducido desde la portada: la serie es la de la tarjeta pulsada, no
+        // la de la última ficha (que suele ser la del destacado o una anterior).
+        if (browseWins(pkg, playbackStartedAt, now)) return browseTitle
         if (pkg != this.pkg) return null
         if (!HintFreshness.usable(source, atMs, playbackStartedAt, now)) {
             return null
@@ -180,6 +217,21 @@ object HintFreshness {
         val name = TitleMatch.normalize(episodeName)
         if (name.length < 4 || GENERIC_EPISODE.matches(name)) return null
         return "$name|${season ?: ""}|${episode ?: ""}"
+    }
+
+    /** Una pulsación en la portada vale si fue como mucho esto antes de reproducir. */
+    const val BROWSE_CLICK_BEFORE_PLAYBACK_MS = 2 * 60 * 1000L
+
+    /**
+     * ¿La pulsación en la portada ([clickAtMs]) manda sobre la ficha vista en
+     * [detailAtMs] (0 si no hay) para la sesión que empezó en [playbackStartedAt]?
+     * Sí si es POSTERIOR a la ficha (se salió de ella y se eligió otra cosa) y
+     * cercana al arranque de la reproducción.
+     */
+    fun browseClickWins(clickAtMs: Long, detailAtMs: Long, playbackStartedAt: Long, nowMs: Long): Boolean {
+        if (clickAtMs <= 0L || nowMs - clickAtMs > MAX_AGE_MS) return false
+        if (clickAtMs <= detailAtMs) return false
+        return clickAtMs >= playbackStartedAt - BROWSE_CLICK_BEFORE_PLAYBACK_MS
     }
 
     fun resumeUsable(confirmedAtMs: Long, nowMs: Long): Boolean =

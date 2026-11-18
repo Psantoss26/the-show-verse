@@ -179,6 +179,29 @@ La ficha se lee del árbol de accesibilidad (`AccessibilityStreamingService`):
   notificaciones, los premios («2 Emmy · 86 premios») ni «Calificación», «Me
   encanta» o «No es para mí».
 
+### La portada no es una ficha
+
+El destacado de la portada de Netflix («Reproducir», «Mi lista», «Más
+información», «7 temporadas») pasaba por la ficha de ese título sin haberla
+abierto. Su serie se recordaba (`RecentDetail`) y se prestaba al episodio que se
+reprodujera después desde «Seguir viendo»: se registraba *One Piece* en vez de
+*Breaking Bad*. Ahora:
+
+- **Portada.** Hay textos que solo salen en la portada (`ScreenHeuristics.isBrowseSignal`:
+  «Más información», «Seguir viendo para…», «Nuevo y popular», «Top 10…») y otros
+  que solo tiene la ficha abierta (`isStrongDetailSignal`: «Episodios», el selector
+  «Temporada N», «Más títulos similares», «Descargar», «Compartir»…). Con alguno de
+  portada y menos de dos de ficha, la pantalla es la portada y no se resuelve como
+  ficha. El registro lo anota como «Portada, no es ficha». «Más información» ya no
+  cuenta como señal de ficha.
+- **Lo pulsado en la portada.** Una tarjeta de «Seguir viendo» reproduce sin
+  pasar por ninguna ficha. Al pulsarla se guarda su título (y el episodio, si su
+  descripción lo trae) con `RecentDetail.rememberBrowseClick`, y la última ficha
+  vista deja de prestarse: si la pulsación es posterior a esa ficha y llegó como
+  mucho 2 minutos antes de reproducir (`HintFreshness.browseClickWins`), la serie
+  es la de la tarjeta. «Reproducir» en el propio destacado usa el título del
+  destacado. Reproducir desde una ficha abierta funciona como antes.
+
 ### Episodio sin serie
 
 Sin la serie de la ficha, Netflix en Android solo da el nombre del episodio

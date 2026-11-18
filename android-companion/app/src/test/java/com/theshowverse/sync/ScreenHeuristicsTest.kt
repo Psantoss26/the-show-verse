@@ -2,6 +2,7 @@ package com.theshowverse.sync
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -274,5 +275,42 @@ class ScreenHeuristicsTest {
         assertTrue(ScreenHeuristics.isAdText("Anuncio 1 de 2"))
         assertTrue(ScreenHeuristics.isAdText("Ad 1 of 2"))
         assertFalse(ScreenHeuristics.isAdText("AD"))
+    }
+
+    @Test
+    fun elDestacadoDeLaPortadaNoEsUnaFicha() {
+        // Destacado de Netflix: «Reproducir», «Mi lista», «Más información», «7
+        // temporadas». Antes contaba como la ficha de One Piece.
+        assertTrue(ScreenHeuristics.isBrowseSignal("Más información"))
+        assertTrue(ScreenHeuristics.isBrowseSignal("Seguir viendo para Pablo"))
+        assertTrue(ScreenHeuristics.isBrowseSignal("Nuevo y popular"))
+        assertTrue(ScreenHeuristics.isBrowseSignal("Top 10 series en España hoy"))
+        assertFalse(ScreenHeuristics.isBrowseSignal("Breaking Bad"))
+        assertFalse(ScreenHeuristics.isBrowseSignal("Reproducir"))
+        assertFalse(ScreenHeuristics.isDetailSignal("Más información"))
+        assertTrue(ScreenHeuristics.isBrowseScreen(browseSignals = 2, strongDetailSignals = 0))
+        assertTrue(ScreenHeuristics.isBrowseScreen(browseSignals = 1, strongDetailSignals = 1))
+    }
+
+    @Test
+    fun laFichaSigueSiendoFichaAunqueAsomeLaBarraDePestanas() {
+        assertTrue(ScreenHeuristics.isStrongDetailSignal("Episodios"))
+        assertTrue(ScreenHeuristics.isStrongDetailSignal("Temporada 2"))
+        assertTrue(ScreenHeuristics.isStrongDetailSignal("Más títulos similares"))
+        assertTrue(ScreenHeuristics.isStrongDetailSignal("Descargar T1:E1"))
+        assertFalse(ScreenHeuristics.isStrongDetailSignal("Mi lista"))
+        assertFalse(ScreenHeuristics.isStrongDetailSignal("7 temporadas"))
+        assertFalse(ScreenHeuristics.isBrowseScreen(browseSignals = 1, strongDetailSignals = 3))
+        assertFalse(ScreenHeuristics.isBrowseScreen(browseSignals = 0, strongDetailSignals = 0))
+    }
+
+    @Test
+    fun elTituloDeLaTarjetaPulsada() {
+        assertEquals("Breaking Bad", ScreenHeuristics.clickedTitle(listOf("Breaking Bad, T5:E3, Reanudar")))
+        assertEquals("Breaking Bad", ScreenHeuristics.clickedTitle(listOf("Reanudar Breaking Bad")))
+        assertEquals("One Piece", ScreenHeuristics.clickedTitle(listOf("Reproducir", "One Piece")))
+        assertNull(ScreenHeuristics.clickedTitle(listOf("Reproducir")))
+        assertNull(ScreenHeuristics.clickedTitle(listOf("Más información")))
+        assertNull(ScreenHeuristics.clickedTitle(emptyList()))
     }
 }

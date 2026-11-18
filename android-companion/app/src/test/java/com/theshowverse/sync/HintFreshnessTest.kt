@@ -52,4 +52,21 @@ class HintFreshnessTest {
         assertNull(HintFreshness.episodeKey("Capítulo 1", 1, 1))
         assertNull(HintFreshness.episodeKey(null, 1, 1))
     }
+
+    @Test
+    fun unaPulsacionEnLaPortadaDejaSinValorLaFichaAnterior() {
+        val ficha = start - 5 * min
+        // Ficha del destacado, luego tarjeta de «Seguir viendo», y a reproducir.
+        assertTrue(HintFreshness.browseClickWins(start - min, ficha, start, start + min))
+        // Sin ficha previa, la pulsación también manda.
+        assertTrue(HintFreshness.browseClickWins(start - min, 0L, start, start + min))
+        // La ficha es POSTERIOR a la pulsación: se abrió la ficha y se reprodujo desde ella.
+        assertFalse(HintFreshness.browseClickWins(ficha - min, ficha, start, start + min))
+        // Pulsación demasiado anterior al arranque, o ninguna.
+        assertFalse(HintFreshness.browseClickWins(start - 5 * min, start - 6 * min, start, start + min))
+        assertFalse(HintFreshness.browseClickWins(0L, 0L, start, start + min))
+        // Nunca más allá de media hora.
+        assertFalse(HintFreshness.browseClickWins(start - min, 0L, start, start + 40 * min))
+    }
 }
+

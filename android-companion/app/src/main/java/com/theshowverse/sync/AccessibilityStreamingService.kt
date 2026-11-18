@@ -117,6 +117,15 @@ class AccessibilityStreamingService : AccessibilityService() {
     // que se pulse en ella. Ver EpisodeChoice.
     private val fichaSeason = HashMap<String, Int>()
 
+    // Qué pantalla de cada app se leyó la última vez: lo pulsado en la PORTADA
+    // (una tarjeta de «Seguir viendo») reproduce sin pasar por ninguna ficha, y la
+    // ficha vista antes no es de lo que va a sonar. Ver RecentDetail.rememberBrowseClick.
+    private enum class ScreenKind { DETAIL, BROWSE, PLAYER, OTHER }
+    private val screenKind = HashMap<String, ScreenKind>()
+    // Título del destacado de la portada (su primer candidato): «Reproducir» en el
+    // destacado no trae el título, que antes daba la ficha falsa del destacado.
+    private val billboardTitle = HashMap<String, String>()
+
     /**
      * Lo pulsado en la app: si es un episodio («Reanudar episodio 9», la fila
      * «9. Nombre», «T6 E9»), se recuerda para la reproducción que empieza. Prime
@@ -142,6 +151,20 @@ class AccessibilityStreamingService : AccessibilityService() {
             }
         } catch (_: Exception) {
             /* el nodo puede desaparecer con la pulsación */
+        }
+        if (screenKind[pkg] == ScreenKind.BROWSE) {
+            // En la portada no hay ficha de la que fiarse: el título sale de la
+            // tarjeta pulsada (y el episodio, si su descripción lo trae).
+            val title = ScreenHeuristics.clickedTitle(texts)
+                ?: billboardTitle[pkg]?.takeIf { texts.any { ScreenHeuristics.isPlayLabel(it) } }
+            val browseChoice = EpisodeChoice.parse(texts, null)
+            RecentDetail.rememberBrowseClick(pkg, title, browseChoice)
+            p.addLog(
+                "Pulsado en la portada de ${Platforms.nameFor(pkg)}: " +
+                    (title?.let { "«$it»" } ?: "sin título") +
+                    (browseChoice?.let { " T${it.season ?: "?"}:E${it.episode}" } ?: ""),
+            )
+            return
         }
         val choice = EpisodeChoice.parse(texts, fichaSeason[pkg]) ?: return
         RecentDetail.rememberEpisode(pkg, choice)
@@ -169,6 +192,7 @@ class AccessibilityStreamingService : AccessibilityService() {
         val readAt = SystemClock.elapsedRealtime()
         lastReadAt[pkg] = readAt
         if (Platforms.readsPlayerScreen(pkg) && readPlayerScreen(p, pkg, roots)) {
+            screenKind[pkg] = ScreenKind.PLAYER
             spacedUntil[pkg] = readAt + SPACED_WINDOW_MS
             return
         }
@@ -202,6 +226,7 @@ class AccessibilityStreamingService : AccessibilityService() {
         // era una película— se recordaría como la serie que se está viendo y el
         // episodio que suena se quedaría sin la suya.
         if (analysis.playerControls >= ScreenHeuristics.MIN_PLAYER_CONTROLS) {
+            screenKind[pkg] = ScreenKind.PLAYER
             ScreenPlayback.playerSeen(pkg, SystemClock.elapsedRealtime(), ScreenHeuristics.playerPaused(analysis.uiLabels))
             return
         }
@@ -219,6 +244,15 @@ class AccessibilityStreamingService : AccessibilityService() {
             spacedUntil.remove(pkg)
             analysis.season?.let { fichaSeason[pkg] = it }
         }
+        screenKind[pkg] = when {
+            analysis.browse -> {
+                val top = analysis.candidates.firstOrNull()
+                if (top != null) billboardTitle[pkg] = top else billboardTitle.remove(pkg)
+                ScreenKind.BROWSE
+            }
+            analysis.looksLikeDetail -> ScreenKind.DETAIL
+            else -> ScreenKind.OTHER
+        }
         if (!analysis.looksLikeDetail || analysis.candidates.isEmpty()) {
             // Diagnóstico (una vez por texto): candidatos, etiquetas de UI y, en Prime,
             // el barrido de ventanas, para afinar si no se reconoce una ficha.
@@ -230,7 +264,8 @@ class AccessibilityStreamingService : AccessibilityService() {
                     " · ui=[" + analysis.uiLabels.joinToString(", ") + "]" else ""
                 val scanTxt = if (winScan.isNotEmpty()) " · win=$winScan" else ""
                 p.addLog(
-                    "Ficha no reconocida (${Platforms.nameFor(pkg)}): play=${analysis.sawPlay} " +
+                    (if (analysis.browse) "Portada, no es ficha" else "Ficha no reconocida") +
+                        " (${Platforms.nameFor(pkg)}): play=${analysis.sawPlay} " +
                         "señales=${analysis.detailSignals} · $titles$labels$scanTxt",
                 )
             }
@@ -345,6 +380,8 @@ class AccessibilityStreamingService : AccessibilityService() {
         val playerControls: Int = 0,
         // Temporada que muestra el selector de la ficha (ver EpisodeChoice.seasonFrom).
         val season: Int? = null,
+        // La PORTADA y no una ficha (ver ScreenHeuristics.isBrowseScreen).
+        val browse: Boolean = false,
     )
 
     // Recorre el árbol (acotado): recoge candidatos de título (encabezados primero,
@@ -362,7 +399,10 @@ class AccessibilityStreamingService : AccessibilityService() {
         var seriesSignals = 0
         var playerControls = 0
         var season: Int? = null
+        var browseSignals = 0
+        var strongDetailSignals = 0
         val detailSeen = HashSet<String>()
+        val browseSeen = HashSet<String>()
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
         var visited = 0
@@ -382,6 +422,12 @@ class AccessibilityStreamingService : AccessibilityService() {
                     detailSignals++
                 }
                 if (ScreenHeuristics.isSeriesSignal(raw)) seriesSignals++
+                if (ScreenHeuristics.isBrowseSignal(raw) && browseSeen.add("b" + raw.lowercase())) {
+                    browseSignals++
+                }
+                if (ScreenHeuristics.isStrongDetailSignal(raw) && browseSeen.add("d" + raw.lowercase())) {
+                    strongDetailSignals++
+                }
                 playerControls += ScreenHeuristics.playerWeight(raw)
                 if (season == null) season = EpisodeChoice.seasonFrom(raw)
                 if (ScreenHeuristics.isLikelyTitle(raw) && seen.add(raw.lowercase())) {
@@ -403,9 +449,12 @@ class AccessibilityStreamingService : AccessibilityService() {
             }
         }
         val ordered = (headings + texts).take(MAX_CANDIDATES)
+        // El destacado de la portada trae «Reproducir» y sus señales de ficha: si
+        // la pantalla es la portada, no es una ficha aunque lo parezca.
+        val browse = ScreenHeuristics.isBrowseScreen(browseSignals, strongDetailSignals)
         return ScreenAnalysis(
             candidates = ordered,
-            looksLikeDetail = ScreenHeuristics.looksLikeDetail(sawPlay, detailSignals),
+            looksLikeDetail = !browse && ScreenHeuristics.looksLikeDetail(sawPlay, detailSignals),
             sawPlay = sawPlay,
             detailSignals = detailSignals,
             headingCount = headings.size,
@@ -413,6 +462,7 @@ class AccessibilityStreamingService : AccessibilityService() {
             seriesSignals = seriesSignals,
             playerControls = playerControls,
             season = season,
+            browse = browse,
         )
     }
 
