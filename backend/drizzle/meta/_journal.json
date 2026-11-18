@@ -225,6 +225,13 @@
       "when": 1793800670351,
       "tag": "0031_pro_psantos26",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794997341950,
+      "tag": "0032_hinted_correction_rules",
+      "breakpoints": true
     }
   ]
 }

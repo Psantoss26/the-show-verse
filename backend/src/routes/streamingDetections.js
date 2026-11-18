@@ -48,6 +48,7 @@ import { invalidateLevelState } from '../level/store.js';
 import {
   GLOBAL_OWNER,
   aggregateGlobalRules,
+  correctionTeachesRules,
   decideFromRules,
   globalRuleMinSupporters,
   userRulesFromCorrection,
@@ -654,8 +655,9 @@ async function correctDetection(userId, detectionId, body) {
     }
 
     // Solo se aprende de huellas útiles, y nunca de «era el mismo título» (solo
-    // se cambió el episodio: el título no estaba mal).
-    if (detection.fingerprint && !sameAsDetected) {
+    // se cambió el episodio: el título no estaba mal) ni de una serie prestada
+    // de otra pantalla (ver correctionTeachesRules).
+    if (detection.fingerprint && !sameAsDetected && correctionTeachesRules(detection)) {
       await applyUserRules(tx, userId, correction);
       await recomputeGlobalRules(tx, detection.platform, detection.fingerprint, detection.triggerText);
     }

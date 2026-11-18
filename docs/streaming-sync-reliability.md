@@ -485,6 +485,15 @@ pings posteriores y crea reglas sobre la **huella** de lo que había en pantalla
 - **«No es un título»:** esa huella se ignora; los clientes además descartan el
   texto antes de tratar la pantalla como ficha.
 
+Una reproducción cuya serie era **prestada** (`seriesFromHint`: la ficha o la
+tarjeta de la portada vista antes) no crea reglas al corregirse ni cuenta para el
+consenso (`correctionTeachesRules`). Ese texto no lo dijo el reproductor: la
+corrección solo dice que la pista era de otro título. Antes, un «Outlander» leído
+de la tarjeta equivocada mientras sonaba *Breaking Bad* dejaba la regla
+«Outlander = Breaking Bad» con Outlander vetado, y cada episodio de Outlander se
+registraba después como Breaking Bad. La migración `0032` quitó las reglas ya
+aprendidas así.
+
 Las reglas valen al momento para quien corrige y para todos cuando coinciden 3
 usuarios distintos (`DETECTION_GLOBAL_MIN_SUPPORTERS`). Diseño completo:
 `docs/superpowers/specs/2026-10-05-streaming-detection-corrections-design.md`.

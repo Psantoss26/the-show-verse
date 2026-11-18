@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   GLOBAL_OWNER,
   aggregateGlobalRules,
+  correctionTeachesRules,
   decideFromRules,
   userRulesFromCorrection,
 } from './detectionRules.js';
@@ -87,4 +88,24 @@ test('un empate en cabeza no decide nada', () => {
     correction('b', { verdict: 'not_a_title' }),
   ];
   assert.equal(aggregateGlobalRules(rows, 1).decision, null);
+});
+
+// El texto de una detección con la serie PRESTADA (la ficha o la tarjeta vista
+// antes, `seriesFromHint`) no lo dijo el reproductor: corregirla no enseña nada
+// sobre ese texto. Un «Outlander» leído de la tarjeta equivocada mientras sonaba
+// Breaking Bad acababa como regla «Outlander = Breaking Bad» con Outlander vetado.
+test('una corrección con la serie prestada no enseña reglas', () => {
+  assert.equal(correctionTeachesRules({ signal: { seriesFromHint: true } }), false);
+  assert.equal(correctionTeachesRules({ signal: { showName: 'Outlander' } }), true);
+  assert.equal(correctionTeachesRules({ signal: null }), true);
+  assert.equal(correctionTeachesRules({}), true);
+});
+
+test('las correcciones con la serie prestada no cuentan para el consenso', () => {
+  const hinted = { signal: { seriesFromHint: true } };
+  const rows = [
+    correction('a', { verdict: 'wrong_title', tmdbId: 1, mediaType: 'tv', ...hinted }),
+    correction('b', { verdict: 'wrong_title', tmdbId: 1, mediaType: 'tv', ...hinted }),
+  ];
+  assert.deepEqual(aggregateGlobalRules(rows, 1), { decision: null, rejects: [] });
 });

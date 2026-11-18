@@ -73,6 +73,20 @@ export function decideFromRules(rules, userId, minSupporters = globalRuleMinSupp
 }
 
 /**
+ * ¿Enseña reglas esta corrección? No cuando la serie de la detección era
+ * PRESTADA (`seriesFromHint`: la ficha o la tarjeta de la portada vista antes de
+ * reproducir). Ese texto no lo dijo el reproductor, así que la corrección dice
+ * que la pista era de otro título, no que el texto se resolviera mal: aprender
+ * de ella convertía «Outlander» (tarjeta equivocada mientras sonaba Breaking
+ * Bad) en «Outlander = Breaking Bad» con Outlander vetado para siempre. Lo que
+ * sí enseña ese texto es corregir su ficha o una reproducción que lo diga.
+ * @param {{ signal?: object|null }} correction fila de detection_corrections (o la detección)
+ */
+export function correctionTeachesRules(correction) {
+  return correction?.signal?.seriesFromHint !== true;
+}
+
+/**
  * Reglas personales que produce una corrección.
  * @returns {{ decision: null | {rule, tmdbId?, mediaType?, title?, posterPath?},
  *   reject: {tmdbId:number, mediaType:string} }}
@@ -111,6 +125,7 @@ export function aggregateGlobalRules(corrections, minSupporters = globalRuleMinS
   const decisions = new Map();
   const rejects = new Map();
   for (const c of latestByUser.values()) {
+    if (!correctionTeachesRules(c)) continue;
     const { decision, reject } = userRulesFromCorrection(c);
     if (decision) {
       const key = decision.rule === 'override' ? titleKey(decision.tmdbId, decision.mediaType) : 'not_a_title';
