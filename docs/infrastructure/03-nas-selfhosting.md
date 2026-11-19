@@ -123,6 +123,17 @@ retiraron):
   `/v1/admin/stats?range=1h|24h|7d|30d` y `/v1/admin/stats/users/:id` (proxys en
   `/api/admin/*`). Las rutas `/api` de Next que llaman directamente a TMDb no
   pasan por el backend y no aparecen.
+
+  Cómo se calcula: la ventana empieza al inicio de un tramo (minuto, hora o día
+  en `STATS_TIME_ZONE`, `Europe/Madrid` por defecto), así que la serie suma lo
+  mismo que los totales y solo el último tramo va en curso. `previous` trae los
+  totales del periodo anterior del mismo largo; cada KPI enseña el cambio
+  («+11 %», en verde o rojo según si subir es bueno) y una minigráfica. Los
+  errores son tasas (5xx y 4xx por separado), la latencia es p50 y p95, y un
+  tramo sin peticiones no tiene latencia (hueco en la gráfica, no 0 ms). La
+  parte cliente está en `src/app/admin/`: `adminFormat.js` (cifras y fechas, con
+  tests), `adminCharts.jsx` (recharts, cargado solo en esta página) y
+  `AdminClient.jsx`.
 - **Visitas** → Umami (páginas vistas, visitantes, países, dispositivos,
   referencias). El script y el envío salen por el propio dominio
   (`/u-stats/script.js`, `/u-stats/api/send`; rewrites de `next.config.ts` hacia

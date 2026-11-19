@@ -88,6 +88,19 @@ test('admin: request_log se llena con el plugin y /stats solo lo ven administrad
   assert.equal(stats.bucket, 'minute');
   assert.ok(stats.totals.requests >= 2);
   assert.ok(stats.series.length >= 60);
+  // Ventana alineada: la serie suma lo mismo que los totales.
+  assert.equal(stats.series.reduce((n, p) => n + p.requests, 0), stats.totals.requests);
+  assert.ok(stats.series.some((p) => p.p95Ms != null));
+  assert.ok(stats.series.some((p) => p.p95Ms === null && p.requests === 0));
+  assert.equal(typeof stats.previous.requests, 'number');
+  for (const key of ['24h', '7d', '30d']) {
+    const r = (await app.inject({ url: `/v1/admin/stats?range=${key}`, headers: { 'x-test-user': admin } })).json();
+    assert.ok(r.series, `${key}: ${JSON.stringify(r)}`);
+    assert.equal(r.series.reduce((n, p) => n + p.requests, 0), r.totals.requests, key);
+  }
+  const days = (await app.inject({ url: '/v1/admin/stats?range=30d', headers: { 'x-test-user': admin } })).json();
+  // Los días empiezan a medianoche de Madrid (23:00 o 22:00 UTC).
+  assert.ok(days.series.every((p) => ['22:00', '23:00'].includes(p.t.slice(11, 16))), days.series[0]?.t);
   assert.ok(stats.topRoutes.some((r) => r.route === '/v1/items/:id'));
   assert.ok(stats.topUsers.some((u) => u.userId === normal && u.count >= 1));
   assert.ok(stats.countries.some((c) => c.country === 'ES'));

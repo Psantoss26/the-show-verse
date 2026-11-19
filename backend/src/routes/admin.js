@@ -5,7 +5,9 @@
 //   GET /v1/admin/stats?range=        → resumen general (solo administradores)
 //   GET /v1/admin/stats/users/:id     → actividad de un usuario (solo administradores)
 //
-// range: 1h | 24h (por defecto) | 7d | 30d. Administradores: ADMIN_USER_IDS.
+// range: 1h | 24h (por defecto) | 7d | 30d, alineado al inicio de un tramo
+// (días en STATS_TIME_ZONE, Europe/Madrid por defecto); `previous` son los
+// totales del periodo anterior del mismo largo. Administradores: ADMIN_USER_IDS.
 
 import { sql } from 'drizzle-orm';
 
@@ -17,15 +19,37 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const num = (value) => Number(value) || 0;
 
+// Zona de los tramos diarios: un «día» empieza a medianoche en España, no en UTC.
+const TIME_ZONE = process.env.STATS_TIME_ZONE || 'Europe/Madrid';
+
+/** Inicio del tramo de `expr` (minuto, hora o día local). */
+function bucketOf(range, expr) {
+  return range.bucket === 'day'
+    ? sql`(date_trunc('day', (${expr}) at time zone ${TIME_ZONE}) at time zone ${TIME_ZONE})`
+    : sql`date_trunc(${range.bucket}, (${expr}))`;
+}
+
+// La ventana empieza al principio de un tramo: así el primer punto de la serie
+// está completo (antes salía recortado y parecía una caída) y la serie suma lo
+// mismo que los totales. Solo el último tramo, el actual, va en curso.
+function windowStart(range) {
+  return bucketOf(range, sql`now() - ${range.interval}::interval`);
+}
+
 function since(range) {
-  return sql`ts >= now() - ${range.interval}::interval`;
+  return sql`ts >= ${windowStart(range)}`;
+}
+
+/** El periodo anterior, del mismo largo, para comparar. */
+function previousWindow(range) {
+  return sql`ts >= ${windowStart(range)} - ${range.interval}::interval and ts < ${windowStart(range)}`;
 }
 
 function userFilter(userId) {
   return userId ? sql`and user_id = ${userId}` : sql``;
 }
 
-async function totals(range, userId) {
+async function totals(range, userId, { previous = false } = {}) {
   const [row] = await db.execute(sql`
     select count(*)::int as requests,
            count(*) filter (where status >= 500)::int as errors_5xx,
@@ -36,7 +60,7 @@ async function totals(range, userId) {
            coalesce(percentile_cont(0.5) within group (order by duration_ms), 0)::int as p50_ms,
            coalesce(percentile_cont(0.95) within group (order by duration_ms), 0)::int as p95_ms
       from request_log
-     where ${since(range)} ${userFilter(userId)}
+     where ${previous ? previousWindow(range) : since(range)} ${userFilter(userId)}
   `);
   return {
     requests: num(row?.requests),
@@ -52,26 +76,31 @@ async function totals(range, userId) {
 
 async function series(range, userId) {
   const step = `1 ${range.bucket}`;
+  const buckets = range.bucket === 'day'
+    ? sql`select d at time zone ${TIME_ZONE} as t
+            from generate_series(
+              date_trunc('day', (now() - ${range.interval}::interval) at time zone ${TIME_ZONE}),
+              date_trunc('day', now() at time zone ${TIME_ZONE}),
+              '1 day'::interval
+            ) as d`
+    : sql`select generate_series(${windowStart(range)}, date_trunc(${range.bucket}, now()), ${step}::interval) as t`;
   const rows = await db.execute(sql`
-    with buckets as (
-      select generate_series(
-        date_trunc(${range.bucket}, now() - ${range.interval}::interval),
-        date_trunc(${range.bucket}, now()),
-        ${step}::interval
-      ) as t
-    ),
+    with buckets as (${buckets}),
     counts as (
-      select date_trunc(${range.bucket}, ts) as t,
+      select ${bucketOf(range, sql`ts`)} as t,
              count(*)::int as requests,
              count(*) filter (where status >= 400 and status < 500)::int as errors_4xx,
              count(*) filter (where status >= 500)::int as errors_5xx,
-             count(distinct user_id)::int as users
+             count(distinct user_id)::int as users,
+             percentile_cont(0.5) within group (order by duration_ms)::int as p50_ms,
+             percentile_cont(0.95) within group (order by duration_ms)::int as p95_ms
         from request_log
        where ${since(range)} ${userFilter(userId)}
        group by 1
     )
     select b.t, coalesce(c.requests, 0) as requests, coalesce(c.errors_4xx, 0) as errors_4xx,
-           coalesce(c.errors_5xx, 0) as errors_5xx, coalesce(c.users, 0) as users
+           coalesce(c.errors_5xx, 0) as errors_5xx, coalesce(c.users, 0) as users,
+           c.p50_ms, c.p95_ms
       from buckets b left join counts c on c.t = b.t
      order by b.t
   `);
@@ -81,6 +110,9 @@ async function series(range, userId) {
     errors4xx: num(r.errors_4xx),
     errors5xx: num(r.errors_5xx),
     users: num(r.users),
+    // Sin peticiones no hay latencia: null (hueco en la gráfica), no 0 ms.
+    p50Ms: r.p50_ms == null ? null : num(r.p50_ms),
+    p95Ms: r.p95_ms == null ? null : num(r.p95_ms),
   }));
 }
 
@@ -183,8 +215,9 @@ export default async function adminRoutes(fastify) {
 
     adminOnly.get('/stats', async (req) => {
       const range = parseStatsRange(req.query?.range);
-      const [summary, timeline, routeStats, users, parts, latest] = await Promise.all([
+      const [summary, previous, timeline, routeStats, users, parts, latest] = await Promise.all([
         totals(range),
+        totals(range, null, { previous: true }),
         series(range),
         routes(range),
         topUsers(range),
@@ -196,6 +229,7 @@ export default async function adminRoutes(fastify) {
         bucket: range.bucket,
         generatedAt: new Date().toISOString(),
         totals: summary,
+        previous,
         series: timeline,
         ...routeStats,
         topUsers: users,
@@ -215,8 +249,9 @@ export default async function adminRoutes(fastify) {
       if (!user) return reply.status(404).send({ error: 'Not Found', message: 'Usuario no encontrado' });
 
       const range = parseStatsRange(req.query?.range);
-      const [summary, timeline, routeStats, parts, latest, lastSeen] = await Promise.all([
+      const [summary, previous, timeline, routeStats, parts, latest, lastSeen] = await Promise.all([
         totals(range, userId),
+        totals(range, userId, { previous: true }),
         series(range, userId),
         routes(range, userId),
         breakdowns(range, userId),
@@ -234,7 +269,9 @@ export default async function adminRoutes(fastify) {
           createdAt: user.created_at ? new Date(user.created_at).toISOString() : null,
           lastSeen: lastSeen?.[0]?.ts ? new Date(lastSeen[0].ts).toISOString() : null,
         },
+        generatedAt: new Date().toISOString(),
         totals: summary,
+        previous,
         series: timeline,
         ...routeStats,
         ...parts,
