@@ -157,9 +157,19 @@ export function clientIpFromHeaders(headerList) {
   return forwarded || get("x-real-ip").trim() || null;
 }
 
+// Además de la IP, el país (Cloudflare) y el navegador del visitante: el
+// registro de peticiones del backend (request_log, estadísticas del
+// administrador) vería si no solo el servidor de Next.
 export function clientIpHeaders(request) {
+  const get = (name) => request?.headers?.get?.(name) || "";
+  const headers = {};
   const ip = clientIpFromHeaders(request?.headers);
-  return ip ? { "X-Forwarded-For": ip } : {};
+  if (ip) headers["X-Forwarded-For"] = ip;
+  const country = get("cf-ipcountry").trim();
+  if (country) headers["CF-IPCountry"] = country;
+  const userAgent = get("user-agent").trim();
+  if (userAgent) headers["X-Client-User-Agent"] = userAgent.slice(0, 300);
+  return headers;
 }
 
 async function fetchBackendOnce(baseUrl, path, init, accessToken, request = null) {

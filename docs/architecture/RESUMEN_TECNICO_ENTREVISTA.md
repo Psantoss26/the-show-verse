@@ -220,7 +220,7 @@ En una entrevista, lo interesante es cómo se protegen las claves y la cuota: ni
 - Imágenes servidas directamente desde el CDN de TMDB con el tamaño justo para cada componente. El optimizador de Next está desactivado a propósito porque duplicaba el coste.
 - Caché por capas: HTTP (`s-maxage` + `stale-while-revalidate`), `revalidate` de Next.js, tabla `tmdb_cache` y pools del dashboard con TTL.
 - View Transitions de React/Next, animaciones con Framer Motion y respeto a `prefers-reduced-motion`. Al volver atrás, las páginas se restauran estáticas, sin reanimar ni reordenar.
-- Métricas reales con Vercel Analytics y Speed Insights.
+- Métricas propias: visitas con Umami autoalojado y registro de peticiones del backend (`/admin`).
 
 ### Testing y calidad
 

@@ -833,3 +833,27 @@ export const pushDeliveries = pgTable('push_deliveries', {
   pk: primaryKey({ columns: [t.userId, t.alertId] }),
   sentAtIdx: index('idx_push_deliveries_sent_at').on(t.userId, t.sentAt),
 }));
+
+// ─────────────────────────────────────────────
+// REGISTRO DE PETICIONES (estadísticas del administrador)
+// ─────────────────────────────────────────────
+// Una fila por petición HTTP al backend, escrita en lotes por el plugin
+// requestLog. Sin clave foránea a users: borrar una cuenta no debe tocar el
+// histórico ni frenar el borrado, y el lote no espera a comprobarla. La IP va
+// truncada (/24 en IPv4, /48 en IPv6) y las filas caducan solas
+// (REQUEST_LOG_RETENTION_DAYS, 90 por defecto).
+export const requestLog = pgTable('request_log', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  ts: timestamp('ts', { withTimezone: true }).defaultNow().notNull(),
+  method: text('method').notNull(),
+  route: text('route').notNull(),
+  status: smallint('status').notNull(),
+  durationMs: integer('duration_ms').notNull(),
+  userId: uuid('user_id'),
+  country: text('country'),
+  ip: text('ip'),
+  userAgent: text('user_agent'),
+}, (t) => ({
+  tsIdx: index('idx_request_log_ts').on(t.ts),
+  userTsIdx: index('idx_request_log_user_ts').on(t.userId, t.ts),
+}));

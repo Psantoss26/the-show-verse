@@ -86,6 +86,8 @@ services:
       args:
         NEXT_PUBLIC_TMDB_API_KEY: ${NEXT_PUBLIC_TMDB_API_KEY}
         NEXT_PUBLIC_API_BASE_URL: http://backend:3001
+        # Id del sitio en Umami (vacío = sin estadísticas de visitas).
+        NEXT_PUBLIC_UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
     restart: unless-stopped
     env_file:
       - ./web.env
@@ -144,6 +146,54 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # Umami: estadísticas de visitas (páginas, visitantes, países, dispositivos)
+  # autoalojadas. Usa su propia base `umami` en el mismo postgres, con un rol
+  # propio que crea `umami-db-init` (idempotente). NO publica puertos: la web la
+  # alcanza por la red interna (rewrites /u-stats/* de next.config.ts) y el
+  # panel se abre por el túnel (stats.theshowverse.com → http://umami:3000)
+  # tras Cloudflare Access. Secretos en deploy/nas/.env (UMAMI_*), sin ':?'
+  # para que una variable ausente no rompa el resto del stack.
+  umami-db-init:
+    image: postgres:18
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGUSER: tsv
+      PGPASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD}
+      UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ -z "$$UMAMI_DB_PASSWORD" ]; then echo "UMAMI_DB_PASSWORD vacío: no se prepara la base de Umami"; exit 0; fi
+        psql -d theshowverse -v ON_ERROR_STOP=1 -v pw="$$UMAMI_DB_PASSWORD" <<'SQL'
+        SELECT format('CREATE ROLE umami LOGIN PASSWORD %L', :'pw')
+         WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'umami') \gexec
+        SELECT format('ALTER ROLE umami PASSWORD %L', :'pw') \gexec
+        SELECT 'CREATE DATABASE umami OWNER umami'
+         WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'umami') \gexec
+        SQL
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://umami:${UMAMI_DB_PASSWORD:-}@postgres:5432/umami"
+      APP_SECRET: ${UMAMI_APP_SECRET:-}
+      # Detrás de Cloudflare: el país sale de CF-IPCountry y la IP real de
+      # CF-Connecting-IP (la reenvía la web en el rewrite).
+      CLIENT_IP_HEADER: cf-connecting-ip
+      DISABLE_TELEMETRY: "1"
+    mem_limit: 384m
+    expose:
+      - "3000"
+    depends_on:
+      umami-db-init:
+        condition: service_completed_successfully
 
   # GitHub Actions self-hosted runner (CI/CD del repo). Mantiene el registro
   # existente (volumen runner-data) y despliega en la carpeta NUEVA (/nas-deploy).

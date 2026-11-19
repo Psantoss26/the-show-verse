@@ -3,10 +3,9 @@ import "@fontsource-variable/inter/wght.css";
 import Navbar from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
 import { ServerStatusProvider } from "@/context/ServerStatusContext";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_TITLE_SHORT } from "@/lib/pageTitle";
 import PwaManager from "@/components/PwaManager";
+import UmamiAnalytics from "@/components/UmamiAnalytics";
 import InAppNotifications from "@/components/notifications/InAppNotifications";
 import AndroidSessionClaim from "@/components/android/AndroidSessionClaim";
 import OfflineManager from "@/components/OfflineManager";
@@ -157,8 +156,7 @@ export default function RootLayout({ children, overlay }) {
               <LetterboxdAutoSync />
               <AndroidSessionClaim />
               <OfflineBanner />
-              <Analytics />
-              <SpeedInsights />
+              <UmamiAnalytics />
             </OutsideEmbed>
           </ServerStatusProvider>
         </AuthProvider>

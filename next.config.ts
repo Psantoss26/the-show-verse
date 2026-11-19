@@ -68,6 +68,19 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Umami (estadísticas de visitas autoalojadas en el NAS, servicio `umami`
+  // del compose): el script y el envío de eventos salen por el MISMO dominio
+  // para que los bloqueadores de anuncios no los corten y no haga falta CORS.
+  // El script deduce el destino de `/api/send` de su propia ruta (/u-stats/).
+  // Solo existe en builds con NEXT_PUBLIC_UMAMI_WEBSITE_ID.
+  async rewrites() {
+    if (!process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID) return [];
+    const umami = (process.env.UMAMI_INTERNAL_URL || "http://umami:3000").replace(/\/$/, "");
+    return [
+      { source: "/u-stats/script.js", destination: `${umami}/script.js` },
+      { source: "/u-stats/api/send", destination: `${umami}/api/send` },
+    ];
+  },
   // Secciones retiradas: un enlace guardado o un acceso directo antiguo lleva
   // al inicio en vez de a un 404.
   async redirects() {

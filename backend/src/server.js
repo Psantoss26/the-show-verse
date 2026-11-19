@@ -18,6 +18,7 @@ import { openApiDocument } from './docs/openapi.js';
 import authPlugin from './plugins/auth.js';
 import levelInvalidationPlugin from './plugins/levelInvalidation.js';
 import pushDispatchPlugin from './plugins/pushDispatch.js';
+import requestLogPlugin from './plugins/requestLog.js';
 import authRoutes from './routes/auth.js';
 import favoritesRoutes from './routes/favorites.js';
 import watchlistRoutes from './routes/watchlist.js';
@@ -38,6 +39,7 @@ import pushRoutes from './routes/push.js';
 import levelRoutes from './routes/level.js';
 import streamingDetectionsRoutes from './routes/streamingDetections.js';
 import billingRoutes from './routes/billing.js';
+import adminRoutes from './routes/admin.js';
 import { refreshAllPools } from './dashboard/pools.js';
 import { syncAllLetterboxdAccounts } from './lib/letterboxdSync.js';
 import { runSocialBotsTick } from './lib/socialBots.js';
@@ -120,6 +122,9 @@ await fastify.register(levelInvalidationPlugin);
 
 // Notificaciones del dispositivo tras un visto o un progreso sincronizado.
 await fastify.register(pushDispatchPlugin);
+
+// Registro de peticiones para las estadísticas del administrador (request_log).
+await fastify.register(requestLogPlugin);
 
 // Cuentas exentas del rate limit global. Se comprueba el EMAIL además del
 // username: la cuenta que entra con Google no tiene por qué llamarse igual, y
@@ -273,6 +278,7 @@ const apiV1 = async (app) => {
   app.register(pushRoutes, { prefix: '/push' });
   app.register(streamingDetectionsRoutes, { prefix: '/streaming' });
   app.register(billingRoutes, { prefix: '/billing' });
+  app.register(adminRoutes, { prefix: '/admin' });
 };
 
 await fastify.register(apiV1, { prefix: '/v1' });

@@ -37,8 +37,7 @@
 ### Utilidades
 
 - **date-fns 2.30.0** - Manipulación de fechas
-- **@vercel/analytics** - Métricas y análisis
-- **@vercel/speed-insights** - Monitorización de rendimiento
+- **Umami** (autoalojado en el NAS) - Visitas; peticiones al backend en `request_log` (`/admin`)
 
 ---
 
