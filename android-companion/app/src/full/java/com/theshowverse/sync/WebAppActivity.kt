@@ -120,9 +120,8 @@ class WebAppActivity : AppCompatActivity() {
         setContentView(binding.root)
         prefs = Prefs(this)
 
-        // Antes que nada se pinte: la frecuencia de refresco que tiene la PWA
-        // dentro de Chrome (90 Hz si la pantalla los tiene). Ver
-        // FrecuenciaPantalla.
+        // Antes que nada se pinte: la frecuencia alta de la pantalla (hasta
+        // 120 Hz). Ver FrecuenciaPantalla.
         aplicarFrecuencia()
 
         configurarWebView()

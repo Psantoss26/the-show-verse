@@ -2499,6 +2499,19 @@ html[data-android-app] {
   --sv-safe-bottom: var(--sv-android-bottom, env(safe-area-inset-bottom, 0px));
 }
 
+/* CANTO DEL CRISTAL EN LA APP DE ANDROID: sin su segundo desenfoque.
+   `.sv-glass-rim` (LiquidGlassOpticalLayers y la barra inferior del Navbar) es
+   un `backdrop-filter` con máscara DENTRO de otro: como el cristal padre es su
+   «backdrop root», solo reprocesa el tinte del propio cristal y apenas se ve
+   (medido en el teléfono: ≤ 6/255 en los paneles, 13/255 en el canto de la
+   barra). Pero cuesta una pasada más por pieza en cada fotograma, y la app va
+   a 120 Hz (8,3 ms por fotograma, ver FrecuenciaPantalla en android-companion):
+   en una ficha, 6-8 % de fotogramas tarde con él y 1,6-2,2 % sin él. Los
+   reflejos del canto, que son degradados, se quedan. */
+html[data-android-app] .sv-glass-rim {
+  backdrop-filter: none;
+}
+
 .sv-topbar {
   transition:
     background-color 300ms,

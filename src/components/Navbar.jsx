@@ -3604,7 +3604,7 @@ function NavbarContent() {
             transición sea continua y no dibuje ningún borde marcado. */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[2px] backdrop-brightness-[1.16] backdrop-saturate-[240%]"
+          className="sv-glass-rim pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[2px] backdrop-brightness-[1.16] backdrop-saturate-[240%]"
           style={{
             WebkitMaskImage:
               "radial-gradient(112% 128% at 50% 50%, transparent 34%, #000 92%)",
@@ -3694,7 +3694,7 @@ function NavbarContent() {
             la luz giradas para una pieza vertical. */}
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[2px] backdrop-brightness-[1.16] backdrop-saturate-[240%]"
+          className="sv-glass-rim pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[2px] backdrop-brightness-[1.16] backdrop-saturate-[240%]"
           style={{
             WebkitMaskImage:
               "radial-gradient(135% 115% at 50% 50%, transparent 40%, #000 95%)",

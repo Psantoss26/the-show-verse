@@ -32,7 +32,7 @@ export default function LiquidGlassOpticalLayers() {
       {/* Refracción del canto: mismo brillo que el cristal, más desenfoque. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[2px] backdrop-brightness-[1.06] backdrop-saturate-[160%]"
+        className="sv-glass-rim pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[2px] backdrop-brightness-[1.06] backdrop-saturate-[160%]"
         style={{
           WebkitMaskImage:
             "radial-gradient(112% 128% at 50% 50%, transparent 62%, #000 100%)",
