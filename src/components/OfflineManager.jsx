@@ -189,9 +189,12 @@ export default function OfflineManager() {
     document.addEventListener("click", click, true);
     document.addEventListener("submit", submit, true);
     const stopHidingBrokenImages = hideBrokenImages(document);
-    // Ask the controlling worker immediately on an offline document reload.
+    // Al recargar sin red en el dispositivo, solo lectura de inmediato. Si el
+    // dispositivo tiene red, el «caído» que recuerda el service worker puede
+    // venir de una petición cortada en segundo plano: lo decide la
+    // comprobación de ServerStatusContext, no esta copia.
     void workerMessage({ type: "OFFLINE_STATUS" }).then((status) => {
-      if (status?.online === false) reportConnection(false);
+      if (status?.online === false && navigator.onLine === false) reportConnection(false);
     });
     return () => {
       document.removeEventListener("click", click, true);
