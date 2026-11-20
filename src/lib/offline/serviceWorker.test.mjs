@@ -39,6 +39,7 @@ function harness() {
     },
   });
   vm.runInContext(source, context);
+  context.HEALTH_CONFIRM_MS = 0;
   return {
     context, caches, stores, messages, listeners,
     network(fn) { handler = fn; },
@@ -324,4 +325,33 @@ test('offline-copy reads get a longer timeout than page reads', async () => {
   await sw.read('/api/trakt/history?limit=all', { headers: { 'X-Showverse-Prepare': '1' } });
   assert.equal(timeouts[0], 6000);
   assert(timeouts[1] >= 60000);
+});
+
+test('one failed health probe does not switch the app to read-only', async () => {
+  const sw = harness();
+  let probes = 0;
+  sw.network((request) => {
+    if (new URL(request.url).pathname !== '/api/health') return json({ items: [] });
+    probes += 1;
+    if (probes === 1) throw new TypeError('net::ERR_NETWORK_CHANGED');
+    return json({ ok: true });
+  });
+  const response = await sw.context.health(new Request(`${origin}/api/health`));
+  assert.equal(response.status, 200);
+  assert.equal(probes, 2);
+  assert.equal((await sw.message({ type: 'OFFLINE_STATUS' })).online, true);
+  assert.ok(!sw.messages.some((m) => m.type === 'OFFLINE_CONNECTION' && m.online === false));
+});
+
+test('two failed health probes do switch the app to read-only', async () => {
+  const sw = harness();
+  let probes = 0;
+  sw.network((request) => {
+    if (new URL(request.url).pathname === '/api/health') probes += 1;
+    return json({ ok: false }, 503);
+  });
+  await sw.context.health(new Request(`${origin}/api/health`));
+  assert.equal(probes, 2);
+  assert.equal((await sw.message({ type: 'OFFLINE_STATUS' })).online, false);
+  assert.ok(sw.messages.some((m) => m.type === 'OFFLINE_CONNECTION' && m.online === false));
 });

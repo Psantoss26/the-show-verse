@@ -43,6 +43,12 @@ const META_URL = new URL("/__offline/session", self.location.origin).href;
 const READ_POSTS = new Set(["/api/backend/items/states", "/api/imdb/ratings"]);
 let sessionPromise;
 let offlineUntil = 0;
+// Una sonda fallida no basta para pasar a solo lectura: al abrir la app o
+// volver a ella, la primera petición suele fallar mientras la red despierta o el
+// servidor arranca en frío, y la siguiente ya funciona. Se repite tras esta
+// espera y solo si fallan las dos se declara caído. `var` para que las pruebas
+// la acorten.
+var HEALTH_CONFIRM_MS = 2000;
 let epoch = 0;
 let identityChange = Promise.resolve();
 let originProbe;
@@ -486,14 +492,24 @@ async function prepareTitle(message) {
   return work;
 }
 
-async function health(request) {
+async function probeHealth(request) {
   try {
     const response = await network(request, 4500);
     const payload = response.ok ? await response.clone().json().catch(() => null) : null;
-    const online = Boolean(response.ok && payload?.ok === true);
-    await connectivity(online);
-    return online ? response : missing();
-  } catch { await connectivity(false); return missing(); }
+    return { response, online: Boolean(response.ok && payload?.ok === true) };
+  } catch { return { response: null, online: false }; }
+}
+const deviceOffline = () => typeof navigator !== "undefined" && navigator.onLine === false;
+async function health(request) {
+  let result = await probeHealth(request);
+  // Sin red en el dispositivo no hay nada que confirmar (ver HEALTH_CONFIRM_MS).
+  if (!result.online && !deviceOffline()) {
+    await new Promise((resolve) => setTimeout(resolve, HEALTH_CONFIRM_MS));
+    // Petición nueva: la del cliente puede haberse cancelado mientras tanto.
+    result = await probeHealth(new Request(request.url, { cache: "no-store" }));
+  }
+  await connectivity(result.online);
+  return result.online ? result.response : missing();
 }
 
 async function cacheIdentity() {
