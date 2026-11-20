@@ -64,8 +64,12 @@ export const viewport = {
 const LEGACY_PERF_CLEANUP_SCRIPT =
   'try{localStorage.removeItem("sv-perf-mode");localStorage.removeItem("sv-perf-probe-v1")}catch(e){}';
 
+// Con `cameraCenterY` en el puente, la app oculta la barra de estado
+// (`data-android-immersive`): la barra superior ocupa su franja, centrada en la
+// cámara y apartada de las esquinas redondeadas. Las versiones anteriores de la
+// app la mostraban y la web bajaba su barra lo que medía.
 const ANDROID_APP_BOOT_SCRIPT =
-  'if(navigator.userAgent.indexOf("TheShowVerseApp/")!==-1){var d=document.documentElement;d.setAttribute("data-android-app","");try{var b=window.TSVAndroidBridge,h=b&&b.statusBarHeight&&b.statusBarHeight(),n=b&&b.navigationBarHeight&&b.navigationBarHeight();if(h>0)d.style.setProperty("--sv-android-top",h+"px");if(n>0)d.style.setProperty("--sv-android-bottom",n+"px")}catch(e){}}';
+  'if(navigator.userAgent.indexOf("TheShowVerseApp/")!==-1){var d=document.documentElement,s=d.style;d.setAttribute("data-android-app","");try{var b=window.TSVAndroidBridge,n=b&&b.navigationBarHeight&&b.navigationBarHeight();if(n>0)s.setProperty("--sv-android-bottom",n+"px");if(b&&b.cameraCenterY){d.setAttribute("data-android-immersive","");s.setProperty("--sv-android-top","0px");var c=b.cameraCenterY(),r=b.screenCornerRadius();if(c>0)s.setProperty("--sv-android-camera-y",c+"px");if(r>0)s.setProperty("--sv-android-corner",r+"px")}else{var h=b&&b.statusBarHeight&&b.statusBarHeight();if(h>0)s.setProperty("--sv-android-top",h+"px")}}catch(e){}}';
 
 export default function RootLayout({ children, overlay }) {
   return (
@@ -121,7 +125,9 @@ export default function RootLayout({ children, overlay }) {
         <link rel="dns-prefetch" href="https://www.youtube.com" />
         <link rel="dns-prefetch" href="https://www.youtube-nocookie.com" />
         <link rel="dns-prefetch" href="https://player.vimeo.com" />
-        {/* APP NATIVA DE ANDROID: velo bajo la barra de estado, que es
+        {/* APP NATIVA DE ANDROID (versiones que aún muestran la barra de
+            estado; las actuales la ocultan, `data-android-immersive`): velo
+            bajo la barra de estado, que es
             transparente, para que la hora y los iconos se lean sobre la portada
             o el contenido que pasa por detrás. Un DEGRADADO, no un cristal: un
             `backdrop-filter` fijo encima de toda la página obliga al WebView a
@@ -131,7 +137,7 @@ export default function RootLayout({ children, overlay }) {
             que se funde) y solo se ve con `data-android-app` en <html>. */}
         <div
           aria-hidden
-          className="pointer-events-none fixed inset-x-0 top-0 z-[90] hidden h-[calc(var(--sv-safe-top,0px)+0.5rem)] bg-gradient-to-b from-black/55 via-black/30 to-transparent [html[data-android-app]_&]:block"
+          className="pointer-events-none fixed inset-x-0 top-0 z-[90] hidden h-[calc(var(--sv-safe-top,0px)+0.5rem)] bg-gradient-to-b from-black/55 via-black/30 to-transparent [html[data-android-app]:not([data-android-immersive])_&]:block"
         />
         <AuthProvider>
           <ServerStatusProvider>

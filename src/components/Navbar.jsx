@@ -3479,7 +3479,9 @@ function NavbarContent() {
             prefetch
             {...navPrefetchHandlers("/")}
             aria-label={t("nav_home", "Inicio")}
-            className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass} ${
+            // `sv-topbar-logo`: en la app de Android la barra va en la franja de
+            // la cámara y el logo, que quedaría bajo ella, no se muestra.
+            className={`sv-topbar-logo absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass} ${
               tabletLogoHidden ? "md:pointer-events-none md:opacity-0" : ""
             }`}
             aria-hidden={tabletLogoHidden || undefined}

@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.RoundedCorner
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
@@ -249,6 +250,8 @@ class WebAppActivity : AppCompatActivity() {
                 ::abrirSoloEnNavegador,
                 { altoBarraEstadoCss },
                 { altoBarraNavegacionCss },
+                { centroCamaraCss },
+                { radioEsquinaCss },
             ),
             WebAppBridge.NAME,
         )
@@ -475,20 +478,23 @@ class WebAppActivity : AppCompatActivity() {
 
     /**
      * Huecos de las barras y de la cámara. La app dibuja EDGE-TO-EDGE (ver
-     * `configurarVentana`) con las dos barras del sistema visibles y
-     * transparentes.
+     * `configurarVentana`) con la barra de navegación visible y transparente y
+     * la BARRA DE ESTADO OCULTA.
      *
-     * Ni arriba ni abajo la web se rellena: pasa por detrás de las dos barras,
-     * y es ella la que baja su barra superior y sube la inferior lo que mide
-     * cada una (`--sv-android-top` y `--sv-android-bottom`, que se le pasan
-     * aquí y por `statusBarHeight()` / `navigationBarHeight()` del puente). Así
-     * esas franjas muestran el fondo de la app en vez de negro. A los lados sí
-     * se rellena (en horizontal, los botones de navegación van en un lateral).
+     * La web no se rellena ni arriba ni abajo: arriba, su barra superior ocupa
+     * la franja de la barra de estado, centrada en la cámara y sin logo (que
+     * quedaría bajo ella), con los botones apartados de las esquinas
+     * redondeadas (`--sv-android-camera-y`, `--sv-android-corner`); abajo pasa
+     * por detrás de la barra de navegación y sube su barra inferior lo que
+     * mide (`--sv-android-bottom`). Todo se le pasa aquí y por el puente
+     * (`cameraCenterY()`, `screenCornerRadius()`, `navigationBarHeight()`). A
+     * los lados sí se rellena (en horizontal, los botones de navegación y la
+     * cámara van en un lateral).
      *
-     * Los huecos se leen IGNORANDO SI LAS BARRAS SE VEN: al salir a recientes o
-     * al ocultarlas un vídeo cambia su visibilidad, y un relleno que siguiera
-     * ese cambio movía el WebView justo mientras el sistema capturaba la
-     * miniatura (salía con la barra superior duplicada).
+     * Los huecos de las barras se leen IGNORANDO SI SE VEN: al salir a
+     * recientes o al ocultarlas un vídeo cambia su visibilidad, y un relleno que
+     * siguiera ese cambio movía el WebView justo mientras el sistema capturaba
+     * la miniatura (salía con la barra superior duplicada).
      *
      * El panel de error, nativo, esquiva barras y cámara con relleno.
      */
@@ -502,10 +508,14 @@ class WebAppActivity : AppCompatActivity() {
                 maxOf(barras.right, camara.right),
                 0,
             )
-            val arriba = maxOf(barras.top, camara.top)
-            bajarIndicadorDeRecarga(arriba)
-            binding.frameMeter.translationY = arriba.toFloat()
-            pasarHuecosDeBarras(arriba, maxOf(barras.bottom, camara.bottom))
+            // El círculo de recarga y el medidor, por debajo de la cámara.
+            bajarIndicadorDeRecarga(camara.top)
+            binding.frameMeter.translationY = camara.top.toFloat()
+            pasarHuecosDeBarras(
+                maxOf(barras.bottom, camara.bottom),
+                centroDeLaCamara(insets),
+                radioDeEsquina(insets),
+            )
             insets
         }
         ViewCompat.setOnApplyWindowInsetsListener(binding.errorPanel) { view, insets ->
@@ -524,11 +534,11 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     /**
-     * Alto de la barra de estado y de la de navegación en píxeles CSS, para la
-     * web. Los lee el script de arranque del <head> por el puente
-     * (`statusBarHeight()`, `navigationBarHeight()`), antes del primer
-     * pintado, y si cambian con la página ya cargada (girar la pantalla) se le
-     * escriben directamente.
+     * Geometría de la parte superior y alto de la barra de navegación, en
+     * píxeles CSS, para la web. Los lee el script de arranque del <head> por
+     * el puente antes del primer pintado, y si cambian con la página ya
+     * cargada (girar la pantalla) se le escriben directamente. La barra de
+     * estado está oculta: su alto, para la web, es 0.
      */
     @Volatile
     private var altoBarraEstadoCss = 0.0
@@ -536,18 +546,57 @@ class WebAppActivity : AppCompatActivity() {
     @Volatile
     private var altoBarraNavegacionCss = 0.0
 
-    private fun pasarHuecosDeBarras(arriba: Int, abajo: Int) {
+    @Volatile
+    private var centroCamaraCss = 0.0
+
+    @Volatile
+    private var radioEsquinaCss = 0.0
+
+    private fun pasarHuecosDeBarras(abajo: Int, centroCamara: Int, radioEsquina: Int) {
         val densidad = resources.displayMetrics.density.toDouble()
-        val estado = arriba / densidad
         val navegacion = abajo / densidad
-        if (estado == altoBarraEstadoCss && navegacion == altoBarraNavegacionCss) return
-        altoBarraEstadoCss = estado
+        val camara = centroCamara / densidad
+        val esquina = radioEsquina / densidad
+        if (
+            navegacion == altoBarraNavegacionCss &&
+            camara == centroCamaraCss &&
+            esquina == radioEsquinaCss
+        ) {
+            return
+        }
         altoBarraNavegacionCss = navegacion
+        centroCamaraCss = camara
+        radioEsquinaCss = esquina
         evaluarJs(
-            "var d=document.documentElement.style;" +
-                "d.setProperty('--sv-android-top','${estado}px');" +
-                "d.setProperty('--sv-android-bottom','${navegacion}px')",
+            "var d=document.documentElement,s=d.style;" +
+                "d.setAttribute('data-android-immersive','');" +
+                "s.setProperty('--sv-android-top','0px');" +
+                "s.setProperty('--sv-android-bottom','${navegacion}px');" +
+                (if (camara > 0) "s.setProperty('--sv-android-camera-y','${camara}px');"
+                else "s.removeProperty('--sv-android-camera-y');") +
+                "s.setProperty('--sv-android-corner','${esquina}px')",
         )
+    }
+
+    /**
+     * Centro vertical de la cámara del borde SUPERIOR (su rectángulo de
+     * recorte), en píxeles físicos; 0 si arriba no hay cámara (en horizontal
+     * queda en un lateral).
+     */
+    private fun centroDeLaCamara(insets: WindowInsetsCompat): Int {
+        val recorte = insets.displayCutout ?: return 0
+        val arriba = recorte.boundingRects.filter { it.top <= 0 && it.height() > 0 }
+        if (arriba.isEmpty() || recorte.safeInsetTop <= 0) return 0
+        return arriba.maxOf { it.centerY() }
+    }
+
+    /** Radio de las esquinas superiores de la pantalla, en píxeles físicos. */
+    private fun radioDeEsquina(insets: WindowInsetsCompat): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return 0
+        val nativos = insets.toWindowInsets() ?: return 0
+        val izquierda = nativos.getRoundedCorner(RoundedCorner.POSITION_TOP_LEFT)?.radius ?: 0
+        val derecha = nativos.getRoundedCorner(RoundedCorner.POSITION_TOP_RIGHT)?.radius ?: 0
+        return maxOf(izquierda, derecha)
     }
 
     /**
@@ -700,30 +749,39 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     /**
-     * Ventana EDGE-TO-EDGE con las DOS barras del sistema visibles y
-     * TRANSPARENTES, como la app de Trakt (`enableEdgeToEdge` con
-     * `SystemBarStyle.dark(Color.TRANSPARENT)` arriba y abajo): se ven la hora,
-     * los iconos y la barra de gestos, y detrás la web (el cristal de sus
-     * barras o la portada), no franjas negras. `dark` = iconos claros, porque
-     * la web es oscura; con un velo transparente no hay contraste forzado. La
-     * ventana se dibuja también dentro del recorte de la cámara.
+     * Ventana EDGE-TO-EDGE (`enableEdgeToEdge`, barras TRANSPARENTES) que se
+     * dibuja también dentro del recorte de la cámara, con la BARRA DE ESTADO
+     * OCULTA: su franja la ocupa la barra superior de la web, centrada en la
+     * cámara (ver `configurarInsets`). Deslizando desde el borde superior la
+     * barra de estado aparece un momento por encima de la página. La barra de
+     * navegación sigue visible y transparente, con la web por detrás. `dark` =
+     * iconos claros, porque la web es oscura.
      */
     private fun configurarVentana() {
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
+        ocultarBarras(WindowInsetsCompat.Type.statusBars())
     }
 
-    /** Solo para el vídeo a pantalla completa: oculta y devuelve las barras. */
-    private fun pantallaCompleta(activa: Boolean) {
+    private fun ocultarBarras(tipos: Int) {
         val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.hide(tipos)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    /**
+     * Solo para el vídeo a pantalla completa: oculta también la barra de
+     * navegación y, al salir, la devuelve (la de estado sigue oculta).
+     */
+    private fun pantallaCompleta(activa: Boolean) {
         if (activa) {
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-            controller.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            ocultarBarras(WindowInsetsCompat.Type.systemBars())
         } else {
-            controller.show(WindowInsetsCompat.Type.systemBars())
+            WindowCompat.getInsetsController(window, window.decorView)
+                .show(WindowInsetsCompat.Type.navigationBars())
         }
     }
 

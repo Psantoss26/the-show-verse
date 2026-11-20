@@ -45,6 +45,8 @@ class WebAppBridge(
     private val abrirSoloEnNavegador: (String) -> Unit = abrirEnNavegador,
     private val altoBarraEstado: () -> Double = { 0.0 },
     private val altoBarraNavegacion: () -> Double = { 0.0 },
+    private val centroCamara: () -> Double = { 0.0 },
+    private val radioEsquina: () -> Double = { 0.0 },
 ) {
 
     /**
@@ -78,6 +80,25 @@ class WebAppBridge(
      */
     @JavascriptInterface
     fun navigationBarHeight(): Double = altoBarraNavegacion()
+
+    /**
+     * Altura del centro de la cámara frontal (el recorte de la pantalla)
+     * desde el borde superior, en píxeles CSS. La barra de estado va OCULTA
+     * y la barra superior de la web ocupa su franja, centrada en la cámara.
+     * Que el método exista ya le dice a la web que la barra de estado no está
+     * (las versiones antiguas de la app la mostraban). 0 si no hay cámara en
+     * el borde superior o aún no se conoce.
+     */
+    @JavascriptInterface
+    fun cameraCenterY(): Double = centroCamara()
+
+    /**
+     * Radio de las esquinas redondeadas de la pantalla, en píxeles CSS: la
+     * web aparta de los lados los botones de su barra superior para que no
+     * queden bajo la curva. 0 si el sistema no lo da (Android < 12).
+     */
+    @JavascriptInterface
+    fun screenCornerRadius(): Double = radioEsquina()
 
     /**
      * Estado completo de la sincronización, en JSON, para que Ajustes lo pinte

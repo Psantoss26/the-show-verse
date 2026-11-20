@@ -2486,7 +2486,9 @@ html[data-fit-viewport] [data-scroll-restoration-root] {
    son transparentes, y sus altos los da la propia app (`--sv-android-top`,
    `--sv-android-bottom`, ver WebAppActivity en android-companion): esas
    franjas muestran el cristal de las barras de la app o la portada, no negro.
-   Si la app aún no los ha pasado, los del sistema. */
+   Si la app aún no los ha pasado, los del sistema. Las versiones actuales de
+   la app OCULTAN la barra de estado (`data-android-immersive`): arriba vale 0
+   y la barra superior ocupa esa franja (ver más abajo). */
 :root {
   --sv-safe-top: env(safe-area-inset-top, 0px);
   --sv-safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -2658,6 +2660,43 @@ html[data-android-app] {
   .sv-topbar,
   .sv-topbar-row {
     transition: none;
+  }
+}
+
+/* APP DE ANDROID SIN BARRA DE ESTADO (`data-android-immersive`, la pone el
+   script del <head> si el puente da `cameraCenterY`). La barra superior del
+   teléfono ocupa la franja de la barra de estado (`--sv-safe-top` vale 0):
+     - CENTRADA EN LA CÁMARA. La fila mide 64px (48 en la ficha) y se sube lo
+       justo para que su centro caiga en el de la cámara
+       (`--sv-android-camera-y`). Ese desplazamiento es el MISMO compactada o
+       no: la barra ya es mínima y no se mueve al desplazarse (los controles
+       siguen encogiendo, ver `mobileTopControlScaleClass` en Navbar).
+     - SIN LOGO: quedaría bajo la cámara.
+     - BOTONES LEJOS DE LAS ESQUINAS REDONDEADAS (`--sv-android-corner`, el
+       radio de la pantalla). Un botón redondo de 40px centrado a la altura de
+       la cámara cabe dentro de la curva a partir de ~0,25 radios del borde;
+       con medio radio queda aire alrededor (medido en un OnePlus de 45px).
+   Solo en teléfono: en tablet la cámara no está en el centro de la barra. */
+@media (max-width: 47.99rem) {
+  html[data-android-immersive] .sv-topbar,
+  html[data-android-immersive] .sv-topbar[data-compact] {
+    transform: translate3d(0, calc(var(--sv-android-camera-y, 24px) - 32px), 0);
+  }
+
+  html[data-android-immersive] .sv-topbar[data-immersive] {
+    transform: translate3d(0, calc(var(--sv-android-camera-y, 24px) - 24px), 0);
+  }
+
+  html[data-android-immersive] .sv-topbar[data-compact] .sv-topbar-row {
+    transform: none;
+  }
+
+  html[data-android-immersive] .sv-topbar-row {
+    padding-inline: max(0.5rem, calc(var(--sv-android-corner, 0px) * 0.5));
+  }
+
+  html[data-android-immersive] .sv-topbar-logo {
+    display: none;
   }
 }
 
