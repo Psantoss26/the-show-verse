@@ -2666,23 +2666,26 @@ html[data-android-app] {
 /* APP DE ANDROID SIN BARRA DE ESTADO (`data-android-immersive`, la pone el
    script del <head> si el puente da `cameraCenterY`). La barra superior del
    teléfono ocupa la franja de la barra de estado (`--sv-safe-top` vale 0) y
-   coloca sus botones respecto a la ESQUINA REDONDEADA de la pantalla
+   coloca los botones de los extremos (menú a la izquierda, avatar de 40px a la
+   derecha) respecto a la ESQUINA REDONDEADA de la pantalla
    (`--sv-android-corner`, su radio R):
-     - `--sv-topbar-c` es la distancia del centro de los botones de los
-       extremos (menú a la izquierda, avatar de 40px a la derecha) al borde de
-       arriba Y al lateral: el mismo hueco por los dos lados. Se elige para
-       que, en la diagonal de la esquina, el avatar quede a 6px de la curva:
-       c = R − (R − 20 − 6)/√2 = 0,2929·R + 18,38px (con R = 45px, unos 32px:
-       12px de aire arriba y al lado del avatar). Nunca por encima del centro
-       de la cámara ni a menos de 28px (pantallas sin esquinas redondeadas).
+     - ALTURA, `--sv-topbar-c`: distancia del centro de esos botones al borde
+       de arriba. c = R − (R − 20 − 6)/√2 = 0,2929·R + 18,38px es lo mínimo
+       para que el avatar quede a 6px de la curva (con R = 45px, unos 32px:
+       12px de aire arriba). Nunca por encima del centro de la cámara ni a
+       menos de 28px (pantallas sin esquinas redondeadas).
+     - LATERAL, `--sv-topbar-cx`: distancia del mismo centro al lado. Con el
+       mínimo de la curva el avatar quedaba a 12px del lateral y se veía
+       pegado: va a medio radio más 18px (unos 41px: 21px de aire), nunca
+       menos que la altura ni de 36px.
      - Los grupos encogen al compactar (`mobileTopControlScaleClass`) desde el
-       centro de su botón exterior, no desde el borde: ese centro no se mueve
-       y los huecos siguen iguales. El menú mide 44px; el avatar, 40 más los
-       4px de `pr-1` del grupo.
-     - La fila (64px; 48 en la ficha) se sube lo justo para que su centro caiga
-       en `c`, igual compactada o no: la barra ya es mínima y no se mueve al
-       desplazarse (los controles siguen encogiendo, ver
-       `mobileTopControlScaleClass` en Navbar).
+       centro de su botón exterior, no desde el borde: ese centro no se mueve.
+       El menú mide 44px; el avatar, 40 más los 4px de `pr-1` del grupo.
+     - La fila (64px; 48 en la ficha) se desplaza `--sv-topbar-shift` para que
+       su centro caiga en `c`, igual compactada o no (la barra ya es mínima).
+       Si BAJA (en la ficha, ~8px), el cristal y el velo de la barra
+       (`.sv-topbar > [aria-hidden]`) se estiran hacia arriba lo mismo: si no,
+       quedaba una franja vacía y transparente sobre la barra.
      - SIN LOGO: quedaría bajo la cámara.
    Solo en teléfono: en tablet la cámara no está en el centro de la barra. */
 @media (max-width: 47.99rem) {
@@ -2692,15 +2695,25 @@ html[data-android-app] {
       calc(var(--sv-android-corner, 0px) * 0.2929 + 18.38px),
       28px
     );
+    --sv-topbar-cx: max(
+      var(--sv-topbar-c),
+      calc(var(--sv-android-corner, 0px) * 0.5 + 18px),
+      36px
+    );
   }
 
   html[data-android-immersive] .sv-topbar,
   html[data-android-immersive] .sv-topbar[data-compact] {
-    transform: translate3d(0, calc(var(--sv-topbar-c) - 32px), 0);
+    --sv-topbar-shift: calc(var(--sv-topbar-c) - 32px);
+    transform: translate3d(0, var(--sv-topbar-shift), 0);
   }
 
   html[data-android-immersive] .sv-topbar[data-immersive] {
-    transform: translate3d(0, calc(var(--sv-topbar-c) - 24px), 0);
+    --sv-topbar-shift: calc(var(--sv-topbar-c) - 24px);
+  }
+
+  html[data-android-immersive] .sv-topbar > [aria-hidden] {
+    top: calc(-1 * max(0px, var(--sv-topbar-shift)));
   }
 
   html[data-android-immersive] .sv-topbar[data-compact] .sv-topbar-row {
@@ -2708,8 +2721,8 @@ html[data-android-app] {
   }
 
   html[data-android-immersive] .sv-topbar-row {
-    padding-left: calc(var(--sv-topbar-c) - 22px);
-    padding-right: calc(var(--sv-topbar-c) - 24px);
+    padding-left: calc(var(--sv-topbar-cx) - 22px);
+    padding-right: calc(var(--sv-topbar-cx) - 24px);
   }
 
   html[data-android-immersive] .sv-topbar-start {
