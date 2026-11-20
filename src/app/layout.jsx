@@ -8,6 +8,7 @@ import PwaManager from "@/components/PwaManager";
 import UmamiAnalytics from "@/components/UmamiAnalytics";
 import InAppNotifications from "@/components/notifications/InAppNotifications";
 import AndroidSessionClaim from "@/components/android/AndroidSessionClaim";
+import AndroidGlassFrost from "@/components/android/AndroidGlassFrost";
 import OfflineManager from "@/components/OfflineManager";
 import LetterboxdAutoSync from "@/components/settings/LetterboxdAutoSync";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -136,6 +137,9 @@ export default function RootLayout({ children, overlay }) {
         <AuthProvider>
           <ServerStatusProvider>
             <ScrollRestoration />
+            {/* App de Android: escarcha en vez del cristal sin desenfoque. Fuera
+                de OutsideEmbed: los paneles en iframe también lo llevan. */}
+            <AndroidGlassFrost />
             <Navbar />
             <MobileUserPageSwipeNavigation>
               <DesktopSideNavInset

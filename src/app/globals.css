@@ -2555,6 +2555,17 @@ html[data-android-app] :is([class*=" backdrop-blur-2xl"], [class*=" backdrop-blu
   --sv-frost: rgb(17 17 20 / 0.62);
 }
 
+/* Lo de arriba cubre el primer pintado. El resto del cristal (clases propias,
+   styled-jsx, utilidades con las clases en varias líneas) lo añade
+   `AndroidGlassFrost` leyendo las hojas cargadas: ver lib/androidGlassFrost.js.
+   Aquí solo el cristal en línea (`style={{ backdropFilter }}`). */
+html[data-android-app] [style*="backdrop-filter"]:not([style*="backdrop-filter: none"]):not([style*="blur(0px)"]) {
+  --sv-frost: rgb(17 17 20 / 0.5);
+  box-shadow:
+    inset 0 0 0 100vmax var(--sv-frost),
+    var(--tw-shadow, 0 0 #0000);
+}
+
 .sv-topbar {
   transition:
     background-color 300ms,
