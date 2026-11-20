@@ -26,6 +26,7 @@ import UserAvatar, { UserAvatarBoot } from "@/components/auth/UserAvatar";
 import Avatar from "@/components/ui/Avatar";
 import { useTranslation } from "@/lib/i18n";
 import { AnimatePresence, motion, useIsPresent } from "framer-motion";
+import { mobileDrawerPanel, mobileDrawerVeil } from "@/lib/motion/drawerMotion";
 import {
   FilmIcon,
   TvIcon,
@@ -3778,9 +3779,7 @@ function NavbarContent() {
             <motion.div
               aria-hidden
               className="absolute inset-0 bg-black/30"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              {...mobileDrawerVeil}
             />
             {/* Mismo cristal que la barra inferior y el menú de secciones de
                 la ficha: `LIQUID_GLASS_SURFACE` + capas ópticas. Entra solo
@@ -3791,10 +3790,9 @@ function NavbarContent() {
               role="dialog"
               aria-modal="true"
               aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
-              initial={{ x: -320 }}
-              animate={{ x: 0 }}
-              exit={{ x: -320 }}
-              transition={{ type: "spring", damping: 28, stiffness: 280 }}
+              // `transform` en cadena (WAAPI, compositor), no `x` con muelle:
+              // ver drawerMotion.js.
+              {...mobileDrawerPanel}
               className={`h-full w-[280px] sm:w-[300px] max-w-[85vw] rounded-r-3xl select-none ${LIQUID_GLASS_SURFACE}`}
               onClick={(e) => e.stopPropagation()}
             >
