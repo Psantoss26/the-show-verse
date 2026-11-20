@@ -2905,7 +2905,7 @@ export default function WatchlistClient() {
       <div
         ref={detailsSequenceRef}
         data-user-details-sequence
-        className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12"
+        className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12"
       >
         {/* Header */}
         <motion.header

@@ -94,7 +94,7 @@ export default function LoginRequiredScreen({
         <div className={`absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full ${t.blobs[2]} blur-[120px] sm:blur-[150px]`} />
       </div>
 
-      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
         <motion.header
           className="mb-8"
           initial={{ opacity: 0, y: -20 }}

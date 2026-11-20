@@ -6,6 +6,10 @@ aliases: [Páginas de usuario, Continuar viendo, Recomendaciones]
 
 Funcionalidades de las páginas personales añadidas o rehechas desde julio de 2026.
 
+## Cabecera de las páginas
+
+Favoritos, Pendientes, Listas, Historial, Biblioteca, Descubrir, Estadísticas, Continuar viendo, En progreso, las secciones del dashboard y la pantalla de «Inicia sesión» comparten el contenedor de página (`max-w-[1600px]`), con la etiqueta de sección y el título grande arriba. En el móvil deja 16 px entre la barra superior y la cabecera (`pt-4`); desde `sm` (640 px) son 32 px y desde `lg` 48 px.
+
 ## Vista por defecto
 
 Una página que se abre sin vista guardada en el navegador usa la **cuadrícula compacta** (`compact`), la que más títulos pone por fila: Favoritos, Pendientes, Biblioteca, Descubrir, Historial, Calendario, las secciones del dashboard y las secciones de pósters del Perfil (Actividad y Vistos siguen en lista). En Biblioteca y Descubrir es siempre la compacta (8 pósters por fila en el ordenador), sin mirar la preferencia de cuenta. Historial y Calendario la toman de la preferencia de cuenta «Vista por defecto» (`defaultView`), que para cuentas nuevas también es `compact` (frontend `AuthContext`, backend `routes/users.js` y columna `user_preferences.default_view`, migración `0029_default_view_compact`). Las filas que ya existían con `grid` se respetan: no se distingue quién la eligió. La vista de cada página se guarda solo al elegirla; las secciones del dashboard la escribían en cada visita, así que quien ya entró conserva `grid`.

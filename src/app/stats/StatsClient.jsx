@@ -1731,7 +1731,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
       <div className="min-h-screen bg-black text-zinc-100 pb-20 selection:bg-emerald-500/30">
         <ProfilePageBackground variant="connect" />
 
-        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -1804,7 +1804,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
     <div className="min-h-screen bg-black pb-20 text-zinc-100 selection:bg-emerald-500/30">
       <ProfilePageBackground />
 
-      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
         {headerReady ? (
           <div className="mb-4 sm:mb-6 lg:mb-8 space-y-6">
             <motion.div

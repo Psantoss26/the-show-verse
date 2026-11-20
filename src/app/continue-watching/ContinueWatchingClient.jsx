@@ -1269,7 +1269,7 @@ export default function ContinueWatchingClient() {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans">
         <Blobs />
-        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
           <Header cards={headerStatCards} />
           <div className="mb-8">
             <HistorySectionNav />
@@ -1298,7 +1298,7 @@ export default function ContinueWatchingClient() {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans">
       <Blobs />
-      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
         <Header cards={headerStatCards} staticEntry={fromSibling} onRefresh={load} refreshing={loading} />
 
         {/* Filtros. Separación con la primera fila de tarjetas: la misma que
