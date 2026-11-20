@@ -39,6 +39,8 @@ import {
   traktGetHistory,
 } from "@/lib/api/traktClient";
 import LiquidButton from "@/components/LiquidButton";
+import FlipReorder from "@/components/ui/FlipReorder";
+import useCardEntrance from "@/hooks/useCardEntrance";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
@@ -1884,6 +1886,39 @@ function Backdrop({ entry, className = "" }) {
 }
 
 // Tarjeta modo LISTA
+// Clave estable de una tarjeta del historial para <FlipReorder>.
+function historyFlipKey(entry) {
+  return (
+    getHistoryId(entry) || `${getTmdbId(entry)}:${entry?.watched_at ?? ""}`
+  );
+}
+
+// Entrada de una tarjeta del historial (fundido + leve subida y escala).
+//
+// Con Web Animations (`useCardEntrance`), no con framer: framer animaba
+// `opacity`, `y` y `scale` de cada tarjeta en JavaScript fotograma a
+// fotograma y, con `layout`, medía TODAS las tarjetas al montar (layout
+// forzado). En la app de Android eso daba un fotograma de ~100 ms al abrir el
+// Historial y la cascada iba a ~30 fps, ralentizada. Así corre en el
+// compositor. La recolocación al cambiar el orden la anima <FlipReorder>.
+//
+// Se decide UNA vez, al montar: en navegación de historial (atrás/adelante) no
+// se anima, y solo entra en cascada lo que cabe en pantalla.
+function useHistoryCardEntrance(ref, entry, { index, totalItems, animateWithin }) {
+  const isBackNav = useIsHistoryNavigation();
+  const [{ shouldAnimate, animDelay }] = useState(() => ({
+    shouldAnimate: !isBackNav && index < Math.max(1, animateWithin),
+    animDelay: totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03,
+  }));
+  useCardEntrance(ref, {
+    enabled: shouldAnimate,
+    delayS: animDelay,
+    durationS: 0.25,
+    fromTransform: "translateY(10px) scale(0.95)",
+  });
+  return historyFlipKey(entry);
+}
+
 const HistoryItemCard = memo(function HistoryItemCard({
   entry,
   busy,
@@ -2103,61 +2138,31 @@ const HistoryItemCard = memo(function HistoryItemCard({
     </div>
   );
 
-  // Reduce animation delay for large lists
-  const isBackNav = useIsHistoryNavigation();
-  const animDelay =
-    totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  // En navegación de historial (atrás/adelante) no se anima la entrada. Se anima
-  // solo lo que cabe en pantalla (cascada tarjeta-a-tarjeta, como Favoritos).
-  const shouldAnimate = !isBackNav && index < Math.max(1, animateWithin);
+  const flipKey = useHistoryCardEntrance(ref, entry, {
+    index,
+    totalItems,
+    animateWithin,
+  });
 
   if (!href || isGroup)
     return (
-      <motion.div
+      <div
         ref={ref}
         className="relative overflow-hidden bg-zinc-900/30 rounded-xl cursor-pointer hover:bg-zinc-900/60 transition-colors group"
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{
-          duration: 0.25,
-          delay: shouldAnimate ? animDelay : 0,
-          // La recolocación no hereda el retardo escalonado de la entrada.
-          layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-          ease: [0.25, 0.1, 0.25, 1],
-        }}
-        layout={!isBackNav}
-        // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
-        // filtrar). Abrir o redimensionar el panel lateral cambia las
-        // columnas, no el orden: ahí la rejilla se reorganiza de una vez
-        // en vez de animar cada tarjeta por separado.
-        layoutDependency={index}
+        data-history-card=""
+        data-flip-key={flipKey}
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
         <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
         <div className="block">{Content}</div>
-      </motion.div>
+      </div>
     );
 
   return (
-    <motion.div
+    <div
       ref={ref}
-      initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      transition={{
-        duration: 0.25,
-        delay: shouldAnimate ? animDelay : 0,
-        // La recolocación no hereda el retardo escalonado de la entrada.
-        layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-        ease: [0.25, 0.1, 0.25, 1],
-      }}
-      layout={!isBackNav}
-      // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
-      // filtrar). Abrir o redimensionar el panel lateral cambia las
-      // columnas, no el orden: ahí la rejilla se reorganiza de una vez
-      // en vez de animar cada tarjeta por separado.
-      layoutDependency={index}
+      data-history-card=""
+      data-flip-key={flipKey}
     >
       <Link
         href={href}
@@ -2169,7 +2174,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
         <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
         {Content}
       </Link>
-    </motion.div>
+    </div>
   );
 });
 
@@ -2304,62 +2309,38 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
     </HoverExpandCard>
   );
 
-  const isBackNav = useIsHistoryNavigation();
-  const animDelay =
-    totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = !isBackNav && index < Math.max(1, animateWithin);
+  const shellRef = useRef(null);
+  const flipKey = useHistoryCardEntrance(shellRef, entry, {
+    index,
+    totalItems,
+    animateWithin,
+  });
   const shellClassName =
     "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
 
   if (!href || isGroup)
     return (
-      <motion.div
+      <div
+        ref={shellRef}
         className={shellClassName}
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{
-          duration: 0.25,
-          delay: shouldAnimate ? animDelay : 0,
-          // La recolocación no hereda el retardo escalonado de la entrada.
-          layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-          ease: [0.25, 0.1, 0.25, 1],
-        }}
-        layout={!isBackNav}
-        // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
-        // filtrar). Abrir o redimensionar el panel lateral cambia las
-        // columnas, no el orden: ahí la rejilla se reorganiza de una vez
-        // en vez de animar cada tarjeta por separado.
-        layoutDependency={index}
+        data-history-card=""
+        data-flip-key={flipKey}
       >
         <div className="block cursor-pointer">{CardInner}</div>
-      </motion.div>
+      </div>
     );
 
   return (
-    <motion.div
+    <div
+      ref={shellRef}
       className={shellClassName}
-      initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      transition={{
-        duration: 0.25,
-        delay: shouldAnimate ? animDelay : 0,
-        // La recolocación no hereda el retardo escalonado de la entrada.
-        layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-        ease: [0.25, 0.1, 0.25, 1],
-      }}
-      layout={!isBackNav}
-      // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
-      // filtrar). Abrir o redimensionar el panel lateral cambia las
-      // columnas, no el orden: ahí la rejilla se reorganiza de una vez
-      // en vez de animar cada tarjeta por separado.
-      layoutDependency={index}
+      data-history-card=""
+      data-flip-key={flipKey}
     >
       <Link href={href} prefetch onClick={onPreviewClick} className="block">
         {CardInner}
       </Link>
-    </motion.div>
+    </div>
   );
 });
 
@@ -2546,33 +2527,33 @@ const HistoryGridCard = memo(function HistoryGridCard({
     </div>
   );
 
-  const isBackNav = useIsHistoryNavigation();
-  const animDelay =
-    totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = !isBackNav && index < Math.max(1, animateWithin);
+  const shellRef = useRef(null);
+  const flipKey = useHistoryCardEntrance(shellRef, entry, {
+    index,
+    totalItems,
+    animateWithin,
+  });
 
   if (!href || isGroup)
     return (
-      <motion.div
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{ duration: 0.25, delay: shouldAnimate ? animDelay : 0, ease: [0.25, 0.1, 0.25, 1] }}
+      <div
+        ref={shellRef}
+        data-history-card=""
+        data-flip-key={flipKey}
       >
         <div className="block cursor-pointer">{CardInner}</div>
-      </motion.div>
+      </div>
     );
   return (
-    <motion.div
-      initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      transition={{ duration: 0.25, delay: shouldAnimate ? animDelay : 0, ease: [0.25, 0.1, 0.25, 1] }}
+    <div
+      ref={shellRef}
+      data-history-card=""
+      data-flip-key={flipKey}
     >
       <Link href={href} prefetch onClick={onPreviewClick} className="block">
         {CardInner}
       </Link>
-    </motion.div>
+    </div>
   );
 });
 
@@ -4025,6 +4006,26 @@ export default function HistoryClient() {
     return { offsets, total: acc };
   }, [groupedWithCollapse]);
 
+  // Firma del ORDEN visible para <FlipReorder> (grupo de cada tarjeta incluido).
+  // Cargar la página siguiente solo AÑADE al final: si la firma nueva empieza
+  // por la anterior se conserva la anterior, para no medir todas las tarjetas
+  // en cada tanda (nada se recoloca).
+  const nextFlipOrderKey = useMemo(
+    () =>
+      groupedWithCollapse
+        .map((g) => `${g.key}:${g.collapsedItems.map(historyFlipKey).join(",")}`)
+        .join("|"),
+    [groupedWithCollapse],
+  );
+  const [historyFlipOrderKey, setHistoryFlipOrderKey] =
+    useState(nextFlipOrderKey);
+  if (
+    nextFlipOrderKey !== historyFlipOrderKey &&
+    (!historyFlipOrderKey || !nextFlipOrderKey.startsWith(historyFlipOrderKey))
+  ) {
+    setHistoryFlipOrderKey(nextFlipOrderKey);
+  }
+
   // Nº de tarjetas a animar = las que caben en pantalla en la vista actual.
   const historyEntranceCount =
     typeof window === "undefined"
@@ -4137,8 +4138,8 @@ export default function HistoryClient() {
         {/* Header */}
         <motion.header
           className="mb-6 lg:mb-10"
-          initial={staticChrome ? false : { opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={staticChrome ? false : { opacity: 0, transform: "translateY(-20px)" }}
+          animate={{ opacity: 1, transform: "translateY(0px)", transitionEnd: { transform: "none" } }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
@@ -4159,8 +4160,8 @@ export default function HistoryClient() {
                 {auth.connected && (historyLoaded || fromSibling) && (
                   <div className="flex items-center gap-2">
                     <motion.div
-                      initial={staticChrome ? false : { opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={staticChrome ? false : { opacity: 0, transform: "scale(0.8)" }}
+                      animate={{ opacity: 1, transform: "scale(1)", transitionEnd: { transform: "none" } }}
                       transition={{ duration: 0.4, delay: 0.3 }}
                     >
                       <LiquidButton
@@ -4179,8 +4180,8 @@ export default function HistoryClient() {
                     </motion.div>
 
                     <motion.div
-                      initial={staticChrome ? false : { opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={staticChrome ? false : { opacity: 0, transform: "scale(0.8)" }}
+                      animate={{ opacity: 1, transform: "scale(1)", transitionEnd: { transform: "none" } }}
                       transition={{ duration: 0.4, delay: 0.4 }}
                     >
                       <LiquidButton
@@ -4208,15 +4209,15 @@ export default function HistoryClient() {
             {auth.connected && (historyLoaded || fromSibling) && (
               <motion.div
                 className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
-                initial={staticChrome ? false : { opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={staticChrome ? false : { opacity: 0, transform: "translateY(20px)" }}
+                animate={{ opacity: 1, transform: "translateY(0px)", transitionEnd: { transform: "none" } }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
                 {headerStatCards.map((card, index) => (
                   <motion.div
                     key={index}
-                    initial={staticChrome ? false : { opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    initial={staticChrome ? false : { opacity: 0, transform: "scale(0.9)" }}
+                    animate={{ opacity: 1, transform: "scale(1)", transitionEnd: { transform: "none" } }}
                     transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.5 + index * 0.1 }}
                     className="w-full min-w-0"
                   >
@@ -4246,8 +4247,8 @@ export default function HistoryClient() {
           {/* Izquierda */}
           <motion.div
             className="space-y-6 min-w-0"
-            initial={staticChrome ? false : { opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={staticChrome ? false : { opacity: 0, transform: "translateX(-20px)" }}
+            animate={{ opacity: 1, transform: "translateX(0px)", transitionEnd: { transform: "none" } }}
             transition={
               staticChrome ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
             }
@@ -4259,8 +4260,8 @@ export default function HistoryClient() {
                 className={`sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-3 mb-3 sm:top-[calc(5rem+var(--sv-safe-top,0px))] lg:mb-6 ${
                   staticChrome ? "transition-none" : "transition-all duration-300"
                 }`}
-                initial={staticChrome ? false : { opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={staticChrome ? false : { opacity: 0, transform: "translateY(10px)" }}
+                animate={{ opacity: 1, transform: "translateY(0px)", transitionEnd: { transform: "none" } }}
                 transition={
                   staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.5 }
                 }
@@ -4775,8 +4776,8 @@ export default function HistoryClient() {
             {showLoginPrompt ? (
               <div className="flex items-center justify-center py-12 lg:py-24">
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, transform: "translateY(20px)" }}
+                  animate={{ opacity: 1, transform: "translateY(0px)", transitionEnd: { transform: "none" } }}
                   className="max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
                 >
                   <div className="relative mb-4 flex h-24 w-48 items-center justify-center mx-auto">
@@ -4810,8 +4811,8 @@ export default function HistoryClient() {
               !loading ? (
               <motion.div
                 className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, transform: "scale(0.95)" }}
+                animate={{ opacity: 1, transform: "scale(1)", transitionEnd: { transform: "none" } }}
                 transition={{ duration: 0.4 }}
               >
                 <LayoutList className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
@@ -4846,7 +4847,11 @@ export default function HistoryClient() {
                 )}
               </motion.div>
             ) : (
-              <div className="space-y-8">
+              <FlipReorder
+                className="space-y-8"
+                orderKey={historyFlipOrderKey}
+                itemSelector="[data-history-card]"
+              >
                 {groupedWithCollapse.map((g, groupIndex) => {
                   // Índice global de la primera tarjeta de este grupo → cascada
                   // continua tarjeta-a-tarjeta en toda la lista (como Favoritos).
@@ -5017,7 +5022,7 @@ export default function HistoryClient() {
                     )}
                   </div>
                 )}
-              </div>
+              </FlipReorder>
             )}
           </motion.div>
 
@@ -5028,8 +5033,8 @@ export default function HistoryClient() {
               className="sv-history-calendar space-y-6 sticky top-20"
               // Llegando desde Continuar viendo (o volviendo atrás) sale quieto
               // con la barra y la columna izquierda, sin esperar a su entrada.
-              initial={staticChrome ? false : { opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={staticChrome ? false : { opacity: 0, transform: "translateX(20px)" }}
+              animate={{ opacity: 1, transform: "translateX(0px)", transitionEnd: { transform: "none" } }}
               transition={
                 staticChrome ? { duration: 0 } : { duration: 0.5, delay: 0.4 }
               }
