@@ -52,9 +52,9 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  // Como la PWA de Trakt: la página puede dibujarse bajo las barras del
-  // sistema (la barra de gestos en Android, si Chrome lo permite; la barra de
-  // estado en iOS) y `env(safe-area-inset-*)` da su alto. Las barras de la app
+  // La página se dibuja bajo las barras del sistema y la cámara (la PWA de
+  // Android va inmersiva, ver site.webmanifest; en iOS, bajo la barra de
+  // estado) y `env(safe-area-inset-*)` da su alto. Las barras de la app
   // lo suman (`--sv-safe-top`, `--sv-safe-bottom` en globals.css).
   viewportFit: "cover",
 };

@@ -71,8 +71,9 @@ export default function PwaManager() {
   // abre su menú de «abrir en pestaña / descargar imagen»; ese menú sale del
   // evento `contextmenu`. En campos editables se respeta (pegar, seleccionar).
   useEffect(() => {
+    // `fullscreen`: la PWA de Android va inmersiva (ver site.webmanifest).
     const query = window.matchMedia?.(
-      "(display-mode: standalone) and (hover: none) and (pointer: coarse)",
+      "(display-mode: standalone) and (hover: none) and (pointer: coarse), (display-mode: fullscreen) and (hover: none) and (pointer: coarse)",
     );
     if (!query) return;
     const onContextMenu = (event) => {
@@ -91,7 +92,8 @@ export default function PwaManager() {
     if (typeof window === "undefined") return;
 
     setIsInstalled(
-      window.matchMedia?.("(display-mode: standalone)")?.matches ||
+      window.matchMedia?.("(display-mode: standalone), (display-mode: fullscreen)")
+        ?.matches ||
         window.navigator.standalone === true,
     );
 

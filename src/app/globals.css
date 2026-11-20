@@ -1640,13 +1640,15 @@ body {
    Android Chrome ignora `-webkit-touch-callout`; ese menú lo corta PwaManager
    cancelando `contextmenu`.
 
-   Solo con `display-mode: standalone` y puntero táctil: en una pestaña del
+   Solo con `display-mode: standalone` o `fullscreen` (la PWA de Android va
+   inmersiva) y puntero táctil: en una pestaña del
    navegador y en la PWA de escritorio se sigue pudiendo copiar texto. Los
    campos editables recuperan la selección (en iOS, `user-select: none` en un
    input impide escribir en él). En `@layer base` para que una utilidad
    `select-text` pueda reactivarla en un elemento concreto. */
 @layer base {
-  @media (display-mode: standalone) and (hover: none) and (pointer: coarse) {
+  @media (display-mode: standalone) and (hover: none) and (pointer: coarse),
+    (display-mode: fullscreen) and (hover: none) and (pointer: coarse) {
     html {
       -webkit-user-select: none;
       user-select: none;
@@ -2471,10 +2473,13 @@ html[data-fit-viewport] [data-scroll-restoration-root] {
    `--sv-safe-bottom`, lo que sube la barra inferior y lo que va sobre ella
    para no quedar bajo la barra de navegación del sistema.
 
-   Como en la PWA de Trakt: `viewport-fit=cover` y `env(safe-area-inset-*)`.
-   En la PWA de Android la barra de estado no deja ver la página (Chrome la
-   pinta con `theme-color`), así que el de arriba vale 0; el de abajo, lo que
-   mida la barra de gestos si Chrome dibuja la página bajo ella.
+   `viewport-fit=cover` y `env(safe-area-inset-*)`. La PWA de Android va
+   INMERSIVA (`display: fullscreen` en site.webmanifest): Chrome no deja a una
+   PWA standalone dibujar bajo la barra de estado (la pintaba negra con
+   `theme-color`, bug de Chromium 407420295), así que se ocultan las dos barras
+   y la página ocupa la pantalla entera; aparecen un momento al deslizar desde
+   el borde, por encima de la página. Arriba queda solo el hueco de la cámara
+   (`safe-area-inset-top`) y abajo el de la barra de gestos si la hubiera.
 
    En la APP NATIVA de Android (`data-android-app`, lo pone un script del
    <head> según el user agent) la web pasa por detrás de las DOS barras, que

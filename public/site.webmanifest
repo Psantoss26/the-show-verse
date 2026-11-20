@@ -3,12 +3,13 @@
     "short_name": "ShowVerse",
     "start_url": "/",
     "scope": "/",
-    "display": "standalone",
+    "display": "fullscreen",
     "launch_handler": {
         "client_mode": "navigate-existing"
     },
     "display_override": [
         "window-controls-overlay",
+        "fullscreen",
         "standalone",
         "minimal-ui"
     ],
