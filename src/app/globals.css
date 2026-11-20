@@ -2492,6 +2492,11 @@ html[data-fit-viewport] [data-scroll-restoration-root] {
 :root {
   --sv-safe-top: env(safe-area-inset-top, 0px);
   --sv-safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Donde se quedan fijas las barras de búsqueda y ajustes de las páginas de
+     usuario (Favoritos, Pendientes, Listas…): 8px bajo la barra superior
+     compactada (48px en móvil). En la app de Android sin barra de estado se
+     redefine más abajo, porque allí la barra superior es más alta. */
+  --sv-page-sticky-top: calc(3.5rem + var(--sv-safe-top, 0px));
 }
 
 html[data-android-app] {
@@ -2758,6 +2763,11 @@ html[data-android-app] .sv-glass-rim {
       calc(var(--sv-android-corner, 0px) * 0.5 + 18px),
       36px
     );
+    /* La barra no sube al compactar: su borde inferior queda en c + 32px
+       (media fila de 64). Las barras fijas de las páginas de usuario, 8px
+       por debajo; con los 56px de siempre quedaban bajo la barra superior y
+       su difuminado. */
+    --sv-page-sticky-top: calc(var(--sv-topbar-c) + 2.5rem);
   }
 
   html[data-android-immersive] .sv-topbar,

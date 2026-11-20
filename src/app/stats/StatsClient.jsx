@@ -1828,7 +1828,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
             </motion.div>
 
             <motion.div
-              className="sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[60] transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] lg:hidden"
+              className="sticky top-[var(--sv-page-sticky-top)] z-[60] transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] lg:hidden"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.2 }}

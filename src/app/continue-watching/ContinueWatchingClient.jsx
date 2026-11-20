@@ -1306,7 +1306,7 @@ export default function ContinueWatchingClient() {
         <motion.div
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          className="sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-3 mb-6 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))]"
+          className="sticky top-[var(--sv-page-sticky-top)] z-[70] space-y-3 mb-6 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))]"
           initial={fromSibling ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}

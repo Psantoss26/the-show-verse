@@ -2084,7 +2084,7 @@ export default function DiscoverClient() {
         <motion.div
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          className="sv-toolbar-rise sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] mb-6 space-y-1 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6"
+          className="sv-toolbar-rise sticky top-[var(--sv-page-sticky-top)] z-[70] mb-6 space-y-1 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6"
           {...toolbarMotion}
         >
           {/* Mobile: search + toggle */}
