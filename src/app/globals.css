@@ -2510,6 +2510,46 @@ html[data-android-app] *::after {
   backdrop-filter: none !important;
 }
 
+/* ESCARCHA: el cristal de la APP NATIVA sin desenfoque.
+   Sin `backdrop-filter` cada superficie de cristal se quedaba en su tinte, que
+   está pensado para ir SOBRE el desenfoque (`bg-black/15` en las barras y
+   tarjetas de LIQUID_GLASS_*): sin él son casi transparentes y lo de detrás se
+   ve nítido, como si no hubiera cristal. Aquí cada superficie que en el
+   navegador difumina recibe un velo que hace el papel de lo difuminado: un
+   gris muy oscuro (el promedio de una interfaz negra con portadas), más denso
+   cuanto más difumina en el navegador.
+
+   Va como SOMBRA INTERIOR que llena la caja, no como `background`: se pinta
+   encima del fondo y debajo del contenido, así que conserva el tinte propio de
+   cada pieza (negro, blanco, zinc) y su degradado de luz, y no hay que conocer
+   el color de cada una. Las sombras de Tailwind (`shadow-*`, `ring-*`) siguen
+   detrás, componiéndose con sus variables. Se rasteriza una vez: al desplazar
+   es solo una capa más para el compositor, sin el coste del desenfoque.
+
+   Qué es cristal: las utilidades `backdrop-blur*` SIN variante (las de
+   `hover:` o `desktop:` no se aplican en el teléfono; `[class*=" …"]` exige
+   que la clase empiece tras un espacio) y las clases propias que difuminan. */
+html[data-android-app] :is([class^="backdrop-blur"], [class*=" backdrop-blur"], .glass, .glass-dark) {
+  --sv-frost: rgb(17 17 20 / 0.5);
+  box-shadow:
+    inset 0 0 0 100vmax var(--sv-frost),
+    var(--tw-inset-shadow, 0 0 #0000),
+    var(--tw-inset-ring-shadow, 0 0 #0000),
+    var(--tw-ring-offset-shadow, 0 0 #0000),
+    var(--tw-ring-shadow, 0 0 #0000),
+    var(--tw-shadow, 0 0 #0000);
+}
+
+/* Desenfoques leves (velos de los modales, 1-6 px): apenas tapaban. */
+html[data-android-app] :is([class^="backdrop-blur-sm"], [class*=" backdrop-blur-sm"], [class*=" backdrop-blur-[1px]"], [class*=" backdrop-blur-[2px]"], [class*=" backdrop-blur-[4px]"], [class*=" backdrop-blur-[6px]"]) {
+  --sv-frost: rgb(17 17 20 / 0.3);
+}
+
+/* Desenfoques fuertes (24 px o más): ahí no se distinguía nada de detrás. */
+html[data-android-app] :is([class*=" backdrop-blur-2xl"], [class*=" backdrop-blur-3xl"], [class*=" backdrop-blur-[28px]"], [class*=" backdrop-blur-[50px]"], [class^="backdrop-blur-2xl"], [class^="backdrop-blur-3xl"]) {
+  --sv-frost: rgb(17 17 20 / 0.62);
+}
+
 .sv-topbar {
   transition:
     background-color 300ms,
