@@ -2992,6 +2992,9 @@ function NavbarContent() {
         // Ficha / recomendaciones: nacen ya con el alto compacto (ver la fila
         // móvil). Lo leen los avisos emergentes para colocarse justo debajo.
         data-immersive={isImmersiveRoute ? "" : undefined}
+        // Búsqueda móvil abierta: en la app de Android la barra queda por
+        // encima de su velo (ver `.sv-mobile-search` en globals.css).
+        data-search-open={showMobileSearch ? "" : undefined}
         // `pt-[var(--sv-safe-top,0px)]`: donde la página pasa por detrás de la
         // barra de estado o de la cámara (la app nativa de Android), la barra
         // baja ese hueco (ver `--sv-safe-top` en globals.css). Lo gana por
@@ -3407,7 +3410,12 @@ function NavbarContent() {
             <button
               ref={tabletMenuButtonRef}
               type="button"
-              onClick={() => setMobileMenuOpen(true)}
+              onClick={() => {
+                // En la app de Android la barra sigue a la vista con la
+                // búsqueda abierta: el menú la sustituye.
+                setShowMobileSearch(false);
+                setMobileMenuOpen(true);
+              }}
               aria-label={t("open_menu", "Abrir menú")}
               aria-controls="mobile-navigation-drawer"
               aria-expanded={mobileMenuOpen}
@@ -3423,7 +3431,10 @@ function NavbarContent() {
             {/* MÓVIL: la búsqueda abre el overlay a pantalla completa. */}
             <button
               type="button"
-              onClick={() => setShowMobileSearch(true)}
+              // Alterna: en la app de Android este botón sigue visible sobre
+              // la búsqueda abierta y la cierra.
+              onClick={() => setShowMobileSearch((open) => !open)}
+              aria-expanded={showMobileSearch}
               className="grid h-11 w-11 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-transform duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 md:hidden"
               aria-label="Buscar"
             >
@@ -4024,7 +4035,11 @@ function NavbarContent() {
       <AnimatePresence>
         {showMobileSearch && (
           <motion.div
-            className="fixed inset-0 z-50 flex flex-col p-4 pt-4"
+            // `sv-mobile-search`: en la app de Android (sin barra de estado)
+            // la barra de búsqueda va bajo la barra superior, que sigue
+            // visible, en vez de arriba del todo bajo la cámara.
+            className="sv-mobile-search fixed inset-0 z-50 flex flex-col p-4 pt-4"
+            data-immersive-route={isImmersiveRoute ? "" : undefined}
             onClick={() => setShowMobileSearch(false)}
           >
             {/* Igual que los modales de DetailsClient: atenúa y difumina la

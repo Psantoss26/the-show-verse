@@ -2749,6 +2749,23 @@ html[data-android-app] .sv-glass-rim {
   html[data-android-immersive] .sv-topbar-logo {
     display: none;
   }
+
+  /* BÚSQUEDA MÓVIL (`.sv-mobile-search`, overlay de Navbar): arriba del todo
+     quedaba cortada por la cámara. Empieza 0.5rem bajo el borde inferior de la
+     barra (centro `c` + media fila: 32px, 24 en la ficha), y la barra sube por
+     encima del velo (z 50) para seguir a la vista y usable: su botón de
+     búsqueda cierra el overlay y el de menú lo cambia por el menú. */
+  html[data-android-immersive] .sv-topbar[data-search-open] {
+    z-index: 51;
+  }
+
+  html[data-android-immersive] .sv-mobile-search {
+    padding-top: calc(var(--sv-topbar-c) + 32px + 0.5rem);
+  }
+
+  html[data-android-immersive] .sv-mobile-search[data-immersive-route] {
+    padding-top: calc(var(--sv-topbar-c) + 24px + 0.5rem);
+  }
 }
 
 /* AVISOS EMERGENTES (InAppNotifications) justo bajo la barra superior, a
