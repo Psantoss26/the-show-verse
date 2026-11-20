@@ -116,7 +116,7 @@ class Prefs(context: Context) {
         set(value) = prefs.edit().putString(KEY_PUSH_TOKEN, value).apply()
 
     // Diagnóstico de rendimiento (ver RendimientoActivity). Por defecto, la app
-    // tal cual: medidor apagado, frecuencia máxima y desenfoques de la web.
+    // tal cual: medidor apagado, frecuencia como Chrome y desenfoques de la web.
 
     var perfFrameMeter: Boolean
         get() = prefs.getBoolean(KEY_PERF_METER, false)

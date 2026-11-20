@@ -599,12 +599,9 @@ export default function LiquidButton({
           : undefined,
         backgroundColor: active && !disabled ? bgColor : undefined,
         color: active && !disabled ? secondaryColor : undefined,
-        // El brillo en línea pisa la sombra de la escarcha de la app de Android
-        // (androidGlassFrost.js); por eso la repite con `--sv-frost`, que solo
-        // existe allí (en el navegador queda transparente).
         boxShadow:
           (isHovered || active || proximityGlow > 0 || isExploding) && !disabled
-            ? `inset 0 0 0 100vmax var(--sv-frost, transparent), 0 0 ${20 + proximityGlow * 30 + (isExploding ? 30 : 0)}px ${currentColors.glow}`
+            ? `0 0 ${20 + proximityGlow * 30 + (isExploding ? 30 : 0)}px ${currentColors.glow}`
             : undefined,
       }}
       {...props}

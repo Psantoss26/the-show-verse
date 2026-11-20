@@ -119,8 +119,8 @@ class WebAppActivity : AppCompatActivity() {
         setContentView(binding.root)
         prefs = Prefs(this)
 
-        // Antes que nada se pinte: la frecuencia de refresco más alta de la
-        // pantalla, como la que tiene la PWA dentro de Chrome. Ver
+        // Antes que nada se pinte: la frecuencia de refresco que tiene la PWA
+        // dentro de Chrome (90 Hz si la pantalla los tiene). Ver
         // FrecuenciaPantalla.
         aplicarFrecuencia()
 
@@ -731,7 +731,7 @@ class WebAppActivity : AppCompatActivity() {
 
     private fun aplicarFrecuencia() {
         if (prefs.perfMaxRefresh) {
-            FrecuenciaPantalla.pedirMaxima(this)
+            FrecuenciaPantalla.pedirFluida(this)
         } else {
             FrecuenciaPantalla.soltar(this)
         }
