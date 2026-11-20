@@ -37,15 +37,16 @@ import androidx.activity.OnBackPressedCallback
  *     transformación solo empieza cuando la captura está lista.
  *
  *  2. AL SOLTAR (o al pulsar ATRÁS sin gesto, capturando en ese momento): la
- *     captura se queda QUIETA encima, donde estaba la web, y un velo opaco tapa
- *     la web, que vuelve a su tamaño y navega atrás por debajo sin que se vea.
- *     Se espera a que la web avise de que la página anterior ya está pintada
- *     ([paginaPintada], desde src/components/android/AndroidBackPaintSignal.jsx)
- *     y a que ese pintado llegue a pantalla ([confirmarPintado]). Con una web
- *     que no avisa se espera poco; con una que sí, como mucho [ESPERA_MAX_MS].
+ *     captura empieza a salir EN EL ACTO, deslizándose hacia el lado contrario
+ *     al borde del gesto, sin esperar a la web. Debajo, un velo opaco tapa la
+ *     web, que vuelve a su tamaño y navega atrás sin que se vea.
  *
- *  3. Se quita el velo: la página anterior aparece entera y ESTÁTICA, y solo la
- *     captura sale deslizándose hacia el lado contrario al borde del gesto.
+ *  3. Cuando la web avisa de que la página anterior ya está pintada
+ *     ([paginaPintada], desde src/components/android/AndroidBackPaintSignal.jsx)
+ *     y ese pintado llega a pantalla ([confirmarPintado]), el velo se desvanece
+ *     y la página aparece entera y ESTÁTICA. Con una web que no avisa se espera
+ *     poco; con una que sí, como mucho [ESPERA_MAX_MS]. Normalmente ocurre
+ *     mientras la captura aún está saliendo.
  *
  * Al cancelar, la web vuelve a su sitio sin navegar. Si la captura falla, se
  * navega igual y la web vuelve a su tamaño.
@@ -131,10 +132,9 @@ class AtrasPredictivo(
     /** Transición en marcha (fases 2 y 3): la captura que la ocupa. */
     private var enTransicion: Bitmap? = null
 
-    /** Fase 2: esperando a que la web pinte la página anterior. */
+    /** El velo sigue puesto: esperando a que la web pinte la página anterior. */
     private var esperandoPagina = false
-    private var inicioSalida = Transformacion.REPOSO
-    private val tiempoAgotado = Runnable { if (esperandoPagina) salirCaptura() }
+    private val tiempoAgotado = Runnable { revelarPagina() }
 
     /** La web ha avisado alguna vez: manda [paginaPintada] y vale la pena esperarla. */
     private var webAvisa = false
@@ -153,9 +153,7 @@ class AtrasPredictivo(
     fun paginaPintada() {
         webAvisa = true
         if (!esperandoPagina) return
-        confirmarPintado {
-            if (esperandoPagina) salirCaptura()
-        }
+        confirmarPintado { revelarPagina() }
     }
 
     // ------------------------------------------------------------ callback
@@ -295,17 +293,21 @@ class AtrasPredictivo(
         val bitmap = captura ?: return sinCaptura()
         captura = null
         enTransicion = bitmap
-        inicioSalida = inicio
 
-        // La captura, quieta donde estaba la web; debajo, el velo tapa la web
-        // entera, que vuelve a su tamaño (no hace falta repintarla).
+        // La captura, donde estaba la web; debajo, el velo tapa la web entera,
+        // que vuelve a su tamaño (no hace falta repintarla) y navega atrás.
         fondo.setBackgroundColor(colorFondo)
         capturaVista.setImageBitmap(bitmap)
         capturaVista.clipToOutline = true
         poner(capturaVista, esquinasCaptura, inicio)
         capturaVista.visibility = View.VISIBLE
+        velo.animate().cancel()
+        velo.alpha = 1f
         velo.visibility = View.VISIBLE
         quitarTransformacion(vista, esquinasWeb)
+
+        // La captura sale YA, en el mismo fotograma: sin esperar a la web.
+        salirCaptura(bitmap, inicio)
 
         volver()
         actualizar()
@@ -317,17 +319,10 @@ class AtrasPredictivo(
 
     // ------------------------------------------------------------ fase 3
 
-    private fun salirCaptura() {
-        esperandoPagina = false
-        principal.removeCallbacks(tiempoAgotado)
-        val bitmap = enTransicion ?: return
-        val inicio = inicioSalida
+    /** La captura sale deslizándose; lo de debajo (velo o página) no se mueve. */
+    private fun salirCaptura(bitmap: Bitmap, inicio: Transformacion) {
         val izquierda = desdeIzquierda
         val ancho = vista.width.toFloat()
-
-        // La página anterior, ya pintada, aparece entera y quieta.
-        velo.visibility = View.GONE
-
         animador = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = DURACION_SALIDA_MS
             interpolator = INTERPOLADOR_SALIDA
@@ -338,11 +333,23 @@ class AtrasPredictivo(
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     if (animador === animation) animador = null
-                    limpiarTransicion(bitmap)
+                    limpiarCaptura(bitmap)
                 }
             })
             start()
         }
+    }
+
+    /** La página anterior ya está pintada (o se agotó la espera): se quita el velo. */
+    private fun revelarPagina() {
+        if (!esperandoPagina) return
+        esperandoPagina = false
+        principal.removeCallbacks(tiempoAgotado)
+        velo.animate()
+            .alpha(0f)
+            .setDuration(DURACION_VELO_MS)
+            .withEndAction { ocultarVelo() }
+            .start()
     }
 
     /** Si hay una transición a medias, la lleva al final al instante. */
@@ -350,21 +357,30 @@ class AtrasPredictivo(
         if (esperandoPagina) {
             esperandoPagina = false
             principal.removeCallbacks(tiempoAgotado)
-            enTransicion?.let { limpiarTransicion(it) }
+        }
+        if (velo.visibility == View.VISIBLE) {
+            velo.animate().cancel()
+            ocultarVelo()
         }
         animador?.end()
         animador = null
     }
 
-    private fun limpiarTransicion(bitmap: Bitmap) {
+    private fun ocultarVelo() {
+        velo.visibility = View.GONE
+        velo.alpha = 1f
+        if (enTransicion == null) fondo.background = null
+    }
+
+    private fun limpiarCaptura(bitmap: Bitmap) {
         if (enTransicion === bitmap) enTransicion = null
         capturaVista.setImageDrawable(null)
         capturaVista.visibility = View.GONE
-        velo.visibility = View.GONE
         reutilizable = bitmap
         quitarTransformacion(capturaVista, esquinasCaptura)
         quitarTransformacion(vista, esquinasWeb)
-        fondo.background = null
+        // El fondo hace falta mientras el velo siga puesto (se está desvaneciendo).
+        if (velo.visibility != View.VISIBLE) fondo.background = null
     }
 
     /** Sin captura no hay transición: se navega y la web vuelve a su tamaño. */
@@ -510,14 +526,16 @@ class AtrasPredictivo(
         // Curva «emphasized decelerate» de Material 3 para seguir al dedo.
         val INTERPOLADOR_GESTO = PathInterpolator(0.05f, 0.7f, 0.1f, 1f)
 
-        // «Emphasized» de Material 3 para la salida de la captura.
-        val INTERPOLADOR_SALIDA = PathInterpolator(0.2f, 0f, 0f, 1f)
+        // «Emphasized decelerate» también para la salida: arranca rápido, para
+        // que la captura se mueva en cuanto se suelta, y frena al final.
+        val INTERPOLADOR_SALIDA = PathInterpolator(0.05f, 0.7f, 0.1f, 1f)
 
-        const val DURACION_SALIDA_MS = 320L
+        const val DURACION_SALIDA_MS = 300L
+        const val DURACION_VELO_MS = 120L
         const val DURACION_SOLTAR_MS = 250L
         const val DURACION_CANCELAR_MS = 200L
 
-        /** Tope de espera a una web que avisa: luego la captura sale igual. */
+        /** Tope de espera a una web que avisa: luego el velo se quita igual. */
         const val ESPERA_MAX_MS = 900L
 
         /** Con una web que no avisa (versión antigua): lo justo para un pintado. */
