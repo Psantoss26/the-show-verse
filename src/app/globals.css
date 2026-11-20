@@ -2601,6 +2601,49 @@ html[data-android-app] .sv-glass-rim {
   );
 }
 
+/* Móvil y tablet: las barras de menú fijas (páginas de usuario, menú de
+   secciones de la ficha) se quedan a 8px bajo la barra (top 3.5rem). Con los
+   20/34px de arriba el difuminado desenfocaba el borde superior de esas
+   barras. Aquí el mismo degradado, más corto: el cristal acaba 4px bajo la
+   barra y el desenfoque leve a 6px, 2px antes que la barra fija. */
+@media not ((min-width: 64rem) and (hover: hover) and (pointer: fine)) {
+  .sv-topbar-glass {
+    inset: 0 0 -4px 0;
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      #000 0,
+      #000 calc(100% - 28px),
+      rgba(0, 0, 0, 0.55) calc(100% - 14px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      #000 0,
+      #000 calc(100% - 28px),
+      rgba(0, 0, 0, 0.55) calc(100% - 14px),
+      transparent 100%
+    );
+  }
+
+  .sv-topbar-glass-soft {
+    inset: 0 0 -6px 0;
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(100% - 30px),
+      #000 calc(100% - 14px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(100% - 30px),
+      #000 calc(100% - 14px),
+      transparent 100%
+    );
+  }
+}
+
 /* BARRA SUPERIOR: en móvil y tablet es transparente en la entrada y muestra
    el cristal al desplazarse. En escritorio, las páginas estándar (Favoritos,
    Pendientes, /lists...) comparten siempre el mismo acabado de cristal.
