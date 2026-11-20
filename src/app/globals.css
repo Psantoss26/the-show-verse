@@ -2605,8 +2605,10 @@ html[data-android-app] .sv-glass-rim {
    secciones de la ficha) se quedan a 8px bajo la barra (top 3.5rem). Con los
    20/34px de arriba el difuminado desenfocaba el borde superior de esas
    barras. Aquí el mismo degradado, más corto: el cristal acaba 4px bajo la
-   barra y el desenfoque leve a 6px, 2px antes que la barra fija. */
-@media not ((min-width: 64rem) and (hover: hover) and (pointer: fine)) {
+   barra y el desenfoque leve a 6px, 2px antes que la barra fija.
+   Es el contrario de la variante `desktop`, escrito como lista: el
+   compilador de CSS descartaba entero `@media not ((…) and (…) and (…))`. */
+@media (max-width: 63.999rem), not all and (hover: hover), not all and (pointer: fine) {
   .sv-topbar-glass {
     inset: 0 0 -4px 0;
     -webkit-mask-image: linear-gradient(
