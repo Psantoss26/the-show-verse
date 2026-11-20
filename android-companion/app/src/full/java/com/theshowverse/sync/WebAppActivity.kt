@@ -85,6 +85,7 @@ class WebAppActivity : AppCompatActivity() {
 
     /** Medidor de fotogramas de diagnóstico; null mientras está apagado. */
     private var medidor: MedidorFotogramas? = null
+    private lateinit var atras: AtrasPredictivo
 
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -304,6 +305,7 @@ class WebAppActivity : AppCompatActivity() {
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
             if (url != currentUrl) medidor?.nuevaPagina()
             currentUrl = url.orEmpty()
+            atras.actualizar()
             if (WebOrigin.isInternal(url, origin)) prefs.lastUrl = url
         }
 
@@ -359,6 +361,7 @@ class WebAppActivity : AppCompatActivity() {
             binding.videoContainer.visibility = View.VISIBLE
             binding.refresh.visibility = View.GONE
             pantallaCompleta(true)
+            atras.actualizar()
         }
 
         override fun onHideCustomView() {
@@ -370,6 +373,7 @@ class WebAppActivity : AppCompatActivity() {
             customViewCallback?.onCustomViewHidden()
             customViewCallback = null
             pantallaCompleta(false)
+            atras.actualizar()
         }
 
         /** Selector de ficheros (avatar, importaciones). */
@@ -449,19 +453,24 @@ class WebAppActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------- navegación
 
+    /**
+     * Atrás: vídeo a pantalla completa > página anterior de la web > salir.
+     * Con gesto predictivo (ver AtrasPredictivo): solo se queda el gesto
+     * cuando la web tiene adónde volver; si no, el sistema anima la salida.
+     */
     private fun configurarBotonAtras() {
-        onBackPressedDispatcher.addCallback(
-            this,
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    when {
-                        customView != null -> binding.webView.webChromeClient?.onHideCustomView()
-                        binding.webView.canGoBack() -> binding.webView.goBack()
-                        else -> finish()
-                    }
-                }
+        val web = binding.webView
+        atras = AtrasPredictivo(
+            vista = binding.refresh,
+            fondo = binding.root,
+            colorFondo = ContextCompat.getColor(this, R.color.tsv_black),
+            puedeVolver = { customView != null || web.canGoBack() },
+            volver = {
+                if (customView != null) web.webChromeClient?.onHideCustomView() else web.goBack()
             },
+            salir = ::finish,
         )
+        onBackPressedDispatcher.addCallback(this, atras)
     }
 
     /**
