@@ -3402,7 +3402,7 @@ function NavbarContent() {
               móvil. En TABLET, si caben (ver `tabletNavFit`), las cinco
               secciones principales le siguen en la barra, como en escritorio. */}
           <div
-            className={`flex flex-shrink-0 origin-left items-center gap-0.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
+            className={`sv-topbar-start flex flex-shrink-0 origin-left items-center gap-0.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
             <button
               ref={tabletMenuButtonRef}
@@ -3509,7 +3509,7 @@ function NavbarContent() {
               en el mismo orden que en escritorio. */}
           <div
             ref={mobileRightRef}
-            className={`flex flex-shrink-0 origin-right items-center gap-2 pr-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
+            className={`sv-topbar-end flex flex-shrink-0 origin-right items-center gap-2 pr-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
             {account ? <TodayNavbarEntry variant="mobile" /> : null}
             {/* TABLET: la barra se despliega EN LÍNEA, como en escritorio, y

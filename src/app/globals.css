@@ -2665,26 +2665,42 @@ html[data-android-app] {
 
 /* APP DE ANDROID SIN BARRA DE ESTADO (`data-android-immersive`, la pone el
    script del <head> si el puente da `cameraCenterY`). La barra superior del
-   teléfono ocupa la franja de la barra de estado (`--sv-safe-top` vale 0):
-     - CENTRADA EN LA CÁMARA. La fila mide 64px (48 en la ficha) y se sube lo
-       justo para que su centro caiga en el de la cámara
-       (`--sv-android-camera-y`). Ese desplazamiento es el MISMO compactada o
-       no: la barra ya es mínima y no se mueve al desplazarse (los controles
-       siguen encogiendo, ver `mobileTopControlScaleClass` en Navbar).
+   teléfono ocupa la franja de la barra de estado (`--sv-safe-top` vale 0) y
+   coloca sus botones respecto a la ESQUINA REDONDEADA de la pantalla
+   (`--sv-android-corner`, su radio R):
+     - `--sv-topbar-c` es la distancia del centro de los botones de los
+       extremos (menú a la izquierda, avatar de 40px a la derecha) al borde de
+       arriba Y al lateral: el mismo hueco por los dos lados. Se elige para
+       que, en la diagonal de la esquina, el avatar quede a 6px de la curva:
+       c = R − (R − 20 − 6)/√2 = 0,2929·R + 18,38px (con R = 45px, unos 32px:
+       12px de aire arriba y al lado del avatar). Nunca por encima del centro
+       de la cámara ni a menos de 28px (pantallas sin esquinas redondeadas).
+     - Los grupos encogen al compactar (`mobileTopControlScaleClass`) desde el
+       centro de su botón exterior, no desde el borde: ese centro no se mueve
+       y los huecos siguen iguales. El menú mide 44px; el avatar, 40 más los
+       4px de `pr-1` del grupo.
+     - La fila (64px; 48 en la ficha) se sube lo justo para que su centro caiga
+       en `c`, igual compactada o no: la barra ya es mínima y no se mueve al
+       desplazarse (los controles siguen encogiendo, ver
+       `mobileTopControlScaleClass` en Navbar).
      - SIN LOGO: quedaría bajo la cámara.
-     - BOTONES LEJOS DE LAS ESQUINAS REDONDEADAS (`--sv-android-corner`, el
-       radio de la pantalla). Un botón redondo de 40px centrado a la altura de
-       la cámara cabe dentro de la curva a partir de ~0,25 radios del borde;
-       con medio radio queda aire alrededor (medido en un OnePlus de 45px).
    Solo en teléfono: en tablet la cámara no está en el centro de la barra. */
 @media (max-width: 47.99rem) {
+  html[data-android-immersive] {
+    --sv-topbar-c: max(
+      var(--sv-android-camera-y, 24px),
+      calc(var(--sv-android-corner, 0px) * 0.2929 + 18.38px),
+      28px
+    );
+  }
+
   html[data-android-immersive] .sv-topbar,
   html[data-android-immersive] .sv-topbar[data-compact] {
-    transform: translate3d(0, calc(var(--sv-android-camera-y, 24px) - 32px), 0);
+    transform: translate3d(0, calc(var(--sv-topbar-c) - 32px), 0);
   }
 
   html[data-android-immersive] .sv-topbar[data-immersive] {
-    transform: translate3d(0, calc(var(--sv-android-camera-y, 24px) - 24px), 0);
+    transform: translate3d(0, calc(var(--sv-topbar-c) - 24px), 0);
   }
 
   html[data-android-immersive] .sv-topbar[data-compact] .sv-topbar-row {
@@ -2692,7 +2708,16 @@ html[data-android-app] {
   }
 
   html[data-android-immersive] .sv-topbar-row {
-    padding-inline: max(0.5rem, calc(var(--sv-android-corner, 0px) * 0.5));
+    padding-left: calc(var(--sv-topbar-c) - 22px);
+    padding-right: calc(var(--sv-topbar-c) - 24px);
+  }
+
+  html[data-android-immersive] .sv-topbar-start {
+    transform-origin: 22px 50%;
+  }
+
+  html[data-android-immersive] .sv-topbar-end {
+    transform-origin: calc(100% - 24px) 50%;
   }
 
   html[data-android-immersive] .sv-topbar-logo {
