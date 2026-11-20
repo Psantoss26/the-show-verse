@@ -342,7 +342,7 @@ function ActionsMenu({ children, open, onOpenChange, buttonProps }) {
   );
 }
 
-export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, statsRef, onDenseStatsChange }) {
+export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, statsRef, onDenseStatsChange, subtitle = null }) {
   const { user } = profile;
   const rowRef = useRef(null);
   const nameRef = useRef(null);
@@ -398,24 +398,38 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
     </LiquidButton>
   );
 
+  // Rejilla: nombre arriba y `subtitle` (@usuario y plan) debajo, en la
+  // primera columna. Por debajo de 1024 los botones van en la segunda columna
+  // ocupando las dos filas, centrados respecto al nombre y al @usuario. Desde
+  // 1024 van pegados al nombre, centrados en su fila, y el @usuario ocupa toda
+  // la fila de abajo. Sin hueco entre columnas: la separación es el `padding`
+  // de los botones, que entra en su ancho medido (así la cuenta de
+  // `useCollapsedActions` —fila − botones— sigue siendo exacta).
   return (
     <div
       ref={rowRef}
-      className="flex min-w-0 items-center justify-between gap-2 @[1024px]/detail-page:justify-start @[1024px]/detail-page:gap-4"
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-0 @[1024px]/detail-page:grid-cols-[minmax(0,max-content)_auto_minmax(0,1fr)]"
     >
       <h1
         data-header-morph="name"
         ref={nameRef}
-        className="min-w-0 flex-1 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white @[1024px]/detail-page:flex-initial @[640px]/detail-page:text-[clamp(2.25rem,4.1vw,3.5rem)]"
+        className="col-start-1 row-start-1 min-w-0 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white @[640px]/detail-page:text-[clamp(2.25rem,4.1vw,3.5rem)]"
       >
         {user.displayName}<span className="text-emerald-400">.</span>
       </h1>
 
-      {/* Margen vertical negativo: los botones (44-48 px) son más altos que
-          el nombre y, sin él, alargan la fila y separan el @usuario de debajo. */}
+      {subtitle ? (
+        <div className="col-start-1 row-start-2 min-w-0 @[1024px]/detail-page:col-span-3">{subtitle}</div>
+      ) : null}
+
+      {/* Desde 1024, margen vertical negativo: los botones (48 px) son más
+          altos que el nombre y, sin él, alargan la fila y separan el @usuario
+          de debajo. */}
       <div
         ref={actionsRef}
-        className="-my-2 flex shrink-0 items-center gap-1 @[640px]/detail-page:gap-2"
+        className={`col-start-2 row-start-1 flex shrink-0 items-center gap-1 pl-2 @[640px]/detail-page:gap-2 @[1024px]/detail-page:-my-2 @[1024px]/detail-page:row-span-1 @[1024px]/detail-page:pl-4${
+          subtitle ? " row-span-2" : ""
+        }`}
         aria-label="Acciones de perfil"
       >
         {collapsed ? (

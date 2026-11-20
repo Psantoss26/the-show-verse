@@ -1240,13 +1240,16 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               onSync={() => setRefreshToken((value) => value + 1)}
               statsRef={statsRef}
               onDenseStatsChange={setDenseStats}
+              subtitle={
+                /* @usuario y plan bajo el nombre: el @usuario se corta con «…»
+                   y la insignia se queda entera. Va dentro de la fila del
+                   nombre para que los botones se centren con las dos líneas. */
+                <div className="mt-1.5 flex min-w-0 items-center gap-2 @[640px]/detail-page:mt-2">
+                  <p className="min-w-0 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:text-sm">@{user.username}</p>
+                  <PlanBadge plan={user.plan} size="md" showFree snap />
+                </div>
+              }
             />
-            {/* @usuario y plan bajo el nombre: el @usuario se corta con «…» y
-                la insignia se queda entera. */}
-            <div className="mt-1.5 flex min-w-0 items-center gap-2 @[640px]/detail-page:mt-2">
-              <p className="min-w-0 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:text-sm">@{user.username}</p>
-              <PlanBadge plan={user.plan} size="md" showFree snap />
-            </div>
             {user.bio && (
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
                 {user.bio}
