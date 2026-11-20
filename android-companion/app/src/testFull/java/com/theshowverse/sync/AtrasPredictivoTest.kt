@@ -1,20 +1,24 @@
 package com.theshowverse.sync
 
+import com.theshowverse.sync.AtrasPredictivo.Fotograma
+import com.theshowverse.sync.AtrasPredictivo.Transformacion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AtrasPredictivoTest {
 
-    private fun t(p: Float, izquierda: Boolean = true) =
-        AtrasPredictivo.Transformacion.para(p, izquierda, anchoPx = 1080f, densidad = 3f)
+    private fun t(p: Float, izquierda: Boolean = true, deltaY: Float = 0f) =
+        Transformacion.para(p, izquierda, anchoPx = 1080f, densidad = 3f, deltaYPx = deltaY, altoPx = 2400f)
+
+    private fun f(p: Float, inicio: Transformacion = Transformacion.REPOSO, izquierda: Boolean = true) =
+        Fotograma.para(p, inicio, izquierda, anchoPx = 1080f, densidad = 3f)
+
+    // ---------------------------------------------------------- gesto
 
     @Test
     fun enReposoLaWebNoCambia() {
-        val r = t(0f)
-        assertEquals(1f, r.escala, 0.0001f)
-        assertEquals(0f, r.desplazamientoX, 0.0001f)
-        assertEquals(0f, r.radio, 0.0001f)
+        assertEquals(Transformacion.REPOSO, t(0f))
     }
 
     @Test
@@ -37,8 +41,54 @@ class AtrasPredictivoTest {
     }
 
     @Test
+    fun sigueAlDedoEnVerticalConTope() {
+        assertEquals(10f, t(0.5f, deltaY = 100f).desplazamientoY, 0.0001f)
+        assertEquals(-10f, t(0.5f, deltaY = -100f).desplazamientoY, 0.0001f)
+        // Tope: 2400 / 20 − 8 dp × 3 = 96 px.
+        assertEquals(96f, t(0.5f, deltaY = 5000f).desplazamientoY, 0.0001f)
+    }
+
+    @Test
     fun elProgresoFueraDeRangoSeRecorta() {
         assertEquals(t(1f), t(1.5f))
         assertEquals(t(0f), t(-0.2f))
+    }
+
+    // ---------------------------------------------------------- transición
+
+    @Test
+    fun laTransicionEmpiezaDondeSeSoltoElGesto() {
+        val inicio = t(0.6f)
+        val r = f(0f, inicio)
+        assertEquals(inicio.escala, r.saliente.escala, 0.0001f)
+        assertEquals(inicio.desplazamientoX, r.saliente.desplazamientoX, 0.0001f)
+        assertEquals(inicio.radio, r.saliente.radio, 0.0001f)
+    }
+
+    @Test
+    fun laPaginaQueSeVaSaleDelTodoPorElLadoContrarioAlBorde() {
+        assertEquals(1080f, f(1f, izquierda = true).saliente.desplazamientoX, 0.0001f)
+        assertEquals(-1080f, f(1f, izquierda = false).saliente.desplazamientoX, 0.0001f)
+    }
+
+    @Test
+    fun laPaginaAnteriorEntraDesdeElLadoDelGestoYAcabaEnSuSitio() {
+        assertTrue(f(0f, izquierda = true).entrante.desplazamientoX < 0f)
+        assertTrue(f(0f, izquierda = false).entrante.desplazamientoX > 0f)
+        assertEquals(Transformacion.REPOSO, f(1f).entrante)
+    }
+
+    @Test
+    fun elVeloSeDesvaneceHastaCero() {
+        assertEquals(Fotograma.VELO_MAXIMO, f(0f).velo, 0.0001f)
+        assertEquals(0f, f(1f).velo, 0.0001f)
+        assertTrue(f(0.5f).velo in 0f..Fotograma.VELO_MAXIMO)
+    }
+
+    @Test
+    fun sinGestoLaCapturaEmpiezaATamanoCompleto() {
+        val r = f(0f)
+        assertEquals(1f, r.saliente.escala, 0.0001f)
+        assertEquals(0f, r.saliente.desplazamientoX, 0.0001f)
     }
 }

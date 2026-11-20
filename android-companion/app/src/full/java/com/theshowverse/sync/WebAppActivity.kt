@@ -458,15 +458,18 @@ class WebAppActivity : AppCompatActivity() {
     /**
      * Atrás: vídeo a pantalla completa > página anterior de la web > salir.
      * Con gesto predictivo (ver AtrasPredictivo): solo se queda el gesto
-     * cuando la web tiene adónde volver; si no, el sistema anima la salida.
+     * cuando la web tiene adónde volver, y lo anima con una transición entre
+     * páginas; si no, el sistema anima la salida.
      */
     private fun configurarBotonAtras() {
         val web = binding.webView
         atras = AtrasPredictivo(
+            ventana = window,
             vista = binding.refresh,
             fondo = binding.root,
             colorFondo = ContextCompat.getColor(this, R.color.tsv_black),
             puedeVolver = { customView != null || web.canGoBack() },
+            animable = { customView == null },
             volver = {
                 if (customView != null) web.webChromeClient?.onHideCustomView() else web.goBack()
             },
