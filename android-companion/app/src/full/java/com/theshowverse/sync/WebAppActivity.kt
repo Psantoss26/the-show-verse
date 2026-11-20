@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.MotionEvent
 import android.view.RoundedCorner
 import android.view.View
 import android.view.ViewGroup
@@ -308,6 +309,7 @@ class WebAppActivity : AppCompatActivity() {
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
             if (url != currentUrl) medidor?.nuevaPagina()
             currentUrl = url.orEmpty()
+            atras.historialCambiado()
             atras.actualizar()
             if (WebOrigin.isInternal(url, origin)) prefs.lastUrl = url
         }
@@ -462,6 +464,7 @@ class WebAppActivity : AppCompatActivity() {
      * cuando la web tiene adónde volver, y lo anima con una transición entre
      * páginas; si no, el sistema anima la salida.
      */
+    @SuppressLint("ClickableViewAccessibility") // solo observa el toque
     private fun configurarBotonAtras() {
         val web = binding.webView
         atras = AtrasPredictivo(
@@ -470,6 +473,7 @@ class WebAppActivity : AppCompatActivity() {
             fondo = binding.root,
             colorFondo = ContextCompat.getColor(this, R.color.tsv_black),
             puedeVolver = { customView != null || web.canGoBack() },
+            indiceHistorial = { web.copyBackForwardList().currentIndex },
             animable = { customView == null },
             // Lo que la web acaba de pintar llega a pantalla en el siguiente
             // dibujado del WebView: entonces se puede quitar lo que lo tapa.
@@ -487,6 +491,12 @@ class WebAppActivity : AppCompatActivity() {
             salir = ::finish,
         )
         onBackPressedDispatcher.addCallback(this, atras)
+        // Cada toque guarda una foto de la página: si lleva a otra, es la que
+        // se ve al volver atrás (ver AtrasPredictivo). No consume el toque.
+        web.setOnTouchListener { _, evento ->
+            if (evento.actionMasked == MotionEvent.ACTION_DOWN) atras.alTocar()
+            false
+        }
     }
 
     /**

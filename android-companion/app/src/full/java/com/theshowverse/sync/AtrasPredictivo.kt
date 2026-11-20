@@ -27,32 +27,38 @@ import androidx.activity.OnBackPressedCallback
  * soltar el gesto era un cambio de golpe y, cuando se animaba la web enseguida,
  * debajo seguía la misma ficha duplicada o un estado intermedio que parpadeaba.
  *
- * LA SOLUCIÓN, en tres fases:
+ * LA SOLUCIÓN. La app guarda una FOTO de cada página al tocarla ([alTocar],
+ * PixelCopy del último fotograma, antes de que el toque cambie nada): el toque
+ * que lleva a otra página deja así la anterior tal como se veía. Cuando el
+ * historial avanza ([historialCambiado]) la foto se asocia a la entrada que se
+ * deja. Al volver, esa foto es la página anterior, estática, desde el primer
+ * fotograma. Luego, en tres fases:
  *
  *  1. MIENTRAS EL DEDO AVANZA (si el sistema entrega el avance): la web se
  *     encoge, se aparta del borde por el que entra el gesto, sigue un poco al
  *     dedo en vertical y redondea las esquinas, como la animación de Android
- *     entre actividades. Antes de tocar nada se hace una CAPTURA de la página
- *     tal cual se ve (PixelCopy, asíncrona y sin volver a pintar la web): la
- *     transformación solo empieza cuando la captura está lista.
+ *     entre actividades; detrás se ve la foto de la página anterior. Antes de
+ *     tocar nada se hace una CAPTURA de la página actual tal cual se ve
+ *     (asíncrona y sin volver a pintar la web): la transformación solo empieza
+ *     cuando la captura está lista.
  *
  *  2. AL SOLTAR (o al pulsar ATRÁS sin gesto, capturando en ese momento): la
- *     captura empieza a salir EN EL ACTO, deslizándose hacia el lado contrario
- *     al borde del gesto, sin esperar a la web. Debajo, un velo opaco tapa la
- *     web, que vuelve a su tamaño y navega atrás sin que se vea.
+ *     foto de la página anterior tapa la web, que vuelve a su tamaño y navega
+ *     atrás sin que se vea, y la captura de la actual sale EN EL ACTO
+ *     deslizándose hacia el lado contrario al borde del gesto.
  *
  *  3. Cuando la web avisa de que la página anterior ya está pintada
  *     ([paginaPintada], desde src/components/android/AndroidBackPaintSignal.jsx)
- *     y ese pintado llega a pantalla ([confirmarPintado]), el velo se desvanece
- *     y la página aparece entera y ESTÁTICA. Con una web que no avisa se espera
- *     poco; con una que sí, como mucho [ESPERA_MAX_MS]. Normalmente ocurre
- *     mientras la captura aún está saliendo.
+ *     y ese pintado llega a pantalla ([confirmarPintado]), la foto se funde con
+ *     la página real, que es igual. Con una web que no avisa se espera poco;
+ *     con una que sí, como mucho [ESPERA_MAX_MS].
+ *
+ * Sin foto de la página anterior (se llegó sin tocar, o tras reabrir la app):
+ * un velo liso tapa la web y la captura espera quieta a que la web pinte para
+ * salir, como antes; así nunca se ve una pantalla vacía detrás.
  *
  * Al cancelar, la web vuelve a su sitio sin navegar. Si la captura falla, se
  * navega igual y la web vuelve a su tamaño.
- *
- * Lo que se ve detrás es [fondo] (negro), que solo se pinta mientras dura el
- * gesto: en reposo el WebView, opaco, cubre la ventana entera.
  *
  * COLOROS (OnePlus, Oppo). El sistema solo entrega el avance del gesto a las
  * apps de terceros con «Ajustes › Sistema y actualización › Navegación por el
@@ -69,6 +75,8 @@ class AtrasPredictivo(
     private val fondo: ViewGroup,
     private val colorFondo: Int,
     private val puedeVolver: () -> Boolean,
+    /** Posición actual en el historial de la web. */
+    private val indiceHistorial: () -> Int,
     /** Falso con un vídeo a pantalla completa: ahí no hay página que animar. */
     private val animable: () -> Boolean,
     /** Llama a `listo` cuando lo que la web acaba de pintar llega a pantalla. */
@@ -82,9 +90,20 @@ class AtrasPredictivo(
 
     private val esquinasWeb = Esquinas(vista)
 
-    /** Tapa la web mientras pinta la página anterior. Encima de la web, debajo de la captura. */
-    private val velo = View(vista.context).apply {
+    /**
+     * Tapa la web mientras pinta la página anterior, con su foto (o liso si no
+     * la hay). Encima de la web, debajo de la captura.
+     */
+    private val velo = ImageView(vista.context).apply {
+        scaleType = ImageView.ScaleType.FIT_XY
         setBackgroundColor(colorFondo)
+        visibility = View.GONE
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    /** La foto de la página anterior DEBAJO de la web, mientras se arrastra. */
+    private val debajo = ImageView(vista.context).apply {
+        scaleType = ImageView.ScaleType.FIT_XY
         visibility = View.GONE
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
@@ -106,6 +125,7 @@ class AtrasPredictivo(
         )
         fondo.addView(velo, indice, tamano)
         fondo.addView(capturaVista, indice + 1, tamano)
+        fondo.addView(debajo, indice - 1, tamano)
     }
 
     // ------------------------------------------------------------ estado
@@ -139,7 +159,59 @@ class AtrasPredictivo(
     /** La web ha avisado alguna vez: manda [paginaPintada] y vale la pena esperarla. */
     private var webAvisa = false
 
+    /** Sin foto de la página anterior: la captura sale cuando la web ya pintó. */
+    private var salidaPendiente = false
+    private var inicioSalida = Transformacion.REPOSO
+
     private var animador: ValueAnimator? = null
+
+    /** Fotos de las páginas que se han dejado, por posición en el historial. */
+    private val paginas = HashMap<Int, Bitmap>()
+
+    /** La del último toque y la posición en la que se hizo. */
+    private var toque: Bitmap? = null
+    private var indiceToque = -1
+    private var capturandoToque = false
+    private var indiceVisto = -1
+
+    /**
+     * Un dedo toca la web: foto de la página tal como se ve (el último
+     * fotograma, aún sin efecto del toque). Si el toque lleva a otra página,
+     * será la que se vea al volver.
+     */
+    fun alTocar() {
+        if (capturandoToque || enGesto || enTransicion != null || pendiente) return
+        if (vista.scaleX != 1f || vista.translationX != 0f) return
+        val indice = indiceHistorial()
+        val destino = toque
+        toque = null
+        capturandoToque = true
+        copiar(destino) { bitmap ->
+            capturandoToque = false
+            toque = bitmap
+            indiceToque = indice
+        }
+    }
+
+    /** El historial de la web ha cambiado (también por `pushState`). */
+    fun historialCambiado() {
+        val nuevo = indiceHistorial()
+        val antes = indiceVisto
+        indiceVisto = nuevo
+        if (antes < 0 || nuevo <= antes) return
+        // Se avanza: lo que había desde la página que se deja ya no vale.
+        paginas.keys.removeAll { it >= antes }
+        val foto = toque
+        if (foto != null && indiceToque == antes) {
+            paginas[antes] = foto
+            toque = null
+        }
+        while (paginas.size > MAX_PAGINAS) paginas.remove(paginas.keys.min())
+    }
+
+    /** La foto de la página a la que se vuelve, si la hay y encaja. */
+    private fun fotoAnterior(): Bitmap? =
+        paginas[indiceHistorial() - 1]?.takeIf { it.width == vista.width && it.height == vista.height }
 
     /** Recalcula si el gesto es de la web o del sistema. Llamarlo tras navegar. */
     fun actualizar() {
@@ -174,6 +246,10 @@ class AtrasPredictivo(
             capturar { aplicarGesto() }
         }
         fondo.setBackgroundColor(colorFondo)
+        fotoAnterior()?.let {
+            debajo.setImageBitmap(it)
+            debajo.visibility = View.VISIBLE
+        }
         vista.clipToOutline = true
         aplicarGesto()
     }
@@ -253,37 +329,36 @@ class AtrasPredictivo(
     }
 
     private fun capturar(listo: () -> Unit) {
+        val destino = reutilizable
+        reutilizable = null
+        capturando = true
+        copiar(destino) { bitmap ->
+            capturando = false
+            captura = bitmap
+            listo()
+            alCapturar?.let { alCapturar = null; it() }
+        }
+    }
+
+    /** Copia lo que se ve de la web a un bitmap (`destino` si encaja). Null si falla. */
+    private fun copiar(destino: Bitmap?, listo: (Bitmap?) -> Unit) {
         val ancho = vista.width
         val alto = vista.height
         if (ancho <= 0 || alto <= 0 || !vista.isAttachedToWindow) {
-            captura = null
-            listo()
+            listo(null)
             return
         }
-        val bitmap = reutilizable?.takeIf { it.width == ancho && it.height == alto && !it.isRecycled }
+        val bitmap = destino?.takeIf { it.width == ancho && it.height == alto && !it.isRecycled }
             ?: Bitmap.createBitmap(ancho, alto, Bitmap.Config.ARGB_8888)
-        reutilizable = null
         val origen = IntArray(2).also { vista.getLocationInWindow(it) }
         val zona = Rect(origen[0], origen[1], origen[0] + ancho, origen[1] + alto)
-        capturando = true
         try {
             PixelCopy.request(ventana, zona, bitmap, { resultado ->
-                capturando = false
-                if (resultado == PixelCopy.SUCCESS) {
-                    captura = bitmap
-                } else {
-                    captura = null
-                    reutilizable = bitmap
-                }
-                listo()
-                alCapturar?.let { alCapturar = null; it() }
+                listo(if (resultado == PixelCopy.SUCCESS) bitmap else null)
             }, principal)
         } catch (e: IllegalArgumentException) {
             // Ventana sin superficie (se está cerrando): sin captura.
-            capturando = false
-            captura = null
-            reutilizable = bitmap
-            listo()
+            listo(null)
         }
     }
 
@@ -301,13 +376,20 @@ class AtrasPredictivo(
         capturaVista.clipToOutline = true
         poner(capturaVista, esquinasCaptura, inicio)
         capturaVista.visibility = View.VISIBLE
+        val anterior = fotoAnterior()
         velo.animate().cancel()
         velo.alpha = 1f
+        velo.setImageBitmap(anterior)
         velo.visibility = View.VISIBLE
         quitarTransformacion(vista, esquinasWeb)
 
-        // La captura sale YA, en el mismo fotograma: sin esperar a la web.
-        salirCaptura(bitmap, inicio)
+        if (anterior != null) {
+            // Con la página anterior ya a la vista, la captura sale YA.
+            salirCaptura(bitmap, inicio)
+        } else {
+            salidaPendiente = true
+            inicioSalida = inicio
+        }
 
         volver()
         actualizar()
@@ -345,6 +427,12 @@ class AtrasPredictivo(
         if (!esperandoPagina) return
         esperandoPagina = false
         principal.removeCallbacks(tiempoAgotado)
+        if (salidaPendiente) {
+            salidaPendiente = false
+            ocultarVelo()
+            enTransicion?.let { salirCaptura(it, inicioSalida) }
+            return
+        }
         velo.animate()
             .alpha(0f)
             .setDuration(DURACION_VELO_MS)
@@ -358,6 +446,10 @@ class AtrasPredictivo(
             esperandoPagina = false
             principal.removeCallbacks(tiempoAgotado)
         }
+        if (salidaPendiente) {
+            salidaPendiente = false
+            enTransicion?.let { limpiarCaptura(it) }
+        }
         if (velo.visibility == View.VISIBLE) {
             velo.animate().cancel()
             ocultarVelo()
@@ -369,6 +461,7 @@ class AtrasPredictivo(
     private fun ocultarVelo() {
         velo.visibility = View.GONE
         velo.alpha = 1f
+        velo.setImageDrawable(null)
         if (enTransicion == null) fondo.background = null
     }
 
@@ -379,6 +472,7 @@ class AtrasPredictivo(
         reutilizable = bitmap
         quitarTransformacion(capturaVista, esquinasCaptura)
         quitarTransformacion(vista, esquinasWeb)
+        ocultarDebajo()
         // El fondo hace falta mientras el velo siga puesto (se está desvaneciendo).
         if (velo.visibility != View.VISIBLE) fondo.background = null
     }
@@ -391,6 +485,11 @@ class AtrasPredictivo(
     }
 
     // ------------------------------------------------------------ utilidades
+
+    private fun ocultarDebajo() {
+        debajo.visibility = View.GONE
+        debajo.setImageDrawable(null)
+    }
 
     private fun poner(v: View, esquinas: Esquinas, t: Transformacion) {
         v.scaleX = t.escala
@@ -412,6 +511,7 @@ class AtrasPredictivo(
             .setInterpolator(INTERPOLADOR_GESTO)
             .withEndAction {
                 quitarTransformacion(vista, esquinasWeb)
+                ocultarDebajo()
                 // En reposo nada que pintar debajo del WebView (ver arriba).
                 fondo.background = null
             }
@@ -537,6 +637,9 @@ class AtrasPredictivo(
 
         /** Tope de espera a una web que avisa: luego el velo se quita igual. */
         const val ESPERA_MAX_MS = 900L
+
+        /** Fotos de páginas anteriores que se guardan (unos 10 MB cada una). */
+        const val MAX_PAGINAS = 4
 
         /** Con una web que no avisa (versión antigua): lo justo para un pintado. */
         const val ESPERA_SIN_AVISO_MS = 250L
