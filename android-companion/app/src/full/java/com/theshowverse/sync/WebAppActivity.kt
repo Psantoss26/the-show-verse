@@ -251,6 +251,7 @@ class WebAppActivity : AppCompatActivity() {
                 { altoBarraNavegacionCss },
                 { centroCamaraCss },
                 { radioEsquinaCss },
+                { if (::atras.isInitialized) atras.paginaPintada() },
             ),
             WebAppBridge.NAME,
         )
@@ -470,6 +471,16 @@ class WebAppActivity : AppCompatActivity() {
             colorFondo = ContextCompat.getColor(this, R.color.tsv_black),
             puedeVolver = { customView != null || web.canGoBack() },
             animable = { customView == null },
+            // Lo que la web acaba de pintar llega a pantalla en el siguiente
+            // dibujado del WebView: entonces se puede quitar lo que lo tapa.
+            confirmarPintado = { listo ->
+                web.postVisualStateCallback(
+                    0L,
+                    object : WebView.VisualStateCallback() {
+                        override fun onComplete(requestId: Long) = listo()
+                    },
+                )
+            },
             volver = {
                 if (customView != null) web.webChromeClient?.onHideCustomView() else web.goBack()
             },

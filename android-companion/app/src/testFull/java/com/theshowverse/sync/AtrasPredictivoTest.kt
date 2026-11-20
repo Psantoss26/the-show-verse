@@ -1,6 +1,6 @@
 package com.theshowverse.sync
 
-import com.theshowverse.sync.AtrasPredictivo.Fotograma
+import com.theshowverse.sync.AtrasPredictivo.Salida
 import com.theshowverse.sync.AtrasPredictivo.Transformacion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -12,7 +12,7 @@ class AtrasPredictivoTest {
         Transformacion.para(p, izquierda, anchoPx = 1080f, densidad = 3f, deltaYPx = deltaY, altoPx = 2400f)
 
     private fun f(p: Float, inicio: Transformacion = Transformacion.REPOSO, izquierda: Boolean = true) =
-        Fotograma.para(p, inicio, izquierda, anchoPx = 1080f, densidad = 3f)
+        Salida.para(p, inicio, izquierda, anchoPx = 1080f, densidad = 3f)
 
     // ---------------------------------------------------------- gesto
 
@@ -54,41 +54,30 @@ class AtrasPredictivoTest {
         assertEquals(t(0f), t(-0.2f))
     }
 
-    // ---------------------------------------------------------- transición
+    // ---------------------------------------------------------- salida
 
     @Test
-    fun laTransicionEmpiezaDondeSeSoltoElGesto() {
-        val inicio = t(0.6f)
-        val r = f(0f, inicio)
-        assertEquals(inicio.escala, r.saliente.escala, 0.0001f)
-        assertEquals(inicio.desplazamientoX, r.saliente.desplazamientoX, 0.0001f)
-        assertEquals(inicio.radio, r.saliente.radio, 0.0001f)
+    fun laSalidaEmpiezaDondeSeSoltoElGesto() {
+        val inicio = t(0.6f, deltaY = 200f)
+        assertEquals(inicio, f(0f, inicio))
     }
 
     @Test
     fun laPaginaQueSeVaSaleDelTodoPorElLadoContrarioAlBorde() {
-        assertEquals(1080f, f(1f, izquierda = true).saliente.desplazamientoX, 0.0001f)
-        assertEquals(-1080f, f(1f, izquierda = false).saliente.desplazamientoX, 0.0001f)
+        assertEquals(1080f, f(1f, izquierda = true).desplazamientoX, 0.0001f)
+        assertEquals(-1080f, f(1f, izquierda = false).desplazamientoX, 0.0001f)
     }
 
     @Test
-    fun laPaginaAnteriorEntraDesdeElLadoDelGestoYAcabaEnSuSitio() {
-        assertTrue(f(0f, izquierda = true).entrante.desplazamientoX < 0f)
-        assertTrue(f(0f, izquierda = false).entrante.desplazamientoX > 0f)
-        assertEquals(Transformacion.REPOSO, f(1f).entrante)
+    fun sinGestoSaleDesdeTamanoCompletoYRedondeaLasEsquinas() {
+        assertEquals(Transformacion.REPOSO, f(0f))
+        assertEquals(84f, f(0.25f).radio, 0.0001f)
+        assertEquals(0.9f, f(1f).escala, 0.0001f)
     }
 
     @Test
-    fun elVeloSeDesvaneceHastaCero() {
-        assertEquals(Fotograma.VELO_MAXIMO, f(0f).velo, 0.0001f)
-        assertEquals(0f, f(1f).velo, 0.0001f)
-        assertTrue(f(0.5f).velo in 0f..Fotograma.VELO_MAXIMO)
-    }
-
-    @Test
-    fun sinGestoLaCapturaEmpiezaATamanoCompleto() {
-        val r = f(0f)
-        assertEquals(1f, r.saliente.escala, 0.0001f)
-        assertEquals(0f, r.saliente.desplazamientoX, 0.0001f)
+    fun avanzaSinSaltosHaciaFuera() {
+        val pasos = (0..10).map { f(it / 10f).desplazamientoX }
+        assertTrue(pasos.zipWithNext().all { (a, b) -> b >= a })
     }
 }

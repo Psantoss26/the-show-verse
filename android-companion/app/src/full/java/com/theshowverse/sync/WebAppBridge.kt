@@ -47,6 +47,7 @@ class WebAppBridge(
     private val altoBarraNavegacion: () -> Double = { 0.0 },
     private val centroCamara: () -> Double = { 0.0 },
     private val radioEsquina: () -> Double = { 0.0 },
+    private val paginaPintada: () -> Unit = {},
 ) {
 
     /**
@@ -219,6 +220,17 @@ class WebAppBridge(
         val pendiente = prefs.pendingGoogleResult ?: return ""
         prefs.pendingGoogleResult = null
         return pendiente
+    }
+
+    /**
+     * La página a la que se ha vuelto ya está pintada (ver
+     * src/components/android/AndroidBackPaintSignal.jsx): la transición de
+     * atrás puede retirar la captura de la página que se va (AtrasPredictivo).
+     */
+    @JavascriptInterface
+    fun backPainted() {
+        if (!propio()) return
+        activity.runOnUiThread { paginaPintada() }
     }
 
     /** Literal JS seguro: el token y los mensajes van dentro de una cadena. */

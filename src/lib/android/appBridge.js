@@ -580,3 +580,13 @@ export function requestAndroidPushPermission() {
     if (call("requestPushPermission", false) !== true) terminar(androidPushPermission());
   });
 }
+
+/**
+ * Avisa a la app de que la página a la que se ha vuelto ya está pintada. La
+ * transición nativa de atrás (AtrasPredictivo) espera este aviso con una
+ * captura de la página que se va encima, para no animar la web mientras aún
+ * enseña esa misma página o un estado intermedio. Ver AndroidBackPaintSignal.
+ */
+export function notifyBackPainted() {
+  call("backPainted", undefined);
+}

@@ -8,6 +8,7 @@ import PwaManager from "@/components/PwaManager";
 import UmamiAnalytics from "@/components/UmamiAnalytics";
 import InAppNotifications from "@/components/notifications/InAppNotifications";
 import AndroidSessionClaim from "@/components/android/AndroidSessionClaim";
+import AndroidBackPaintSignal from "@/components/android/AndroidBackPaintSignal";
 import OfflineManager from "@/components/OfflineManager";
 import LetterboxdAutoSync from "@/components/settings/LetterboxdAutoSync";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -161,6 +162,8 @@ export default function RootLayout({ children, overlay }) {
               <OfflineManager />
               <LetterboxdAutoSync />
               <AndroidSessionClaim />
+              {/* Transición de atrás de la app de Android: avisa cuando la página anterior ya está pintada. */}
+              <AndroidBackPaintSignal />
               <OfflineBanner />
               <UmamiAnalytics />
             </OutsideEmbed>
