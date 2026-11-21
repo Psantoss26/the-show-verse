@@ -106,6 +106,11 @@ const HERO_TAP_MAX_MOVE_PX = 24;
 const YOUTUBE_QUALITY_HINT = "highres";
 const YOUTUBE_QUALITY_MIN = "hd1080";
 const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800, 3200];
+// Relevo imagen ↔ tráiler (ver .hero-media-swap en los estilos). La salida
+// dura lo que el fundido del tráiler; el tope de arranque cubre que YouTube
+// no llegue a avisar de que reproduce.
+const HERO_TRAILER_SWAP_OUT_MS = 820;
+const HERO_TRAILER_START_TIMEOUT_MS = 3500;
 
 // Layout ANCHO (backdrop + información en la esquina). Misma condición que la
 // variante `hero-wide:` de globals.css; lo demás (móvil y tablet en vertical)
@@ -548,6 +553,73 @@ function FeaturedSlide({
   const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
   const [loadedBackdropSrc, setLoadedBackdropSrc] = useState("");
   const trailerIframeRef = useRef(null);
+  // Relevo imagen ↔ tráiler. El iframe se monta oculto bajo la imagen al
+  // pulsar y solo se funde por encima cuando YouTube dice que ya reproduce
+  // (`trailerStarted`): antes se desmontaba la imagen al momento y quedaba
+  // un esqueleto gris y el negro del reproductor cargando. Al cerrar, el
+  // iframe sigue montado (`trailerMounted`) mientras la imagen vuelve por
+  // encima y se desmonta al acabar el fundido.
+  const [trailerStarted, setTrailerStarted] = useState(false);
+  const [trailerMounted, setTrailerMounted] = useState(false);
+
+  useEffect(() => {
+    if (showTrailer) {
+      setTrailerMounted(true);
+      return undefined;
+    }
+    // Cerrado sin llegar a verse: no hay fundido que esperar.
+    if (!trailerStarted) {
+      setTrailerMounted(false);
+      return undefined;
+    }
+    const id = window.setTimeout(() => {
+      setTrailerMounted(false);
+      setTrailerStarted(false);
+    }, HERO_TRAILER_SWAP_OUT_MS + 80);
+    return () => window.clearTimeout(id);
+  }, [showTrailer, trailerStarted]);
+
+  // YouTube avisa del estado del reproductor por postMessage cuando el
+  // padre se suscribe («listening»); playerState 1 = reproduciendo. Con
+  // tope: si el aviso no llega, el relevo se hace igual.
+  useEffect(() => {
+    if (!showTrailer || trailerStarted) return undefined;
+    const reveal = () => setTrailerStarted(true);
+    const onMessage = (event) => {
+      const win = trailerIframeRef.current?.contentWindow;
+      if (!win || event.source !== win) return;
+      let data = event.data;
+      if (typeof data === "string") {
+        try {
+          data = JSON.parse(data);
+        } catch {
+          return;
+        }
+      }
+      const state =
+        data?.event === "onStateChange"
+          ? data.info
+          : data?.event === "infoDelivery"
+            ? data.info?.playerState
+            : undefined;
+      if (state === 1) reveal();
+    };
+    window.addEventListener("message", onMessage);
+    const fallback = window.setTimeout(reveal, HERO_TRAILER_START_TIMEOUT_MS);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      window.clearTimeout(fallback);
+    };
+  }, [showTrailer, trailerStarted]);
+
+  const trailerPhase = showTrailer
+    ? trailerStarted
+      ? "playing"
+      : "loading"
+    : trailerMounted
+      ? "closing"
+      : "off";
+
   const infoPanelRef = useRef(null);
   const infoExtraRef = useRef(null);
   const infoTrailerModeRef = useRef(showTrailer);
@@ -1388,7 +1460,11 @@ function FeaturedSlide({
             : "relative aspect-[2/3]"
         } hero-wide:absolute hero-wide:inset-0 hero-wide:h-full hero-wide:aspect-auto`}
       >
-        {!showTrailer && shouldLoadMedia && bgSrc && (
+        {shouldLoadMedia && bgSrc && (
+          <div
+            className="hero-media-swap hero-media-backdrop absolute inset-0"
+            data-trailer-phase={trailerPhase}
+          >
           <div
             key={bgSrc}
             className={`hero-backdrop-reveal absolute inset-0 ${
@@ -1450,15 +1526,16 @@ function FeaturedSlide({
               />
             </picture>
           </div>
+          </div>
         )}
 
-        {showTrailer && (
-          <>
-            {(trailerLoading || !trailerSrc) && (
-              <div className="absolute inset-0 animate-pulse bg-neutral-900" />
-            )}
-            {trailerSrc && (
-              <div className="hero-trailer-reveal absolute inset-0 overflow-hidden">
+        {/* Tráiler: va por encima de la imagen pero invisible hasta que
+            reproduce; el relevo lo hacen las transiciones de .hero-media-swap. */}
+        {(showTrailer || trailerMounted) && trailerSrc && (
+              <div
+                className="hero-media-swap hero-media-trailer absolute inset-0 overflow-hidden"
+                data-trailer-phase={trailerPhase}
+              >
                 <div className="hero-trailer-viewport absolute inset-0 overflow-hidden">
                   <iframe
                     key={trailer.key}
@@ -1494,13 +1571,22 @@ function FeaturedSlide({
                         YOUTUBE_QUALITY_RETRY_DELAYS.forEach((delay) => {
                           setTimeout(requestBestQuality, delay);
                         });
+                        // Suscripción a los avisos de estado (para saber
+                        // cuándo empieza a reproducir); se repite porque el
+                        // reproductor puede no estar listo en el primer aviso.
+                        [0, 300, 1000].forEach((delay) => {
+                          setTimeout(() => {
+                            win.postMessage(
+                              JSON.stringify({ event: "listening", id: 1, channel: "widget" }),
+                              target,
+                            );
+                          }, delay);
+                        });
                       } catch { }
                     }}
                   />
                 </div>
               </div>
-            )}
-          </>
         )}
       </div>
 
@@ -1868,9 +1954,55 @@ function FeaturedSlide({
           will-change: opacity;
         }
 
-        .hero-trailer-reveal {
-          animation: heroTrailerReveal 520ms cubic-bezier(0.22, 1, 0.36, 1)
-            both;
+        /* Relevo imagen <-> trailer. Al pulsar, la imagen se acerca un poco
+           (respuesta inmediata) mientras el iframe carga invisible encima.
+           Cuando reproduce, el trailer se funde encima asentandose desde una
+           escala algo mayor y la imagen sigue acercandose; la imagen solo se
+           apaga cuando el trailer ya la tapa entera, para que no haya un
+           bajon a negro a mitad del fundido. Al cerrar, la imagen vuelve
+           opaca enseguida (debajo) y se aleja a su tamano mientras el
+           trailer se desvanece por encima. Solo opacidad y transform: los
+           mueve el compositor, y las transiciones CSS se invierten solas si
+           se cambia de idea a mitad.
+           OJO: template literal, aqui NO pueden ir acentos graves. */
+        .hero-media-swap {
+          transform-origin: 50% 40%;
+          transition:
+            opacity 820ms cubic-bezier(0.33, 0, 0.2, 1),
+            transform 1600ms cubic-bezier(0.22, 1, 0.36, 1);
+          will-change: opacity, transform;
+        }
+
+        .hero-media-backdrop[data-trailer-phase="loading"] {
+          transform: scale(1.035);
+        }
+
+        .hero-media-backdrop[data-trailer-phase="playing"] {
+          opacity: 0;
+          transform: scale(1.08);
+          transition-duration: 220ms, 900ms;
+          transition-delay: 440ms, 0ms;
+        }
+
+        .hero-media-backdrop[data-trailer-phase="closing"] {
+          transition-duration: 320ms, 1400ms;
+        }
+
+        .hero-media-trailer {
+          opacity: 0;
+          transform: scale(1.06);
+          pointer-events: none;
+        }
+
+        .hero-media-trailer[data-trailer-phase="playing"] {
+          opacity: 1;
+          transform: scale(1);
+          transition-duration: 460ms, 900ms;
+        }
+
+        .hero-media-trailer[data-trailer-phase="closing"] {
+          opacity: 0;
+          transform: scale(1.03);
         }
 
         /* El hero puede ser mucho más ancho que 16:9 en pantallas panorámicas.
@@ -1898,17 +2030,6 @@ function FeaturedSlide({
           height: calc(
             max(108cqw, calc(108cqh * var(--hero-trailer-scope))) * 9 / 16
           );
-        }
-
-        @keyframes heroTrailerReveal {
-          from {
-            opacity: 0;
-            transform: scale(1.015);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
         }
 
         /* Solo opacidad y transform: los compone la GPU sin repintar. El
@@ -2116,8 +2237,8 @@ function FeaturedSlide({
             will-change: auto;
           }
 
-          .hero-trailer-reveal {
-            animation: none;
+          .hero-media-swap {
+            transition: none;
           }
 
           .hero-eq-bar {
