@@ -548,6 +548,81 @@ function FeaturedSlide({
   const [episodeRatingsOpen, setEpisodeRatingsOpen] = useState(false);
   const [loadedBackdropSrc, setLoadedBackdropSrc] = useState("");
   const trailerIframeRef = useRef(null);
+  const infoPanelRef = useRef(null);
+  const infoExtraRef = useRef(null);
+  const infoTrailerModeRef = useRef(showTrailer);
+
+  // Con el tráiler el bloque de información se queda en logo + botones. El
+  // layout cambia de golpe (la información secundaria sale del flujo) y el
+  // salto se anima con FLIP: el panel parte desplazado lo que medía esa
+  // información y vuelve a 0 con `translate`, que corre en el compositor.
+  // Animar el alto (filas de grid) recalculaba el layout en cada fotograma
+  // justo cuando se monta el iframe del tráiler y daba tirones. `translate`
+  // (y no `transform`) porque el panel ya lleva `scale` en layout ancho:
+  // `translate` se aplica fuera de la escala, en píxeles de pantalla, que es
+  // lo que se mide. Nada de opacidad en el panel: apagaría el cristal de los
+  // botones; solo se funde la información secundaria.
+  useLayoutEffect(() => {
+    if (infoTrailerModeRef.current === showTrailer) return;
+    infoTrailerModeRef.current = showTrailer;
+    const panel = infoPanelRef.current;
+    const extra = infoExtraRef.current;
+    if (!panel || !extra || typeof panel.animate !== "function") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    // Si se interrumpe una animación a medias, se parte de donde iba.
+    const currentShift =
+      parseFloat(getComputedStyle(panel).translate.split(" ")[1]) || 0;
+    // La clase oculta ya está aplicada al llegar aquí: la opacidad calculada
+    // solo vale como punto de partida si había un fundido a medias.
+    const fadeRunning = extra
+      .getAnimations()
+      .some((a) => a.id === "sv-hero-info-fade" && a.playState === "running");
+    const currentOpacity = fadeRunning
+      ? parseFloat(getComputedStyle(extra).opacity)
+      : showTrailer
+        ? 1
+        : 0;
+    panel.getAnimations().forEach((a) => {
+      if (a.id === "sv-hero-info-shift") a.cancel();
+    });
+    extra.getAnimations().forEach((a) => {
+      if (a.id === "sv-hero-info-fade") a.cancel();
+    });
+
+    // Desplazamiento real del panel: se vuelve un instante al layout anterior
+    // (la clase oculta es lo único que cambia) y se compara su borde superior
+    // con el nuevo. La altura del bloque no vale: oculto es un bloque
+    // absoluto y sus márgenes ya no colapsan hacia fuera (17 px de más), y
+    // el panel arrancaba desplazado y daba un salto.
+    const hiddenClass = "hero-info-extra-hidden";
+    extra.classList.toggle(hiddenClass, !showTrailer);
+    const previousTop = panel.getBoundingClientRect().top;
+    extra.classList.toggle(hiddenClass, showTrailer);
+    const delta = previousTop - panel.getBoundingClientRect().top;
+    if (!delta && !currentShift) return;
+    const from = delta + currentShift;
+    const easing = "cubic-bezier(0.25, 0.8, 0.3, 1)";
+
+    const shift = panel.animate(
+      { translate: [`0px ${from}px`, "0px 0px"] },
+      { duration: 580, easing },
+    );
+    shift.id = "sv-hero-info-shift";
+
+    const fade = showTrailer
+      ? extra.animate(
+          { opacity: [currentOpacity, 0] },
+          { duration: 260, easing: "cubic-bezier(0.4, 0, 1, 1)" },
+        )
+      : extra.animate(
+          { opacity: [currentOpacity, 1] },
+          { duration: 380, delay: 160, easing: "ease-out", fill: "backwards" },
+        );
+    fade.id = "sv-hero-info-fade";
+  }, [showTrailer]);
 
   // Soundtrack: su visibilidad y el silencio se conservan como preferencias
   // globales para todos los FeaturedHero. Solo arranca solo con la
@@ -1463,7 +1538,7 @@ function FeaturedSlide({
           degradado. Layout ancho: bloque de ancho fijo de referencia anclado a
           la esquina inferior izquierda y escalado con --hero-ui-scale (ver
           .hero-info-panel en los estilos). */}
-      <div className="hero-info-panel absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-3 pt-12">
+      <div ref={infoPanelRef} className="hero-info-panel absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-3 pt-12">
         <div className="hero-info-inner flex max-w-full flex-col items-center text-center hero-wide:block hero-wide:text-left">
             {/* Solo el logo del título; no se muestra el título en texto. */}
             {logoSrc ? (
@@ -1633,6 +1708,16 @@ function FeaturedSlide({
             </div>
             </div>
 
+            {/* Con el tráiler en marcha el bloque se queda en logo + botones:
+                puntuaciones, metadatos y sinopsis salen del flujo (quedan
+                justo debajo, invisibles) y el panel, anclado abajo, baja a
+                ocupar el hueco; la animación la hace el efecto FLIP de arriba. */}
+            <div
+              ref={infoExtraRef}
+              className={`hero-info-extra ${showTrailer ? "hero-info-extra-hidden" : ""}`}
+              aria-hidden={showTrailer || undefined}
+              inert={showTrailer || undefined}
+            >
             {isMobile ? (
               <>
                 {/* Puntuaciones TMDb e IMDb (sin premios en móvil) */}
@@ -1721,6 +1806,7 @@ function FeaturedSlide({
                 {overview}
               </p>
             )}
+            </div>
 
             {error && (
               <p
@@ -1792,14 +1878,26 @@ function FeaturedSlide({
            dejaba una franja vacía a la izquierda. Estas unidades relativas al
            propio contenedor mantienen el iframe en 16:9 y aplican un "cover"
            real en cualquier proporción, con un pequeño overscan para ocultar
-           por completo el chrome y los bordes internos de YouTube. */
+           por completo el chrome y los bordes internos de YouTube.
+           Los tráileres de cine llegan en 16:9 con bandas negras de
+           panorámico (2,39:1) dentro del propio vídeo: si el "cover" se hace
+           sobre el 16:9, la banda superior queda visible detrás del navbar
+           como una franja negra. Por eso el cover se calcula sobre la zona
+           útil 2,39:1 (el iframe sigue siendo 16:9): la imagen real llega
+           siempre al borde superior y las bandas quedan fuera. */
         .hero-trailer-viewport {
           container-type: size;
+          --hero-trailer-scope: 2.39;
         }
 
         .hero-trailer-iframe {
-          width: max(108cqw, calc(108cqh * 16 / 9));
-          height: max(108cqh, calc(108cqw * 9 / 16));
+          width: max(
+            108cqw,
+            calc(108cqh * var(--hero-trailer-scope))
+          );
+          height: calc(
+            max(108cqw, calc(108cqh * var(--hero-trailer-scope))) * 9 / 16
+          );
         }
 
         @keyframes heroTrailerReveal {
@@ -1845,6 +1943,10 @@ function FeaturedSlide({
             scale: var(--hero-ui-scale, 1);
             transform-origin: left bottom;
           }
+
+          .hero-info-panel::after {
+            display: none;
+          }
         }
 
         /* Tablet en VERTICAL (layout movil a mas ancho que un telefono): el
@@ -1882,6 +1984,37 @@ function FeaturedSlide({
           .hero-info-overview {
             display: -webkit-box;
           }
+        }
+
+        /* Informacion secundaria con el trailer: fuera del flujo, justo
+           debajo de los botones (donde estaba) e invisible. El paso de un
+           estado a otro lo anima el efecto FLIP del panel. */
+        .hero-info-inner {
+          position: relative;
+        }
+
+        .hero-info-extra-hidden {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        /* Movil: el panel lleva un degradado a negro hasta el borde inferior.
+           Durante el FLIP el panel parte desplazado hacia arriba y dejaria un
+           hueco sin negro debajo; esta prolongacion lo tapa (el hero la
+           recorta con su overflow). */
+        .hero-info-panel::after {
+          content: "";
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          height: 100vh;
+          background: #000;
+          pointer-events: none;
         }
 
         .hero-backdrop-loading {
