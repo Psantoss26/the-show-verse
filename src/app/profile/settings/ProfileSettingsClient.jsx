@@ -52,6 +52,7 @@ import {
   Tv,
   Users,
   Sparkles,
+  Smartphone,
 } from "lucide-react";
 import {
   DEFAULT_MOBILE_BOTTOM_NAV,
@@ -71,7 +72,7 @@ import SubscriptionPanel from "@/components/settings/SubscriptionPanel";
 import useEntitlements from "@/hooks/useEntitlements";
 import { planName } from "@/lib/billing/plans";
 import LetterboxdConnectionCard from "@/components/settings/LetterboxdConnectionCard";
-import { pairDevice, pairSyncApp, readSyncStatus, useSyncStatus } from "@/lib/android/appBridge";
+import { pairDevice, pairSyncApp, readSyncStatus, useAndroidStatusBarMode, useSyncStatus } from "@/lib/android/appBridge";
 import { buildSyncPairLinks } from "@/lib/android/syncPairLink";
 import { useTranslation } from "@/lib/i18n";
 import {
@@ -1639,6 +1640,8 @@ function ProfileSettingsClient() {
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAccountSecurityModal, setShowAccountSecurityModal] = useState(false);
   const [showMobileBottomNavEditor, setShowMobileBottomNavEditor] = useState(false);
+  // Modo de la barra de notificaciones (solo en la app de Android que lo admite).
+  const statusBarMode = useAndroidStatusBarMode();
 
   const saveProfileNames = async ({ username, displayName }) => {
     setProfileSaving(true);
@@ -2506,6 +2509,20 @@ function ProfileSettingsClient() {
                       disabled={saving}
                       onClick={() => setShowMobileBottomNavEditor(true)}
                     />
+                    {/* Solo en la app de Android: se guarda en el dispositivo
+                        (no en la cuenta) y se aplica al momento. */}
+                    {statusBarMode.available && (
+                      <ToggleRow
+                        icon={Smartphone}
+                        title={t("settings_android_statusbar", "Mostrar la barra de notificaciones")}
+                        description={t(
+                          "settings_android_statusbar_desc",
+                          "La hora y los iconos quedan sobre el fondo de cada página, y las portadas empiezan justo debajo. Desactivada, la barra se oculta y la barra superior ocupa esa zona.",
+                        )}
+                        checked={statusBarMode.visible}
+                        onChange={(value) => statusBarMode.setVisible(value)}
+                      />
+                    )}
                   </div>
                   {/* Al abrir un título (escritorio). En el móvil se abre
                       siempre la ficha completa. */}

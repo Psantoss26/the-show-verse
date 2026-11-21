@@ -1180,6 +1180,36 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                 por su fundido inferior (la prolongación difuminada del
                 mosaico, ver UnifiedListDetailsLayout). */}
             {hasImage ? null : collageUnderlay}
+            {/* App de Android con la barra de estado VISIBLE
+                (`data-android-statusbar`): la portada empieza justo debajo
+                de ella y su franja (`--sv-cover-strip`, 0 en el resto) lleva
+                el borde de arriba del póster reflejado y difuminado, para que
+                la hora y los iconos queden sobre el color de la imagen. */}
+            {hasImage && !inPanel ? (
+                <div
+                    className="pointer-events-none absolute inset-x-0 overflow-hidden"
+                    style={{
+                        top: 'calc(-1 * var(--sv-cover-strip, 0px))',
+                        height: 'var(--sv-cover-strip, 0px)',
+                    }}
+                >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={firstSrc}
+                        alt=""
+                        decoding="async"
+                        className="absolute inset-x-0 bottom-0 w-full object-cover object-bottom"
+                        style={{
+                            height: 'var(--mobile-cover-h)',
+                            objectPosition,
+                            // Volteada en su sitio: su fila de arriba queda en
+                            // el borde inferior de la franja, junto a la portada.
+                            transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, -1)`,
+                            filter: 'blur(14px) brightness(0.85) saturate(1.1)',
+                        }}
+                    />
+                </div>
+            ) : null}
             {hasImage && blurredUnderlay ? (
                 <div
                     className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"

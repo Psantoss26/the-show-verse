@@ -174,6 +174,41 @@ export function useAppPullToRefreshLock(active) {
   }, [active]);
 }
 
+// BARRA DE NOTIFICACIONES (barra de estado) de la app. Dos modos, guardados en
+// el nativo: OCULTA (por defecto; la barra superior de la web ocupa su franja,
+// `data-android-immersive`) o VISIBLE y transparente sobre el fondo de cada
+// página (`data-android-statusbar`; las portadas empiezan justo debajo y la
+// franja muestra la portada difuminada). El nativo cambia la ventana y los
+// atributos de <html> al momento; ver WebAppActivity en android-companion.
+
+/** ¿La app instalada deja elegir el modo de la barra de notificaciones? */
+export function canChooseStatusBarMode() {
+  const api = bridge();
+  return Boolean(api && typeof api.setStatusBarVisible === "function");
+}
+
+/** ¿Está la barra de notificaciones visible (modo 2)? */
+export function readStatusBarVisible() {
+  return call("statusBarVisible", false) === true;
+}
+
+/** Cambia el modo. false si no se puede (fuera de la app o APK anterior). */
+export function setStatusBarVisible(visible) {
+  return call("setStatusBarVisible", false, Boolean(visible)) === true;
+}
+
+/** Estado del modo para Ajustes: `{ available, visible, setVisible }`. */
+export function useAndroidStatusBarMode() {
+  const [state, setState] = useState({ available: false, visible: false });
+  useEffect(() => {
+    setState({ available: canChooseStatusBarMode(), visible: readStatusBarVisible() });
+  }, []);
+  const setVisible = (visible) => {
+    if (setStatusBarVisible(visible)) setState({ available: true, visible: Boolean(visible) });
+  };
+  return { ...state, setVisible };
+}
+
 /** Compartir con el selector del sistema (en la app) o con la Web Share API. */
 export function shareFromApp(text, url) {
   if (isAndroidApp()) {

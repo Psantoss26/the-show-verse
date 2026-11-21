@@ -2487,8 +2487,9 @@ html[data-fit-viewport] [data-scroll-restoration-root] {
    `--sv-android-bottom`, ver WebAppActivity en android-companion): esas
    franjas muestran el cristal de las barras de la app o la portada, no negro.
    Si la app aún no los ha pasado, los del sistema. Las versiones actuales de
-   la app OCULTAN la barra de estado (`data-android-immersive`): arriba vale 0
-   y la barra superior ocupa esa franja (ver más abajo). */
+   la app OCULTAN la barra de estado por defecto (`data-android-immersive`):
+   arriba vale 0 y la barra superior ocupa esa franja (ver más abajo). Si en
+   Ajustes se elige mostrarla (`data-android-statusbar`), arriba vale su alto. */
 :root {
   --sv-safe-top: env(safe-area-inset-top, 0px);
   --sv-safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -2497,11 +2498,25 @@ html[data-fit-viewport] [data-scroll-restoration-root] {
      compactada (48px en móvil). En la app de Android sin barra de estado se
      redefine más abajo, porque allí la barra superior es más alta. */
   --sv-page-sticky-top: calc(3.5rem + var(--sv-safe-top, 0px));
+  /* Cuánto suben las portadas móviles de las fichas (MobileHeroCover) para
+     pasar por detrás de la barra de estado, y la franja de esa barra que
+     ocupa su reflejo difuminado (0: ninguna). */
+  --sv-cover-raise: var(--sv-safe-top, 0px);
+  --sv-cover-strip: 0px;
 }
 
 html[data-android-app] {
   --sv-safe-top: var(--sv-android-top, env(safe-area-inset-top, 0px));
   --sv-safe-bottom: var(--sv-android-bottom, env(safe-area-inset-bottom, 0px));
+}
+
+/* App de Android con la barra de estado VISIBLE (modo elegido en Ajustes,
+   `data-android-statusbar`): la barra es transparente y deja ver el fondo de
+   cada página, pero la portada de las fichas empieza justo debajo de ella; en
+   su franja, el borde del póster reflejado y difuminado. */
+html[data-android-statusbar] {
+  --sv-cover-raise: 0px;
+  --sv-cover-strip: var(--sv-safe-top, 0px);
 }
 
 /* CANTO DEL CRISTAL EN LA APP DE ANDROID: sin su segundo desenfoque.

@@ -253,6 +253,7 @@ class WebAppActivity : AppCompatActivity() {
                 { centroCamaraCss },
                 { radioEsquinaCss },
                 { if (::atras.isInitialized) atras.paginaPintada() },
+                ::cambiarBarraEstado,
             ),
             WebAppBridge.NAME,
         )
@@ -531,10 +532,13 @@ class WebAppActivity : AppCompatActivity() {
                 maxOf(barras.right, camara.right),
                 0,
             )
-            // El círculo de recarga y el medidor, por debajo de la cámara.
-            bajarIndicadorDeRecarga(camara.top)
-            binding.frameMeter.translationY = camara.top.toFloat()
+            // El círculo de recarga y el medidor, por debajo de la cámara (y
+            // de la barra de estado si se ve).
+            val arriba = if (prefs.statusBarVisible) maxOf(barras.top, camara.top) else 0
+            bajarIndicadorDeRecarga(maxOf(arriba, camara.top))
+            binding.frameMeter.translationY = maxOf(arriba, camara.top).toFloat()
             pasarHuecosDeBarras(
+                arriba,
                 maxOf(barras.bottom, camara.bottom),
                 centroDeLaCamara(insets),
                 radioDeEsquina(insets),
@@ -560,8 +564,12 @@ class WebAppActivity : AppCompatActivity() {
      * Geometría de la parte superior y alto de la barra de navegación, en
      * píxeles CSS, para la web. Los lee el script de arranque del <head> por
      * el puente antes del primer pintado, y si cambian con la página ya
-     * cargada (girar la pantalla) se le escriben directamente. La barra de
-     * estado está oculta: su alto, para la web, es 0.
+     * cargada (girar la pantalla, cambiar el modo de la barra de estado) se
+     * le escriben directamente. Con la barra de estado OCULTA (modo por
+     * defecto) su alto, para la web, es 0 y la web va en modo inmersivo
+     * (`data-android-immersive`); VISIBLE, la web pasa por detrás de ella,
+     * baja su barra superior su alto (`--sv-android-top`) y las portadas
+     * empiezan justo debajo (`data-android-statusbar`).
      */
     @Volatile
     private var altoBarraEstadoCss = 0.0
@@ -575,29 +583,43 @@ class WebAppActivity : AppCompatActivity() {
     @Volatile
     private var radioEsquinaCss = 0.0
 
-    private fun pasarHuecosDeBarras(abajo: Int, centroCamara: Int, radioEsquina: Int) {
+    private var barraEstadoVisibleEnWeb = false
+
+    private fun pasarHuecosDeBarras(arriba: Int, abajo: Int, centroCamara: Int, radioEsquina: Int) {
         val densidad = resources.displayMetrics.density.toDouble()
+        val estado = arriba / densidad
         val navegacion = abajo / densidad
         val camara = centroCamara / densidad
         val esquina = radioEsquina / densidad
+        val visible = prefs.statusBarVisible
         if (
+            visible == barraEstadoVisibleEnWeb &&
+            estado == altoBarraEstadoCss &&
             navegacion == altoBarraNavegacionCss &&
             camara == centroCamaraCss &&
             esquina == radioEsquinaCss
         ) {
             return
         }
+        // Las fichas miden dónde empieza su portada al cargar y al redimensionar:
+        // si cambia la franja de arriba (modo de la barra de estado) sin que el
+        // WebView cambie de tamaño, se les avisa con un `resize`.
+        val cambiaArriba = visible != barraEstadoVisibleEnWeb || estado != altoBarraEstadoCss
+        barraEstadoVisibleEnWeb = visible
+        altoBarraEstadoCss = estado
         altoBarraNavegacionCss = navegacion
         centroCamaraCss = camara
         radioEsquinaCss = esquina
         evaluarJs(
             "var d=document.documentElement,s=d.style;" +
-                "d.setAttribute('data-android-immersive','');" +
-                "s.setProperty('--sv-android-top','0px');" +
+                (if (visible) "d.removeAttribute('data-android-immersive');d.setAttribute('data-android-statusbar','');"
+                else "d.removeAttribute('data-android-statusbar');d.setAttribute('data-android-immersive','');") +
+                "s.setProperty('--sv-android-top','${estado}px');" +
                 "s.setProperty('--sv-android-bottom','${navegacion}px');" +
                 (if (camara > 0) "s.setProperty('--sv-android-camera-y','${camara}px');"
                 else "s.removeProperty('--sv-android-camera-y');") +
-                "s.setProperty('--sv-android-corner','${esquina}px')",
+                "s.setProperty('--sv-android-corner','${esquina}px');" +
+                (if (cambiaArriba) "window.dispatchEvent(new Event('resize'))" else ""),
         )
     }
 
@@ -785,7 +807,26 @@ class WebAppActivity : AppCompatActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
-        ocultarBarras(WindowInsetsCompat.Type.statusBars())
+        aplicarBarraEstado()
+    }
+
+    /** Muestra u oculta la barra de estado según el modo elegido en Ajustes. */
+    private fun aplicarBarraEstado() {
+        if (prefs.statusBarVisible) {
+            WindowCompat.getInsetsController(window, window.decorView)
+                .show(WindowInsetsCompat.Type.statusBars())
+        } else {
+            ocultarBarras(WindowInsetsCompat.Type.statusBars())
+        }
+    }
+
+    /**
+     * Cambio de modo desde Ajustes (`WebAppBridge.setStatusBarVisible`, ya
+     * guardado): la ventana y, al volver a pedir los huecos, la web.
+     */
+    private fun cambiarBarraEstado(@Suppress("UNUSED_PARAMETER") visible: Boolean) {
+        aplicarBarraEstado()
+        ViewCompat.requestApplyInsets(binding.refresh)
     }
 
     private fun ocultarBarras(tipos: Int) {
@@ -797,7 +838,8 @@ class WebAppActivity : AppCompatActivity() {
 
     /**
      * Solo para el vídeo a pantalla completa: oculta también la barra de
-     * navegación y, al salir, la devuelve (la de estado sigue oculta).
+     * navegación y, al salir, la devuelve (y la de estado, si su modo es
+     * visible).
      */
     private fun pantallaCompleta(activa: Boolean) {
         if (activa) {
@@ -805,6 +847,7 @@ class WebAppActivity : AppCompatActivity() {
         } else {
             WindowCompat.getInsetsController(window, window.decorView)
                 .show(WindowInsetsCompat.Type.navigationBars())
+            aplicarBarraEstado()
         }
     }
 

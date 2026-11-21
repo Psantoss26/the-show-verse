@@ -65,12 +65,16 @@ export const viewport = {
 const LEGACY_PERF_CLEANUP_SCRIPT =
   'try{localStorage.removeItem("sv-perf-mode");localStorage.removeItem("sv-perf-probe-v1")}catch(e){}';
 
-// Con `cameraCenterY` en el puente, la app oculta la barra de estado
-// (`data-android-immersive`): la barra superior ocupa su franja, centrada en la
-// cámara y apartada de las esquinas redondeadas. Las versiones anteriores de la
-// app la mostraban y la web bajaba su barra lo que medía.
+// Con `cameraCenterY` en el puente, la app oculta la barra de estado por
+// defecto (`data-android-immersive`): la barra superior ocupa su franja,
+// centrada en la cámara y apartada de las esquinas redondeadas. Si en Ajustes
+// se elige mostrarla (`statusBarVisible()`), queda transparente sobre la web
+// (`data-android-statusbar`): la barra superior baja lo que mide y las
+// portadas empiezan justo debajo, con su difuminado en la franja. Las
+// versiones anteriores de la app la mostraban siempre (sin ninguno de los dos
+// atributos) y la web bajaba su barra lo que medía.
 const ANDROID_APP_BOOT_SCRIPT =
-  'if(navigator.userAgent.indexOf("TheShowVerseApp/")!==-1){var d=document.documentElement,s=d.style;d.setAttribute("data-android-app","");try{var b=window.TSVAndroidBridge,n=b&&b.navigationBarHeight&&b.navigationBarHeight();if(n>0)s.setProperty("--sv-android-bottom",n+"px");if(b&&b.cameraCenterY){d.setAttribute("data-android-immersive","");s.setProperty("--sv-android-top","0px");var c=b.cameraCenterY(),r=b.screenCornerRadius();if(c>0)s.setProperty("--sv-android-camera-y",c+"px");if(r>0)s.setProperty("--sv-android-corner",r+"px")}else{var h=b&&b.statusBarHeight&&b.statusBarHeight();if(h>0)s.setProperty("--sv-android-top",h+"px")}}catch(e){}}';
+  'if(navigator.userAgent.indexOf("TheShowVerseApp/")!==-1){var d=document.documentElement,s=d.style;d.setAttribute("data-android-app","");try{var b=window.TSVAndroidBridge,n=b&&b.navigationBarHeight&&b.navigationBarHeight();if(n>0)s.setProperty("--sv-android-bottom",n+"px");if(b&&b.cameraCenterY&&!(b.statusBarVisible&&b.statusBarVisible())){d.setAttribute("data-android-immersive","");s.setProperty("--sv-android-top","0px");var c=b.cameraCenterY(),r=b.screenCornerRadius();if(c>0)s.setProperty("--sv-android-camera-y",c+"px");if(r>0)s.setProperty("--sv-android-corner",r+"px")}else{if(b&&b.cameraCenterY)d.setAttribute("data-android-statusbar","");var h=b&&b.statusBarHeight&&b.statusBarHeight();if(h>0)s.setProperty("--sv-android-top",h+"px")}}catch(e){}}';
 
 export default function RootLayout({ children, overlay }) {
   return (
@@ -138,7 +142,7 @@ export default function RootLayout({ children, overlay }) {
             que se funde) y solo se ve con `data-android-app` en <html>. */}
         <div
           aria-hidden
-          className="pointer-events-none fixed inset-x-0 top-0 z-[90] hidden h-[calc(var(--sv-safe-top,0px)+0.5rem)] bg-gradient-to-b from-black/55 via-black/30 to-transparent [html[data-android-app]:not([data-android-immersive])_&]:block"
+          className="pointer-events-none fixed inset-x-0 top-0 z-[90] hidden h-[calc(var(--sv-safe-top,0px)+0.5rem)] bg-gradient-to-b from-black/55 via-black/30 to-transparent [html[data-android-app]:not([data-android-immersive]):not([data-android-statusbar])_&]:block"
         />
         <AuthProvider>
           <ServerStatusProvider>

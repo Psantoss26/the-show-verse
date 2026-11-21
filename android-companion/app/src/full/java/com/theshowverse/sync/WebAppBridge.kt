@@ -48,6 +48,7 @@ class WebAppBridge(
     private val centroCamara: () -> Double = { 0.0 },
     private val radioEsquina: () -> Double = { 0.0 },
     private val paginaPintada: () -> Unit = {},
+    private val cambiarBarraEstado: (Boolean) -> Unit = {},
 ) {
 
     /**
@@ -100,6 +101,25 @@ class WebAppBridge(
      */
     @JavascriptInterface
     fun screenCornerRadius(): Double = radioEsquina()
+
+    /**
+     * Modo de la barra de notificaciones (se elige en Ajustes de la web):
+     * false = OCULTA, la barra superior de la web ocupa su franja; true =
+     * VISIBLE y transparente, con la web por detrás (`statusBarHeight()` da
+     * entonces su alto). El script de arranque de la web lo lee antes del
+     * primer pintado.
+     */
+    @JavascriptInterface
+    fun statusBarVisible(): Boolean = prefs.statusBarVisible
+
+    /** Cambia el modo, lo guarda y lo aplica al momento (ventana y web). */
+    @JavascriptInterface
+    fun setStatusBarVisible(visible: Boolean): Boolean {
+        if (!propio()) return false
+        prefs.statusBarVisible = visible
+        activity.runOnUiThread { cambiarBarraEstado(visible) }
+        return true
+    }
 
     /**
      * Estado completo de la sincronización, en JSON, para que Ajustes lo pinte

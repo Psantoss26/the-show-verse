@@ -130,6 +130,13 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(KEY_PERF_NO_BLUR, false)
         set(value) = prefs.edit().putBoolean(KEY_PERF_NO_BLUR, value).apply()
 
+    // Barra de notificaciones de la app (WebAppActivity): false = OCULTA, la
+    // barra superior de la web ocupa su franja (por defecto); true = VISIBLE y
+    // transparente, con la web por detrás. Se elige en Ajustes de la web.
+    var statusBarVisible: Boolean
+        get() = prefs.getBoolean(KEY_STATUS_BAR_VISIBLE, false)
+        set(value) = prefs.edit().putBoolean(KEY_STATUS_BAR_VISIBLE, value).apply()
+
     fun isPaired(): Boolean = !token.isNullOrBlank() && !origin.isNullOrBlank()
 
     /** Apps activadas para sincronizar. Por defecto, las de streaming conocidas. */
@@ -219,6 +226,7 @@ class Prefs(context: Context) {
         private const val KEY_PERF_METER = "perf_frame_meter"
         private const val KEY_PERF_MAX_REFRESH = "perf_max_refresh"
         private const val KEY_PERF_NO_BLUR = "perf_no_blur"
+        private const val KEY_STATUS_BAR_VISIBLE = "status_bar_visible"
         private const val KEY_NOT_A_TITLE = "not_a_title_rules"
         private const val KEY_NOT_A_TITLE_AT = "not_a_title_fetched_at"
     }
