@@ -491,7 +491,13 @@ class WebAppActivity : AppCompatActivity() {
             fondo = binding.root,
             colorFondo = ContextCompat.getColor(this, R.color.tsv_black),
             puedeVolver = { customView != null || web.canGoBack() },
-            indiceHistorial = { web.copyBackForwardList().currentIndex },
+            historial = {
+                val lista = web.copyBackForwardList()
+                FotosHistorial.Historial(
+                    urls = List(lista.size) { lista.getItemAtIndex(it)?.url.orEmpty() },
+                    indice = lista.currentIndex,
+                )
+            },
             animable = { customView == null },
             // Lo que la web acaba de pintar llega a pantalla en el siguiente
             // dibujado del WebView: entonces se puede quitar lo que lo tapa.

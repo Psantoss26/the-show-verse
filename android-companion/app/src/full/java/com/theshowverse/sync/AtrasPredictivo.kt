@@ -31,8 +31,10 @@ import androidx.activity.OnBackPressedCallback
  * PixelCopy del último fotograma, antes de que el toque cambie nada): el toque
  * que lleva a otra página deja así la anterior tal como se veía. Cuando el
  * historial avanza ([historialCambiado]) la foto se asocia a la entrada que se
- * deja. Al volver, esa foto es la página anterior, estática, desde el primer
- * fotograma. Luego, en tres fases:
+ * deja, con su URL ([FotosHistorial]). Al volver, esa foto es la página
+ * anterior, estática, desde el primer fotograma; si la entrada ya no tiene esa
+ * URL (historial lleno que se ha desplazado, `replaceState`…), no se usa: nunca
+ * se enseña la foto de otra página. Luego, en tres fases:
  *
  *  1. MIENTRAS EL DEDO AVANZA (si el sistema entrega el avance): la web se
  *     encoge, se aparta del borde por el que entra el gesto, sigue un poco al
@@ -75,8 +77,8 @@ class AtrasPredictivo(
     private val fondo: ViewGroup,
     private val colorFondo: Int,
     private val puedeVolver: () -> Boolean,
-    /** Posición actual en el historial de la web. */
-    private val indiceHistorial: () -> Int,
+    /** El historial de la web: URL de cada entrada y posición actual. */
+    private val historial: () -> FotosHistorial.Historial,
     /** Falso con un vídeo a pantalla completa: ahí no hay página que animar. */
     private val animable: () -> Boolean,
     /** Llama a `listo` cuando lo que la web acaba de pintar llega a pantalla. */
@@ -165,14 +167,10 @@ class AtrasPredictivo(
 
     private var animador: ValueAnimator? = null
 
-    /** Fotos de las páginas que se han dejado, por posición en el historial. */
-    private val paginas = HashMap<Int, Bitmap>()
+    /** Fotos de las páginas que se han dejado (ver [FotosHistorial]). */
+    private val fotos = FotosHistorial<Bitmap>(MAX_PAGINAS)
 
-    /** La del último toque y la posición en la que se hizo. */
-    private var toque: Bitmap? = null
-    private var indiceToque = -1
     private var capturandoToque = false
-    private var indiceVisto = -1
 
     /**
      * Un dedo toca la web: foto de la página tal como se ve (el último
@@ -182,36 +180,23 @@ class AtrasPredictivo(
     fun alTocar() {
         if (capturandoToque || enGesto || enTransicion != null || pendiente) return
         if (vista.scaleX != 1f || vista.translationX != 0f) return
-        val indice = indiceHistorial()
-        val destino = toque
-        toque = null
+        val ahora = historial()
+        val destino = fotos.soltarToque()
         capturandoToque = true
         copiar(destino) { bitmap ->
             capturandoToque = false
-            toque = bitmap
-            indiceToque = indice
+            if (bitmap != null) fotos.tocado(bitmap, ahora.indice, ahora.urlActual)
         }
     }
 
-    /** El historial de la web ha cambiado (también por `pushState`). */
+    /** El historial de la web ha cambiado (también por `pushState` y `replaceState`). */
     fun historialCambiado() {
-        val nuevo = indiceHistorial()
-        val antes = indiceVisto
-        indiceVisto = nuevo
-        if (antes < 0 || nuevo <= antes) return
-        // Se avanza: lo que había desde la página que se deja ya no vale.
-        paginas.keys.removeAll { it >= antes }
-        val foto = toque
-        if (foto != null && indiceToque == antes) {
-            paginas[antes] = foto
-            toque = null
-        }
-        while (paginas.size > MAX_PAGINAS) paginas.remove(paginas.keys.min())
+        fotos.cambio(historial())
     }
 
-    /** La foto de la página a la que se vuelve, si la hay y encaja. */
+    /** La foto de la página a la que se vuelve, si la hay, es de esa página y encaja. */
     private fun fotoAnterior(): Bitmap? =
-        paginas[indiceHistorial() - 1]?.takeIf { it.width == vista.width && it.height == vista.height }
+        fotos.anterior(historial())?.takeIf { it.width == vista.width && it.height == vista.height }
 
     /** Recalcula si el gesto es de la web o del sistema. Llamarlo tras navegar. */
     fun actualizar() {
@@ -626,14 +611,15 @@ class AtrasPredictivo(
         // Curva «emphasized decelerate» de Material 3 para seguir al dedo.
         val INTERPOLADOR_GESTO = PathInterpolator(0.05f, 0.7f, 0.1f, 1f)
 
-        // «Emphasized decelerate» también para la salida: arranca rápido, para
-        // que la captura se mueva en cuanto se suelta, y frena al final.
-        val INTERPOLADOR_SALIDA = PathInterpolator(0.05f, 0.7f, 0.1f, 1f)
+        // Salida más suave que el gesto: la captura empieza a moverse en cuanto
+        // se suelta, pero sin el tirón inicial del «emphasized decelerate»
+        // (pendiente de arranque ~2,5 frente a ~14), y frena largo al final.
+        val INTERPOLADOR_SALIDA = PathInterpolator(0.2f, 0.5f, 0.15f, 1f)
 
-        const val DURACION_SALIDA_MS = 300L
-        const val DURACION_VELO_MS = 120L
-        const val DURACION_SOLTAR_MS = 250L
-        const val DURACION_CANCELAR_MS = 200L
+        const val DURACION_SALIDA_MS = 450L
+        const val DURACION_VELO_MS = 200L
+        const val DURACION_SOLTAR_MS = 350L
+        const val DURACION_CANCELAR_MS = 280L
 
         /** Tope de espera a una web que avisa: luego el velo se quita igual. */
         const val ESPERA_MAX_MS = 900L
