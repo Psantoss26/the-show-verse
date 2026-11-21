@@ -952,13 +952,14 @@ const MOBILE_COVER_EXTEND_SCALE_X = 1.12
 // los botones, como el fundido a oscuro de la portada de la ficha. Empieza
 // transparente por encima del borde, así que no marca ninguna línea.
 const MOBILE_COVER_SHADE_LEAD_PX = 48
-const MOBILE_COVER_SHADE = `linear-gradient(to bottom,
+const buildCoverShade = (leadPx) => `linear-gradient(to bottom,
     rgba(10, 10, 10, 0) 0px,
-    rgba(10, 10, 10, 0.08) ${MOBILE_COVER_SHADE_LEAD_PX * 0.5}px,
-    rgba(10, 10, 10, 0.24) ${MOBILE_COVER_SHADE_LEAD_PX}px,
-    rgba(10, 10, 10, 0.5) ${MOBILE_COVER_SHADE_LEAD_PX + 60}px,
-    rgba(10, 10, 10, 0.72) ${MOBILE_COVER_SHADE_LEAD_PX + 130}px,
+    rgba(10, 10, 10, 0.08) ${leadPx * 0.5}px,
+    rgba(10, 10, 10, 0.24) ${leadPx}px,
+    rgba(10, 10, 10, 0.5) ${leadPx + 60}px,
+    rgba(10, 10, 10, 0.72) ${leadPx + 130}px,
     rgba(10, 10, 10, 0.86) 100%)`
+const MOBILE_COVER_SHADE = buildCoverShade(MOBILE_COVER_SHADE_LEAD_PX)
 
 // REFLEJO DIFUMINADO bajo la portada (`blurredUnderlay`, la ficha): sin él, lo
 // que queda bajo el póster (botones y marcador) es el fondo casi negro de la
@@ -971,13 +972,14 @@ const MOBILE_COVER_SHADE = `linear-gradient(to bottom,
 const MOBILE_COVER_UNDERLAY_MASK = `linear-gradient(to bottom,
     transparent calc(var(--mobile-cover-h) - 48px),
     #000 calc(var(--mobile-cover-h) + 8px))`
-const MOBILE_COVER_SHADE_SOFT = `linear-gradient(to bottom,
+const buildCoverShadeSoft = (leadPx) => `linear-gradient(to bottom,
     rgba(10, 10, 10, 0) 0px,
-    rgba(10, 10, 10, 0.08) ${MOBILE_COVER_SHADE_LEAD_PX * 0.5}px,
-    rgba(10, 10, 10, 0.2) ${MOBILE_COVER_SHADE_LEAD_PX}px,
-    rgba(10, 10, 10, 0.36) ${MOBILE_COVER_SHADE_LEAD_PX + 90}px,
-    rgba(10, 10, 10, 0.46) ${MOBILE_COVER_SHADE_LEAD_PX + 220}px,
+    rgba(10, 10, 10, 0.08) ${leadPx * 0.5}px,
+    rgba(10, 10, 10, 0.2) ${leadPx}px,
+    rgba(10, 10, 10, 0.36) ${leadPx + 90}px,
+    rgba(10, 10, 10, 0.46) ${leadPx + 220}px,
     rgba(10, 10, 10, 0.52) 100%)`
+const MOBILE_COVER_SHADE_SOFT = buildCoverShadeSoft(MOBILE_COVER_SHADE_LEAD_PX)
 
 // CONTRASTE ADAPTATIVO (`adaptiveContrast`, la ficha): el logo y los botones
 // son blancos sobre cristal, y con pósters claros (cielo, nieve, fondos
@@ -1101,10 +1103,12 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
 // scroll) en vez de colgar de la ventana, y no lleva nada atado al viewport ni
 // al scroll del documento: el relevo con el fondo lo anima el panel.
 // `edgeBandPx`: alto de la entrada de la capa difuminada sobre el pie del
-// póster (por defecto MOBILE_COVER_BLUR_BAND_PX). Las temporadas lo acortan:
-// sus pósters llevan el título impreso abajo y, con el póster difuminado
-// debajo (`blurredUnderlay`), basta con empezar más cerca del borde.
-export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX, ready, animate, inPanel = false, objectPosition = 'center bottom' }) {
+// póster (por defecto MOBILE_COVER_BLUR_BAND_PX). `shadeLeadPx`: cuánto sube el
+// velo de los botones por encima del borde (por defecto
+// MOBILE_COVER_SHADE_LEAD_PX). Las temporadas acortan los dos: su póster es la
+// imagen entera, con el título impreso abajo y sin logo encima, y el
+// difuminado y el velo, pensados para el logo de la ficha, lo apagaban.
+export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX, shadeLeadPx = MOBILE_COVER_SHADE_LEAD_PX, ready, animate, inPanel = false, objectPosition = 'center bottom' }) {
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
@@ -1295,12 +1299,14 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                 <div
                     className="pointer-events-none absolute inset-x-0"
                     style={{
-                        top: `calc(var(--mobile-cover-h) - ${MOBILE_COVER_SHADE_LEAD_PX}px)`,
+                        top: `calc(var(--mobile-cover-h) - ${shadeLeadPx}px)`,
                         // Con el reflejo, hasta el pie de la pantalla.
                         height: blurredUnderlay
-                            ? `calc(100lvh + ${MOBILE_COVER_SHADE_LEAD_PX}px)`
-                            : MOBILE_COVER_EXTEND_PX + MOBILE_COVER_SHADE_LEAD_PX,
-                        backgroundImage: blurredUnderlay ? MOBILE_COVER_SHADE_SOFT : MOBILE_COVER_SHADE,
+                            ? `calc(100lvh + ${shadeLeadPx}px)`
+                            : MOBILE_COVER_EXTEND_PX + shadeLeadPx,
+                        backgroundImage: shadeLeadPx === MOBILE_COVER_SHADE_LEAD_PX
+                            ? (blurredUnderlay ? MOBILE_COVER_SHADE_SOFT : MOBILE_COVER_SHADE)
+                            : (blurredUnderlay ? buildCoverShadeSoft(shadeLeadPx) : buildCoverShade(shadeLeadPx)),
                     }}
                 />
             ) : null}

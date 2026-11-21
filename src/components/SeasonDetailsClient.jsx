@@ -185,6 +185,11 @@ function scheduleAfterFirstPaint(task, delay = 0) {
 
 // Caché de plataformas de la serie en sessionStorage, la MISMA clave y forma
 // que usa DetailsClient (ficha de la serie), con su caducidad de 24 h.
+// Pie del póster en móvil: franja de difuminado más corta que la de la ficha
+// (64 px) y velo de los botones que sube menos sobre la imagen (la ficha, 48
+// px). Con 12/8 px se veía el corte horizontal en pósters claros.
+const SEASON_COVER_EDGE_BAND_PX = 36;
+const SEASON_COVER_SHADE_LEAD_PX = 28;
 const SHOW_PROVIDERS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const showProvidersCacheKey = (showId) => `streaming:tv:${showId}`;
 
@@ -1591,10 +1596,12 @@ export default function SeasonDetailsClient({
           // parte central muy difuminada en vez de una franja lisa, así que no
           // se ve el corte donde termina la imagen.
           blurredUnderlay
-          // Rótulo y botones legibles sobre pósters claros: se oscurece su
-          // zona según lo claro que sea (medido), nada en los oscuros. Igual
-          // que en la ficha de la serie.
-          adaptiveContrast
+          // Sin el oscurecido adaptativo ni el difuminado largo de la ficha:
+          // allí protegen el LOGO que va encima del póster; aquí el póster es
+          // la imagen entera (con su título impreso) y la apagaban. Solo una
+          // franja corta en el borde para que no se vea el corte.
+          edgeBandPx={SEASON_COVER_EDGE_BAND_PX}
+          shadeLeadPx={SEASON_COVER_SHADE_LEAD_PX}
         />
 
         {/* Sombreados de legibilidad. En MÓVIL siguen al scroll hasta el 60%,
