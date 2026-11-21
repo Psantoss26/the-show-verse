@@ -172,6 +172,26 @@ class AtrasPredictivo(
 
     private var capturandoToque = false
 
+    /** X (en la web) donde empezó el último toque, y si el sistema se lo quitó. */
+    private var xToque = 0f
+    private var xToqueRobado: Float? = null
+    private var momentoRobado = 0L
+
+    /** Empieza un toque: se apunta dónde, por si es el de un gesto de atrás. */
+    fun alEmpezarToque(x: Float) {
+        xToque = x
+    }
+
+    /**
+     * El toque se cancela: el sistema reconoce un gesto (el de atrás, entre
+     * otros) y le quita el dedo a la web. Sin avance del gesto, es la única
+     * pista de por qué borde entró (ver [LadoGesto]).
+     */
+    fun alCancelarToque() {
+        xToqueRobado = xToque
+        momentoRobado = android.os.SystemClock.uptimeMillis()
+    }
+
     /**
      * Un dedo toca la web: foto de la página tal como se ve (el último
      * fotograma, aún sin efecto del toque). Si el toque lleva a otra página,
@@ -288,7 +308,12 @@ class AtrasPredictivo(
             return
         }
         pendiente = true
-        desdeIzquierda = true
+        desdeIzquierda = LadoGesto.desdeIzquierda(
+            xInicio = xToqueRobado,
+            anchoPx = vista.width.toFloat(),
+            edadMs = android.os.SystemClock.uptimeMillis() - momentoRobado,
+        )
+        xToqueRobado = null
         capturar {
             pendiente = false
             if (captura != null) transicion(Transformacion.REPOSO) else sinCaptura()
@@ -605,6 +630,24 @@ class AtrasPredictivo(
         }
 
         private fun mezclar(a: Float, b: Float, t: Float) = a + (b - a) * t
+    }
+
+    /**
+     * Por qué borde entró el gesto cuando el sistema no lo dice (solo llega
+     * ATRÁS al soltar, sin `swipeEdge`: ColorOS con las animaciones de
+     * deslizamiento apagadas). Al reconocer el gesto, el sistema le quita el
+     * dedo a la web (`ACTION_CANCEL`): el lado de la pantalla donde empezó ese
+     * toque es el del gesto. Sin ese toque, o si es de hace rato (tecla ATRÁS,
+     * tres botones), la izquierda, como siempre. Puro, con pruebas.
+     */
+    object LadoGesto {
+        /** Un toque robado más viejo que esto no es de este gesto. */
+        const val VIGENCIA_MS = 3000L
+
+        fun desdeIzquierda(xInicio: Float?, anchoPx: Float, edadMs: Long): Boolean {
+            if (xInicio == null || anchoPx <= 0f || edadMs !in 0..VIGENCIA_MS) return true
+            return xInicio < anchoPx / 2f
+        }
     }
 
     private companion object {

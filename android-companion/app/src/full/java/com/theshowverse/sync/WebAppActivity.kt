@@ -516,9 +516,17 @@ class WebAppActivity : AppCompatActivity() {
         )
         onBackPressedDispatcher.addCallback(this, atras)
         // Cada toque guarda una foto de la página: si lleva a otra, es la que
-        // se ve al volver atrás (ver AtrasPredictivo). No consume el toque.
+        // se ve al volver atrás (ver AtrasPredictivo). Dónde empieza y si el
+        // sistema lo cancela da el borde del gesto de atrás cuando el sistema
+        // no lo dice (AtrasPredictivo.LadoGesto). No consume el toque.
         web.setOnTouchListener { _, evento ->
-            if (evento.actionMasked == MotionEvent.ACTION_DOWN) atras.alTocar()
+            when (evento.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    atras.alEmpezarToque(evento.x)
+                    atras.alTocar()
+                }
+                MotionEvent.ACTION_CANCEL -> atras.alCancelarToque()
+            }
             false
         }
     }

@@ -1,8 +1,10 @@
 package com.theshowverse.sync
 
 import com.theshowverse.sync.AtrasPredictivo.Salida
+import com.theshowverse.sync.AtrasPredictivo.LadoGesto
 import com.theshowverse.sync.AtrasPredictivo.Transformacion
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -79,5 +81,29 @@ class AtrasPredictivoTest {
     fun avanzaSinSaltosHaciaFuera() {
         val pasos = (0..10).map { f(it / 10f).desplazamientoX }
         assertTrue(pasos.zipWithNext().all { (a, b) -> b >= a })
+    }
+
+    // ---------------------------------------------------------- lado sin avance
+
+    @Test
+    fun unToqueRobadoEnLaMitadDerechaEsGestoDesdeLaDerecha() {
+        assertFalse(LadoGesto.desdeIzquierda(xInicio = 1070f, anchoPx = 1080f, edadMs = 400L))
+    }
+
+    @Test
+    fun unToqueRobadoEnLaMitadIzquierdaEsGestoDesdeLaIzquierda() {
+        assertTrue(LadoGesto.desdeIzquierda(xInicio = 10f, anchoPx = 1080f, edadMs = 400L))
+    }
+
+    @Test
+    fun sinToqueRobadoOConUnoViejoSeQuedaLaIzquierda() {
+        assertTrue(LadoGesto.desdeIzquierda(xInicio = null, anchoPx = 1080f, edadMs = 0L))
+        assertTrue(LadoGesto.desdeIzquierda(xInicio = 1070f, anchoPx = 1080f, edadMs = LadoGesto.VIGENCIA_MS + 1))
+        assertTrue(LadoGesto.desdeIzquierda(xInicio = 1070f, anchoPx = 0f, edadMs = 400L))
+    }
+
+    @Test
+    fun laSalidaDesdeLaDerechaVaHaciaLaIzquierda() {
+        assertEquals(-1080f, f(1f, izquierda = false).desplazamientoX, 0.0001f)
     }
 }
