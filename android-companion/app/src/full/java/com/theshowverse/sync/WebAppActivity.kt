@@ -81,6 +81,14 @@ class WebAppActivity : AppCompatActivity() {
     private var currentUrl: String = ""
 
     private var listoParaPintar = false
+
+    /**
+     * Ya se probó a abrir la portada tras un fallo de carga. Sin servidor, la
+     * página pedida puede no tener copia guardada pero la portada sí: el
+     * service worker la sirve con el aviso «Sin conexión». Solo una vez por
+     * carga, para no entrar en bucle si tampoco hay portada.
+     */
+    private var portadaIntentada = false
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
@@ -133,6 +141,7 @@ class WebAppActivity : AppCompatActivity() {
 
         binding.retryButton.setOnClickListener {
             ocultarError()
+            portadaIntentada = false
             binding.webView.reload()
         }
         binding.serverButton.setOnClickListener { abrirAjustesDeServidor() }
@@ -321,6 +330,14 @@ class WebAppActivity : AppCompatActivity() {
             error: WebResourceError,
         ) {
             if (!request.isForMainFrame) return
+            // Antes del panel de error, la portada: con el servidor caído es la
+            // copia guardada con más probabilidad, y la web enseña el aviso de
+            // sin conexión en vez de una pantalla negra.
+            if (!portadaIntentada && esOtraPaginaDelOrigen(request.url.toString())) {
+                portadaIntentada = true
+                view.post { view.loadUrl(origin) }
+                return
+            }
             listoParaPintar = true
             mostrarError(
                 getString(R.string.web_error_title),
@@ -705,6 +722,7 @@ class WebAppActivity : AppCompatActivity() {
         )
         binding.refresh.setOnRefreshListener {
             ocultarError()
+            portadaIntentada = false
             binding.webView.reload()
         }
     }
@@ -758,7 +776,14 @@ class WebAppActivity : AppCompatActivity() {
 
     private fun cargar(url: String) {
         ocultarError()
+        portadaIntentada = false
         binding.webView.loadUrl(url)
+    }
+
+    /** ¿Es una página de la web propia distinta de la portada? */
+    private fun esOtraPaginaDelOrigen(url: String): Boolean {
+        if (!WebOrigin.isInternal(url, origin)) return false
+        return Uri.parse(url).path.orEmpty().trim('/').isNotEmpty()
     }
 
     // ------------------------------------------------------------------ estado

@@ -192,9 +192,13 @@ export default function OfflineManager() {
     // Al recargar sin red en el dispositivo, solo lectura de inmediato. Si el
     // dispositivo tiene red, el «caído» que recuerda el service worker puede
     // venir de una petición cortada en segundo plano: lo decide la
-    // comprobación de ServerStatusContext, no esta copia.
-    void workerMessage({ type: "OFFLINE_STATUS" }).then((status) => {
-      if (status?.online === false && navigator.onLine === false) reportConnection(false);
+    // comprobación de ServerStatusContext, no esta copia. La excepción es que
+    // ESTA página haya salido de la copia guardada (`servedOffline`): el worker
+    // acaba de confirmar el servidor caído al servirla, así que el aviso sale
+    // ya, sin esperar a la comprobación entera (decenas de segundos). Esa
+    // comprobación sigue en marcha y lo quita en cuanto el servidor vuelve.
+    void workerMessage({ type: "OFFLINE_STATUS" }, 5000).then((status) => {
+      if (status?.servedOffline || (status?.online === false && navigator.onLine === false)) reportConnection(false);
     });
     return () => {
       document.removeEventListener("click", click, true);

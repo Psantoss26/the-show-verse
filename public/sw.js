@@ -411,6 +411,28 @@ async function savedFlight(request) {
 }
 const isRscPrefetch = (request) => request.headers.has("Next-Router-Prefetch") || request.headers.has("Next-Router-Segment-Prefetch");
 
+// Ventanas cuyo documento salió de la copia guardada porque el servidor no
+// respondía: al arrancar preguntan (OFFLINE_STATUS) y ponen el aviso «Sin
+// conexión» sin repetir la comprobación entera, que tarda decenas de segundos.
+const servedOffline = new Set();
+function markServedOffline(event) {
+  const id = event?.resultingClientId;
+  if (!id) return;
+  servedOffline.add(id);
+  if (servedOffline.size > 20) servedOffline.delete(servedOffline.values().next().value);
+}
+// Página guardada a la que abrir cuando no hay copia de la pedida y no hay
+// ninguna otra abierta que conservar.
+const FALLBACK_ROUTES = ["/", "/favorites", "/watchlist", "/history", "/in-progress"];
+async function savedFallback(request) {
+  const current = new URL(request.url).pathname;
+  for (const path of FALLBACK_ROUTES) {
+    if (path !== current && await savedDocument(absolute(path))) return absolute(path);
+  }
+  return null;
+}
+const hasOpenWindow = async () => (await self.clients.matchAll({ type: "window", includeUncontrolled: true })).length > 0;
+
 async function navigation(request, event) {
   const generation = epoch;
   try {
@@ -425,7 +447,15 @@ async function navigation(request, event) {
     await confirmOriginFailure();
     if (generation === epoch) {
       const saved = await savedDocument(request);
-      if (saved) return offlineResponse(saved);
+      if (saved) { markServedOffline(event); return offlineResponse(saved); }
+      // Sin ninguna página abierta (la app de Android al arrancar en frío en la
+      // última página vista, o una pestaña nueva) el 204 de abajo no conserva
+      // nada: dejaba la pantalla vacía. Se abre otra página guardada y, si no
+      // hay ninguna, la carga falla para que la app lo explique.
+      if (event && !(await hasOpenWindow())) {
+        const fallback = await savedFallback(request);
+        return fallback ? Response.redirect(fallback, 302) : Response.error();
+      }
     }
     // A navigation response with 204 leaves the current document in place.
     // This also protects address-bar / unguarded navigations without replacing
@@ -558,7 +588,7 @@ self.addEventListener("message", (event) => {
     let result = { ok: true };
     if (message?.type === "OFFLINE_CLEAR") await changeOwner(null);
     if (message?.type === "OFFLINE_PREPARE_BEGIN") storageFull = false;
-    if (message?.type === "OFFLINE_STATUS") result = { owner: (await session()).owner, online: Date.now() >= offlineUntil, storageFull };
+    if (message?.type === "OFFLINE_STATUS") result = { owner: (await session()).owner, online: Date.now() >= offlineUntil, storageFull, servedOffline: servedOffline.has(event.source?.id) };
     if (message?.type === "OFFLINE_PREPARE_TITLE") result = await prepareTitle(message);
     if (message?.type === "OFFLINE_HAS_ROUTE") {
       const url = new URL(message.path, self.location.origin);

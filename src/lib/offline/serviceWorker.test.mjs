@@ -29,12 +29,14 @@ function harness() {
   };
   let handler = () => json({ ok: true });
   const background = [];
+  // Ventanas abiertas del origen: una por defecto (la app ya está en marcha).
+  const windows = [{ id: 'window-1', postMessage: (message) => messages.push(message) }];
   const context = vm.createContext({
     URL, URLSearchParams, Request, Response, Headers, TextEncoder, Uint8Array, Blob, atob,
     crypto: webcrypto, AbortController, setTimeout, clearTimeout, console, caches,
     fetch: async (request) => handler(request),
     self: { location: { href: `${origin}/sw.js?v=build-a`, origin }, skipWaiting: async () => {},
-      clients: { claim: async () => {}, matchAll: async () => [{ postMessage: (message) => messages.push(message) }] },
+      clients: { claim: async () => {}, matchAll: async () => [...windows] },
       addEventListener: (name, fn) => { listeners[name] = fn; },
     },
   });
@@ -43,13 +45,15 @@ function harness() {
   return {
     context, caches, stores, messages, listeners,
     network(fn) { handler = fn; },
+    // Arranque en frío: ninguna página del origen abierta.
+    closeWindows() { windows.length = 0; },
     async online() { await context.connectivity(true); },
     async login(id) { await context.changeOwner(id); },
     async read(path, init = {}) { return context.apiRead(new Request(`${origin}${path}`, init)); },
     async navigate(path) { return context.navigation(new Request(`${origin}${path}`, { headers: { Accept: 'text/html' } })); },
-    async message(data) { let pending; let result; listeners.message({ data, ports: [{ postMessage: (value) => { result = value; } }], waitUntil: (promise) => { pending = promise; } }); await pending; return result; },
+    async message(data, source) { let pending; let result; listeners.message({ data, source, ports: [{ postMessage: (value) => { result = value; } }], waitUntil: (promise) => { pending = promise; } }); await pending; return result; },
     async activate() { let pending; listeners.activate({ waitUntil: (promise) => { pending = promise; } }); await pending; },
-    async fetch(path, init) { let response; listeners.fetch({ request: new Request(path.startsWith('http') ? path : `${origin}${path}`, init), respondWith: (promise) => { response = promise; }, waitUntil: (promise) => { background.push(promise); } }); return response; },
+    async fetch(path, init, resultingClientId = '') { let response; listeners.fetch({ request: new Request(path.startsWith('http') ? path : `${origin}${path}`, init), resultingClientId, respondWith: (promise) => { response = promise; }, waitUntil: (promise) => { background.push(promise); } }); return response; },
     // Trabajo que el worker dejó en segundo plano (event.waitUntil).
     async settle() { while (background.length) await background.shift(); },
   };
@@ -354,4 +358,37 @@ test('two failed health probes do switch the app to read-only', async () => {
   assert.equal(probes, 2);
   assert.equal((await sw.message({ type: 'OFFLINE_STATUS' })).online, false);
   assert.ok(sw.messages.some((m) => m.type === 'OFFLINE_CONNECTION' && m.online === false));
+});
+
+const html = (body) => new Response(`<html>${body}</html>`, { headers: { 'Content-Type': 'text/html' } });
+
+test('cold start without a copy of the last page opens a saved page instead of a blank screen', async () => {
+  const sw = harness(); await sw.login('alice');
+  sw.network(() => html('Inicio'));
+  await sw.navigate('/');
+  sw.network(() => new Response('NAS down', { status: 502 }));
+  sw.closeWindows();
+  const response = await sw.fetch('/details/tv/77?season=2', { headers: { Accept: 'text/html' } });
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get('Location'), `${origin}/`);
+});
+
+test('cold start with nothing saved fails the load so the app can explain it', async () => {
+  const sw = harness(); await sw.login('alice');
+  sw.network(() => new Response('NAS down', { status: 502 }));
+  sw.closeWindows();
+  const response = await sw.fetch('/details/tv/77', { headers: { Accept: 'text/html' } });
+  assert.equal(response.type, 'error');
+});
+
+test('a page served from the saved copy is told so, to show the offline notice at once', async () => {
+  const sw = harness(); await sw.login('alice');
+  sw.network(() => html('Inicio'));
+  await sw.navigate('/');
+  sw.network(() => new Response('NAS down', { status: 502 }));
+  sw.closeWindows();
+  const response = await sw.fetch('/', { headers: { Accept: 'text/html' } }, 'window-2');
+  assert.match(await response.text(), /Inicio/);
+  assert.equal((await sw.message({ type: 'OFFLINE_STATUS' }, { id: 'window-2' })).servedOffline, true);
+  assert.equal((await sw.message({ type: 'OFFLINE_STATUS' }, { id: 'window-1' })).servedOffline, false);
 });
