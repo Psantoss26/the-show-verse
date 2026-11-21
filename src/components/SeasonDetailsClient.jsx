@@ -187,9 +187,11 @@ function scheduleAfterFirstPaint(task, delay = 0) {
 // que usa DetailsClient (ficha de la serie), con su caducidad de 24 h.
 // Pie del póster en móvil: franja de difuminado más corta que la de la ficha
 // (64 px) y velo de los botones que sube menos sobre la imagen (la ficha, 48
-// px). Con 12/8 px se veía el corte horizontal en pósters claros.
-const SEASON_COVER_EDGE_BAND_PX = 36;
-const SEASON_COVER_SHADE_LEAD_PX = 28;
+// px). Con 12/8 px se veía el corte horizontal en pósters claros; la franja
+// entra con smootherstep (ver MobileHeroCover), casi nada en su parte alta,
+// para que se integre sin desenfocar el texto impreso del póster.
+const SEASON_COVER_EDGE_BAND_PX = 44;
+const SEASON_COVER_SHADE_LEAD_PX = 32;
 const SHOW_PROVIDERS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const showProvidersCacheKey = (showId) => `streaming:tv:${showId}`;
 

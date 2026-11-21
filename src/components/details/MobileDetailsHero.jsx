@@ -937,6 +937,21 @@ const buildCoverExtendMask = (extendPx, bandPx = MOBILE_COVER_BLUR_BAND_PX) => `
     rgba(0, 0, 0, 0.058) calc(var(--mobile-cover-h) + ${extendPx * 0.9}px),
     transparent calc(var(--mobile-cover-h) + ${extendPx}px))`
 const MOBILE_COVER_EXTEND_MASK = buildCoverExtendMask(MOBILE_COVER_EXTEND_PX)
+// Variante de franja corta (temporadas, `edgeBandPx` propio): entrada con
+// smootherstep en 10 tramos. Arranca más plana que smoothstep, así el
+// desenfoque apenas toca la parte alta de la franja (donde puede haber texto
+// impreso) y llega al borde sin que se lea ningún escalón.
+const smootherstep = (t) => t * t * t * (t * (t * 6 - 15) + 10)
+const buildCoverExtendMaskSmooth = (extendPx, bandPx) => {
+    const stops = Array.from({ length: 9 }, (_, i) => {
+        const t = (i + 1) / 10
+        return `rgba(0, 0, 0, ${smootherstep(t).toFixed(3)}) calc(var(--mobile-cover-h) - ${(bandPx * (1 - t)).toFixed(1)}px)`
+    }).join(',\n    ')
+    return buildCoverExtendMask(extendPx, bandPx).replace(
+        /transparent calc\(var\(--mobile-cover-h\) - [^)]*\),[\s\S]*?#000 var\(--mobile-cover-h\),/,
+        `transparent calc(var(--mobile-cover-h) - ${bandPx}px),\n    ${stops},\n    #000 var(--mobile-cover-h),`,
+    )
+}
 // Con el fondo difuminado debajo (`blurredUnderlay`) la prolongación es más
 // corta: es la última fila del póster, casi siempre oscura, y en 200px tapaba
 // el color del fondo justo donde van los botones.
@@ -1139,7 +1154,7 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
     const extendMask =
         edgeBandPx === MOBILE_COVER_BLUR_BAND_PX
             ? (blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_MASK : MOBILE_COVER_EXTEND_MASK)
-            : buildCoverExtendMask(blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_PX : MOBILE_COVER_EXTEND_PX, edgeBandPx)
+            : buildCoverExtendMaskSmooth(blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_PX : MOBILE_COVER_EXTEND_PX, edgeBandPx)
 
     return (
         // Relevo con el scroll: la portada se desvanece mientras aparece el
