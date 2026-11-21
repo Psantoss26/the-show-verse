@@ -215,7 +215,12 @@ export default function SocialHub({ initialView, initialToday, initialFeedPrefs 
       </div>
 
       <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-        <header className="mb-6">
+        <motion.header
+          className="mb-6"
+          initial={statsEntry ? { opacity: 0, y: -20 } : false}
+          animate={{ opacity: 1, y: 0 }}
+          transition={statsEntry ? { duration: 0.5, ease: "easeOut" } : { duration: 0 }}
+        >
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-3">
@@ -251,7 +256,7 @@ export default function SocialHub({ initialView, initialToday, initialFeedPrefs 
               ))}
             </motion.div>
           </div>
-        </header>
+        </motion.header>
 
         <SocialClient initialView={initialView} initialToday={initialToday} initialFeedPrefs={initialFeedPrefs} onTodaySummary={handleTodaySummary} onScopeChange={setSeccion} />
       </div>

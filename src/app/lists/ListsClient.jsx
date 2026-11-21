@@ -2730,9 +2730,11 @@ export default function ListsClient({ initialSource = DEFAULT_LISTS_SOURCE }) {
         {/* Header */}
         <motion.header
           className="mb-6 sm:mb-10"
-          initial={false}
+          initial={isBackNav ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={
+            isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }
+          }
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
