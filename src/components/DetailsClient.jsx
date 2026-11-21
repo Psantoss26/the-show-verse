@@ -229,6 +229,7 @@ import DetailsSectionMenu from "./DetailsSectionMenu";
 import {
   DETAILS_STICKY_TOP_DESKTOP,
   DETAILS_STICKY_TOP_MOBILE,
+  useSafeTopPx,
 } from "@/hooks/useDetailsStickyTop";
 
 // Cache de datos OMDb en localStorage para evitar peticiones repetidas
@@ -330,6 +331,14 @@ import {
 // listas, reseñas, soundtrack…): componente PRESENTACIONAL compartido con la
 // ficha rápida del dashboard (DetailModal) para que la fila sea IDÉNTICA.
 import DetailActionsRow, { DETAIL_ACTION_DESKTOP_SIZE_CLASS } from "@/components/details/DetailActionsRow";
+
+// Pie del póster en móvil: un poco menos que lo común a las portadas con logo
+// encima (franja de 64 px, velo desde 48 px, oscurecido medido entero), sin
+// llegar a lo de las temporadas (44/32 y sin oscurecido), que dejaría el logo
+// sin contraste.
+const DETAILS_COVER_EDGE_BAND_PX = 56;
+const DETAILS_COVER_SHADE_LEAD_PX = 40;
+const DETAILS_COVER_CONTRAST_SCALE = 0.8;
 
 // -- Modales del componente --
 import AddToListModal from "@/components/details/AddToListModal";
@@ -8466,9 +8475,12 @@ export default function DetailsClient({
   // `useDetailsStickyTop`, que es donde viven para que esta ficha y la de actor
   // no puedan volver a separarse (aquí se usa `isMobileViewport`, que ya existe
   // para otras diez cosas, en vez de montar una segunda media query).
-  const STICKY_TOP = isMobileViewport
+  // Más `--sv-safe-top`: con la barra de notificaciones visible en la app de
+  // Android la barra superior acaba más abajo (ver `useSafeTopPx`).
+  const safeTopPx = useSafeTopPx();
+  const STICKY_TOP = (isMobileViewport
     ? DETAILS_STICKY_TOP_MOBILE
-    : DETAILS_STICKY_TOP_DESKTOP;
+    : DETAILS_STICKY_TOP_DESKTOP) + safeTopPx;
 
   const menuStickyRef = useRef(null);
   const sectionElsRef = useRef({});
@@ -10439,6 +10451,13 @@ export default function DetailsClient({
               // Logo y botones legibles sobre cualquier póster: se oscurece
               // su zona según lo claro que sea (medido), nada en los oscuros.
               adaptiveContrast
+              // Algo más suave que el resto de portadas con contraste
+              // adaptativo: con pósters claros el pie quedaba muy oscuro. La
+              // franja difuminada entra con la curva suave de las temporadas
+              // (smootherstep) y el velo de los botones sube menos.
+              contrastScale={DETAILS_COVER_CONTRAST_SCALE}
+              edgeBandPx={DETAILS_COVER_EDGE_BAND_PX}
+              shadeLeadPx={DETAILS_COVER_SHADE_LEAD_PX}
             />
           </>
         ) : (

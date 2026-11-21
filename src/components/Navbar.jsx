@@ -3797,7 +3797,7 @@ function NavbarContent() {
               onClick={(e) => e.stopPropagation()}
             >
               <LiquidGlassOpticalLayers />
-              <div className="relative flex h-full flex-col overflow-y-auto no-scrollbar px-4 pt-3 pb-6">
+              <div className="relative flex h-full flex-col overflow-y-auto no-scrollbar px-4 pt-[calc(var(--sv-safe-top,0px)+0.75rem)] pb-6">
                 {/* Header */}
                 <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 mb-2">
                   <Link
@@ -4036,7 +4036,7 @@ function NavbarContent() {
             // `sv-mobile-search`: en la app de Android (sin barra de estado)
             // la barra de búsqueda va bajo la barra superior, que sigue
             // visible, en vez de arriba del todo bajo la cámara.
-            className="sv-mobile-search fixed inset-0 z-50 flex flex-col p-4 pt-4"
+            className="sv-mobile-search fixed inset-0 z-50 flex flex-col p-4 pt-[calc(var(--sv-safe-top,0px)+1rem)]"
             data-immersive-route={isImmersiveRoute ? "" : undefined}
             onClick={() => setShowMobileSearch(false)}
           >

@@ -996,6 +996,29 @@ const buildCoverShadeSoft = (leadPx) => `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.52) 100%)`
 const MOBILE_COVER_SHADE_SOFT = buildCoverShadeSoft(MOBILE_COVER_SHADE_LEAD_PX)
 
+// FRANJA DE LA BARRA DE ESTADO en la app de Android con la barra VISIBLE
+// (`data-android-statusbar`, `--sv-cover-strip`): la portada empieza justo
+// debajo y la franja lleva el póster prolongado hacia arriba, difuminado. Una
+// franja aparte que acabara en el borde de la portada dejaba una línea (de
+// imagen difuminada a imagen nítida de golpe), así que la capa difuminada baja
+// MOBILE_STATUS_STRIP_BAND_PX por dentro del póster y se desvanece ahí con
+// smootherstep, igual que la del borde inferior. Por arriba sobra
+// MOBILE_STATUS_STRIP_PAD_PX fuera de la pantalla: el desenfoque no mezcla con
+// transparente en el borde visible.
+const MOBILE_STATUS_STRIP_PAD_PX = 40
+const MOBILE_STATUS_STRIP_BAND_PX = 56
+const MOBILE_STATUS_STRIP_MASK = (() => {
+    const edge = `${MOBILE_STATUS_STRIP_PAD_PX}px + var(--sv-cover-strip, 0px)`
+    const stops = Array.from({ length: 9 }, (_, i) => {
+        const t = (i + 1) / 10
+        return `rgba(0, 0, 0, ${(1 - smootherstep(t)).toFixed(3)}) calc(${edge} + ${(MOBILE_STATUS_STRIP_BAND_PX * t).toFixed(1)}px)`
+    }).join(',\n    ')
+    return `linear-gradient(to bottom,
+    #000 calc(${edge}),
+    ${stops},
+    transparent calc(${edge} + ${MOBILE_STATUS_STRIP_BAND_PX}px))`
+})()
+
 // CONTRASTE ADAPTATIVO (`adaptiveContrast`, la ficha): el logo y los botones
 // son blancos sobre cristal, y con pósters claros (cielo, nieve, fondos
 // blancos) se perdían. Oscurecer siempre apagaba los pósters oscuros, que no
@@ -1113,6 +1136,8 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.9) calc(var(--mobile-cover-h) * 0.86),
     rgb(10, 10, 10) calc(var(--mobile-cover-h) * 0.95))`
 
+// `contrastScale` (0…1): rebaja el oscurecido medido. La ficha lo usa algo por
+// debajo de 1: con pósters claros el máximo dejaba un pie oscuro muy intenso.
 // `inPanel`: la portada de la ficha de teléfono del drawer (`usePanelHeroFit`).
 // Llena su contenedor (una capa fija del panel, detrás del contenido con
 // scroll) en vez de colgar de la ventana, y no lleva nada atado al viewport ni
@@ -1123,7 +1148,65 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
 // MOBILE_COVER_SHADE_LEAD_PX). Las temporadas acortan los dos: su póster es la
 // imagen entera, con el título impreso abajo y sin logo encima, y el
 // difuminado y el velo, pensados para el logo de la ficha, lo apagaban.
-export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX, shadeLeadPx = MOBILE_COVER_SHADE_LEAD_PX, ready, animate, inPanel = false, objectPosition = 'center bottom' }) {
+// Franja de la barra de estado VISIBLE en la app de Android
+// (`data-android-statusbar`, ver MOBILE_STATUS_STRIP_MASK): la imagen de
+// arriba de la portada (`src`, con el alto `imgHeight` y el encuadre con que
+// se pinta en ella) prolongada hacia arriba y difuminada. Una capa difuminada
+// que baja por dentro de la portada y se desvanece ahí: no se ve ni borde ni
+// corte. Sobresale 24 px por cada lado: el desenfoque mezcla transparencia en
+// los cantos de la capa y, a ras de pantalla, oscurecía los laterales. Solo
+// existe en ese modo.
+function StatusStripExtension({ src, imgHeight, objectPosition }) {
+    const strip = 'var(--sv-cover-strip, 0px)'
+    const above = `calc(${strip} + ${MOBILE_STATUS_STRIP_PAD_PX}px)`
+    return (
+        <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-x-6 hidden [html[data-android-statusbar]_&]:block"
+            style={{
+                top: `calc(-1 * ${above})`,
+                height: `calc(${strip} + ${MOBILE_STATUS_STRIP_PAD_PX + MOBILE_STATUS_STRIP_BAND_PX}px)`,
+                filter: 'blur(14px) saturate(1.1)',
+                WebkitMaskImage: MOBILE_STATUS_STRIP_MASK,
+                maskImage: MOBILE_STATUS_STRIP_MASK,
+            }}
+        >
+            <div className="absolute inset-0 overflow-hidden">
+                {/* Encima de la portada: su borde de arriba reflejado, así la
+                    prolongación sigue el color de esa fila. */}
+                <div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: above }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={src}
+                        alt=""
+                        decoding="async"
+                        className="absolute inset-x-0 bottom-0 w-full object-cover"
+                        style={{ height: imgHeight, objectPosition, transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, -1)` }}
+                    />
+                </div>
+                {/* La banda de arriba de la portada, en su sitio. */}
+                <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ top: above }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={src}
+                        alt=""
+                        decoding="async"
+                        className="absolute inset-x-0 top-0 w-full object-cover"
+                        style={{ height: imgHeight, objectPosition, transform: `scaleX(${MOBILE_COVER_EXTEND_SCALE_X})` }}
+                    />
+                </div>
+                {/* Algo más oscuro bajo la hora y los iconos, que se apaga
+                    antes de llegar a la portada. */}
+                <div
+                    className="absolute inset-x-0 top-0"
+                    style={{ height: above, background: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 60%, rgba(0, 0, 0, 0))' }}
+                />
+            </div>
+        </div>
+    )
+}
+
+export function MobileHeroCover({ src, lowSrc, topEdge, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, contrastScale = 1, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX, shadeLeadPx = MOBILE_COVER_SHADE_LEAD_PX, ready, animate, inPanel = false, objectPosition = 'center bottom' }) {
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
@@ -1195,36 +1278,6 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                 por su fundido inferior (la prolongación difuminada del
                 mosaico, ver UnifiedListDetailsLayout). */}
             {hasImage ? null : collageUnderlay}
-            {/* App de Android con la barra de estado VISIBLE
-                (`data-android-statusbar`): la portada empieza justo debajo
-                de ella y su franja (`--sv-cover-strip`, 0 en el resto) lleva
-                el borde de arriba del póster reflejado y difuminado, para que
-                la hora y los iconos queden sobre el color de la imagen. */}
-            {hasImage && !inPanel ? (
-                <div
-                    className="pointer-events-none absolute inset-x-0 overflow-hidden"
-                    style={{
-                        top: 'calc(-1 * var(--sv-cover-strip, 0px))',
-                        height: 'var(--sv-cover-strip, 0px)',
-                    }}
-                >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        src={firstSrc}
-                        alt=""
-                        decoding="async"
-                        className="absolute inset-x-0 bottom-0 w-full object-cover object-bottom"
-                        style={{
-                            height: 'var(--mobile-cover-h)',
-                            objectPosition,
-                            // Volteada en su sitio: su fila de arriba queda en
-                            // el borde inferior de la franja, junto a la portada.
-                            transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, -1)`,
-                            filter: 'blur(14px) brightness(0.85) saturate(1.1)',
-                        }}
-                    />
-                </div>
-            ) : null}
             {hasImage && blurredUnderlay ? (
                 <div
                     className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"
@@ -1340,6 +1393,17 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                     </div>
                 </div>
             ) : null}
+            {/* App de Android con la barra de estado VISIBLE: la franja de
+                la barra con la imagen de arriba prolongada y difuminada (ver
+                StatusStripExtension). Con mosaico (episodios), su primera
+                imagen (`topEdge`). */}
+            {!inPanel && (hasImage || topEdge?.src) ? (
+                <StatusStripExtension
+                    src={hasImage ? firstSrc : topEdge.src}
+                    imgHeight={hasImage ? 'var(--mobile-cover-h)' : topEdge.height}
+                    objectPosition={hasImage ? objectPosition : 'center'}
+                />
+            ) : null}
             {hasImage ? (
                 <div
                     className="pointer-events-none absolute inset-x-0"
@@ -1361,7 +1425,7 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                     style={{
                         height: 'calc(var(--mobile-cover-h) + 100lvh)',
                         backgroundImage: MOBILE_COVER_CONTRAST_SCRIM,
-                        opacity: contrastScrim ?? 0,
+                        opacity: (contrastScrim ?? 0) * contrastScale,
                     }}
                 />
             ) : null}

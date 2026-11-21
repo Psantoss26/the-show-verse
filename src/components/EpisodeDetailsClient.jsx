@@ -1700,6 +1700,16 @@ export default function EpisodeDetailsClient({
           ready={mobileCoverReady}
           animate={animateMobileEntry}
           collage={<EpisodeStillStack load={mobileStillStackLoad} />}
+          // Barra de estado visible en la app de Android: su franja prolonga
+          // el primer still (la banda de arriba del mosaico, mismo alto).
+          topEdge={
+            mobileStillStackLoad.sources.length
+              ? {
+                  src: mobileStillStackLoad.sources[0],
+                  height: `calc(var(--mobile-cover-h) / ${mobileStillStackLoad.sources.length})`,
+                }
+              : null
+          }
         />
 
         {/* Sombreados de legibilidad. En MÓVIL siguen al scroll hasta el 60%,
