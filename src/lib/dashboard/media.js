@@ -559,6 +559,17 @@ export async function fetchBestLogo(
 }
 
 /**
+ * ¿Llegó de verdad el /images del título? `getMovieImages` y `getTitleLogos`
+ * solo guardan en caché las respuestas buenas: si la red falla devuelven listas
+ * vacías SIN cachear, indistinguibles de «el título no tiene arte». Esto separa
+ * ambos casos para no tomar un fallo de red por la elección definitiva.
+ */
+export function hasCachedTitleImages(itemId, mediaType = "movie") {
+  const cacheKey = `${mediaType}:${itemId}`;
+  return movieImagesCache.has(cacheKey) && movieLogosCache.has(cacheKey);
+}
+
+/**
  * El mejor logo YA en caché, sin pedir nada: `undefined` si aún no se sabe
  * (hay que llamar a `fetchBestLogo`), `null` si el título no tiene logo y la
  * ruta si lo tiene. Permite pintar el estado final desde el primer render.

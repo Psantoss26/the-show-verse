@@ -38,7 +38,11 @@ import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
-import { resolveFeaturedHeroPoster } from "@/lib/dashboard/featuredHeroMedia";
+import {
+  featuredHeroAssetsOutcome,
+  resolveFeaturedHeroPoster,
+  shouldResolveFeaturedHeroAssets,
+} from "@/lib/dashboard/featuredHeroMedia";
 import {
   DEFAULT_SOUNDTRACK_VOLUME,
   resolveHeroSoundtrackVolume,
@@ -63,6 +67,7 @@ import {
   fetchBestBackdropNoLang,
   fetchBestPosterNoLang,
   fetchBestLogo,
+  hasCachedTitleImages,
   HERO_LOGO_LANGS,
   getBestTrailerCached,
   yearOf,
@@ -2086,6 +2091,10 @@ export default function FeaturedHero({
   const isMobile = useHeroMobileLayout();
   const assetsRef = useRef({});
   const resolvingAssetsRef = useRef(new Set());
+  // Reintentos del arte cuando /images falla (ver featuredHeroAssetsOutcome).
+  const assetAttemptsRef = useRef(new Map());
+  const assetRetryTimersRef = useRef(new Map());
+  const resolveAssetsRef = useRef(null);
   const lastBackdropChoiceRef = useRef(new Map());
   const heroSectionRef = useRef(null);
   const pointerStartRef = useRef(null);
@@ -2190,7 +2199,11 @@ export default function FeaturedHero({
     async (movie, { priority } = {}) => {
       if (!movie?.id) return;
       const id = movie.id;
-      if (assetsRef.current[id] || resolvingAssetsRef.current.has(id)) return;
+      if (
+        !shouldResolveFeaturedHeroAssets(assetsRef.current[id]) ||
+        resolvingAssetsRef.current.has(id)
+      )
+        return;
 
       resolvingAssetsRef.current.add(id);
       const mediaType = getMediaTypeForItem(movie);
@@ -2248,6 +2261,30 @@ export default function FeaturedHero({
       poster = posterResult.status === "fulfilled" ? posterResult.value : null;
       logo = logoResult.status === "fulfilled" ? logoResult.value : null;
 
+      // Un fallo de red NO es «sin póster sin idioma ni logo»: se reintenta y
+      // el hero sigue en su estado de carga (sin póster provisional ni título
+      // en texto) en vez de quedarse con el respaldo hasta recargar.
+      const attempt = assetAttemptsRef.current.get(id) || 0;
+      const outcome = featuredHeroAssetsOutcome({
+        imagesLoaded: hasCachedTitleImages(id, mediaType),
+        attempt,
+      });
+      if (outcome.action === "retry") {
+        assetAttemptsRef.current.set(id, attempt + 1);
+        resolvingAssetsRef.current.delete(id);
+        window.clearTimeout(assetRetryTimersRef.current.get(id));
+        assetRetryTimersRef.current.set(
+          id,
+          window.setTimeout(() => {
+            assetRetryTimersRef.current.delete(id);
+            resolveAssetsRef.current?.(movie, { priority });
+          }, outcome.delay),
+        );
+        return;
+      }
+      assetAttemptsRef.current.delete(id);
+      const incomplete = outcome.incomplete;
+
       try {
         // Para cuando llegamos aquí, `/images` de este título ya está en
         // caché (la petición de arriba la rellenó): esto resuelve sin vuelta
@@ -2297,14 +2334,28 @@ export default function FeaturedHero({
       }
 
       setAssets((prev) =>
-        prev[id]
+        !shouldResolveFeaturedHeroAssets(prev[id])
           ? prev
-          : { ...prev, [id]: { backdrop, backdrops, poster, logo, communityLogo } },
+          : {
+              ...prev,
+              [id]: { backdrop, backdrops, poster, logo, communityLogo, incomplete },
+            },
       );
       resolvingAssetsRef.current.delete(id);
     },
     [deferInitialBackdrop],
   );
+  useEffect(() => {
+    resolveAssetsRef.current = resolveAssetsFor;
+  }, [resolveAssetsFor]);
+
+  useEffect(() => {
+    const timers = assetRetryTimersRef.current;
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
 
   // El slide activo se resuelve inmediatamente y con prioridad alta: es lo
   // primero que se ve del dashboard, así que su petición de `/images` salta
@@ -2312,6 +2363,30 @@ export default function FeaturedHero({
   useEffect(() => {
     if (!list.length) return;
     resolveAssetsFor(list[activeIndex], { priority: "high" });
+  }, [list, activeIndex, resolveAssetsFor]);
+
+  // Al volver a primer plano o recuperar la red, el arte que se quedó con el
+  // respaldo (`incomplete`) o a medio reintentar se vuelve a pedir YA: es
+  // justo el momento en que la app reanudada tenía la red aún caída.
+  useEffect(() => {
+    if (!list.length) return;
+    const retryNow = () => {
+      if (document.visibilityState === "hidden") return;
+      const movie = list[activeIndex];
+      if (!movie?.id || !shouldResolveFeaturedHeroAssets(assetsRef.current[movie.id])) return;
+      window.clearTimeout(assetRetryTimersRef.current.get(movie.id));
+      assetRetryTimersRef.current.delete(movie.id);
+      assetAttemptsRef.current.delete(movie.id);
+      resolveAssetsFor(movie, { priority: "high" });
+    };
+    window.addEventListener("online", retryNow);
+    window.addEventListener("pageshow", retryNow);
+    document.addEventListener("visibilitychange", retryNow);
+    return () => {
+      window.removeEventListener("online", retryNow);
+      window.removeEventListener("pageshow", retryNow);
+      document.removeEventListener("visibilitychange", retryNow);
+    };
   }, [list, activeIndex, resolveAssetsFor]);
 
   // Preparamos únicamente los metadatos del siguiente título cuando el
