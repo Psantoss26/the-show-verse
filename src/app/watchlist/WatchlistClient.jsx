@@ -1162,7 +1162,7 @@ function GroupDivider({
       // Fijada bajo el navbar: sus superficies pasan al cristal del
       // navbar (regla `[data-menu-pinned]` en globals.css).
       data-menu-pinned={renderSticky}
-      className={`sticky z-[60] ${hasPreviousGroup ? "my-4" : "mt-2 mb-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 ${skipMotion ? "transition-none" : "transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]"} top-[108px] lg:top-[136px]`}
+      className={`sticky z-[60] ${hasPreviousGroup ? "my-4" : "mt-2 mb-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 ${skipMotion ? "transition-none" : "transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]"} top-[calc(var(--sv-page-sticky-top)+52px)] sm:top-[108px] lg:top-[136px]`}
       // Solo opacidad al entrar: trasladar este nodo alteraría la medición
       // del punto de acople. Al retroceder no se anima.
       initial={skipMotion ? false : { opacity: 0 }}
@@ -2788,7 +2788,11 @@ export default function WatchlistClient() {
     const dividerMarginTop = divider
       ? Number.parseFloat(window.getComputedStyle(divider).marginTop) || 0
       : 0;
-    const stickyTop = window.innerWidth >= 1024 ? 136 : 108;
+    // El punto de acople sale del CSS: en móvil depende de la altura de la
+    // barra superior (zona segura, app de Android sin barra de estado).
+    const stickyTop = divider
+      ? Number.parseFloat(window.getComputedStyle(divider).top) || 108
+      : window.innerWidth >= 1024 ? 136 : 108;
     const activationBias = 4;
 
     setForcedStickyGroupKey(groupKey);

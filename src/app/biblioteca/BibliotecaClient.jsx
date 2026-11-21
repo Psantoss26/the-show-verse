@@ -548,37 +548,29 @@ function GroupDivider({
   const skipMotion = isBackNav || reduceMotion;
   const [isSticky, setIsSticky] = useState(false);
   const ref = useRef(null);
-  const [transitioningThreshold, setTransitioningThreshold] = useState(108);
-
-  useEffect(() => {
-    if (mobileFiltersOpen) {
-      setTransitioningThreshold(232);
-    } else {
-      const timer = setTimeout(() => {
-        setTransitioningThreshold(108);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [mobileFiltersOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
       if (!ref.current) return;
       const top = ref.current.getBoundingClientRect().top;
-      const isLg = window.innerWidth >= 1024;
-      const threshold = isLg ? 136 : transitioningThreshold;
+      // El punto de acople sale del CSS (sigue a la barra de búsqueda y
+      // ajustes, también durante la transición de `top`).
+      const threshold =
+        Number.parseFloat(getComputedStyle(ref.current).top) || 0;
       setIsSticky(top <= threshold + 1);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [transitioningThreshold]);
+  }, [mobileFiltersOpen]);
 
   return (
     <motion.div
       ref={ref}
       className={`sticky z-[60] ${isFirstGroup ? mobileFiltersOpen ? "mt-0 mb-4" : "mt-2 mb-4" : "my-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
-        mobileFiltersOpen ? "top-[232px]" : "top-[108px]"
+        mobileFiltersOpen
+          ? "top-[calc(var(--sv-page-sticky-top)+176px)] sm:top-[232px]"
+          : "top-[calc(var(--sv-page-sticky-top)+52px)] sm:top-[108px]"
       }`}
       // Solo opacidad al entrar, como Favoritos: trasladar el divisor sticky
       // alteraría la medición del punto de acople. Al retroceder no se anima.
