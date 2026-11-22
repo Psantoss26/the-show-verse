@@ -3621,7 +3621,11 @@ export default function DetailModal({
 
   return (
     <div
+      // Mientras sale (animación de cierre), el velo y el panel ya no son la
+      // pantalla activa: sin esto se tragaban el primer toque sobre la página.
       className={`fixed inset-y-0 ${overModal ? "z-[10001]" : "z-[9999]"} flex ${
+        isPresent ? "" : "pointer-events-none [&_*]:pointer-events-none "
+      }${
         // `left-0 w-screen` en vez de `inset-x-0` (equivalente a `right-0`):
         // <html> reserva SIEMPRE el hueco de la scrollbar (`scrollbar-gutter:
         // stable`, ver globals.css), y ese hueco reduce el viewport que usa

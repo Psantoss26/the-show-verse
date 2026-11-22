@@ -21,7 +21,7 @@
 //     (`data-sv-sheet-open`, globals.css): el velo ya la desenfoca y así cada
 //     toque dentro de la hoja no reorganiza las capas de toda la página.
 
-import { createContext, useContext, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { createContext, startTransition, useContext, useEffect, useId, useOptimistic, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircle2, SlidersHorizontal, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -533,20 +533,36 @@ export function SheetOptionGroup({ label, icon: Icon, children, layout = "wrap",
 // a la línea base y empujaba logo y texto ~3 px por encima del centro.
 export function SheetOption({ active, onClick, children, icon: Icon, media = null, count = null, disabled = false, className = "" }) {
   const accent = useContext(OptionsSheetContext);
+  // Cambiar un filtro, el orden o la agrupación vuelve a pintar la página
+  // entera (cientos de tarjetas). Hecho dentro del clic, el hilo quedaba
+  // ocupado hasta 1,9 s (CPU ×4) y ningún otro toque respondía. En una
+  // transición React cede el hilo entre componentes: el siguiente toque se
+  // atiende al momento. La píldora se enciende ya, sin esperar a ese render
+  // (solo al encender: en los grupos de opción única, volver a tocar la
+  // activa no cambia nada y apagarla un instante sería un parpadeo).
+  const [shownActive, setShownActive] = useOptimistic(Boolean(active));
+  const handleClick = onClick
+    ? (event) => {
+        startTransition(() => {
+          if (!active) setShownActive(true);
+          onClick(event);
+        });
+      }
+    : undefined;
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
-      aria-pressed={active ? "true" : "false"}
+      aria-pressed={shownActive ? "true" : "false"}
       className={`inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 ${
-        active
+        shownActive
           ? "bg-white text-zinc-950 shadow-lg"
           : "bg-gradient-to-br from-white/10 to-white/5 text-zinc-200 shadow-lg hover:from-white/15 hover:to-white/10"
       } ${className}`}
     >
       {Icon ? (
-        <Icon className={`h-4 w-4 shrink-0 ${active ? "text-zinc-950" : ACCENTS[accent] || ACCENTS.zinc}`} aria-hidden="true" />
+        <Icon className={`h-4 w-4 shrink-0 ${shownActive ? "text-zinc-950" : ACCENTS[accent] || ACCENTS.zinc}`} aria-hidden="true" />
       ) : null}
       {media ? <span className="flex shrink-0" aria-hidden="true">{media}</span> : null}
       <span className="min-w-0 truncate">{children}</span>
@@ -556,13 +572,13 @@ export function SheetOption({ active, onClick, children, icon: Icon, media = nul
         // centradas en la insignia.
         <span
           className={`inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 pt-px text-[11px] font-bold tabular-nums leading-none ${
-            active ? "bg-zinc-950/10 text-zinc-700" : "bg-white/[0.08] text-zinc-400"
+            shownActive ? "bg-zinc-950/10 text-zinc-700" : "bg-white/[0.08] text-zinc-400"
           }`}
         >
           {count}
         </span>
       ) : null}
-      {active && !Icon ? <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+      {shownActive && !Icon ? <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
     </button>
   );
 }

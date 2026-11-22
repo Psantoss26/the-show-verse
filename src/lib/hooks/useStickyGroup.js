@@ -23,12 +23,16 @@ export default function useStickyGroup(mobileFiltersOpen, forceSticky) {
     const node = ref.current;
     if (!node) return;
     const content = node.firstElementChild;
-    const reserveHeight = () => {
-      // Keep the expanded footprint: shrinking the sticky surface must not
-      // move the cards, trigger scroll anchoring or change the docking point.
-      if (!stickyRef.current && !forceSticky && content) {
-        node.style.minHeight = `${content.offsetHeight}px`;
-      }
+    // Keep the expanded footprint: shrinking the sticky surface must not
+    // move the cards, trigger scroll anchoring or change the docking point.
+    // The height comes from the ResizeObserver entry (its first notification
+    // arrives before the first paint): reading the content height here, right
+    // after another group wrote its `minHeight`, forced one full layout per
+    // group inside the commit (~260 ms with CPU ×4 on Favorites "by year").
+    const reserveHeight = (entry) => {
+      if (stickyRef.current || forceSticky || !content) return;
+      const height = entry?.borderBoxSize?.[0]?.blockSize;
+      if (height > 0) node.style.minHeight = `${height}px`;
     };
     const read = () => {
       const top = node.getBoundingClientRect().top;
@@ -40,10 +44,9 @@ export default function useStickyGroup(mobileFiltersOpen, forceSticky) {
         setIsSticky(next);
       };
     };
-    reserveHeight();
     read()?.();
-    const observer = new ResizeObserver(() => {
-      reserveHeight();
+    const observer = new ResizeObserver((entries) => {
+      reserveHeight(entries[entries.length - 1]);
       schedule();
     });
     if (content) observer.observe(content);

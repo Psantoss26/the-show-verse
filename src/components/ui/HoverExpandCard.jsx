@@ -259,6 +259,12 @@ export default function HoverExpandCard({
     // gesto: una sola pasada con el ancho definitivo en vez de un rAF por
     // tarjeta y fotograma.
     let deferred = false;
+    // Ancho de la celda según el ResizeObserver. Leer `offsetWidth` al montar
+    // forzaba un layout por tarjeta (cada una escribe `srcset` justo antes):
+    // al reagrupar Favoritos, cientos de layouts en un fotograma de ~1 s con
+    // CPU ×4, durante el que ningún toque respondía. La primera notificación
+    // del observador llega antes de pintar, con el layout ya hecho.
+    let cellWidth = 0;
     const update = () => {
       frame = 0;
       if (isDrawerResizeActive()) {
@@ -266,7 +272,7 @@ export default function HoverExpandCard({
         return;
       }
       deferred = false;
-      const width = cell.offsetWidth * (enabled ? EXPAND : 1);
+      const width = (cellWidth || cell.offsetWidth) * (enabled ? EXPAND : 1);
       card.querySelectorAll("img").forEach((img) => {
         applyTmdbResponsiveImage(img, width);
       });
@@ -282,7 +288,6 @@ export default function HoverExpandCard({
       if (!active && deferred) schedule();
     });
 
-    update();
     // Solo `src`: `srcset` y `sizes` los escribe `update`, y observarlos
     // provocaría un bucle.
     const mutations = new MutationObserver(schedule);
@@ -293,8 +298,20 @@ export default function HoverExpandCard({
       attributeFilter: ["src"],
     });
     const resize =
-      typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
-    resize?.observe(cell);
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver((entries) => {
+            const box = entries[entries.length - 1]?.borderBoxSize?.[0];
+            if (!box?.inlineSize) return schedule();
+            const first = !cellWidth;
+            cellWidth = box.inlineSize;
+            // La primera medida se aplica ya (antes de pintar); los cambios
+            // de tamaño siguientes, agrupados en el próximo fotograma.
+            if (first && !isDrawerResizeActive()) update();
+            else schedule();
+          })
+        : null;
+    if (resize) resize.observe(cell);
+    else update();
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
       mutations.disconnect();
