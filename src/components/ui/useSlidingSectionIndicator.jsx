@@ -28,9 +28,13 @@ const HANDOFF_MAX_AGE_MS = 1500;
 const PRESSED_MAX_AGE_MS = 5000;
 const lastByGroup = new Map(); // groupId → { key, left, width, leftAt }
 
-// Equivale al muelle de antes (stiffness 420, damping 38: casi crítico).
-const SLIDE_MS = 340;
-const SLIDE_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+// Al ritmo del contenido: la sección vieja sale en 160 ms y la nueva entra en
+// 280 ms (ListsClient), así que la pastilla tarda lo mismo que ese relevo
+// entero y llega cuando el contenido se asienta. Curva de entrada y salida
+// suave: arranca sin tirón y frena largo. La de antes (0.22, 1, 0.36, 1 en
+// 340 ms) hacía casi todo el recorrido en los primeros 100 ms y se veía brusca.
+const SLIDE_MS = 440;
+const SLIDE_EASING = "cubic-bezier(0.45, 0, 0.2, 1)";
 
 function measure(nav, activeKey) {
   const button = nav?.querySelector(`[data-section-key="${activeKey}"]`);
