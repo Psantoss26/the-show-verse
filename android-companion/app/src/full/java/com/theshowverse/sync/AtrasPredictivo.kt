@@ -40,9 +40,10 @@ import androidx.activity.OnBackPressedCallback
  *     encoge, se aparta del borde por el que entra el gesto, sigue un poco al
  *     dedo en vertical y redondea las esquinas, como la animación de Android
  *     entre actividades; detrás se ve la foto de la página anterior. Antes de
- *     tocar nada se hace una CAPTURA de la página actual tal cual se ve
- *     (asíncrona y sin volver a pintar la web): la transformación solo empieza
- *     cuando la captura está lista.
+ *     tocar nada se pide una CAPTURA de la página actual tal cual se ve
+ *     (asíncrona y sin volver a pintar la web). La web se mueve YA, sin
+ *     esperarla: PixelCopy copia el último fotograma ya entregado y la petición
+ *     llega al hilo de render antes que el fotograma transformado.
  *
  *  2. AL SOLTAR (o al pulsar ATRÁS sin gesto, capturando en ese momento): la
  *     foto de la página anterior tapa la web, que vuelve a su tamaño y navega
@@ -56,8 +57,9 @@ import androidx.activity.OnBackPressedCallback
  *     con una que sí, como mucho [ESPERA_MAX_MS].
  *
  * Sin foto de la página anterior (se llegó sin tocar, o tras reabrir la app):
- * un velo liso tapa la web y la captura espera quieta a que la web pinte para
- * salir, como antes; así nunca se ve una pantalla vacía detrás.
+ * un velo liso tapa la web y la captura sale igual EN EL ACTO; el velo se funde
+ * cuando la web pinta. Antes la captura esperaba quieta a ese pintado (hasta
+ * [ESPERA_MAX_MS]) y el atrás parecía no responder.
  *
  * Al cancelar, la web vuelve a su sitio sin navegar. Si la captura falla, se
  * navega igual y la web vuelve a su tamaño.
@@ -160,10 +162,6 @@ class AtrasPredictivo(
 
     /** La web ha avisado alguna vez: manda [paginaPintada] y vale la pena esperarla. */
     private var webAvisa = false
-
-    /** Sin foto de la página anterior: la captura sale cuando la web ya pintó. */
-    private var salidaPendiente = false
-    private var inicioSalida = Transformacion.REPOSO
 
     private var animador: ValueAnimator? = null
 
@@ -269,9 +267,10 @@ class AtrasPredictivo(
         if (conGesto) {
             when {
                 captura != null -> transicion(transformacionGesto())
-                // La web aún no se ha movido (espera a la captura): sale desde reposo.
-                capturando -> alCapturar = {
-                    if (captura != null) transicion(Transformacion.REPOSO) else sinCaptura()
+                // La captura aún no ha llegado: sale desde donde se soltó.
+                capturando -> {
+                    val inicio = transformacionGesto()
+                    alCapturar = { if (captura != null) transicion(inicio) else sinCaptura() }
                 }
                 else -> sinCaptura()
             }
@@ -307,9 +306,9 @@ class AtrasPredictivo(
     )
 
     private fun aplicarGesto() {
-        // Hasta tener la captura la web no se mueve (ver arriba): es un
-        // fotograma o dos, al principio del gesto, cuando apenas se nota.
-        if (capturando || !enGesto) return
+        // No espera a la captura (ver arriba): el gesto responde en el primer
+        // fotograma. Esperarla dejaba la web quieta varios fotogramas.
+        if (!enGesto) return
         poner(vista, esquinasWeb, transformacionGesto())
     }
 
@@ -368,13 +367,9 @@ class AtrasPredictivo(
         velo.visibility = View.VISIBLE
         quitarTransformacion(vista, esquinasWeb)
 
-        if (anterior != null) {
-            // Con la página anterior ya a la vista, la captura sale YA.
-            salirCaptura(bitmap, inicio)
-        } else {
-            salidaPendiente = true
-            inicioSalida = inicio
-        }
+        // La captura sale YA, haya o no foto de la página anterior: sin foto,
+        // debajo queda el velo liso hasta que la web pinta.
+        salirCaptura(bitmap, inicio)
 
         volver()
         actualizar()
@@ -412,12 +407,6 @@ class AtrasPredictivo(
         if (!esperandoPagina) return
         esperandoPagina = false
         principal.removeCallbacks(tiempoAgotado)
-        if (salidaPendiente) {
-            salidaPendiente = false
-            ocultarVelo()
-            enTransicion?.let { salirCaptura(it, inicioSalida) }
-            return
-        }
         velo.animate()
             .alpha(0f)
             .setDuration(DURACION_VELO_MS)
@@ -430,10 +419,6 @@ class AtrasPredictivo(
         if (esperandoPagina) {
             esperandoPagina = false
             principal.removeCallbacks(tiempoAgotado)
-        }
-        if (salidaPendiente) {
-            salidaPendiente = false
-            enTransicion?.let { limpiarCaptura(it) }
         }
         if (velo.visibility == View.VISIBLE) {
             velo.animate().cancel()
