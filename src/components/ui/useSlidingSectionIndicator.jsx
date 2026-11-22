@@ -1,7 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 // Pastilla de la sección activa de un selector de secciones (Listas, En
 // progreso · Completadas) que SE DESLIZA de un botón a otro en vez de saltar.
@@ -17,10 +16,21 @@ import { motion } from "framer-motion";
 // montada o desmontada hace un instante): al llegar desde otra página sale
 // quieta. Los selectores ocultos (el de escritorio en móvil y al revés) miden
 // 0 y no cuentan.
+//
+// EL DESLIZAMIENTO ES WAAPI SOBRE `transform`, no framer: framer calcula `x`
+// y `width` en JS, fotograma a fotograma en el hilo principal, y justo al
+// cambiar de sección ese hilo está montando la página nueva; en la app de
+// Android (WebView) la pastilla iba a tirones y se frenaba. Con `transform`
+// la animación corre en el compositor aunque React esté ocupado. El ancho solo
+// se anima si cambia (escritorio, con títulos); en móvil todos los botones son
+// iconos del mismo ancho y queda solo el `transform`.
 const HANDOFF_MAX_AGE_MS = 1500;
+const PRESSED_MAX_AGE_MS = 5000;
 const lastByGroup = new Map(); // groupId → { key, left, width, leftAt }
 
-const SLIDE = { type: "spring", stiffness: 420, damping: 38, mass: 0.9 };
+// Equivale al muelle de antes (stiffness 420, damping 38: casi crítico).
+const SLIDE_MS = 340;
+const SLIDE_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 function measure(nav, activeKey) {
   const button = nav?.querySelector(`[data-section-key="${activeKey}"]`);
@@ -33,9 +43,58 @@ function measure(nav, activeKey) {
   };
 }
 
-export function useSlidingSectionIndicator({ navRef, activeKey, groupId, className = "" }) {
-  // { from, to, instant }: `from` solo cuenta al montar la pastilla.
+// Posición pintada ahora mismo (a mitad de un deslizamiento, la intermedia).
+function currentBox(el, fallback) {
+  if (!el?.getAnimations?.().length) return fallback;
+  const style = getComputedStyle(el);
+  const matrix = new DOMMatrixReadOnly(style.transform === "none" ? undefined : style.transform);
+  const width = parseFloat(style.width);
+  return { left: matrix.m41, width: Number.isFinite(width) ? width : fallback.width };
+}
+
+export function useSlidingSectionIndicator({ navRef, activeKey: committedKey, groupId, className = "" }) {
+  // { to, from, instant, id }: `from` es de dónde sale el deslizamiento.
   const [box, setBox] = useState(null);
+  const pillRef = useRef(null);
+  const animatedIdRef = useRef(0);
+
+  // LA PASTILLA SALE AL TOCAR, no cuando llega la sección nueva. El cambio va
+  // en una transición (startTransition, o la navegación del router) y la
+  // sección activa no cambia hasta que React termina de pintar la página
+  // nueva: medido en /lists, hasta 1 s con la pastilla quieta, y más en la app
+  // de Android. Aquí el toque es una actualización urgente de este hook (solo
+  // re-renderiza el selector) y la página nueva se monta después sin frenar el
+  // deslizamiento, que va en el compositor. `base` ata el toque a la sección
+  // de entonces: en cuanto cambia, manda la de verdad.
+  const [pressed, setPressed] = useState(null); // { key, base }
+  const activeKey = pressed && pressed.base === committedKey ? pressed.key : committedKey;
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return undefined;
+    const onClick = (event) => {
+      if (event.defaultPrevented || event.button > 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const key = event.target.closest?.("[data-section-key]")?.getAttribute("data-section-key");
+      if (key && key !== committedKey) setPressed({ key, base: committedKey });
+    };
+    nav.addEventListener("click", onClick, true);
+    return () => nav.removeEventListener("click", onClick, true);
+  }, [navRef, committedKey]);
+
+  // Llegó la sección (o cambió por otra vía): el toque ya no cuenta.
+  useEffect(() => {
+    setPressed((p) => (p && p.base !== committedKey ? null : p));
+  }, [committedKey]);
+  // Navegación cancelada: el toque caduca.
+  useEffect(() => {
+    if (!pressed) return undefined;
+    const timer = setTimeout(() => setPressed(null), PRESSED_MAX_AGE_MS);
+    return () => clearTimeout(timer);
+  }, [pressed]);
+  // Pantalla oculta en el keep-alive (<Activity>) o desmontada: al volver a
+  // ella la pastilla está en su sección, no en la que se tocó al irse.
+  useEffect(() => () => setPressed(null), []);
 
   useLayoutEffect(() => {
     const nav = navRef.current;
@@ -49,14 +108,15 @@ export function useSlidingSectionIndicator({ navRef, activeKey, groupId, classNa
           // Misma medida (el ResizeObserver avisa también al empezar a
           // observar): no se toca, para no cortar el deslizamiento en curso.
           const same = ["left", "top", "width", "height"].every((k) => prev.to[k] === next[k]);
-          return same ? prev : { from: prev.from, to: next, instant };
+          if (same) return prev;
+          return { from: instant ? next : currentBox(pillRef.current, prev.to), to: next, instant, id: prev.id + 1 };
         }
         const last = lastByGroup.get(groupId);
         const fresh =
           last &&
           last.key !== activeKey &&
           (last.leftAt == null || Date.now() - last.leftAt < HANDOFF_MAX_AGE_MS);
-        return { from: fresh ? { ...next, left: last.left, width: last.width } : next, to: next, instant: false };
+        return { from: fresh ? { left: last.left, width: last.width } : next, to: next, instant: false, id: 1 };
       });
       lastByGroup.set(groupId, { key: activeKey, left: next.left, width: next.width, leftAt: null });
     };
@@ -78,14 +138,39 @@ export function useSlidingSectionIndicator({ navRef, activeKey, groupId, classNa
     [groupId, activeKey],
   );
 
+  // El estilo en línea ya deja la pastilla en su destino; la animación solo
+  // pinta el camino desde `from`.
+  useLayoutEffect(() => {
+    const el = pillRef.current;
+    if (!el || !box || animatedIdRef.current === box.id) return;
+    animatedIdRef.current = box.id;
+    el.getAnimations().forEach((animation) => animation.cancel());
+    const { from, to } = box;
+    if (box.instant || typeof el.animate !== "function") return;
+    if (Math.abs(from.left - to.left) < 0.5 && Math.abs(from.width - to.width) < 0.5) return;
+    const options = { duration: SLIDE_MS, easing: SLIDE_EASING };
+    el.animate(
+      [{ transform: `translate3d(${from.left}px,0,0)` }, { transform: `translate3d(${to.left}px,0,0)` }],
+      options,
+    );
+    // Animación aparte: una con `width` dejaría también el `transform` fuera
+    // del compositor.
+    if (Math.abs(from.width - to.width) >= 0.5) {
+      el.animate([{ width: `${from.width}px` }, { width: `${to.width}px` }], options);
+    }
+  }, [box]);
+
   const indicator = box ? (
-    <motion.span
+    <span
+      ref={pillRef}
       aria-hidden="true"
-      className={`pointer-events-none absolute left-0 top-0 rounded-xl ${className}`}
-      style={{ top: box.to.top, height: box.to.height }}
-      initial={{ x: box.from.left, width: box.from.width }}
-      animate={{ x: box.to.left, width: box.to.width }}
-      transition={box.instant ? { duration: 0 } : SLIDE}
+      className={`pointer-events-none absolute left-0 top-0 rounded-xl will-change-transform ${className}`}
+      style={{
+        top: box.to.top,
+        height: box.to.height,
+        width: box.to.width,
+        transform: `translate3d(${box.to.left}px,0,0)`,
+      }}
     />
   ) : null;
 
