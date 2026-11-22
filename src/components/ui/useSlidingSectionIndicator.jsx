@@ -30,11 +30,13 @@ const lastByGroup = new Map(); // groupId → { key, left, width, leftAt }
 
 // Al ritmo del contenido: la sección vieja sale en 160 ms y la nueva entra en
 // 280 ms (ListsClient), así que la pastilla tarda lo mismo que ese relevo
-// entero y llega cuando el contenido se asienta. Curva de entrada y salida
-// suave: arranca sin tirón y frena largo. La de antes (0.22, 1, 0.36, 1 en
-// 340 ms) hacía casi todo el recorrido en los primeros 100 ms y se veía brusca.
-const SLIDE_MS = 440;
-const SLIDE_EASING = "cubic-bezier(0.45, 0, 0.2, 1)";
+// entero y llega cuando el contenido se asienta. Curva de frenado suave: sale
+// ya moviéndose (pendiente inicial ~2,4) y frena largo, sin fases. Ni la de
+// 0.22, 1, 0.36, 1 (pendiente ~4,5: casi todo el recorrido en 100 ms, brusca)
+// ni una de entrada y salida (0.45, 0, 0.2, 1: arranca parada y acelera a
+// mitad, se veía rara y acelerada).
+const SLIDE_MS = 460;
+const SLIDE_EASING = "cubic-bezier(0.25, 0.6, 0.3, 1)";
 
 function measure(nav, activeKey) {
   const button = nav?.querySelector(`[data-section-key="${activeKey}"]`);

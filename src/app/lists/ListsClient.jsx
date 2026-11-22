@@ -17,7 +17,7 @@ import {
   useState,
   useCallback,
   useDeferredValue,
-  useTransition,
+  startTransition,
   memo,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -1931,7 +1931,11 @@ export default function ListsClient({ initialSource = DEFAULT_LISTS_SOURCE }) {
   const historyNavigation = useIsHistoryNavigation();
   const hydrationDone = useHydrationReady();
   const [isBackNav] = useState(() => hydrationDone && historyNavigation);
-  const [isPending, startTransition] = useTransition();
+  // `startTransition` de React, no el de `useTransition`: este marca
+  // `isPending` con una actualización URGENTE que re-renderiza la página entera
+  // en el mismo toque (medido: ~300 ms en móvil al cambiar de sección), y
+  // durante ese tiempo ni la pastilla del selector ni otro toque responden.
+  // `isPending` no se usaba.
 
   const {
     canUse,
