@@ -1,3 +1,5 @@
+import { SHEET_ENTER_FRAMER, SHEET_EXIT_FRAMER } from "../../lib/ui/sectionSheetMotion.js";
+
 // MOVIMIENTO DE LOS PANELES DE FICHA (DetailModal y el de temporada/episodio,
 // SubrouteDetailsPanel): entrada y salida del modal centrado y del panel
 // lateral, y la transición a la ficha completa. Compartido para que los dos
@@ -10,7 +12,7 @@ export const backdropVariants = {
   // recorrido, para que no se asiente antes ni se quede colgado al cerrar.
   visible: {
     opacity: 1,
-    transition: { duration: 0.36, ease: [0.22, 1, 0.36, 1] },
+    transition: SHEET_ENTER_FRAMER,
   },
   navigate: {
     // El dim real se oculta durante la navegación; la capa temporal usa un
@@ -20,7 +22,7 @@ export const backdropVariants = {
   },
   exit: {
     opacity: 0,
-    transition: { duration: 0.32, ease: [0.25, 0.8, 0.25, 1] },
+    transition: SHEET_EXIT_FRAMER,
   },
 };
 
@@ -45,11 +47,12 @@ export const backdropVariants = {
 // opacidad. `switching` (bajar/subir en la pila de previews con el modal ya
 // abierto) mantiene el fundido cruzado en el sitio: deslizar ahí dejaría ver
 // el fondo entre ficha y ficha.
-const SHEET_EASE_IN = [0.16, 1, 0.3, 1];
-// Salida: sale rápido y frena, por lo mismo que el drawer (ver
-// DRAWER_EASE_OUT): con un ease-in el panel parecía quieto y luego se esfumaba.
-const SHEET_EASE_OUT = [0.25, 0.8, 0.25, 1];
-const SHEET_EXIT_DURATION = 0.32;
+//
+// Curvas y duraciones (2026-11-23): las de las vistas laterales de la ficha
+// (SHEET_ENTER/SHEET_EXIT de lib/ui/sectionSheetMotion.js), para que todos
+// los paneles se muevan igual. Ojo: la salida vuelve a ser un ease-in corto
+// (260 ms), lo que antes se había cambiado por una curva que sale rápido y
+// frena (ver la nota del drawer); fue elección expresa de Pablo.
 const sheetTransform = "translate3d(0, 0, 0)";
 const sheetHiddenTransform = "translate3d(0, 100%, 0)";
 export const createPanelVariants = (reduceMotion) => ({
@@ -60,10 +63,11 @@ export const createPanelVariants = (reduceMotion) => ({
   visible: (switching) => ({
     opacity: 1,
     transform: sheetTransform,
-    transition: {
-      duration: reduceMotion ? 0 : switching ? 0.2 : 0.44,
-      ease: switching ? [0.22, 1, 0.36, 1] : SHEET_EASE_IN,
-    },
+    transition: reduceMotion
+      ? { duration: 0 }
+      : switching
+        ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
+        : SHEET_ENTER_FRAMER,
   }),
   navigate: {
     // El panel real se oculta: el movimiento visible lo hace un clon inerte
@@ -75,10 +79,11 @@ export const createPanelVariants = (reduceMotion) => ({
   exit: (switching) => ({
     opacity: switching && !reduceMotion ? 0 : 1,
     transform: switching || reduceMotion ? sheetTransform : sheetHiddenTransform,
-    transition: {
-      duration: reduceMotion ? 0 : switching ? 0.16 : SHEET_EXIT_DURATION,
-      ease: switching ? [0.4, 0, 1, 1] : SHEET_EASE_OUT,
-    },
+    transition: reduceMotion
+      ? { duration: 0 }
+      : switching
+        ? { duration: 0.16, ease: [0.4, 0, 1, 1] }
+        : SHEET_EXIT_FRAMER,
   }),
 });
 
@@ -100,7 +105,6 @@ export const createPanelVariants = (reduceMotion) => ({
 // se lee más nítido y directo que uno que además aparece de la nada, y se anima
 // una propiedad menos. El fundido se conserva SOLO para `switching` (cambio de
 // título con el drawer abierto), donde el crossfade sí es el efecto buscado.
-const DRAWER_EASE_IN = [0.16, 1, 0.3, 1];
 // CIERRE: también desacelera, como la apertura.
 //
 // Antes era un ease-in (`[0.32, 0, 0.67, 0]`, 240 ms): arranca casi parado y
@@ -109,8 +113,8 @@ const DRAWER_EASE_IN = [0.16, 1, 0.3, 1];
 // veía "quieto" y luego desaparecía de golpe, sin que se llegara a percibir el
 // deslizamiento. Con una curva que sale rápido y frena, el movimiento se ve
 // desde el primer fotograma y el recorrido entero se lee.
-const DRAWER_EASE_OUT = [0.25, 0.8, 0.25, 1];
-const DRAWER_EXIT_DURATION = 0.28;
+// (Historia: desde 2026-11-23 el drawer usa las curvas de las vistas
+// laterales, SHEET_ENTER_FRAMER/SHEET_EXIT_FRAMER, también en la salida.)
 
 // Animate the complete transform so Motion can use native WAAPI. Its `x`
 // shorthand runs on the main thread and stalls whenever the detail data renders.
@@ -126,10 +130,11 @@ export const createPanelVariantsRight = (reduceMotion) => ({
   visible: (switching) => ({
     opacity: 1,
     transform: drawerTransform,
-    transition: {
-      duration: reduceMotion ? 0 : switching ? 0.2 : 0.32,
-      ease: switching ? [0.22, 1, 0.36, 1] : DRAWER_EASE_IN,
-    },
+    transition: reduceMotion
+      ? { duration: 0 }
+      : switching
+        ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
+        : SHEET_ENTER_FRAMER,
   }),
   navigate: {
     opacity: 0,
@@ -139,10 +144,11 @@ export const createPanelVariantsRight = (reduceMotion) => ({
   exit: (switching) => ({
     opacity: switching ? 0 : 1,
     transform: switching || reduceMotion ? drawerTransform : drawerHiddenTransform,
-    transition: {
-      duration: reduceMotion ? 0 : switching ? 0.16 : DRAWER_EXIT_DURATION,
-      ease: switching ? [0.4, 0, 1, 1] : DRAWER_EASE_OUT,
-    },
+    transition: reduceMotion
+      ? { duration: 0 }
+      : switching
+        ? { duration: 0.16, ease: [0.4, 0, 1, 1] }
+        : SHEET_EXIT_FRAMER,
   }),
 });
 

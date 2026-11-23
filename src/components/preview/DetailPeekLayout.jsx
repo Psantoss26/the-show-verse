@@ -10,6 +10,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, usePresence, useReducedMotion } from "framer-motion";
 
 import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
+import { SHEET_ENTER, SHEET_EXIT } from "@/lib/ui/sectionSheetMotion";
 import {
   MOBILE_POSTER_OVERSCAN,
   MobileHeroCover,
@@ -85,58 +86,16 @@ function peekOriginTransform(origin, geometry) {
 // los 700 ms de la apertura medidos con la CPU a ×4): la tarjeta se frenaba
 // a mitad al abrir y al cerrar. Con la API de animaciones y solo `transform`
 // y `opacity`, el navegador la mueve en el compositor aunque React esté
-// ocupado. El muelle es el de antes (rigidez 380, amortiguación 32, masa
-// 0,9), muestreado en una curva `linear()`.
-const PEEK_SPRING = { stiffness: 380, damping: 32, mass: 0.9 };
+// ocupado.
+//
+// Curvas y duraciones: las de las vistas laterales de la ficha (SHEET_ENTER
+// y SHEET_EXIT de lib/ui/sectionSheetMotion.js, desde 2026-11-23; antes un
+// muelle muestreado al abrir y una curva propia al cerrar): crece desde la
+// tarjeta pulsada con una deceleración larga sin rebote y vuelve a ella con
+// una salida corta. El fundido de cierre va en la segunda mitad, ya cerca de
+// la tarjeta, para que no parezca esfumarse a mitad de camino.
 const PEEK_OPACITY_IN_MS = 140;
-// Cierre: vuelve a la tarjeta pulsada frenando al llegar (sale rápido del
-// centro y se posa en su sitio), y se desvanece en la segunda mitad del
-// recorrido, ya cerca de ella. Antes aceleraba hasta el final (`ease-in`) y se
-// fundía desde el primer fotograma: parecía que se esfumaba a mitad de camino
-// y llegaba de golpe.
-const PEEK_EXIT_MS = 320;
-const PEEK_EXIT_EASING = "cubic-bezier(0.3, 0.7, 0.1, 1)";
 const PEEK_EXIT_FADE_DELAY_MS = 110;
-const PEEK_FALLBACK_EASING = "cubic-bezier(0.2, 0.9, 0.25, 1)";
-
-function sampleSpring({ stiffness, damping, mass }) {
-  const dt = 1 / 120;
-  let x = 0;
-  let v = 0;
-  const points = [0];
-  let t = 0;
-  while (t < 2) {
-    const a = (stiffness * (1 - x) - damping * v) / mass;
-    v += a * dt;
-    x += v * dt;
-    t += dt;
-    points.push(x);
-    if (Math.abs(1 - x) < 0.0005 && Math.abs(v) < 0.01) break;
-  }
-  points[points.length - 1] = 1;
-  // Uno de cada dos puntos (60 por segundo) basta para que no se note el
-  // tramo recto entre ellos.
-  const stops = points.filter(
-    (_, index) => index % 2 === 0 || index === points.length - 1,
-  );
-  return {
-    duration: Math.round(t * 1000),
-    easing: `linear(${stops.map((value) => value.toFixed(4)).join(", ")})`,
-  };
-}
-
-let peekSpringCache = null;
-function peekSpring() {
-  if (peekSpringCache) return peekSpringCache;
-  const spring = sampleSpring(PEEK_SPRING);
-  const supported =
-    typeof CSS !== "undefined" &&
-    CSS.supports?.("transition-timing-function", "linear(0, 1)");
-  peekSpringCache = supported
-    ? spring
-    : { duration: spring.duration, easing: PEEK_FALLBACK_EASING };
-  return peekSpringCache;
-}
 
 const peekTransformCss = ({ x, y, scale }) =>
   `translate(${x}px, ${y}px) scale(${scale})`;
@@ -228,12 +187,10 @@ export default function DetailPeekLayout({
     if (!shown || openedRef.current || !card) return;
     openedRef.current = true;
     if (typeof card.animate !== "function") return;
-    const spring = reduceMotion
-      ? { duration: 150, easing: "ease-out" }
-      : peekSpring();
+    const enter = reduceMotion ? { duration: 150, easing: "ease-out" } : SHEET_ENTER;
     card.animate([{ transform: fromCss }, { transform: "none" }], {
-      duration: spring.duration,
-      easing: spring.easing,
+      duration: enter.duration,
+      easing: enter.easing,
     });
     card.animate([{ opacity: 0 }, { opacity: 1 }], {
       duration: reduceMotion ? 150 : PEEK_OPACITY_IN_MS,
@@ -253,11 +210,11 @@ export default function DetailPeekLayout({
     // Desde donde esté ahora (también si se cierra a mitad de la apertura).
     const current = window.getComputedStyle(card);
     card.getAnimations().forEach((animation) => animation.cancel());
-    const exitMs = reduceMotion ? 120 : PEEK_EXIT_MS;
+    const exitMs = reduceMotion ? 120 : SHEET_EXIT.duration;
     const fadeDelay = reduceMotion ? 0 : PEEK_EXIT_FADE_DELAY_MS;
     card.animate(
       [{ transform: current.transform }, { transform: fromCss }],
-      { duration: exitMs, easing: PEEK_EXIT_EASING, fill: "forwards" },
+      { duration: exitMs, easing: reduceMotion ? "ease-out" : SHEET_EXIT.easing, fill: "forwards" },
     );
     const exit = card.animate(
       [{ opacity: current.opacity }, { opacity: 0 }],
