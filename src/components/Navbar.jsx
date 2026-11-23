@@ -68,6 +68,8 @@ import AlertsMenu, { AlertsMenuBoot } from "@/components/notifications/AlertsMen
 import TodayNavbarEntry from "@/components/today/TodayNavbarEntry";
 import OfflineBanner from "@/components/OfflineBanner";
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
+import useHeldWhileOpen from "@/hooks/useHeldWhileOpen";
 import MobileOptionsSheet, {
   SheetOption,
   SheetOptionGroup,
@@ -2833,8 +2835,18 @@ function NavbarContent() {
   // El panel se saca de la barra con un portal (ver más abajo), así que deja de
   // estar dentro de `profileMenuRef`: sin este segundo ref, pulsar en el propio
   // menú contaría como "pulsar fuera" y lo cerraría.
-  const profileMenuPanelRef = useRef(null);
   const [profileMenuPosition, setProfileMenuPosition] = useState(null);
+  // Entrada y salida: la de los modales de los botones de acción de las fichas
+  // (nace del avatar y vuelve a él). Al cerrar, la posición vuelve a null: la
+  // salida usa la última que tuvo.
+  const profileMenuMotion = useActionModalMotion(profileMenuOpen && profileMenuPosition != null, {
+    anchor: "below",
+  });
+  const profileMenuPanelRef = profileMenuMotion.panelRef;
+  const shownProfileMenuPosition = useHeldWhileOpen(
+    { position: profileMenuPosition },
+    profileMenuOpen,
+  ).position;
   const [profilePortalReady, setProfilePortalReady] = useState(false);
   useEffect(() => {
     setProfilePortalReady(true);
@@ -2855,7 +2867,7 @@ function NavbarContent() {
       document.removeEventListener("pointerdown", fuera);
       document.removeEventListener("keydown", escape);
     };
-  }, [profileMenuOpen]);
+  }, [profileMenuOpen, profileMenuPanelRef]);
 
   // Posición del panel, ahora que va por portal y no cuelga del botón. Mismo
   // procedimiento que los desplegables de la barra de búsqueda: se mide el botón
@@ -3281,16 +3293,11 @@ function NavbarContent() {
                     desplegables de la barra de búsqueda. */}
                 {profilePortalReady &&
                   createPortal(
-                    <AnimatePresence>
-                      {profileMenuOpen && profileMenuPosition ? (
-                        <motion.div
+                    profileMenuMotion.present && shownProfileMenuPosition ? (
+                        <div
                           ref={profileMenuPanelRef}
                           role="menu"
-                          style={profileMenuPosition}
-                          initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                          style={shownProfileMenuPosition}
                           // MISMO CRISTAL Y MISMA FORMA que el desplegable de la barra de
                           // busqueda: identico `LIQUID_GLASS_PANEL`, mismo radio
                           // (rounded-2xl) y misma capa. Antes iba con rounded-3xl y un
@@ -3300,7 +3307,9 @@ function NavbarContent() {
                           // fija ahora `profileMenuPosition` (antes: `w-64`,
                           // `right-0 top-full` y `mt-5`), porque con el portal ya
                           // no hay un contenedor del que colgar.
-                          className={`fixed z-[99999] overflow-hidden rounded-2xl p-2 text-white ${LIQUID_GLASS_PANEL}`}
+                          className={`fixed z-[99999] overflow-hidden rounded-2xl p-2 text-white ${LIQUID_GLASS_PANEL}${
+                            profileMenuMotion.closing ? " pointer-events-none" : ""
+                          }`}
                         >
                           {/* Una columna, en el mismo orden que el menú lateral de
                               móvil/tablet. */}
@@ -3316,13 +3325,13 @@ function NavbarContent() {
                                     role="menuitem"
                                     onClick={() => setProfileMenuOpen(false)}
                                     aria-current={isActive(href) ? "page" : undefined}
-                                    className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                                    className={`flex items-center gap-3 rounded-xl px-3 py-2 text-[15px]/5 transition-colors ${
                                       isActive(href)
                                         ? "bg-white/10 font-bold text-white"
                                         : "text-zinc-300 hover:bg-white/5 hover:text-white"
                                     }`}
                                   >
-                                    <Icon className={`h-4 w-4 shrink-0 ${tone}`} />
+                                    <Icon className={`h-[18px] w-[18px] shrink-0 ${tone}`} />
                                     <span className="truncate">{label}</span>
                                   </Link>
                                 ))}
@@ -3336,13 +3345,13 @@ function NavbarContent() {
                               role="menuitem"
                               onClick={() => setProfileMenuOpen(false)}
                               aria-current={isActive("/recap") ? "page" : undefined}
-                              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-[15px]/5 transition-colors ${
                                 isActive("/recap")
                                   ? "bg-white/10 font-bold text-white"
                                   : "text-zinc-300 hover:bg-white/5 hover:text-white"
                               }`}
                             >
-                              <PartyPopper className="h-4 w-4 shrink-0 text-lime-300" />
+                              <PartyPopper className="h-[18px] w-[18px] shrink-0 text-lime-300" />
                               <span className="truncate">Recap</span>
                             </Link>
 
@@ -3355,19 +3364,18 @@ function NavbarContent() {
                               role="menuitem"
                               onClick={() => setProfileMenuOpen(false)}
                               aria-current={isActive("/assistant") ? "page" : undefined}
-                              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-[15px]/5 transition-colors ${
                                 isActive("/assistant")
                                   ? "bg-white/10 font-bold text-white"
                                   : "text-zinc-300 hover:bg-white/5 hover:text-white"
                               }`}
                             >
-                              <Sparkles className="h-4 w-4 shrink-0 text-cyan-400" />
+                              <Sparkles className="h-[18px] w-[18px] shrink-0 text-cyan-400" />
                               <span className="truncate">Asistente</span>
                             </Link>
                           </div>
-                        </motion.div>
-                      ) : null}
-                    </AnimatePresence>,
+                        </div>
+                      ) : null,
                     document.body,
                   )}
               </div>

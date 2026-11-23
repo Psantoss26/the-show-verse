@@ -70,12 +70,18 @@ export function isVisibleOrigin(rect, viewport) {
  * (`originRect`): mismo centro y una escala uniforme que lo deja del tamaño del
  * botón. Uniforme para que el contenido no se deforme.
  */
-export function originTransform(panelRect, originRect) {
+export function originTransform(panelRect, originRect, { anchor = "center" } = {}) {
   if (!isUsableRect(panelRect) || !isUsableRect(originRect)) return null;
   const dx = originRect.left + originRect.width / 2 - (panelRect.left + panelRect.width / 2);
-  const dy = originRect.top + originRect.height / 2 - (panelRect.top + panelRect.height / 2);
   const fit = Math.max(originRect.width / panelRect.width, originRect.height / panelRect.height);
   const scale = Math.min(MAX_ORIGIN_SCALE, Math.max(MIN_ORIGIN_SCALE, fit));
+  // `below` (desplegables de la barra superior): el panel encogido no sube al
+  // centro del botón, se queda con su borde superior donde empieza el panel
+  // abierto, bajo el botón. Así nunca pisa la barra ni sus botones.
+  const dy =
+    anchor === "below"
+      ? (scale - 1) * (panelRect.height / 2)
+      : originRect.top + originRect.height / 2 - (panelRect.top + panelRect.height / 2);
   return {
     dx: Math.round(dx * 100) / 100,
     dy: Math.round(dy * 100) / 100,
@@ -96,7 +102,14 @@ const FALLBACK_TO = "translate3d(0px, 18px, 0) scale(0.96)";
  * opciones WAAPI para el panel y el fondo, más un fundido opcional del panel
  * (solo en la salida, al final).
  */
-export function buildModalMotion({ phase, panelRect, originRect, viewport, reducedMotion = false }) {
+export function buildModalMotion({
+  phase,
+  panelRect,
+  originRect,
+  viewport,
+  reducedMotion = false,
+  anchor = "center",
+}) {
   const entering = phase === "enter";
 
   if (reducedMotion) {
@@ -117,7 +130,7 @@ export function buildModalMotion({ phase, panelRect, originRect, viewport, reduc
   }
 
   const origin = isVisibleOrigin(originRect, viewport)
-    ? originTransform(panelRect, originRect)
+    ? originTransform(panelRect, originRect, { anchor })
     : null;
 
   if (origin) {

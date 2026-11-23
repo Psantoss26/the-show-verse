@@ -58,7 +58,10 @@ function canAnimate(el) {
   return !!el && typeof el.animate === "function";
 }
 
-export default function useActionModalMotion(open) {
+// `anchor: "below"`: para desplegables que cuelgan de un botón de la barra
+// superior. El panel nace y vuelve bajo el botón (su borde superior no se
+// mueve) en vez de encogerse hasta el centro del botón, encima de la barra.
+export default function useActionModalMotion(open, { anchor = "center" } = {}) {
   const [present, setPresent] = useState(!!open);
   const panelRef = useRef(null);
   const backdropRef = useRef(null);
@@ -100,6 +103,7 @@ export default function useActionModalMotion(open) {
       originRect: rectOf(originElRef.current),
       viewport: { width: window.innerWidth, height: window.innerHeight },
       reducedMotion: prefersReducedMotion(),
+      anchor,
     });
 
     const anims = [];

@@ -69,3 +69,15 @@ test("el modal de puntuación nace del botón y vuelve a él", async () => {
   assert.match(source, /ref=\{modalBackdropRef\}/);
   assert.doesNotMatch(source, /animate-in/);
 });
+
+test("anchor below: el panel encogido conserva su borde superior bajo el botón", () => {
+  const panelRect = { left: 1000, top: 92, width: 256, height: 475 };
+  const originRect = { left: 1180, top: 20, width: 52, height: 52 };
+  const t = originTransform(panelRect, originRect, { anchor: "below" });
+  const centerY = panelRect.top + panelRect.height / 2 + t.dy;
+  const topEdge = centerY - (t.scale * panelRect.height) / 2;
+  assert.ok(Math.abs(topEdge - panelRect.top) < 0.5, `borde superior ${topEdge}`);
+  assert.ok(topEdge >= originRect.top + originRect.height, "no sube sobre el botón");
+  const centerX = panelRect.left + panelRect.width / 2 + t.dx;
+  assert.equal(centerX, originRect.left + originRect.width / 2);
+});

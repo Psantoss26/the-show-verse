@@ -5,6 +5,7 @@ import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { createPortal } from "react-dom";
 import { BookmarkMinus, BookmarkPlus, Heart, HeartOff, Trash2, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
+import useHeldWhileOpen from "@/hooks/useHeldWhileOpen";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 // Textos y colores por tipo. El color es el del botón de la fila de acciones:
@@ -73,10 +74,10 @@ const KINDS = {
  */
 export default function ListToggleConfirmModal({
   open,
-  kind = "favorite",
-  active = false,
-  itemTitle = "",
-  subject = "este título",
+  kind: kindProp = "favorite",
+  active: activeProp = false,
+  itemTitle: itemTitleProp = "",
+  subject: subjectProp = "este título",
   layerClassName = "z-[10060]",
   onConfirm,
   onClose,
@@ -84,6 +85,13 @@ export default function ListToggleConfirmModal({
   const [portalReady, setPortalReady] = useState(false);
   useEffect(() => setPortalReady(true), []);
   useModalGuard({ open, onClose, closeOnBack: true });
+
+  // Durante la salida se pinta lo que había al cerrar: el padre suele limpiar
+  // `kind` (vuelve al favorito por defecto) o invertir `active` al confirmar.
+  const { kind, active, itemTitle, subject } = useHeldWhileOpen(
+    { kind: kindProp, active: activeProp, itemTitle: itemTitleProp, subject: subjectProp },
+    open,
+  );
 
   const actionMotion = useActionModalMotion(open);
   if (!actionMotion.present || !portalReady) return null;
