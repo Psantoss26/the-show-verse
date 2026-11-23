@@ -88,6 +88,15 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     viewTransition: true,
+    // TURBOPACK EN `next dev`: SIN CACHÉ EN DISCO Y CON TOPE DE MEMORIA.
+    //
+    // La caché persistente (.next/dev/cache/turbopack) no se purga nunca: llegó
+    // a 48 GB, y al leerla y compactarla el next-server se comía los 24 núcleos
+    // y 31 GB de RAM. Tras borrarla volvió a 11 GB en dos minutos. Sin ella, el
+    // primer arranque compila de cero (algo más lento) y lo demás va igual.
+    // El tope hace que Turbopack libere memoria en vez de crecer sin límite.
+    turbopackFileSystemCacheForDev: false,
+    turbopackMemoryLimit: 6 * 1024 ** 3,
   },
   images: {
     // Optimización de imágenes de Vercel DESACTIVADA a propósito.

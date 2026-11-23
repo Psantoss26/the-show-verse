@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { setPriority } from 'node:os';
 import { root, prepareLocalEnv, webEnv, backendEnv } from './local-env.mjs';
 
 const backend = process.argv[2] === 'backend';
@@ -37,6 +38,10 @@ if (backend) {
     ['node_modules/next/dist/bin/next', 'dev', '--turbopack', '--hostname', '127.0.0.1', '--port', '3000', ...process.argv.slice(2)],
     { cwd: root, env, stdio: 'inherit' },
   );
+  // Prioridad baja: al recompilar, Turbopack usa todos los núcleos y dejaba el
+  // escritorio a tirones. Así cede la CPU a lo interactivo. El next-server que
+  // lanza `next dev` hereda esta prioridad.
+  try { setPriority(child.pid, 10); } catch {}
   for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => child.kill(signal));
   }
