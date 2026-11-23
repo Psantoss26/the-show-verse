@@ -1004,9 +1004,14 @@ const MOBILE_COVER_SHADE_SOFT = buildCoverShadeSoft(MOBILE_COVER_SHADE_LEAD_PX)
 // MOBILE_STATUS_STRIP_BAND_PX por dentro del póster y se desvanece ahí con
 // smootherstep, igual que la del borde inferior. Por arriba sobra
 // MOBILE_STATUS_STRIP_PAD_PX fuera de la pantalla: el desenfoque no mezcla con
-// transparente en el borde visible.
+// transparente en el borde visible. La entrada sobre el póster es la mínima que
+// no deja línea (MOBILE_STATUS_STRIP_BAND_PX): el póster se ve casi entero.
+// La capa en sí baja más (MOBILE_STATUS_STRIP_LAYER_PX, oculta por la máscara)
+// por lo mismo que el relleno de arriba: si acabara donde la máscara, el canto
+// del desenfoque aclararía el pie de la franja y marcaría el corte.
 const MOBILE_STATUS_STRIP_PAD_PX = 40
-const MOBILE_STATUS_STRIP_BAND_PX = 56
+const MOBILE_STATUS_STRIP_BAND_PX = 16
+const MOBILE_STATUS_STRIP_LAYER_PX = 56
 const MOBILE_STATUS_STRIP_MASK = (() => {
     const edge = `${MOBILE_STATUS_STRIP_PAD_PX}px + var(--sv-cover-strip, 0px)`
     const stops = Array.from({ length: 9 }, (_, i) => {
@@ -1165,7 +1170,7 @@ function StatusStripExtension({ src, imgHeight, objectPosition }) {
             className="pointer-events-none absolute -inset-x-6 hidden [html[data-android-statusbar]_&]:block"
             style={{
                 top: `calc(-1 * ${above})`,
-                height: `calc(${strip} + ${MOBILE_STATUS_STRIP_PAD_PX + MOBILE_STATUS_STRIP_BAND_PX}px)`,
+                height: `calc(${strip} + ${MOBILE_STATUS_STRIP_PAD_PX + MOBILE_STATUS_STRIP_LAYER_PX}px)`,
                 filter: 'blur(14px) saturate(1.1)',
                 WebkitMaskImage: MOBILE_STATUS_STRIP_MASK,
                 maskImage: MOBILE_STATUS_STRIP_MASK,
