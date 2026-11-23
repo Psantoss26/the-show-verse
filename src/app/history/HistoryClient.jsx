@@ -2763,7 +2763,7 @@ function EpisodeSubItem({
       {!confirmDel && (
         <button
           onClick={handleDeleteClick}
-          className="pointer-events-auto absolute right-12 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 scale-100 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/45 shadow-sm backdrop-blur-xl transition-all duration-300 ease-out hover:border-red-300/30 hover:bg-red-500/15 hover:text-red-300 lg:scale-95 lg:opacity-0 lg:group-hover/subitem:scale-100 lg:group-hover/subitem:opacity-100 sm:right-14"
+          className="pointer-events-auto absolute right-12 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 scale-100 items-center justify-center rounded-full bg-white/[0.04] text-white/45 transition-all duration-300 ease-out hover:bg-red-500/15 hover:text-red-300 lg:scale-95 lg:opacity-0 lg:group-hover/subitem:scale-100 lg:group-hover/subitem:opacity-100 sm:right-14"
           aria-label="Borrar del historial"
           title="Borrar del historial"
         >
