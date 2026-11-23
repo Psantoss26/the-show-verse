@@ -3,7 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -70,7 +70,11 @@ import {
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import {
   buildSeasonEpisodeMetadata,
+  HISTORY_EPISODE_STILL_SIZES,
   historyEpisodeMetadataKey,
+  historyEpisodeStillSrc,
+  historyEpisodeStillSrcSet,
+  readResolvedSeasonMetadata,
 } from "@/lib/history/episodeSeasonMetadata";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
@@ -453,22 +457,83 @@ function loadHistorySeasonMetadata(showId, season) {
   return request;
 }
 
-function useHistoryEpisodeMetadata(showId, episodes) {
-  const seasonSignature = useMemo(
-    () =>
-      [...new Set((episodes || []).map(getEpisodeMeta).filter(Boolean).map((episode) => episode.season))]
-        .sort((a, b) => a - b)
-        .join(","),
-    [episodes],
+function historyGroupSeasons(episodes) {
+  return [...new Set((episodes || []).map(getEpisodeMeta).filter(Boolean).map((episode) => episode.season))]
+    .sort((a, b) => a - b);
+}
+
+// Cuántas miniaturas del modal agrupado se piden de entrada (las que caben en
+// el panel sin desplazarse); el resto quedan `lazy`.
+const HISTORY_GROUP_EAGER_STILLS = 8;
+const warmedHistoryGroups = new Set();
+
+// Adelanta la carga del modal de episodios agrupados: al pasar el ratón,
+// enfocar o tocar la tarjeta (antes del clic) se piden los metadatos de sus
+// temporadas y se precargan y decodifican las primeras miniaturas con el MISMO
+// srcset/sizes que pintará el modal, así el navegador elige el mismo candidato
+// y al abrirse ya están en la caché de memoria. Una vez por grupo.
+function warmHistoryGroup(entry) {
+  if (typeof window === "undefined") return;
+  const showId = getTmdbId(entry);
+  const episodes = Array.isArray(entry?._group) ? entry._group : [];
+  const seasons = historyGroupSeasons(episodes);
+  if (!showId || !seasons.length) return;
+  const warmKey = `${showId}:${seasons.join(",")}`;
+  if (warmedHistoryGroups.has(warmKey)) return;
+  warmedHistoryGroups.add(warmKey);
+
+  Promise.all(seasons.map((season) => loadHistorySeasonMetadata(showId, season))).then(
+    (results) => {
+      const merged = new Map();
+      for (const result of results) for (const [key, value] of result) merged.set(key, value);
+      let preloaded = 0;
+      for (const ep of episodes) {
+        if (preloaded >= HISTORY_GROUP_EAGER_STILLS) break;
+        const meta = getEpisodeMeta(ep);
+        const stillPath =
+          (meta && merged.get(historyEpisodeMetadataKey(meta.season, meta.episode))?.stillPath) ||
+          ep?.still_path ||
+          ep?.stillPath ||
+          null;
+        const src = historyEpisodeStillSrc(stillPath);
+        if (!src) continue;
+        preloaded += 1;
+        const img = new Image();
+        img.decoding = "async";
+        img.sizes = HISTORY_EPISODE_STILL_SIZES;
+        img.srcset = historyEpisodeStillSrcSet(stillPath);
+        img.src = src;
+        img.decode?.().catch(() => {});
+      }
+    },
   );
-  const [metadata, setMetadata] = useState(() => new Map());
+}
+
+// Devuelve { metadata, ready }. Si las temporadas ya están en la caché (porque
+// warmHistoryGroup se adelantó o el modal se abrió antes), el PRIMER render ya
+// trae las miniaturas: sin pasar por la tarjeta vacía.
+function useHistoryEpisodeMetadata(showId, episodes) {
+  const seasonSignature = useMemo(() => historyGroupSeasons(episodes).join(","), [episodes]);
+  const seasons = useMemo(
+    () => (seasonSignature ? seasonSignature.split(",").map(Number).filter(Number.isInteger) : []),
+    [seasonSignature],
+  );
+  const [state, setState] = useState(() => {
+    const resolved = readResolvedSeasonMetadata(historySeasonMetadataCache, showId, seasons);
+    return { key: `${showId}|${seasonSignature}`, metadata: resolved || new Map(), ready: !!resolved };
+  });
+  const stateKey = `${showId}|${seasonSignature}`;
 
   useEffect(() => {
-    const seasons = seasonSignature
-      ? seasonSignature.split(",").map(Number).filter(Number.isInteger)
-      : [];
     if (!showId || !seasons.length) {
-      setMetadata(new Map());
+      setState({ key: stateKey, metadata: new Map(), ready: true });
+      return undefined;
+    }
+    const resolved = readResolvedSeasonMetadata(historySeasonMetadataCache, showId, seasons);
+    if (resolved) {
+      setState((prev) =>
+        prev.key === stateKey && prev.ready ? prev : { key: stateKey, metadata: resolved, ready: true },
+      );
       return undefined;
     }
 
@@ -482,16 +547,83 @@ function useHistoryEpisodeMetadata(showId, episodes) {
             next.set(key, episodeMetadata);
           }
         }
-        setMetadata(next);
+        setState({ key: stateKey, metadata: next, ready: true });
       },
     );
 
     return () => {
       cancelled = true;
     };
-  }, [seasonSignature, showId]);
+  }, [seasons, showId, stateKey]);
 
-  return metadata;
+  return state.key === stateKey ? state : { metadata: new Map(), ready: false };
+}
+
+// Miniatura (still) de episodio del modal de episodios agrupados y del grupo
+// del calendario. Mientras llegan los metadatos o la imagen se ve un hueco con
+// la forma de la tarjeta; la imagen entra con un fundido corto cuando YA está
+// decodificada (sin fotogramas a medio pintar). Si estaba en caché se pinta
+// directamente, sin fundido. El icono de película solo sale si el episodio no
+// tiene still o la imagen falla.
+function EpisodeStillThumb({ stillPath, pending = false, eager = false, iconClassName = "h-5 w-5" }) {
+  const src = historyEpisodeStillSrc(stillPath);
+  const imgRef = useRef(null);
+  const [status, setStatus] = useState({ src: null, value: "loading" });
+  const current = status.src === src ? status.value : "loading";
+
+  useLayoutEffect(() => {
+    const img = imgRef.current;
+    if (src && img?.complete && img.naturalWidth > 0) {
+      setStatus({ src, value: "instant" });
+    }
+  }, [src]);
+
+  const handleLoad = (e) => {
+    const img = e.currentTarget;
+    const loadedSrc = src;
+    const done = () =>
+      setStatus((prev) =>
+        prev.src === loadedSrc && prev.value === "instant" ? prev : { src: loadedSrc, value: "loaded" },
+      );
+    if (typeof img.decode === "function") img.decode().then(done, done);
+    else done();
+  };
+
+  const shown = current === "loaded" || current === "instant";
+  const showIcon = !pending && (!src || current === "error");
+
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-white/[0.08] via-white/[0.04] to-white/[0.015] text-zinc-700 transition-opacity duration-500 ease-out motion-reduce:transition-none ${
+          shown ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        {showIcon && <Film className={iconClassName} aria-hidden="true" />}
+      </span>
+      {src && current !== "error" && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          ref={imgRef}
+          src={src}
+          srcSet={historyEpisodeStillSrcSet(stillPath)}
+          sizes={HISTORY_EPISODE_STILL_SIZES}
+          alt=""
+          decoding="async"
+          loading={eager ? "eager" : "lazy"}
+          fetchPriority={eager ? "high" : undefined}
+          onLoad={handleLoad}
+          onError={() => setStatus({ src, value: "error" })}
+          className={`absolute inset-0 h-full w-full object-cover ${
+            current === "instant"
+              ? ""
+              : "transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          } ${shown ? "scale-100 opacity-100" : "scale-[1.04] opacity-0"}`}
+        />
+      )}
+    </>
+  );
 }
 
 // IMPORTANTE: si es episodio, prioriza el TMDb de la SERIE (show)
@@ -1457,16 +1589,16 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
 
   // Metadatos localizados de cada episodio, como en el modal agrupado.
   // Solo se piden al desplegar (showId null mientras está colapsado → sin fetch).
-  const episodeMetadata = useHistoryEpisodeMetadata(
-    expanded ? getTmdbId(entry) : null,
-    entry._group,
-  );
+  const { metadata: episodeMetadata, ready: episodeMetadataReady } =
+    useHistoryEpisodeMetadata(expanded ? getTmdbId(entry) : null, entry._group);
 
   return (
     <div className="rounded-xl overflow-hidden">
       {/* Header del grupo */}
       <button
         onClick={() => setExpanded(!expanded)}
+        onPointerEnter={() => warmHistoryGroup(entry)}
+        onFocus={() => warmHistoryGroup(entry)}
         className="w-full flex items-center gap-3.5 p-2.5 hover:bg-white/5 transition-colors"
       >
         <div className="w-[56px] h-[84px] shrink-0 relative">
@@ -1537,18 +1669,12 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
                     className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors group/sub"
                   >
                     <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-lg bg-zinc-900 shadow-sm">
-                      {finalStill ? (
-                        <OptimizedImage
-                          src={`https://image.tmdb.org/t/p/w780${finalStill}`}
-                          alt=""
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-zinc-700">
-                          <Film className="h-4 w-4" aria-hidden="true" />
-                        </span>
-                      )}
+                      <EpisodeStillThumb
+                        stillPath={finalStill}
+                        pending={!finalStill && !episodeMetadataReady}
+                        eager={subIdx < HISTORY_GROUP_EAGER_STILLS}
+                        iconClassName="h-4 w-4"
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       {subMeta && (
@@ -2564,6 +2690,8 @@ function EpisodeSubItem({
   isBusy,
   stillPath,
   episodeTitle,
+  metadataPending = false,
+  eagerStill = false,
 }) {
   const meta = getEpisodeMeta(entry);
   const resolvedEpisodeTitle = meta?.title || episodeTitle || null;
@@ -2615,18 +2743,11 @@ function EpisodeSubItem({
         className={`flex items-center gap-3 p-3 ${isBusy ? "opacity-50 pointer-events-none" : ""}`}
       >
         <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-md sm:w-28">
-          {stillPath || entry?.still_path || entry?.stillPath ? (
-            <OptimizedImage
-              src={`https://image.tmdb.org/t/p/w780${stillPath || entry?.still_path || entry?.stillPath}`}
-              alt=""
-              className="h-full w-full object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center text-zinc-700">
-              <Film className="h-5 w-5" aria-hidden="true" />
-            </span>
-          )}
+          <EpisodeStillThumb
+            stillPath={stillPath || entry?.still_path || entry?.stillPath || null}
+            pending={metadataPending}
+            eager={eagerStill}
+          />
         </div>
         <div className="flex-1 min-w-0 pr-12 sm:pr-14">
           <p className="text-sm font-bold text-emerald-300 sm:text-[15px]">
@@ -2719,7 +2840,8 @@ function ExpandedGroupPanel({
   const title = getMainTitle(entry);
   const tmdbId = getTmdbId(entry);
   const episodes = Array.isArray(entry?._group) ? entry._group : [];
-  const episodeMetadata = useHistoryEpisodeMetadata(tmdbId, episodes);
+  const { metadata: episodeMetadata, ready: episodeMetadataReady } =
+    useHistoryEpisodeMetadata(tmdbId, episodes);
   const href = tmdbId ? `/details/tv/${tmdbId}` : "#";
   // Pulsar el título/póster de la serie abre su PREVIEW (drawer), no navega.
   const previewClick = usePreviewOpen();
@@ -2829,6 +2951,8 @@ function ExpandedGroupPanel({
               entry={ep}
               stillPath={localizedMetadata?.stillPath || null}
               episodeTitle={localizedMetadata?.title || null}
+              metadataPending={!episodeMetadataReady}
+              eagerStill={idx < HISTORY_GROUP_EAGER_STILLS}
               onRemoveFromHistory={onRemoveFromHistory}
               isBusy={busyId === `del:${getHistoryId(ep)}`}
             />;
@@ -4894,6 +5018,11 @@ export default function HistoryClient() {
                         >
                           <div
                             data-action-modal-origin=""
+                            // Adelanta metadatos y miniaturas del modal en
+                            // cuanto se apunta o toca la tarjeta.
+                            onPointerEnter={() => warmHistoryGroup(entry)}
+                            onPointerDown={() => warmHistoryGroup(entry)}
+                            onFocus={() => warmHistoryGroup(entry)}
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
