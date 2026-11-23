@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { recordSlide, resumableSlide } from "@/lib/ui/slidingIndicatorFlight";
 
 // Pastilla de la sección activa de un selector de secciones (Listas, En
 // progreso · Completadas) que SE DESLIZA de un botón a otro en vez de saltar.
@@ -27,6 +28,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 const HANDOFF_MAX_AGE_MS = 1500;
 const PRESSED_MAX_AGE_MS = 5000;
 const lastByGroup = new Map(); // groupId → { key, left, width, leftAt }
+// groupId → deslizamiento en curso, para que el selector de la ruta hermana
+// lo retome a mitad en vez de saltar al final (slidingIndicatorFlight.js).
+const slideFlights = new Map();
 
 // Al ritmo del contenido: la sección vieja sale en 160 ms y la nueva entra en
 // 280 ms (ListsClient), así que la pastilla tarda lo mismo que ese relevo
@@ -115,14 +119,41 @@ export function useSlidingSectionIndicator({ navRef, activeKey: committedKey, gr
           // observar): no se toca, para no cortar el deslizamiento en curso.
           const same = ["left", "top", "width", "height"].every((k) => prev.to[k] === next[k]);
           if (same) return prev;
-          return { from: instant ? next : currentBox(pillRef.current, prev.to), to: next, instant, id: prev.id + 1 };
+          return {
+            from: instant ? next : currentBox(pillRef.current, prev.to),
+            to: next,
+            instant,
+            id: prev.id + 1,
+            key: activeKey,
+            startedAt: null,
+          };
+        }
+        // Selector recién montado en la ruta hermana mientras la pastilla del
+        // anterior aún se deslizaba hacia aquí (el toque la lanzó allí):
+        // sigue ese mismo deslizamiento, con su origen y su reloj.
+        const flight = resumableSlide(
+          slideFlights,
+          groupId,
+          activeKey,
+          document.timeline?.currentTime ?? null,
+          SLIDE_MS,
+        );
+        if (flight) {
+          return { from: flight.from, to: next, instant: false, id: 1, key: activeKey, startedAt: flight.startedAt };
         }
         const last = lastByGroup.get(groupId);
         const fresh =
           last &&
           last.key !== activeKey &&
           (last.leftAt == null || Date.now() - last.leftAt < HANDOFF_MAX_AGE_MS);
-        return { from: fresh ? { left: last.left, width: last.width } : next, to: next, instant: false, id: 1 };
+        return {
+          from: fresh ? { left: last.left, width: last.width } : next,
+          to: next,
+          instant: false,
+          id: 1,
+          key: activeKey,
+          startedAt: null,
+        };
       });
       lastByGroup.set(groupId, { key: activeKey, left: next.left, width: next.width, leftAt: null });
     };
@@ -151,20 +182,32 @@ export function useSlidingSectionIndicator({ navRef, activeKey: committedKey, gr
     if (!el || !box || animatedIdRef.current === box.id) return;
     animatedIdRef.current = box.id;
     el.getAnimations().forEach((animation) => animation.cancel());
+    slideFlights.delete(groupId);
     const { from, to } = box;
     if (box.instant || typeof el.animate !== "function") return;
     if (Math.abs(from.left - to.left) < 0.5 && Math.abs(from.width - to.width) < 0.5) return;
     const options = { duration: SLIDE_MS, easing: SLIDE_EASING };
-    el.animate(
-      [{ transform: `translate3d(${from.left}px,0,0)` }, { transform: `translate3d(${to.left}px,0,0)` }],
-      options,
-    );
+    // Reloj explícito: el del deslizamiento que se retoma, o ahora. Así el
+    // selector de la ruta hermana puede seguir este mismo en el punto exacto.
+    const startedAt = box.startedAt ?? document.timeline?.currentTime ?? null;
+    const animations = [
+      el.animate(
+        [{ transform: `translate3d(${from.left}px,0,0)` }, { transform: `translate3d(${to.left}px,0,0)` }],
+        options,
+      ),
+    ];
     // Animación aparte: una con `width` dejaría también el `transform` fuera
     // del compositor.
     if (Math.abs(from.width - to.width) >= 0.5) {
-      el.animate([{ width: `${from.width}px` }, { width: `${to.width}px` }], options);
+      animations.push(el.animate([{ width: `${from.width}px` }, { width: `${to.width}px` }], options));
     }
-  }, [box]);
+    if (startedAt != null) {
+      animations.forEach((animation) => {
+        animation.startTime = startedAt;
+      });
+    }
+    recordSlide(slideFlights, groupId, { key: box.key, from, to, startedAt });
+  }, [box, groupId]);
 
   const indicator = box ? (
     <span
