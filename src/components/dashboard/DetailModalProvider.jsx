@@ -31,6 +31,7 @@ import {
 } from "react";
 import { AnimatePresence } from "framer-motion";
 import { SHEET_ENTER, SHEET_EXIT } from "@/lib/ui/sectionSheetMotion";
+import { flipDrawerContent, stopDrawerContentFlip } from "@/lib/ui/drawerContentFlip";
 
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { isServerReachable } from "@/lib/offline/client";
@@ -156,84 +157,33 @@ function markDrawerReflow(ms = DRAWER_REFLOW_MS) {
   }, ms);
 }
 
-// EL CONTENIDO SE MUEVE CON EL PANEL, FOTOGRAMA A FOTOGRAMA.
+// EL CONTENIDO SE MUEVE CON EL PANEL.
 //
-// Al abrir o cerrar el drawer acoplado el margen ya no cambia de golpe: se
-// anima con la MISMA duración y curva que la entrada/salida del panel
-// (SHEET_ENTER/SHEET_EXIT, las de `createPanelVariantsRight`) y con su mismo
-// `startTime`, así que el borde derecho de la página va pegado al borde
-// izquierdo del panel, como si este la empujara.
+// Al abrir o cerrar el drawer acoplado el margen cambia UNA vez (la rejilla se
+// coloca en su sitio definitivo) y cada pieza visible viaja con `transform`
+// desde donde estaba hasta donde queda, con la duración, la curva y el
+// `startTime` de la entrada/salida del panel (ver `flipDrawerContent`).
 //
-// Antes el margen se ponía o se quitaba entero en el primer fotograma: al
-// cerrar, la rejilla, la cabecera y la barra de filtros recuperaban su ancho
-// mientras el panel aún ocupaba la derecha, y al abrir se estrechaban dejando
-// un hueco que el panel tardaba 420 ms en tapar.
-//
-// El panel se anima con framer-motion, que crea su animación WAAPI uno o dos
-// fotogramas después de este commit. Se busca esa animación (`transform` en
-// `.sv-drawer-panel`) y se copia su `startTime`: así las dos comparten reloj
-// aunque el hilo principal vaya cargado. Si no aparece (movimiento reducido,
-// ficha restaurada del historial sin entrada), el margen se coloca de golpe.
-let contentMarginAnimation = null;
-
-function findPanelTransformAnimation() {
-  for (const panel of document.querySelectorAll(".sv-drawer-panel")) {
-    for (const animation of panel.getAnimations()) {
-      const frames = animation.effect?.getKeyframes?.() ?? [];
-      if (frames.some((frame) => frame.transform != null)) return animation;
-    }
-  }
-  return null;
-}
-
-function syncWithPanel(animation, triesLeft = 3) {
-  window.requestAnimationFrame(() => {
-    if (contentMarginAnimation !== animation) return;
-    const panel = findPanelTransformAnimation();
-    if (panel?.startTime != null) {
-      animation.startTime = panel.startTime;
-      return;
-    }
-    if (triesLeft > 0) syncWithPanel(animation, triesLeft - 1);
-    else animation.finish();
-  });
-}
-
-function stopContentMarginAnimation() {
-  if (!contentMarginAnimation) return;
-  const animation = contentMarginAnimation;
-  contentMarginAnimation = null;
-  animation.cancel();
-}
-
+// Antes el margen se ponía o quitaba entero en el primer fotograma: al cerrar,
+// la página recuperaba su ancho con el panel aún encima. Luego se animó el
+// propio `margin-right`, y la rejilla se reorganizaba en cada fotograma: las
+// tarjetas cambiaban de tamaño a saltos y el contenido parpadeaba.
 function applyContentMargin(el, value, motion = null) {
   if (!el) return;
   // Mismo valor (el panel vuelve a informar de su ancho mientras entra): no se
   // toca, y el movimiento en curso sigue.
   if (el.style.marginRight === value) return;
-  // Si el movimiento anterior sigue en curso, el nuevo arranca desde donde va.
-  const from = motion ? window.getComputedStyle(el).marginRight : null;
-  stopContentMarginAnimation();
-  el.style.marginRight = value;
   if (!motion) {
+    stopDrawerContentFlip();
+    el.style.marginRight = value;
     // El arrastre del tirador ya tiene su propio modo (`data-sv-drawer-resizing`).
     if (!isDrawerResizing()) markDrawerReflow();
     return;
   }
-  const to = value || "0px";
-  if (from === to) return;
   markDrawerReflow(motion.duration + 120);
-  const animation = el.animate(
-    [{ marginRight: from }, { marginRight: to }],
-    { duration: motion.duration, easing: motion.easing },
-  );
-  contentMarginAnimation = animation;
-  animation.finished
-    .then(() => {
-      if (contentMarginAnimation === animation) contentMarginAnimation = null;
-    })
-    .catch(() => {});
-  syncWithPanel(animation);
+  flipDrawerContent(el, () => {
+    el.style.marginRight = value;
+  }, motion);
 }
 
 const DRAWER_VIEW_STORAGE_KEY = "showverse:detailModalView";

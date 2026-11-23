@@ -291,7 +291,7 @@ test("acoplado, la página se reorganiza en directo durante el arrastre", async 
   );
   assert.match(
     provider,
-    /if \(!docked \|\| !contentRef\.current\) return;[\s\S]*?contentRef\.current\.style\.marginRight = `\$\{width\}px`;/,
+    /if \(!docked \|\| !contentRef\.current\) return;[\s\S]*?applyContentMargin\(contentRef\.current, `\$\{width\}px`/,
   );
 
   // Mientras dura el gesto, el contenido no anima sus cambios: con las
