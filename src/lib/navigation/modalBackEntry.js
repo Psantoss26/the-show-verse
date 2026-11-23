@@ -30,6 +30,7 @@ import {
   isCleanBackEntry,
   isCleanBackEntryHeld,
 } from "./backGestureCapture.js";
+import { installModalBackGesture } from "./modalBackGesture.js";
 
 export const MODAL_DEPTH_KEY = "svModalDepth";
 const STALE_KEY = "svModalStale";
@@ -139,6 +140,7 @@ function onPopState() {
 }
 
 if (typeof window !== "undefined") {
+  installModalBackGesture();
   window.addEventListener("popstate", onPopState);
   document.addEventListener(
     "click",

@@ -248,6 +248,7 @@ export default function SectionSheet({
         {...panelProps}
         ref={panelRef}
         data-sv-sheet-panel=""
+        data-sv-back-panel=""
         className={`relative flex h-full w-full flex-col overflow-hidden outline-none will-change-transform sm:w-[30rem] sm:rounded-l-[2rem] lg:w-[34rem] ${LIQUID_GLASS_PANEL}`}
       >
         <header className={`shrink-0 ${LIQUID_GLASS_MODAL_HEADER} px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6`}>

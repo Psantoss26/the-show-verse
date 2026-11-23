@@ -504,8 +504,14 @@ class WebAppActivity : AppCompatActivity() {
                 )
             },
             // Con un modal de la web abierto, atrás solo lo cierra (la web lo
-            // anima): ni encogido ni foto de la página anterior.
+            // anima): ni encogido de la página ni foto de la anterior; el
+            // gesto mueve el modal (modalAbierto, gestoModal).
             animable = { customView == null && !modalWebAbierto },
+            // El gesto mueve entonces el panel del modal en la web (GestoModal).
+            modalAbierto = { customView == null && modalWebAbierto },
+            gestoModal = { fase, progreso, desdeIzquierda ->
+                evaluarJs(GestoModal.js(fase, progreso, desdeIzquierda))
+            },
             // Lo que la web acaba de pintar llega a pantalla en el siguiente
             // dibujado del WebView: entonces se puede quitar lo que lo tapa.
             confirmarPintado = { listo ->

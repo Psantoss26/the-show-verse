@@ -16,6 +16,7 @@
 // desmonta solo cuando el panel ya ha vuelto al botón.
 
 import { useLayoutEffect, useRef, useState } from "react";
+import { BACK_PANEL_ATTR, takeBackGesture } from "@/lib/navigation/modalBackGesture";
 import { ORIGIN_MAX_AGE_MS, buildModalMotion } from "@/lib/ui/actionModalMotion";
 
 // ---- Origen: el último botón pulsado ------------------------------------
@@ -83,6 +84,11 @@ export default function useActionModalMotion(open, { anchor = "center" } = {}) {
     const backdrop = backdropRef.current;
     let cancelled = false;
 
+    // Panel que mueve el gesto de atrás de la app de Android (modalBackGesture).
+    // Si la salida viene de ese gesto, la recoge: parte de donde lo dejó el dedo.
+    if (open) panel?.setAttribute(BACK_PANEL_ATTR, "");
+    const gestureTransform = open ? null : takeBackGesture(panel);
+
     // Donde esté AHORA el panel (p. ej. a mitad de una salida que se
     // interrumpe reabriendo): la nueva animación parte de ahí, sin saltos.
     const currentTransform =
@@ -110,6 +116,7 @@ export default function useActionModalMotion(open, { anchor = "center" } = {}) {
     if (plan.panel) {
       const keyframes = plan.panel.keyframes.map((k) => ({ ...k }));
       if (currentTransform && currentTransform !== "none") keyframes[0].transform = currentTransform;
+      else if (gestureTransform) keyframes[0].transform = gestureTransform;
       anims.push(panel.animate(keyframes, plan.panel.options));
     }
     if (plan.panelFade) anims.push(panel.animate(plan.panelFade.keyframes, plan.panelFade.options));

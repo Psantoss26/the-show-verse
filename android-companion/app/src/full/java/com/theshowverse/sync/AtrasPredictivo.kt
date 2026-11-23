@@ -64,6 +64,11 @@ import androidx.activity.OnBackPressedCallback
  * Al cancelar, la web vuelve a su sitio sin navegar. Si la captura falla, se
  * navega igual y la web vuelve a su tamaño.
  *
+ * CON UN MODAL DE LA WEB ABIERTO ([modalAbierto]) atrás solo cierra el modal:
+ * la página no se encoge ni se usa ninguna foto. El gesto pasa a la web
+ * ([GestoModal]), que mueve solo el panel del modal sobre su velo, y al soltar
+ * el `popstate` lo cierra con su salida. Una sola animación, la del modal.
+ *
  * COLOROS (OnePlus, Oppo). El sistema solo entrega el avance del gesto a las
  * apps de terceros con «Ajustes › Sistema y actualización › Navegación por el
  * sistema › Animaciones de deslizamiento (beta)» activado (y su opción para
@@ -81,8 +86,15 @@ class AtrasPredictivo(
     private val puedeVolver: () -> Boolean,
     /** El historial de la web: URL de cada entrada y posición actual. */
     private val historial: () -> FotosHistorial.Historial,
-    /** Falso con un vídeo a pantalla completa: ahí no hay página que animar. */
+    /**
+     * Falso con un vídeo a pantalla completa o con un modal de la web abierto:
+     * ahí no hay página que animar.
+     */
     private val animable: () -> Boolean,
+    /** ¿Hay un modal de la web abierto? Entonces el gesto mueve solo el modal. */
+    private val modalAbierto: () -> Boolean,
+    /** Pasa el gesto a la web cuando lo que se mueve es el modal ([GestoModal]). */
+    private val gestoModal: (fase: GestoModal.Fase, progreso: Float, desdeIzquierda: Boolean) -> Unit,
     /** Llama a `listo` cuando lo que la web acaba de pintar llega a pantalla. */
     private val confirmarPintado: (listo: () -> Unit) -> Unit,
     private val volver: () -> Unit,
@@ -213,8 +225,20 @@ class AtrasPredictivo(
 
     // ------------------------------------------------------------ callback
 
+    /** El gesto en curso es del modal de la web, no de la página. */
+    private var enGestoModal = false
+    private var modalDesdeIzquierda = true
+
     override fun handleOnBackStarted(backEvent: BackEventCompat) {
-        if (!animable()) return
+        enGestoModal = false
+        if (!animable()) {
+            if (modalAbierto()) {
+                enGestoModal = true
+                modalDesdeIzquierda = backEvent.swipeEdge != BackEventCompat.EDGE_RIGHT
+                gestoModal(GestoModal.Fase.INICIO, backEvent.progress, modalDesdeIzquierda)
+            }
+            return
+        }
         terminarTransicion()
         vista.animate().cancel()
         enGesto = true
@@ -238,6 +262,10 @@ class AtrasPredictivo(
     }
 
     override fun handleOnBackProgressed(backEvent: BackEventCompat) {
+        if (enGestoModal) {
+            gestoModal(GestoModal.Fase.PROGRESO, backEvent.progress, modalDesdeIzquierda)
+            return
+        }
         if (!enGesto) return
         progreso = backEvent.progress
         deltaY = backEvent.touchY - yInicial
@@ -245,6 +273,11 @@ class AtrasPredictivo(
     }
 
     override fun handleOnBackCancelled() {
+        if (enGestoModal) {
+            enGestoModal = false
+            gestoModal(GestoModal.Fase.CANCELAR, 0f, modalDesdeIzquierda)
+            return
+        }
         if (!enGesto) return
         enGesto = false
         alCapturar = null
@@ -256,6 +289,10 @@ class AtrasPredictivo(
     override fun handleOnBackPressed() {
         val conGesto = enGesto
         enGesto = false
+        if (enGestoModal) {
+            enGestoModal = false
+            gestoModal(GestoModal.Fase.SOLTAR, 1f, modalDesdeIzquierda)
+        }
 
         if (!animable() || !puedeVolver()) {
             if (puedeVolver()) volver() else salir()
