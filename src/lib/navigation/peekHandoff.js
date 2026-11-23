@@ -50,11 +50,13 @@ export function beginPeekHandoff(href) {
   if (pending && peekHrefKeepsParts(href)) {
     document.documentElement.setAttribute(PEEK_HANDOFF_ACTIVE_ATTR, "");
   }
+  if (pending) document.documentElement.setAttribute(PEEK_HANDOFF_LEAVING_ATTR, "");
 }
 
 export function endPeekHandoff() {
   pending = null;
   revealPeekHandoffParts();
+  document.documentElement.removeAttribute(PEEK_HANDOFF_LEAVING_ATTR);
 }
 
 // Las piezas de la ficha dejan de estar ocultas (ver globals.css).
@@ -85,6 +87,11 @@ export const PEEK_HANDOFF_PENDING_ATTR = "data-peek-handoff-pending";
 // de la ficha están ocultas (`visibility`, no `opacity`, que mataría el
 // cristal de los botones) para no verse dobles a través de la tarjeta.
 export const PEEK_HANDOFF_ACTIVE_ATTR = "data-peek-handoff-active";
+// En <html> durante todo el relevo (desde el toque hasta que la vista previa
+// se retira): los navbars superior e inferior, que son del layout y siguen
+// montados, suben por encima de la capa de la vista previa (globals.css), así
+// la ficha llega con ellos ya puestos y no aparecen de golpe al final.
+export const PEEK_HANDOFF_LEAVING_ATTR = "data-peek-handoff-leaving";
 
 // ¿Lleva `href` a una ficha de película o serie (DetailsClient), que tiene
 // pareja para cada pieza?
@@ -152,6 +159,7 @@ function peekImageBox(card, cover, { fullPoster }) {
     cx: cardRect.left + cardRect.width / 2 - t.tx,
     cy,
     width,
+    height: imageHeight,
     top: coverTop - (imageHeight - coverHeight) / 2,
   };
 }
@@ -470,6 +478,14 @@ export function morphPeekCard(card, cover, { href = null, parts = [], fadeNodes 
     top: known ? known.top : rootPx("--sv-cover-strip"),
     width,
   });
+  if (fullPoster) {
+    mountStatusStrip(card, cover, {
+      left: known ? known.left : (box.vw - width) / 2,
+      top: known ? known.top : rootPx("--sv-cover-strip"),
+      width,
+      height: (width * box.height) / box.width,
+    });
+  }
   card.animate(
     [
       { transform: fromCard.css, opacity: fromOpacity, borderRadius: current.borderRadius },
@@ -485,6 +501,61 @@ export function morphPeekCard(card, cover, { href = null, parts = [], fadeNodes 
       { duration: PEEK_MORPH_MS, easing: "linear", fill: "forwards" },
     );
   }
+}
+
+// Franja de la barra de notificaciones (app de Android con la barra visible,
+// `--sv-cover-strip` > 0): la ficha la pinta con el borde de arriba de su
+// portada reflejado y desenfocado (MobileDetailsHero), pero aún no está
+// montada. Mientras tanto la vista previa pinta una igual con su portada, que
+// entra a la vez que la tarjeta crece y se funde al final con la de la ficha.
+// `goal` es la caja en pantalla de la imagen de la portada al acabar.
+const STATUS_STRIP_AXIS_PX = 12;
+function mountStatusStrip(card, cover, goal) {
+  const strip = rootPx("--sv-cover-strip");
+  const src = cover.querySelector("img")?.currentSrc;
+  const layer = card.closest('[role="dialog"]');
+  if (!(strip > 0) || !src || !layer || !goal.width) return;
+  layer.querySelector("[data-peek-status-strip]")?.remove();
+  const wrap = document.createElement("div");
+  wrap.setAttribute("data-peek-status-strip", "");
+  wrap.setAttribute("aria-hidden", "true");
+  Object.assign(wrap.style, {
+    position: "fixed",
+    left: "0",
+    right: "0",
+    top: "0",
+    height: `${strip}px`,
+    overflow: "hidden",
+    pointerEvents: "none",
+    background: "#000",
+  });
+  const copy = document.createElement("img");
+  copy.src = src;
+  copy.alt = "";
+  copy.decoding = "async";
+  // Reflejada sobre una línea algo por debajo del borde: el desenfoque no
+  // mezcla con transparente en el canto que toca la portada. Más ancha por
+  // los lados por lo mismo.
+  const axis = goal.top + STATUS_STRIP_AXIS_PX;
+  Object.assign(copy.style, {
+    position: "absolute",
+    left: `${goal.left}px`,
+    top: `${goal.top}px`,
+    width: `${goal.width}px`,
+    height: `${goal.height}px`,
+    maxWidth: "none",
+    objectFit: "cover",
+    transformOrigin: `50% ${axis - goal.top}px`,
+    transform: "scale(1.15, -1)",
+    filter: "blur(10px) brightness(0.85)",
+  });
+  wrap.append(copy);
+  layer.append(wrap);
+  wrap.animate([{ opacity: 0 }, { opacity: 1 }], {
+    duration: PEEK_MORPH_MS,
+    easing: PEEK_MORPH_EASING,
+    fill: "forwards",
+  });
 }
 
 // Último tramo, con la ficha ya en pantalla: la tarjeta se ajusta a la caja

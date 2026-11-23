@@ -3471,6 +3471,14 @@ html[data-peek-handoff-active] [data-peek-handoff-part] {
   visibility: hidden;
 }
 
+/* Durante todo el relevo, los navbars (del layout, siguen montados) van por
+   encima de la capa de la vista previa (z-[9999]): están desde el primer
+   fotograma, en vez de aparecer al final con el desvanecido. */
+html[data-peek-handoff-leaving] .sv-topbar,
+html[data-peek-handoff-leaving] .sv-navbar-bottom-shift {
+  z-index: 10000;
+}
+
 /* =============================================================================
    Recharts - Eliminar recuadro de enfoque blanco al hacer click o tap en gráficas
    ========================================================================== */
