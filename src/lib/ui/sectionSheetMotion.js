@@ -42,10 +42,12 @@ export const SHEET_SCRIM_FRAMES = [{ opacity: 0 }, { opacity: 1 }];
  *   sticky del menú de secciones, medida ahora.
  * @param {number} stickyTop  su `top` de sticky (donde se queda pegado).
  * @param {number} viewportHeight
- * @returns {{ scrollBy: number, top: number } | null}  `scrollBy`: cuánto
- *   desplazar la página antes de abrir para que el menú quede pegado bajo la
- *   barra (si aún está más abajo); `top`: borde superior del panel tras ese
- *   desplazamiento. `null` si no hay menú visible: panel a pantalla completa.
+ * @returns {{ top: number } | null}  `top`: borde superior del panel, bajo
+ *   el menú ya pegado. `null` a pantalla completa: sin menú medible o con el
+ *   menú aún sin pegar (la cabecera de la ficha sigue a la vista). Antes se
+ *   subía la página hasta pegarlo y el panel quedaba bajo el menú también
+ *   abriendo desde las primeras secciones; Pablo lo quiere a pantalla
+ *   completa en ese caso.
  */
 export function sheetAnchorPlacement(anchorRect, stickyTop, viewportHeight) {
   if (!anchorRect || !Number.isFinite(anchorRect.top) || !Number.isFinite(anchorRect.bottom)) return null;
@@ -54,11 +56,10 @@ export function sheetAnchorPlacement(anchorRect, stickyTop, viewportHeight) {
   const pinnedTop = Number.isFinite(stickyTop) ? stickyTop : anchorRect.top;
   // Menú por encima de la pantalla (no debería pasar con sticky): sin anclar.
   if (anchorRect.bottom <= 0) return null;
-  // Menú aún sin pegar (la cabecera de la ficha sigue a la vista): se sube la
-  // página lo justo para que quede pegado y el panel tenga todo el alto.
-  const scrollBy = anchorRect.top > pinnedTop + 1 ? Math.round(anchorRect.top - pinnedTop) : 0;
-  const top = Math.round(anchorRect.bottom - scrollBy);
-  // Si ni así cabe un panel útil (pantalla muy baja), a pantalla completa.
+  // Menú aún sin pegar (la cabecera de la ficha sigue a la vista).
+  if (anchorRect.top > pinnedTop + 1) return null;
+  const top = Math.round(anchorRect.bottom);
+  // Si no cabe un panel útil (pantalla muy baja), a pantalla completa.
   if (viewportHeight - top < viewportHeight * 0.4) return null;
-  return { scrollBy, top };
+  return { top };
 }

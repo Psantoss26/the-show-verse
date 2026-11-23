@@ -161,11 +161,12 @@ export default function SectionSheet({
   // `null` a pantalla completa. Se mide al abrir, antes de pintar.
   const [anchorTop, setAnchorTop] = useState(null);
 
-  // Antes de bloquear el scroll (useModalGuard lo hace en un efecto, después
-  // de este): si el menú de secciones aún no está pegado bajo la barra, se
-  // sube la página lo justo para que lo esté, y el panel empieza debajo.
+  // Con el menú de secciones ya pegado bajo la barra, el panel empieza
+  // debajo; si aún no lo está (primeras secciones), a pantalla completa.
+  // Sin esperar a portalReady: ese llega en un render posterior, cuando
+  // useModalGuard ya ha bloqueado el scroll y el menú ha perdido su sitio.
   useLayoutEffect(() => {
-    if (!isOpen || !portalReady) return undefined;
+    if (!isOpen) return undefined;
     if (!window.matchMedia?.(`(max-width: ${SHEET_ANCHOR_MAX_WIDTH}px)`).matches) {
       setAnchorTop(null);
       return undefined;
@@ -178,11 +179,9 @@ export default function SectionSheet({
       setAnchorTop(null);
       return undefined;
     }
-    if (placement.scrollBy) window.scrollBy({ top: placement.scrollBy, behavior: "instant" });
-    // Medida real tras desplazar (la página puede no dar para todo el salto).
-    setAnchorTop(Math.round(anchor.getBoundingClientRect().bottom));
+    setAnchorTop(placement.top);
     return undefined;
-  }, [isOpen, portalReady]);
+  }, [isOpen]);
   // Panel anclado bajo el menú: la barra inferior sube por encima y la barra
   // superior y el menú conservan su cristal (globals.css). Hasta que acaba
   // la salida, para que la barra no se esconda tras el panel que se va.

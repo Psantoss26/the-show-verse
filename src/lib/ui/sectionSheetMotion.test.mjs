@@ -12,11 +12,14 @@ import {
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 
 test("el panel empieza bajo un menú ya pegado sin desplazar la página", () => {
-  assert.deepEqual(sheetAnchorPlacement({ top: 64, bottom: 120 }, 64, 800), { scrollBy: 0, top: 120 });
+  assert.deepEqual(sheetAnchorPlacement({ top: 64, bottom: 120 }, 64, 800), { top: 120 });
 });
 
-test("si el menú aún no está pegado, se sube la página lo justo", () => {
-  assert.deepEqual(sheetAnchorPlacement({ top: 600, bottom: 656 }, 64, 800), { scrollBy: 536, top: 120 });
+test("si el menú aún no está pegado, pantalla completa y sin mover la página", () => {
+  assert.equal(sheetAnchorPlacement({ top: 600, bottom: 656 }, 64, 800), null);
+  assert.equal(sheetAnchorPlacement({ top: 66, bottom: 122 }, 64, 800), null);
+  const sheet = read("components/details/sectionSheet/SectionSheet.jsx");
+  assert.doesNotMatch(sheet, /window\.scrollBy/);
 });
 
 test("sin menú medible o sin sitio útil, pantalla completa", () => {
