@@ -60,3 +60,12 @@ test("movimiento reducido: sin transform, solo fundidos cortos", () => {
   assert.equal(m.panel, null);
   assert.ok(m.duration <= 160);
 });
+
+test("el modal de puntuación nace del botón y vuelve a él", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(new URL("../../components/StarRating.jsx", import.meta.url), "utf8");
+  assert.match(source, /useActionModalMotion\(open\)/);
+  assert.match(source, /ref=\{modalPanelRef\}/);
+  assert.match(source, /ref=\{modalBackdropRef\}/);
+  assert.doesNotMatch(source, /animate-in/);
+});

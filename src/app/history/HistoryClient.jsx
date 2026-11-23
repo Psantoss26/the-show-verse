@@ -48,6 +48,7 @@ import { isServerUnavailable } from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import HistorySectionNav from "@/components/HistorySectionNav";
 import { useSiblingArrival } from "@/lib/hooks/useSiblingArrival";
 import { useStatCardsHandoff } from "@/lib/hooks/useStatCardsHandoff";
@@ -2680,13 +2681,46 @@ function EpisodeSubItem({
   );
 }
 
-function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
+// Nace de la tarjeta del grupo pulsada y vuelve a ella al cerrar, como los
+// modales de los botones de acción de las fichas (useActionModalMotion). Esta
+// envoltura queda montada en cada tarjeta agrupada para poder animar la salida;
+// el contenido (y su carga de metadatos) solo existe mientras el modal se ve.
+function ExpandedGroupView({ open, entry, onCollapse, onRemoveFromHistory, busyId }) {
+  const {
+    present: modalPresent,
+    closing: modalClosing,
+    panelRef: modalPanelRef,
+    backdropRef: modalBackdropRef,
+  } = useActionModalMotion(open);
+  useModalGuard({ open, onClose: onCollapse });
+  if (!modalPresent || typeof document === "undefined") return null;
+  return (
+    <ExpandedGroupPanel
+      entry={entry}
+      onCollapse={onCollapse}
+      onRemoveFromHistory={onRemoveFromHistory}
+      busyId={busyId}
+      closing={modalClosing}
+      panelRef={modalPanelRef}
+      backdropRef={modalBackdropRef}
+    />
+  );
+}
+
+function ExpandedGroupPanel({
+  entry,
+  onCollapse,
+  onRemoveFromHistory,
+  busyId,
+  closing,
+  panelRef,
+  backdropRef,
+}) {
   const title = getMainTitle(entry);
   const tmdbId = getTmdbId(entry);
   const episodes = Array.isArray(entry?._group) ? entry._group : [];
   const episodeMetadata = useHistoryEpisodeMetadata(tmdbId, episodes);
   const href = tmdbId ? `/details/tv/${tmdbId}` : "#";
-  const [mounted, setMounted] = useState(false);
   // Pulsar el título/póster de la serie abre su PREVIEW (drawer), no navega.
   const previewClick = usePreviewOpen();
   const onSeriesPreview = previewClick(entry, {
@@ -2694,35 +2728,24 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
     mediaType: "tv",
   });
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useModalGuard({ open: mounted, onClose: onCollapse });
-
-  if (!mounted) return null;
-
   return createPortal(
-    <motion.div
+    <div
       // z-[10000] > z-[9999] de DetailModal: el modal de grupo tapa una preview
       // abierta antes; la que se abre DESDE él sube a z-[10001] (`overModal`) y
       // queda encima. Con el drawer derecho abierto, `right: var(--sv-drawer-width)`
       // restringe su zona (y su fondo difuminado) al espacio LIBRE a la izquierda,
       // así se centra ahí y NO tapa la preview. Sin drawer la var es 0px → ventana
       // completa (centrado normal). El cambio de anchura se anima con transition.
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-4 transition-[right] duration-300 ease-out sm:p-6"
+      className={`fixed inset-0 z-[10000] flex items-center justify-center p-4 transition-[right] duration-300 ease-out sm:p-6${closing ? " pointer-events-none" : ""}`}
       style={{ right: "var(--sv-drawer-width, 0px)" }}
       // Marca de "capa de modal": el drawer derecho de DetailModal se cierra con un
       // listener global de click salvo dentro de `[data-detail-modal-layer]`. Sin
       // esto, cualquier clic en este modal (backdrop o panel) cerraría la preview.
       data-detail-modal-layer=""
       onClick={(e) => e.stopPropagation()}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
     >
       <div
+        ref={backdropRef}
         className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={(e) => {
           e.preventDefault();
@@ -2732,17 +2755,14 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
         aria-hidden="true"
       />
 
-      <motion.section
+      <section
+        ref={panelRef}
         className={`relative isolate flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="history-grouped-episodes-title"
         aria-describedby="history-grouped-episodes-description"
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
       >
         <div
           className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.05),transparent_42%)]"
@@ -2814,8 +2834,8 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
             />;
           })}
         </div>
-      </motion.section>
-    </motion.div>,
+      </section>
+    </div>,
     document.body,
   );
 }
@@ -4873,6 +4893,7 @@ export default function HistoryClient() {
                           className="relative cursor-pointer"
                         >
                           <div
+                            data-action-modal-origin=""
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -4891,18 +4912,13 @@ export default function HistoryClient() {
                               {...extraProps}
                             />
                           </div>
-                          <AnimatePresence>
-                            {isExpanded && (
-                              <ExpandedGroupView
-                                entry={entry}
-                                onCollapse={() =>
-                                  toggleExpandGroup(collapseKey)
-                                }
-                                onRemoveFromHistory={removeFromHistory}
-                                busyId={mutatingId}
-                              />
-                            )}
-                          </AnimatePresence>
+                          <ExpandedGroupView
+                            open={isExpanded}
+                            entry={entry}
+                            onCollapse={() => toggleExpandGroup(collapseKey)}
+                            onRemoveFromHistory={removeFromHistory}
+                            busyId={mutatingId}
+                          />
                         </div>
                       );
                     }

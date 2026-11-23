@@ -4,6 +4,7 @@ import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGl
 
 import { useEffect, useId, useRef, useState } from "react";
 import useModalGuard from "@/hooks/useModalGuard";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { useCenteredGlyphOffset } from "@/hooks/useCenteredGlyphOffset";
 import { createPortal } from "react-dom";
 import { Star, X, Minus, Plus, Loader2, Trash2 } from "lucide-react";
@@ -78,6 +79,14 @@ export default function StarRating({
 
   // Comportamiento común del modal: bloqueo de scroll de fondo + cierre con Esc.
   useModalGuard({ open, onClose: () => setOpen(false) });
+  // Nace del botón de puntuar y vuelve a él al cerrar (como los demás modales
+  // de los botones de acción de las fichas).
+  const {
+    present: modalPresent,
+    closing: modalClosing,
+    panelRef: modalPanelRef,
+    backdropRef: modalBackdropRef,
+  } = useActionModalMotion(open);
 
   // normaliza a step + clamp
   const normalize = (v) => {
@@ -206,23 +215,25 @@ export default function StarRating({
 
       {/* --- MODAL --- */}
       {mounted &&
-        open &&
+        modalPresent &&
         createPortal(
           <div
             data-detail-modal-layer=""
-            className={`fixed inset-0 ${layerClassName} flex items-center justify-center p-4 sm:p-6`}
+            className={`fixed inset-0 ${layerClassName} flex items-center justify-center p-4 sm:p-6${modalClosing ? " pointer-events-none" : ""}`}
             onPointerDown={stopModalEvent}
             onMouseDown={stopModalEvent}
             onClick={stopModalEvent}
           >
             <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
+              ref={modalBackdropRef}
+              className="absolute inset-0 bg-black/60 backdrop-blur-lg"
               onClick={closeFromEvent}
               aria-hidden="true"
             />
 
             <div
-              className={`relative w-full max-w-sm overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+              ref={modalPanelRef}
+              className={`relative w-full max-w-sm overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
               role="dialog"
               aria-modal="true"
               aria-labelledby={titleId}
