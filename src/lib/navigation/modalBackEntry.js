@@ -21,6 +21,7 @@
 // - Los demás oyentes de `popstate` (vista previa en cajón, vista previa móvil)
 //   ignoran los que atiende este módulo: `wasModalHistoryPop()`.
 
+import { setAppModalOpen } from "../android/appBridge.js";
 import {
   CLEAN_BACK_KEY,
   isCleanBackEntry,
@@ -36,6 +37,15 @@ export const NAVIGATION_INTENT_MS = 1500;
 
 const stack = [];
 let ignorePops = 0;
+let notifiedOpen = false;
+
+/** La app de Android solo anima la página al volver si no hay modal abierto. */
+function syncAppModalState() {
+  const open = stack.length > 0;
+  if (open === notifiedOpen) return;
+  notifiedOpen = open;
+  setAppModalOpen(open);
+}
 let handledPop = false;
 let navigationIntentAt = -Infinity;
 let staleSeq = 0;
@@ -114,6 +124,7 @@ function onPopState() {
   if (stack.length <= depth) return;
   flagHandled();
   const closing = stack.splice(depth);
+  syncAppModalState();
   for (let i = closing.length - 1; i >= 0; i -= 1) {
     closing[i].popped = true;
     closing[i].close();
@@ -135,6 +146,7 @@ if (typeof window !== "undefined") {
 export function openModalEntry(close) {
   const record = { close, popped: false, depth: stack.length + 1 };
   stack.push(record);
+  syncAppModalState();
   const state = window.history.state;
   if (modalDepthOf(state) === record.depth && !state?.[STALE_KEY]) return record;
   const next = withModalDepth(state, record.depth);
@@ -152,6 +164,7 @@ export function openModalEntry(close) {
 export function closeModalEntry(record) {
   const index = stack.indexOf(record);
   if (index !== -1) stack.splice(index, 1);
+  syncAppModalState();
   if (record.popped) return;
   const state = window.history.state;
   if (modalDepthOf(state) !== record.depth || state?.[STALE_KEY]) return;

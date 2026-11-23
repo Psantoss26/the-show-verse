@@ -49,6 +49,7 @@ class WebAppBridge(
     private val radioEsquina: () -> Double = { 0.0 },
     private val paginaPintada: () -> Unit = {},
     private val cambiarBarraEstado: (Boolean) -> Unit = {},
+    private val cambiarModalAbierto: (Boolean) -> Unit = {},
 ) {
 
     /**
@@ -251,6 +252,17 @@ class WebAppBridge(
     fun backPainted() {
         if (!propio()) return
         activity.runOnUiThread { paginaPintada() }
+    }
+
+    /**
+     * La web abre o cierra un modal que se cierra con atrás (ver
+     * src/lib/navigation/modalBackEntry.js). Con uno abierto, atrás solo lo
+     * cierra: la app no anima el cambio de página (AtrasPredictivo).
+     */
+    @JavascriptInterface
+    fun setModalOpen(abierto: Boolean) {
+        if (!propio()) return
+        activity.runOnUiThread { cambiarModalAbierto(abierto) }
     }
 
     /** Literal JS seguro: el token y los mensajes van dentro de una cadena. */

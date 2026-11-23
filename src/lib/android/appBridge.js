@@ -19,6 +19,15 @@ function bridge() {
   return raw && typeof raw.isApp === "function" ? raw : null;
 }
 
+/**
+ * Avisa a la app de que hay (o no) un modal abierto que se cierra con atrás:
+ * con uno abierto, el gesto de atrás solo lo cierra y la app no anima el cambio
+ * de página. Una app sin el método sigue con su animación de siempre.
+ */
+export function setAppModalOpen(open) {
+  call("setModalOpen", undefined, Boolean(open));
+}
+
 /** ¿La página se está ejecutando dentro de la app de Android? */
 export function isAndroidApp() {
   return bridge() != null;

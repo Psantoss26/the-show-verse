@@ -45,8 +45,8 @@ test("el icono se pinta con su color esté activa o no la sección", async () =>
 
   // Igual que «Asistente», que va siempre en cian: la fila activa ya se
   // distingue por su fondo y su negrita, no por encender el icono.
-  assert.match(navbar, /<Icon className=\{`h-4 w-4 shrink-0 \$\{tone\}`\} \/>/);
-  assert.match(navbar, /<Sparkles className="h-4 w-4 shrink-0 text-cyan-400" \/>/);
+  assert.match(navbar, /<Icon className=\{`h-\[18px\] w-\[18px\] shrink-0 \$\{tone\}`\} \/>/);
+  assert.match(navbar, /<Sparkles className="h-\[18px\] w-\[18px\] shrink-0 text-cyan-400" \/>/);
 });
 
 test("el color coincide con el que usa esa sección en el menú móvil", async () => {

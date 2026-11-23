@@ -153,7 +153,9 @@ export default function SectionSheet({
   const layerRef = useRef(null);
   const scrimRef = useRef(null);
   // Bloquea el scroll de la ficha y cierra con Escape.
-  useModalGuard({ open: isOpen, onClose: close });
+  // En táctil (móvil, tableta, app de Android), atrás cierra solo la vista
+  // lateral y deja la ficha (lib/navigation/modalBackEntry).
+  useModalGuard({ open: isOpen, onClose: close, closeOnBack: true });
 
   // Entrada y salida con WAAPI (en el compositor; solo transform y el
   // velo). Al terminar la entrada se marca la página tapada

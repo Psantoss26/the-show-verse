@@ -91,6 +91,9 @@ class WebAppActivity : AppCompatActivity() {
     private var portadaIntentada = false
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var customView: View? = null
+
+    /** Hay un modal de la web abierto: atrás lo cierra sin animar la página. */
+    private var modalWebAbierto = false
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
     /** Medidor de fotogramas de diagnóstico; null mientras está apagado. */
@@ -263,6 +266,7 @@ class WebAppActivity : AppCompatActivity() {
                 { radioEsquinaCss },
                 { if (::atras.isInitialized) atras.paginaPintada() },
                 ::cambiarBarraEstado,
+                { abierto -> modalWebAbierto = abierto },
             ),
             WebAppBridge.NAME,
         )
@@ -302,6 +306,7 @@ class WebAppActivity : AppCompatActivity() {
             // Una página nueva no hereda el panel abierto de la anterior: si la
             // web se fue con el bloqueo puesto, aquí se libera.
             recargaBloqueada = false
+            modalWebAbierto = false
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
@@ -498,7 +503,9 @@ class WebAppActivity : AppCompatActivity() {
                     indice = lista.currentIndex,
                 )
             },
-            animable = { customView == null },
+            // Con un modal de la web abierto, atrás solo lo cierra (la web lo
+            // anima): ni encogido ni foto de la página anterior.
+            animable = { customView == null && !modalWebAbierto },
             // Lo que la web acaba de pintar llega a pantalla en el siguiente
             // dibujado del WebView: entonces se puede quitar lo que lo tapa.
             confirmarPintado = { listo ->
