@@ -1428,7 +1428,7 @@ function DiaryGroupedEpisodesModal({ entry, onClose }) {
         aria-hidden="true"
       />
       <motion.section
-        className={`relative isolate flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+        className={`relative isolate flex sv-modal-max-h w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"

@@ -2,12 +2,13 @@
 // sitio para la duración y la curva de la entrada y la salida.
 
 // Entrada: deceleración larga, sin rebote (la curva de las hojas de iOS). La
-// salida es más corta y acelera al irse: así el cierre se siente inmediato
-// sin cortar el gesto de golpe.
+// salida es más corta y acelera al irse, pero arranca ya con velocidad: con
+// una curva que sale parada (0.4, 0, 0.9, 0.6) en 50 ms solo había recorrido
+// un 4 % y la X parecía tardar en responder; ahora un 16 %.
 // También la usan las vistas previas de la ficha (DetailModal y su drawer, el
 // panel de temporada/episodio y la vista previa móvil): todas se mueven igual.
 const ENTER_CURVE = [0.32, 0.72, 0, 1];
-const EXIT_CURVE = [0.4, 0, 0.9, 0.6];
+const EXIT_CURVE = [0.2, 0.2, 0.9, 0.6];
 const ENTER_MS = 420;
 const EXIT_MS = 260;
 const cubic = (curve) => `cubic-bezier(${curve.join(", ")})`;

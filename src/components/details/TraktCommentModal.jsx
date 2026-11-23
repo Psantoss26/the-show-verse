@@ -140,7 +140,7 @@ export default function TraktCommentModal({
       />
 
       {/* Modal Card */}
-      <div ref={actionMotion.panelRef} className={`relative w-full max-w-xl flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}>
+      <div ref={actionMotion.panelRef} className={`relative w-full max-w-xl flex flex-col sv-modal-max-h overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}>
         {/* Header */}
         <div className={`flex w-full items-center justify-between px-5 py-4 sm:px-6 sm:py-6 ${LIQUID_GLASS_MODAL_HEADER} shrink-0`}>
           <div>

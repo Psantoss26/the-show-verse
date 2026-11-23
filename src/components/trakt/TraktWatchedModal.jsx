@@ -354,7 +354,7 @@ export default function TraktWatchedModal({
       {/* Modal Container */}
       <div
         ref={actionMotion.panelRef}
-        className={`relative flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+        className={`relative flex sv-modal-max-h w-full max-w-md flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
         role="dialog"
         aria-modal="true"
         aria-label="Historial de visionados"

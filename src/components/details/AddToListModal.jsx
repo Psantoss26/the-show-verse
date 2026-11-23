@@ -103,7 +103,7 @@ export default function AddToListModal(props) {
       />
 
       {/* Modal */}
-      <div ref={actionMotion.panelRef} className={`relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}>
+      <div ref={actionMotion.panelRef} className={`relative w-full max-w-xl flex flex-col sv-modal-max-h overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}>
         {/* Header */}
         <div className={`flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER} shrink-0`}>
           <div>

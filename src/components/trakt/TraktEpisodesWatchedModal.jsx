@@ -1281,7 +1281,7 @@ export default function TraktEpisodesWatchedModal({
   // La ficha de episodios mantiene una altura estable antes de cargar. Ambos
   // modales de episodios se limitan a 90dvh para respirar un 5% por arriba y
   // abajo, en cualquier tamaño de pantalla.
-  const PanelClass = `relative z-[10060] flex w-full max-w-5xl ${isMovie ? "max-h-[85dvh] sm:max-h-[85vh]" : "h-[90dvh] max-h-[90dvh]"} flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_DETAIL_SURFACE}`;
+  const PanelClass = `relative z-[10060] flex w-full max-w-5xl ${isMovie ? "sv-modal-max-h" : "sv-modal-h"} flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_DETAIL_SURFACE}`;
 
   const ButtonBase =
     "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed";

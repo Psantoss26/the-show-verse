@@ -8,7 +8,7 @@
 // Qué sección está abierta vive en un `valueStore`, no en el estado de la
 // ficha: abrir o cerrar un panel solo re-renderiza este anfitrión.
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   CheckCircle2,
   Clapperboard,
@@ -76,7 +76,7 @@ export function openActorSectionSheet(store, id) {
 
 export default function ActorSectionSheets({ store, data }) {
   const openId = useSyncExternalStore(store.subscribe, store.get, serverSnapshot);
-  const close = () => store.set(null);
+  const close = useCallback(() => store.set(null), [store]);
   // Sigue montado mientras sale (ver SectionSheet).
   const { shownId, presence } = useSheetPresence(openId && SECTIONS[openId] ? openId : null);
   if (!shownId) return null;
@@ -88,7 +88,10 @@ export default function ActorSectionSheets({ store, data }) {
   );
 }
 
-function SheetContent({ id, data, onClose }) {
+// `memo`: al cerrar solo cambia la presencia (que lee SectionSheet por
+// contexto); sin él, el clic en la X volvía a renderizar toda la lista antes
+// de que arrancara la salida.
+const SheetContent = memo(function SheetContent({ id, data, onClose }) {
   const meta = SECTIONS[id];
   const [tab, setTab] = useState(null);
   const [query, setQuery] = useState("");
@@ -101,7 +104,7 @@ function SheetContent({ id, data, onClose }) {
     return <CreditsSheet {...props} items={data[id]} rawItems={data[`${id}Raw`]} />;
   }
   return <TitlesSheet {...props} items={data[id]} />;
-}
+});
 
 // Notas de IMDb de los títulos del panel, POR TRAMOS según se ven: Películas
 // y Series pueden pasar del centenar y pedirlas todas al abrir era una ráfaga

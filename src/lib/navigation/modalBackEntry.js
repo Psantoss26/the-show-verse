@@ -10,7 +10,10 @@
 //   abierto encima…). Al llegar un `popstate` con una profundidad menor que la
 //   pila, se cierran los modales que sobran, del de arriba al de abajo.
 // - Cerrar el modal desde la interfaz (X, fondo, Escape) deshace su entrada con
-//   `history.back()`. Antes la marca como entrada de captura limpia
+//   `history.back()`, pero cuando ya ha salido (`CLOSE_BACK_DELAY_MS`): el
+//   `popstate` vuelve a renderizar la página con el router y, lanzado en el
+//   mismo instante, retenía el primer fotograma de la salida (la X tardaba en
+//   responder). Antes la marca como entrada de captura limpia
 //   (`svCleanBack`, ver backGestureCapture): si el cierre viene de pulsar un
 //   enlace del modal o de un `router.push`, no se vuelve atrás (anularía la
 //   navegación en curso) y la navegación SUSTITUYE la entrada
@@ -34,6 +37,10 @@ const TOUCH_QUERY = "(hover: none) and (pointer: coarse)";
 /** Un clic en un enlace o un `router.push` así de reciente cuenta como «el
  * modal se cierra para navegar». */
 export const NAVIGATION_INTENT_MS = 1500;
+/** Lo que tarda en salir el modal más lento (SectionSheet, DetailModal: 260 ms)
+ * y un margen: hasta entonces la entrada del modal cerrado sigue en el
+ * historial, ya marcada como de captura limpia. */
+export const CLOSE_BACK_DELAY_MS = 320;
 
 const stack = [];
 let ignorePops = 0;
@@ -179,5 +186,5 @@ export function closeModalEntry(record) {
     if (window.history.state?.[STALE_KEY] !== token) return;
     ignorePops += 1;
     window.history.back();
-  }, 0);
+  }, CLOSE_BACK_DELAY_MS);
 }

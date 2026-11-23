@@ -59,7 +59,7 @@ export default function ListActionModal({ open, onClose, title, subtitle, footer
             <div
                 ref={panelRef}
                 tabIndex={-1}
-                className={`relative flex max-h-[85dvh] w-full ${SIZES[size] || SIZES.md} flex-col overflow-hidden rounded-[2rem] outline-none ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+                className={`relative flex sv-modal-max-h w-full ${SIZES[size] || SIZES.md} flex-col overflow-hidden rounded-[2rem] outline-none ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
             >
                 <div className={`flex w-full shrink-0 items-center justify-between gap-4 ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
                     <div className="min-w-0">

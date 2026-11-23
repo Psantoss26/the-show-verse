@@ -10,7 +10,7 @@
 // ficha, que ya los tiene cargados; el equipo técnico y las notas de IMDb de
 // recomendaciones se piden aquí al abrir su vista, con caché compartida.
 
-import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   Bookmark,
@@ -113,7 +113,10 @@ export default function DetailsSectionSheets({ store, data }) {
   );
 }
 
-function SheetContent({ id, data, onClose }) {
+// `memo`: al cerrar solo cambia la presencia (que lee SectionSheet por
+// contexto); sin él, el clic en la X volvía a renderizar toda la lista antes
+// de que arrancara la salida.
+const SheetContent = memo(function SheetContent({ id, data, onClose }) {
   const meta = SECTIONS[id];
   const [tab, setTab] = useState(null);
   const [query, setQuery] = useState("");
@@ -134,7 +137,7 @@ function SheetContent({ id, data, onClose }) {
   };
   const View = views[id];
   return <View meta={meta} {...props} />;
-}
+});
 
 // ─── Reparto y equipo ──────────────────────────────────────────────────────
 

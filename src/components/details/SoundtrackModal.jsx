@@ -296,7 +296,7 @@ export default function SoundtrackModal({
         // En pantallas bajas el reproductor (con el interruptor de reproducción
         // automática) no cabe: se desplaza por dentro en vez de salirse.
         ref={actionMotion.panelRef}
-        className={`relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[460px] flex-col overflow-y-auto overscroll-contain rounded-[2rem] [scrollbar-width:none] ${LIQUID_GLASS_PANEL}`}
+        className={`relative flex sv-modal-max-h w-full max-w-[460px] flex-col overflow-y-auto overscroll-contain rounded-[2rem] [scrollbar-width:none] ${LIQUID_GLASS_PANEL}`}
         role="dialog"
         aria-modal="true"
         aria-label={`Soundtrack de ${title || "este título"}`}

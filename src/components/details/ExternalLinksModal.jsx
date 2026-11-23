@@ -74,7 +74,7 @@ export default function ExternalLinksModal({
                 entrada con los modales de tráiler, lista y soundtrack. */}
             <div
                 ref={actionMotion.panelRef}
-                className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+                className={`relative flex sv-modal-max-h w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
             >
                         <div className={`flex w-full shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
                             <div className="min-w-0">

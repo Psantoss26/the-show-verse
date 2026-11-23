@@ -2879,7 +2879,7 @@ function ExpandedGroupPanel({
 
       <section
         ref={panelRef}
-        className={`relative isolate flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+        className={`relative isolate flex sv-modal-max-h w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -2994,7 +2994,7 @@ function MobileDayTitlesModal({ dayKey, items, onClose }) {
       />
 
       <motion.section
-        className={`relative isolate flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+        className={`relative isolate flex sv-modal-max-h w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

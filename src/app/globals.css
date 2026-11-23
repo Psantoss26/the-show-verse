@@ -2487,6 +2487,30 @@ html[data-android-app] {
   --sv-safe-bottom: var(--sv-android-bottom, env(safe-area-inset-bottom, 0px));
 }
 
+/* ALTO MÁXIMO DE LOS MODALES CENTRADOS (botones de acción de las fichas,
+   episodios agrupados del Historial…): nunca rozan los bordes de la pantalla.
+   Dejan arriba y abajo un margen que crece con el alto disponible (7 % del
+   alto, entre 2,5 y 5,5 rem) más las zonas seguras (cámara, barra de gestos,
+   barras de la app de Android). Clase `.sv-modal-max-h`; si el contenido no
+   cabe, el modal desplaza por dentro. */
+:root {
+  --sv-modal-gap: clamp(2.5rem, 7dvh, 5.5rem);
+  --sv-modal-max-h: calc(
+    100dvh - var(--sv-safe-top, 0px) - var(--sv-safe-bottom, 0px) - 2 *
+      var(--sv-modal-gap)
+  );
+}
+
+.sv-modal-max-h {
+  max-height: var(--sv-modal-max-h);
+}
+
+/* Modal que ocupa siempre todo ese alto (no solo como tope). */
+.sv-modal-h {
+  height: var(--sv-modal-max-h);
+  max-height: var(--sv-modal-max-h);
+}
+
 /* App de Android con la barra de estado VISIBLE (modo elegido en Ajustes,
    `data-android-statusbar`): la barra es transparente y deja ver el fondo de
    cada página, pero la portada de las fichas empieza justo debajo de ella; en

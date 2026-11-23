@@ -1770,7 +1770,7 @@ function AddProgressModal({ existingKeys, onAdded, onClose }) {
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
-        className={`relative flex max-h-[85dvh] w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+        className={`relative flex sv-modal-max-h w-full max-w-xl flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
       >
         <header className="flex w-full shrink-0 items-center justify-between gap-4 bg-white/[0.025] p-6 sm:px-8 sm:pb-6 sm:pt-8">
           <div className="min-w-0">

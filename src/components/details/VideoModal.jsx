@@ -259,7 +259,7 @@ export default function VideoModal({
 
       {/* MODAL CONTAINER: Liquid Glass */}
       <div
-        className={`relative w-full max-h-[calc(100dvh-0.5rem)] flex flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+        className={`relative w-full sv-modal-max-h flex flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
         role="dialog"
         aria-modal="true"
       >
@@ -315,7 +315,7 @@ export default function VideoModal({
         </div>
 
         {/* VIDEO AREA: Aspect Ratio cinematográfico */}
-        <div className="relative w-full aspect-square max-h-[calc(100dvh-11.5rem)] sm:aspect-video sm:max-h-none bg-black/40 group">
+        <div className="relative w-full aspect-square max-h-[calc(var(--sv-modal-max-h)-11rem)] sm:aspect-video sm:max-h-none bg-black/40 group">
           {embed ? (
             <iframe
               ref={iframeRef}
