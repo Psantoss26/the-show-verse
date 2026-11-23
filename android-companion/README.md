@@ -64,7 +64,8 @@ backend guarda el origen de cada detección (`android` / `browser`).
 
 ```
 WebAppActivity  ── carcasa: WebView a pantalla completa con theshowverse.com
-      │              (sesión, tráileres, enlaces externos, offline, recarga)
+      │              (sesión, tráileres, enlaces externos, offline; sin
+      │              deslizar para recargar: reintentar solo tras error)
       │
       ├── WebAppBridge  ── window.TSVAndroidBridge: la web habla con el nativo
       │                     (emparejar, ver permisos, abrir ajustes, compartir)

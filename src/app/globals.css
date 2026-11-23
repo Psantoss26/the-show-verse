@@ -1405,9 +1405,9 @@ html {
    los navegadores (Safari desde iOS 16).
 
    CONTRAPARTIDA, ya valorada: en una PESTAÑA de Chrome Android también
-   desactiva su "deslizar hacia abajo para recargar". No afecta a la app de
-   Android (su recarga es nativa y solo mira si el WebView está arriba) ni a la
-   PWA instalada (en modo standalone Chrome no ofrece ese gesto).
+   desactiva su "deslizar hacia abajo para recargar". La app de Android
+   no tiene ese gesto (lo quita en nativo) y la PWA instalada tampoco (en modo
+   standalone Chrome no lo ofrece).
    Los contenedores con scroll propio (modales, carruseles) siguen con su
    `overscroll-behavior` para no encadenar el desplazamiento a la página. */
 html,

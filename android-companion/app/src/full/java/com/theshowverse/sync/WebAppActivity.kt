@@ -184,8 +184,8 @@ class WebAppActivity : AppCompatActivity() {
 
         // Sin estirado al llegar al principio o al final de la página: la web
         // ya lo corta con `overscroll-behavior-y: none` y así tampoco lo dibuja
-        // el WebView. La recarga al deslizar es del SwipeRefreshLayout y no
-        // depende de esto.
+        // el WebView. (La app no tiene "deslizar para recargar": ver
+        // configurarRefresco.)
         web.overScrollMode = View.OVER_SCROLL_NEVER
 
         web.settings.apply {
@@ -701,49 +701,24 @@ class WebAppActivity : AppCompatActivity() {
         binding.refresh.setProgressViewOffset(false, INICIO_INDICADOR_DP + enDp, FIN_INDICADOR_DP + enDp)
     }
 
-    // La web tiene abierto un panel con scroll propio (ver
-    // WebAppBridge.setPullToRefreshLocked): mientras tanto, arrastrar hacia abajo
-    // es para ese panel, nunca para recargar.
+    // La web avisa por el puente de que tiene abierto un panel con scroll propio
+    // (WebAppBridge.setPullToRefreshLocked). Ya no hace falta para nada: el
+    // gesto de deslizar para recargar está quitado (ver configurarRefresco), pero
+    // la web lo sigue llamando y se deja como no-op.
     private var recargaBloqueada = false
 
     private fun bloquearRecarga(bloqueada: Boolean) {
         recargaBloqueada = bloqueada
-        if (!binding.refresh.isRefreshing) {
-            binding.refresh.isEnabled = !bloqueada && binding.webView.scrollY <= 0
-        }
     }
 
     private fun configurarRefresco() {
-        // Deslizar para recargar SOLO cuando la página está arriba del todo: si
-        // no, el gesto compite con el scroll y con los carruseles horizontales.
-        binding.refresh.setOnChildScrollUpCallback { _, _ ->
-            recargaBloqueada || binding.webView.scrollY > 0
-        }
-
-        // Y, ADEMÁS, se APAGA mientras no estás arriba del todo.
-        //
-        // El callback de arriba evita que el gesto dispare la recarga, pero el
-        // contenedor sigue en el camino del táctil: cada movimiento del dedo pasa
-        // por su `onInterceptTouchEvent` antes de llegar al WebView. Chrome/PWA no
-        // tiene ningún contenedor así, y esa diferencia se nota como un arranque
-        // del desplazamiento menos inmediato. Desactivado, Android se lo salta
-        // entero y los eventos van directos al WebView.
-        binding.refresh.isEnabled = true
-        binding.webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
-            val activo = scrollY <= 0 && !recargaBloqueada
-            if (binding.refresh.isEnabled != activo && !binding.refresh.isRefreshing) {
-                binding.refresh.isEnabled = activo
-            }
-        }
-        binding.refresh.setColorSchemeColors(ContextCompat.getColor(this, R.color.tsv_amber))
-        binding.refresh.setProgressBackgroundColorSchemeColor(
-            ContextCompat.getColor(this, R.color.tsv_black),
-        )
-        binding.refresh.setOnRefreshListener {
-            ocultarError()
-            portadaIntentada = false
-            binding.webView.reload()
-        }
+        // SIN "deslizar hacia abajo para recargar". Arrastrar desde arriba del
+        // todo recargaba la página entera por accidente (y perdía lo que tenías
+        // abierto). El contenedor se queda en el layout, pero siempre
+        // DESACTIVADO: así Android ni siquiera le pasa el táctil
+        // (`onInterceptTouchEvent`) y los eventos van directos al WebView. Para
+        // reintentar tras un error queda el botón de la pantalla de error.
+        binding.refresh.isEnabled = false
     }
 
     /** Enlace externo: pestaña personalizada, que conserva el aspecto de la app. */
