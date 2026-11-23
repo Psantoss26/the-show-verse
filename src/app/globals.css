@@ -53,6 +53,15 @@
   }
 }
 
+/* Pantalla BAJA y apaisada (móvil en horizontal, ventana muy baja): el
+ * reproductor del SoundtrackModal no cabe en columna y pasa a dos columnas
+ * (portada | controles) para no desplazarse ni recortarse. */
+@custom-variant modal-short {
+  @media (max-height: 45rem) and (min-aspect-ratio: 4 / 3) {
+    @slot;
+  }
+}
+
 /* La app es SIEMPRE oscura: no existe tema claro. Estos dos tokens venían del
    boilerplate de create-next-app con su par claro/oscuro (#ffffff / #0a0a0a) y
    el único sitio que los consume es la regla `body` de más abajo.

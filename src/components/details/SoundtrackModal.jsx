@@ -293,10 +293,12 @@ export default function SoundtrackModal({
       />
 
       <div
-        // En pantallas bajas el reproductor (con el interruptor de reproducción
-        // automática) no cabe: se desplaza por dentro en vez de salirse.
+        // El reproductor se ajusta al alto disponible sin desplazarse: la
+        // portada encoge y los huecos entre bloques se estrechan con el alto
+        // de la pantalla (ver el contenedor de la pista). `overflow-y-auto`
+        // queda solo como red de seguridad en alturas absurdas.
         ref={actionMotion.panelRef}
-        className={`relative flex sv-modal-max-h w-full max-w-[460px] flex-col overflow-y-auto overscroll-contain rounded-[2rem] [scrollbar-width:none] ${LIQUID_GLASS_PANEL}`}
+        className={`relative flex sv-modal-max-h w-full max-w-[460px] modal-short:max-w-[44rem] flex-col overflow-y-auto overscroll-contain rounded-[2rem] [scrollbar-width:none] ${LIQUID_GLASS_PANEL}`}
         role="dialog"
         aria-modal="true"
         aria-label={`Soundtrack de ${title || "este título"}`}
@@ -313,9 +315,16 @@ export default function SoundtrackModal({
             </p>
           </div>
         ) : selectedTrack ? (
-          <div className="flex flex-col p-8 items-center w-full">
+          // Columna flexible: `min-h-0` deja que encoja al tope del panel y
+          // la portada (único bloque con `min-h` bajo) absorbe lo que falte.
+          // Huecos y relleno vertical con `clamp(…dvh…)`: anchos en pantallas
+          // altas, estrechos en las bajas. En pantalla baja y apaisada
+          // (`modal-short:`, móvil en horizontal) no cabe en columna: rejilla
+          // de dos columnas, portada a la izquierda y el resto a la derecha
+          // (controles y volumen comparten fila).
+          <div className="flex min-h-0 w-full flex-col items-center gap-[clamp(0.625rem,2.6dvh,2rem)] px-8 py-[clamp(1.25rem,4dvh,2rem)] modal-short:grid modal-short:grid-cols-[auto_minmax(0,1fr)_auto] modal-short:content-center modal-short:gap-x-5 modal-short:gap-y-1.5 modal-short:px-5 modal-short:py-3">
             {/* --- CABECERA --- */}
-            <div className="flex w-full justify-between items-center mb-8">
+            <div className="flex w-full shrink-0 justify-between items-center modal-short:col-span-2 modal-short:col-start-2">
               {selectedExternalUrl ? (
                 <a
                   href={selectedExternalUrl}
@@ -364,7 +373,11 @@ export default function SoundtrackModal({
             </div>
 
             {/* --- PORTADA --- */}
-            <div className="relative w-72 h-72 sm:w-80 sm:h-80 rounded-[2.5rem] overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9)] mb-8 transition-transform duration-500 hover:scale-[1.02]">
+            {/* Alto propio de 18/20rem que ENCOGE (hasta 3rem) cuando el resto
+                no cabe; el cuadrado sigue al alto con `aspect-square`. En
+                `modal-short:` ocupa la columna izquierda con el alto del panel. */}
+            <div className="flex h-72 min-h-12 w-full shrink justify-center sm:h-80 modal-short:col-start-1 modal-short:row-span-6 modal-short:row-start-1 modal-short:h-[min(20rem,calc(var(--sv-modal-max-h)-1.5rem))] modal-short:w-auto modal-short:self-center">
+            <div className="relative h-full aspect-square max-w-full rounded-[clamp(1rem,12%,2.5rem)] overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9)] transition-transform duration-500 hover:scale-[1.02]">
               {selectedTrack.artworkUrl ? (
                 <OptimizedImage
                   src={selectedTrack.artworkUrl}
@@ -375,21 +388,24 @@ export default function SoundtrackModal({
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-white/5">
-                  <Music2 className="h-20 w-20 text-yellow-300/50" />
+                  <Music2 className="h-1/3 w-1/3 text-yellow-300/50" />
                 </div>
               )}
             </div>
+            </div>
 
             {/* --- INFO PISTA --- */}
-            <div className="w-full text-center mb-8 space-y-1">
-              <h4 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md text-balance">
+            <div className="w-full shrink-0 text-center space-y-1 modal-short:col-span-2 modal-short:col-start-2 modal-short:space-y-0">
+              <h4 className="text-[clamp(1.25rem,3.4dvh,1.5rem)] leading-tight sm:text-[clamp(1.25rem,3.4dvh,1.875rem)] modal-short:text-base font-black text-white drop-shadow-md text-balance line-clamp-2 [overflow-wrap:anywhere]" title={selectedTrack.trackName}>
                 {selectedTrack.trackName}
               </h4>
               {/* Hasta DOS líneas de intérpretes: con una sola se cortaban
                   nombres que caben de sobra, y algunas pistas acreditan a diez
                   o más y empujaban los controles fuera del modal. Pasadas las
-                  dos líneas se recorta con puntos suspensivos. */}
-              <p className="text-base sm:text-lg font-medium text-white/70 line-clamp-2 [overflow-wrap:anywhere] drop-shadow-sm">
+                  dos líneas (una en `modal-short:`) se recorta con puntos
+                  suspensivos; el nombre completo queda en `title`. El tamaño
+                  de letra baja con el alto de la pantalla antes de recortar. */}
+              <p className="text-[clamp(0.875rem,2.4dvh,1rem)] sm:text-[clamp(0.875rem,2.4dvh,1.125rem)] modal-short:text-xs modal-short:line-clamp-1 font-medium text-white/70 line-clamp-2 [overflow-wrap:anywhere] drop-shadow-sm" title={selectedTrack.artistName}>
                 {selectedTrack.artistName}
               </p>
             </div>
@@ -408,7 +424,7 @@ export default function SoundtrackModal({
                   onPause={() => setIsPlaying(false)}
                 />
 
-                <div className="w-full flex items-center gap-4 mb-8">
+                <div className="w-full shrink-0 flex items-center gap-4 modal-short:col-span-2 modal-short:col-start-2">
                   <span className="text-xs font-semibold text-white/50 w-10 text-right tabular-nums">
                     {formatTime(progress)}
                   </span>
@@ -437,7 +453,7 @@ export default function SoundtrackModal({
                 </div>
               </>
             ) : (
-              <div className="mb-8 flex w-full flex-col items-center gap-3 rounded-3xl bg-white/5 px-5 py-4 text-center">
+              <div className="flex w-full shrink-0 flex-col items-center gap-3 rounded-3xl bg-white/5 px-5 py-4 text-center modal-short:col-span-2 modal-short:col-start-2 modal-short:gap-2 modal-short:py-2.5">
                 <p className="text-sm font-medium text-white/60">
                   Esta pista no tiene preview disponible.
                 </p>
@@ -463,27 +479,27 @@ export default function SoundtrackModal({
             )}
 
             {/* --- CONTROLES DE REPRODUCCIÓN --- */}
-            <div className="w-full flex items-center justify-center gap-8 mb-8">
+            <div className="w-full shrink-0 flex items-center justify-center gap-8 modal-short:col-start-2 modal-short:gap-6">
               <button
                 type="button"
                 onClick={goPrev}
                 disabled={!hasPrev}
                 className="text-white/70 hover:text-white transition disabled:opacity-30 disabled:hover:text-white/70"
               >
-                <SkipBack className="w-8 h-8 sm:w-9 sm:h-9 fill-current" />
+                <SkipBack className="w-8 h-8 sm:w-9 sm:h-9 modal-short:h-6 modal-short:w-6 fill-current" />
               </button>
 
               {selectedHasPreview && (
                 <button
                   type="button"
                   onClick={togglePlay}
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/10 backdrop-blur-xl text-white flex items-center justify-center hover:bg-white/20 hover:scale-105 active:scale-95 transition shadow-[0_10px_40px_-10px_rgba(255,255,255,0.2)]"
+                  className="size-[clamp(3.5rem,10dvh,5rem)] sm:size-[clamp(3.5rem,10dvh,6rem)] modal-short:size-11 rounded-full bg-white/10 backdrop-blur-xl text-white flex items-center justify-center hover:bg-white/20 hover:scale-105 active:scale-95 transition shadow-[0_10px_40px_-10px_rgba(255,255,255,0.2)]"
                   aria-label="Reproducir o pausar preview"
                 >
                   {isPlaying ? (
-                    <Pause className="w-10 h-10 sm:w-12 sm:h-12 fill-current" />
+                    <Pause className="size-1/2 fill-current" />
                   ) : (
-                    <Play className="w-10 h-10 sm:w-12 sm:h-12 fill-current ml-1 sm:ml-1.5" />
+                    <Play className="size-1/2 fill-current ml-[6%]" />
                   )}
                 </button>
               )}
@@ -494,13 +510,13 @@ export default function SoundtrackModal({
                 disabled={!hasNext}
                 className="text-white/70 hover:text-white transition disabled:opacity-30 disabled:hover:text-white/70"
               >
-                <SkipForward className="w-8 h-8 sm:w-9 sm:h-9 fill-current" />
+                <SkipForward className="w-8 h-8 sm:w-9 sm:h-9 modal-short:h-6 modal-short:w-6 fill-current" />
               </button>
             </div>
 
             {/* --- VOLUMEN (y botón de más opciones) --- */}
             {(selectedHasPreview || hasOptions) && (
-              <div className="w-full flex items-center justify-center gap-4 px-8">
+              <div className="w-full shrink-0 flex items-center justify-center gap-4 px-8 modal-short:col-start-3 modal-short:w-auto modal-short:gap-3 modal-short:px-0">
                 {selectedHasPreview && (
                   <>
                     <button
@@ -564,7 +580,7 @@ export default function SoundtrackModal({
             {hasOptions && optionsOpen && (
               <div
                 id="soundtrack-modal-options"
-                className="mt-5 flex w-full items-center justify-center gap-4 animate-in fade-in slide-in-from-top-1 duration-200"
+                className="flex w-full shrink-0 items-center justify-center gap-4 modal-short:col-span-2 modal-short:col-start-2 animate-in fade-in slide-in-from-top-1 duration-200"
               >
                 {showAutoplaySwitch && (
                   <AutoplaySwitch
