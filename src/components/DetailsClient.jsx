@@ -11715,13 +11715,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             desaparecían durante la animación y aparecían de golpe al final. */}
         <div data-details-transition-part="content" className="mt-2 sm:mt-10">
           {/* Menú de navegación sticky que se queda fijo debajo del navbar al hacer scroll */}
-          {/* `data-sv-sheet-anchor`: las vistas laterales de las secciones
-              (SectionSheet) empiezan justo debajo en el teléfono, así el menú
-              sigue a la vista; `data-sv-sheet-keep`: conserva su cristal. */}
           <div
             ref={menuStickyRef}
-            data-sv-sheet-anchor=""
-            data-sv-sheet-keep=""
             className="sticky z-30 py-2"
             style={{
               top: STICKY_TOP,

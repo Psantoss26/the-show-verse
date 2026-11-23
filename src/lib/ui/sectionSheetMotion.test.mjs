@@ -6,26 +6,17 @@ import {
   SHEET_ENTER,
   SHEET_EXIT,
   SHEET_PANEL_FRAMES,
-  sheetAnchorPlacement,
 } from "./sectionSheetMotion.js";
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 
-test("el panel empieza bajo un menú ya pegado sin desplazar la página", () => {
-  assert.deepEqual(sheetAnchorPlacement({ top: 64, bottom: 120 }, 64, 800), { top: 120 });
-});
-
-test("si el menú aún no está pegado, pantalla completa y sin mover la página", () => {
-  assert.equal(sheetAnchorPlacement({ top: 600, bottom: 656 }, 64, 800), null);
-  assert.equal(sheetAnchorPlacement({ top: 66, bottom: 122 }, 64, 800), null);
+test("en el teléfono el panel ocupa siempre la pantalla completa", () => {
   const sheet = read("components/details/sectionSheet/SectionSheet.jsx");
-  assert.doesNotMatch(sheet, /window\.scrollBy/);
-});
-
-test("sin menú medible o sin sitio útil, pantalla completa", () => {
-  assert.equal(sheetAnchorPlacement(null, 64, 800), null);
-  assert.equal(sheetAnchorPlacement({ top: 0, bottom: 0 }, 64, 800), null);
-  assert.equal(sheetAnchorPlacement({ top: 300, bottom: 600 }, 300, 800), null);
+  assert.match(sheet, /className=\{`fixed inset-0 z-\[10000\]/);
+  assert.doesNotMatch(sheet, /data-sv-sheet-anchor|anchorTop|window\.scrollBy/);
+  assert.doesNotMatch(read("components/DetailsClient.jsx"), /data-sv-sheet-(anchor|keep)/);
+  assert.doesNotMatch(read("components/Navbar.jsx"), /data-sv-sheet-keep/);
+  assert.doesNotMatch(read("app/globals.css"), /data-sv-sheet-(anchored|keep)/);
 });
 
 test("entrada y salida: una sola definición, solo transform en el panel", () => {
@@ -39,24 +30,10 @@ test("entrada y salida: una sola definición, solo transform en el panel", () =>
   assert.doesNotMatch(sheet, /sv-sheet-in/);
 });
 
-test("la barra superior, la inferior y el menú de secciones siguen a la vista con el panel abierto", () => {
-  const navbar = read("components/Navbar.jsx");
-  assert.equal(navbar.match(/data-sv-sheet-keep=""/g)?.length, 2);
+test("el menú de secciones marca la sección del panel abierto y cambia de panel", () => {
   const details = read("components/DetailsClient.jsx");
-  assert.match(details, /data-sv-sheet-anchor=""\s+data-sv-sheet-keep=""\s+className="sticky z-30/);
-  // El menú marca la sección del panel abierto y cambia de panel.
   assert.match(details, /onChange=\{onSectionMenuChange\}/);
   assert.match(details, /activeId=\{sheetId \|\| activeId\}/);
-
-  const css = read("app/globals.css");
-  // Lo marcado con data-sv-sheet-keep no pierde su cristal.
-  assert.match(css, /body > :not\(\[data-detail-modal-layer\], \.sv-inline-menu, \[data-sv-sheet-keep\]\)/);
-  assert.match(css, /:not\(\[data-sv-sheet-keep\], \[data-sv-sheet-keep\] \*\)/);
-  // La barra inferior flota sobre el panel anclado.
-  assert.match(css, /:root\[data-sv-sheet-anchored\] \.sv-navbar-bottom-shift \{\s*z-index: 10001;/);
-
-  const sheet = read("components/details/sectionSheet/SectionSheet.jsx");
-  assert.match(sheet, /querySelector\("\[data-sv-sheet-anchor\]"\)/);
 });
 
 test("los paneles de la ficha y del actor siguen montados mientras salen", () => {

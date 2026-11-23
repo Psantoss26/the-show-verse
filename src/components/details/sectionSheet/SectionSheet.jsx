@@ -5,10 +5,7 @@
 // Se abre al pulsar el título de la sección (SectionTitle `onOpen`).
 //
 // Panel a la derecha con cabecera fija: título, pestañas opcionales, buscador
-// opcional y cerrar. En el teléfono ocupa todo el ancho y, si la página tiene
-// un menú de secciones (`data-sv-sheet-anchor`, el de DetailsClient), empieza
-// justo debajo de él: la barra superior y el menú siguen a la vista y la barra
-// inferior queda por encima del panel. Entra y sale deslizándose solo con
+// opcional y cerrar. En el teléfono ocupa la pantalla completa. Entra y sale deslizándose solo con
 // `transform` (WAAPI, curvas en lib/ui/sectionSheetMotion): un fundido de
 // opacidad sobre el panel lo convertiría en raíz de backdrop y aplanaría el
 // cristal mientras dura (ver liquidGlass).
@@ -20,12 +17,10 @@ import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { placeTabPill } from "@/lib/details/artworkRowTransition";
 import {
-  SHEET_ANCHOR_MAX_WIDTH,
   SHEET_ENTER,
   SHEET_EXIT,
   SHEET_PANEL_FRAMES,
   SHEET_SCRIM_FRAMES,
-  sheetAnchorPlacement,
 } from "@/lib/ui/sectionSheetMotion";
 
 // Quien monta y desmonta los paneles (DetailsSectionSheets, ActorSectionSheets)
@@ -157,42 +152,6 @@ export default function SectionSheet({
   if (isOpen && !present) setPresent(true);
   const layerRef = useRef(null);
   const scrimRef = useRef(null);
-  // Borde superior del panel en el teléfono (bajo el menú de secciones), o
-  // `null` a pantalla completa. Se mide al abrir, antes de pintar.
-  const [anchorTop, setAnchorTop] = useState(null);
-
-  // Con el menú de secciones ya pegado bajo la barra, el panel empieza
-  // debajo; si aún no lo está (primeras secciones), a pantalla completa.
-  // Sin esperar a portalReady: ese llega en un render posterior, cuando
-  // useModalGuard ya ha bloqueado el scroll y el menú ha perdido su sitio.
-  useLayoutEffect(() => {
-    if (!isOpen) return undefined;
-    if (!window.matchMedia?.(`(max-width: ${SHEET_ANCHOR_MAX_WIDTH}px)`).matches) {
-      setAnchorTop(null);
-      return undefined;
-    }
-    const anchor = document.querySelector("[data-sv-sheet-anchor]");
-    const rect = anchor?.getBoundingClientRect();
-    const stickyTop = anchor ? parseFloat(getComputedStyle(anchor).top) : NaN;
-    const placement = rect?.height ? sheetAnchorPlacement(rect, stickyTop, window.innerHeight) : null;
-    if (!placement) {
-      setAnchorTop(null);
-      return undefined;
-    }
-    setAnchorTop(placement.top);
-    return undefined;
-  }, [isOpen]);
-  // Panel anclado bajo el menú: la barra inferior sube por encima y la barra
-  // superior y el menú conservan su cristal (globals.css). Hasta que acaba
-  // la salida, para que la barra no se esconda tras el panel que se va.
-  const anchoredShown = present && portalReady && anchorTop != null;
-  useLayoutEffect(() => {
-    if (!anchoredShown) return undefined;
-    const root = document.documentElement;
-    root.setAttribute("data-sv-sheet-anchored", "");
-    return () => root.removeAttribute("data-sv-sheet-anchored");
-  }, [anchoredShown]);
-
   // Bloquea el scroll de la ficha y cierra con Escape.
   useModalGuard({ open: isOpen, onClose: close });
 
@@ -263,15 +222,11 @@ export default function SectionSheet({
 
   if (!present || !portalReady) return null;
 
-  const anchored = anchorTop != null;
-
   return createPortal(
     <div
       ref={layerRef}
       data-detail-modal-layer=""
-      data-sv-sheet-anchored={anchored ? "" : undefined}
-      className={`fixed inset-x-0 bottom-0 z-[10000] flex justify-end ${isOpen ? "" : "pointer-events-none"}`}
-      style={{ top: anchored ? anchorTop : 0 }}
+      className={`fixed inset-0 z-[10000] flex justify-end ${isOpen ? "" : "pointer-events-none"}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -291,9 +246,9 @@ export default function SectionSheet({
         {...panelProps}
         ref={panelRef}
         data-sv-sheet-panel=""
-        className={`relative flex h-full w-full flex-col overflow-hidden outline-none will-change-transform sm:w-[30rem] sm:rounded-l-[2rem] lg:w-[34rem] ${anchored ? "rounded-t-[1.75rem]" : ""} ${LIQUID_GLASS_PANEL}`}
+        className={`relative flex h-full w-full flex-col overflow-hidden outline-none will-change-transform sm:w-[30rem] sm:rounded-l-[2rem] lg:w-[34rem] ${LIQUID_GLASS_PANEL}`}
       >
-        <header className={`shrink-0 ${LIQUID_GLASS_MODAL_HEADER} px-5 pb-4 ${anchored ? "pt-5" : "pt-[max(1.25rem,env(safe-area-inset-top))]"} sm:px-6 sm:pt-6`}>
+        <header className={`shrink-0 ${LIQUID_GLASS_MODAL_HEADER} px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6`}>
           <div className="flex items-start gap-3">
             {leading ? (
               <span className="mt-0.5 shrink-0">{leading}</span>
@@ -408,12 +363,12 @@ export default function SectionSheet({
             No aplana el cristal: eso lo hace `opacity`, no `transform`. */}
         {/* Anclado bajo el menú, la barra inferior flota encima del panel: el
             final de la lista deja su hueco para no quedar debajo. */}
-        <div className={`details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 ${anchored && !footer ? "pb-[calc(5.5rem+var(--sv-safe-bottom,0px))]" : "pb-[max(1.5rem,var(--sv-safe-bottom,0px))]"} pt-1 will-change-transform sm:px-6`}>
+        <div className={`details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,var(--sv-safe-bottom,0px))] pt-1 will-change-transform sm:px-6`}>
           {children}
         </div>
 
         {footer ? (
-          <div className={`shrink-0 border-t border-white/5 px-4 ${anchored ? "pb-[calc(5.5rem+var(--sv-safe-bottom,0px))]" : "pb-[max(1rem,var(--sv-safe-bottom,0px))]"} pt-4 sm:px-6`}>
+          <div className={`shrink-0 border-t border-white/5 px-4 pb-[max(1rem,var(--sv-safe-bottom,0px))] pt-4 sm:px-6`}>
             {footer}
           </div>
         ) : null}

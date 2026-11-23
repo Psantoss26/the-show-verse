@@ -2985,9 +2985,6 @@ function NavbarContent() {
           sobre el hero, con un velo oscuro mínimo para que los botones se vean;
           al hacer scroll aparece el fondo glass difuminado. */}
       <nav
-        // Sigue a la vista con una vista lateral abierta (SectionSheet): no
-        // pierde su cristal ni sus animaciones (`data-sv-sheet-open`).
-        data-sv-sheet-keep=""
         // Compactado por scroll en móvil/tablet: solo con `transform`, igual que
         // la barra inferior. Ver `.sv-topbar` en globals.css.
         data-compact={isScrolled && !isImmersiveRoute ? "" : undefined}
@@ -3589,9 +3586,6 @@ function NavbarContent() {
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
       <nav
         aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
-        // Flota sobre la vista lateral anclada (SectionSheet): conserva su
-        // cristal (`data-sv-sheet-open`) y sube por encima (globals.css).
-        data-sv-sheet-keep=""
         data-bars-instant={instantBars ? "" : undefined}
         // Píldora flotante con margen amplio a los lados. Solo se anima
         // `transform` (scale desde el borde inferior): al no tocar width/height
