@@ -3450,9 +3450,10 @@ html[data-peek-handoff-active] [data-peek-handoff-part] {
 
 /* Durante todo el relevo, los navbars (del layout, siguen montados) van por
    encima de la capa de la vista previa (z-[9999]): están desde el primer
-   fotograma, en vez de aparecer al final con el desvanecido. */
-html[data-peek-handoff-leaving] .sv-topbar,
-html[data-peek-handoff-leaving] .sv-navbar-bottom-shift {
+   fotograma, en vez de aparecer al final con el desvanecido. Solo cuando el
+   Navbar ya los pinta como en la ficha (`data-peek-handoff-styled`). */
+html[data-peek-handoff-leaving] .sv-topbar[data-peek-handoff-styled],
+html[data-peek-handoff-leaving] .sv-navbar-bottom-shift[data-peek-handoff-styled] {
   z-index: 10000;
 }
 

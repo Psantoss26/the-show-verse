@@ -14,8 +14,13 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import Link from "next/link";
+import {
+  getPeekHandoffPathname,
+  subscribePeekHandoff,
+} from "@/lib/navigation/peekHandoff";
 import { usePathname } from "next/navigation";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { isHistoryNavigation } from "@/lib/navigation/historyNavigation";
@@ -2137,17 +2142,38 @@ export default function Navbar() {
 function NavbarContent() {
   const { account, hydrated, preferences } = useAuth();
   const { t } = useTranslation();
-  const pathname = usePathname();
+  const currentPathname = usePathname();
   const router = useRouter();
+  // Relevo de la vista previa móvil a la ficha (lib/navigation/peekHandoff):
+  // los navbars van por encima de la vista previa desde el primer fotograma,
+  // así que ya se pintan como en la ficha de destino (ruta inmersiva, arriba
+  // del todo, sin sección activa). Si no, salían con el estilo de la página de
+  // detrás (desplazada, compacta) y cambiaban de golpe al montarse la ficha.
+  const peekHandoffPathname = useSyncExternalStore(
+    subscribePeekHandoff,
+    getPeekHandoffPathname,
+    () => null,
+  );
+  const peekRoute =
+    peekHandoffPathname && peekHandoffPathname !== currentPathname
+      ? peekHandoffPathname
+      : null;
+  // `pathname` es la ruta con la que se ESTILAN los navbars; la real, para
+  // efectos y enlaces, es `currentPathname`.
+  const pathname = peekRoute || currentPathname;
 
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [isScrolledState, setIsScrolled] = useState(false);
+  // Hasta que acaba el relevo (no solo hasta que cambia la ruta): el efecto
+  // que corrige `isScrolled` al cambiar de ruta llega un fotograma tarde.
+  const isScrolled = peekHandoffPathname ? false : isScrolledState;
   const isScrolledRef = useRef(false);
   // Barra inferior (móvil): se compacta según la DIRECCIÓN del scroll, no según
   // la posición. `isScrolled` no sirve aquí porque solo vuelve a false al llegar
   // arriba del todo, y además lo comparten la barra superior y el fondo del hero.
-  const [bottomNavCompact, setBottomNavCompact] = useState(false);
+  const [bottomNavCompactState, setBottomNavCompact] = useState(false);
+  const bottomNavCompact = peekHandoffPathname ? false : bottomNavCompactState;
   const bottomNavCompactRef = useRef(false);
   // Referencia de scroll de la barra inferior (la usa su efecto de scroll; la
   // vuelta atrás la resincroniza, ver más abajo).
@@ -2280,15 +2306,15 @@ function NavbarContent() {
   // página en su scroll guardado en su efecto de layout.
   useLayoutEffect(() => {
     const previous = barsPageRef.current;
-    if (previous && previous !== pathname) {
+    if (previous && previous !== currentPathname) {
       bottomNavByPageRef.current.set(previous, bottomNavCompactRef.current);
     }
-    barsPageRef.current = pathname;
-    if (!previous || previous === pathname || !isHistoryNavigation(pathname)) return;
+    barsPageRef.current = currentPathname;
+    if (!previous || previous === currentPathname || !isHistoryNavigation(currentPathname)) return;
 
     const y = Math.max(0, window.scrollY);
     const nextScrolled = y > 40;
-    const nextBottom = y > 48 && Boolean(bottomNavByPageRef.current.get(pathname));
+    const nextBottom = y > 48 && Boolean(bottomNavByPageRef.current.get(currentPathname));
     // El salto al scroll restaurado no es un gesto: no compacta ni expande.
     bottomNavLastYRef.current = y;
     // Siempre sin transición: aunque `isScrolled` no cambie, la ficha es una
@@ -2298,7 +2324,7 @@ function NavbarContent() {
     setIsScrolled(nextScrolled);
     setBottomNavCompact(nextBottom);
     setInstantBars(true);
-  }, [pathname]);
+  }, [currentPathname]);
 
   // Las transiciones vuelven tras pintar el estado final.
   useEffect(() => {
@@ -2327,7 +2353,7 @@ function NavbarContent() {
     if (next === isScrolledRef.current) return;
     isScrolledRef.current = next;
     setIsScrolled(next);
-  }, [pathname]);
+  }, [currentPathname]);
 
   useEffect(() => {
     let frameId = 0;
@@ -2421,7 +2447,7 @@ function NavbarContent() {
   // el destino optimista para volver a basarse en el pathname real.
   useEffect(() => {
     setPendingHref(null);
-  }, [pathname]);
+  }, [currentPathname]);
 
   const featuredHeroRoutes = ["/", "/movies", "/series"];
   const isFeaturedHeroRoute = featuredHeroRoutes.includes(pathname || "/");
@@ -2516,10 +2542,10 @@ function NavbarContent() {
 
   const prefetchNavRoute = useCallback(
     (href) => {
-      if (!href || pathname === href) return;
+      if (!href || currentPathname === href) return;
       router.prefetch(href);
     },
-    [pathname, router],
+    [currentPathname, router],
   );
 
   // Prefetch por intención del puntero/foco: cuando el usuario apunta o enfoca
@@ -2560,7 +2586,7 @@ function NavbarContent() {
     );
 
     return () => cancel(handle);
-  }, [pathname, prefetchNavRoute]);
+  }, [currentPathname, prefetchNavRoute]);
 
   const navLinkClass = (href) => {
     const active = isActive(href);
@@ -2962,7 +2988,7 @@ function NavbarContent() {
     return () => window.cancelAnimationFrame(frameId);
   }, [desktopSideNavRoute]);
   const loginHref = `/login?next=${encodeURIComponent(
-    pathname || "/",
+    currentPathname || "/",
   )}`;
   const profileAuthLoading = !hydrated;
 
@@ -2993,7 +3019,11 @@ function NavbarContent() {
         // la barra inferior. Ver `.sv-topbar` en globals.css.
         data-compact={isScrolled && !isImmersiveRoute ? "" : undefined}
         // Vuelta atrás: el estado final sin transición (ver `instantBars`).
-        data-bars-instant={instantBars ? "" : undefined}
+        data-bars-instant={instantBars || peekHandoffPathname ? "" : undefined}
+        // Relevo de la vista previa: ya con el estilo de la ficha, sube por
+        // encima de la vista previa (globals.css). En el mismo render que el
+        // estilo, para que nunca se vea la barra de la página de detrás.
+        data-peek-handoff-styled={peekHandoffPathname ? "" : undefined}
         // Ficha / recomendaciones: nacen ya con el alto compacto (ver la fila
         // móvil). Lo leen los avisos emergentes para colocarse justo debajo.
         data-immersive={isImmersiveRoute ? "" : undefined}
@@ -3590,7 +3620,11 @@ function NavbarContent() {
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
       <nav
         aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
-        data-bars-instant={instantBars ? "" : undefined}
+        data-bars-instant={instantBars || peekHandoffPathname ? "" : undefined}
+        // Relevo de la vista previa: ya con el estilo de la ficha, sube por
+        // encima de la vista previa (globals.css). En el mismo render que el
+        // estilo, para que nunca se vea la barra de la página de detrás.
+        data-peek-handoff-styled={peekHandoffPathname ? "" : undefined}
         // Píldora flotante con margen amplio a los lados. Solo se anima
         // `transform` (scale desde el borde inferior): al no tocar width/height
         // no hay recálculo de layout, así la compactación es fluida en todo

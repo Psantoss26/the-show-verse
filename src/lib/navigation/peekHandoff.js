@@ -51,12 +51,30 @@ export function beginPeekHandoff(href) {
     document.documentElement.setAttribute(PEEK_HANDOFF_ACTIVE_ATTR, "");
   }
   if (pending) document.documentElement.setAttribute(PEEK_HANDOFF_LEAVING_ATTR, "");
+  notifyHandoff();
 }
 
 export function endPeekHandoff() {
   pending = null;
   revealPeekHandoffParts();
   document.documentElement.removeAttribute(PEEK_HANDOFF_LEAVING_ATTR);
+  notifyHandoff();
+}
+
+// Ruta de destino del relevo en curso, para `useSyncExternalStore`: el Navbar
+// se estila ya como en la ficha mientras va por encima de la vista previa.
+const handoffListeners = new Set();
+function notifyHandoff() {
+  for (const listener of handoffListeners) listener();
+}
+
+export function subscribePeekHandoff(listener) {
+  handoffListeners.add(listener);
+  return () => handoffListeners.delete(listener);
+}
+
+export function getPeekHandoffPathname() {
+  return pending ? pending.pathname : null;
 }
 
 // Las piezas de la ficha dejan de estar ocultas (ver globals.css).
