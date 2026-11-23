@@ -30,6 +30,7 @@ import {
   useState,
 } from "react";
 import { AnimatePresence } from "framer-motion";
+import { SHEET_ENTER, SHEET_EXIT } from "@/lib/ui/sectionSheetMotion";
 
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { isServerReachable } from "@/lib/offline/client";
@@ -137,31 +138,102 @@ function publishDrawerInset(width) {
 
 // REORGANIZACIÓN DE LA PÁGINA AL ABRIR, CERRAR O CAMBIAR DE VISTA.
 //
-// El margen del contenido cambia de golpe (una sola vez, en el mismo fotograma
-// en que el panel empieza a entrar) y la rejilla se recoloca a la primera. Lo
-// que la hacía "dar tumbos" eran las transiciones CSS de cada tarjeta, que
-// animaban por su cuenta el salto de tamaño y posición. Mientras dura la
-// entrada del panel se apagan, igual que durante el arrastre del tirador (ver
-// `[data-sv-drawer-reflow]` en globals.css).
+// Mientras el margen cambia, las transiciones CSS de cada tarjeta se apagan
+// (ver `[data-sv-drawer-reflow]` en globals.css): con ellas, cada tarjeta
+// animaba por su cuenta su salto de tamaño y posición y la rejilla "daba
+// tumbos" hasta asentarse. La marca dura lo que dure el movimiento.
 const DRAWER_REFLOW_ATTR = "data-sv-drawer-reflow";
 const DRAWER_REFLOW_MS = 360;
 let drawerReflowTimer = 0;
 
-function markDrawerReflow() {
+function markDrawerReflow(ms = DRAWER_REFLOW_MS) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.setAttribute(DRAWER_REFLOW_ATTR, "");
   window.clearTimeout(drawerReflowTimer);
   drawerReflowTimer = window.setTimeout(() => {
     root.removeAttribute(DRAWER_REFLOW_ATTR);
-  }, DRAWER_REFLOW_MS);
+  }, ms);
 }
 
-function applyContentMargin(el, value) {
-  if (!el || el.style.marginRight === value) return;
-  // El arrastre del tirador ya tiene su propio modo (`data-sv-drawer-resizing`).
-  if (!isDrawerResizing()) markDrawerReflow();
+// EL CONTENIDO SE MUEVE CON EL PANEL, FOTOGRAMA A FOTOGRAMA.
+//
+// Al abrir o cerrar el drawer acoplado el margen ya no cambia de golpe: se
+// anima con la MISMA duración y curva que la entrada/salida del panel
+// (SHEET_ENTER/SHEET_EXIT, las de `createPanelVariantsRight`) y con su mismo
+// `startTime`, así que el borde derecho de la página va pegado al borde
+// izquierdo del panel, como si este la empujara.
+//
+// Antes el margen se ponía o se quitaba entero en el primer fotograma: al
+// cerrar, la rejilla, la cabecera y la barra de filtros recuperaban su ancho
+// mientras el panel aún ocupaba la derecha, y al abrir se estrechaban dejando
+// un hueco que el panel tardaba 420 ms en tapar.
+//
+// El panel se anima con framer-motion, que crea su animación WAAPI uno o dos
+// fotogramas después de este commit. Se busca esa animación (`transform` en
+// `.sv-drawer-panel`) y se copia su `startTime`: así las dos comparten reloj
+// aunque el hilo principal vaya cargado. Si no aparece (movimiento reducido,
+// ficha restaurada del historial sin entrada), el margen se coloca de golpe.
+let contentMarginAnimation = null;
+
+function findPanelTransformAnimation() {
+  for (const panel of document.querySelectorAll(".sv-drawer-panel")) {
+    for (const animation of panel.getAnimations()) {
+      const frames = animation.effect?.getKeyframes?.() ?? [];
+      if (frames.some((frame) => frame.transform != null)) return animation;
+    }
+  }
+  return null;
+}
+
+function syncWithPanel(animation, triesLeft = 3) {
+  window.requestAnimationFrame(() => {
+    if (contentMarginAnimation !== animation) return;
+    const panel = findPanelTransformAnimation();
+    if (panel?.startTime != null) {
+      animation.startTime = panel.startTime;
+      return;
+    }
+    if (triesLeft > 0) syncWithPanel(animation, triesLeft - 1);
+    else animation.finish();
+  });
+}
+
+function stopContentMarginAnimation() {
+  if (!contentMarginAnimation) return;
+  const animation = contentMarginAnimation;
+  contentMarginAnimation = null;
+  animation.cancel();
+}
+
+function applyContentMargin(el, value, motion = null) {
+  if (!el) return;
+  // Mismo valor (el panel vuelve a informar de su ancho mientras entra): no se
+  // toca, y el movimiento en curso sigue.
+  if (el.style.marginRight === value) return;
+  // Si el movimiento anterior sigue en curso, el nuevo arranca desde donde va.
+  const from = motion ? window.getComputedStyle(el).marginRight : null;
+  stopContentMarginAnimation();
   el.style.marginRight = value;
+  if (!motion) {
+    // El arrastre del tirador ya tiene su propio modo (`data-sv-drawer-resizing`).
+    if (!isDrawerResizing()) markDrawerReflow();
+    return;
+  }
+  const to = value || "0px";
+  if (from === to) return;
+  markDrawerReflow(motion.duration + 120);
+  const animation = el.animate(
+    [{ marginRight: from }, { marginRight: to }],
+    { duration: motion.duration, easing: motion.easing },
+  );
+  contentMarginAnimation = animation;
+  animation.finished
+    .then(() => {
+      if (contentMarginAnimation === animation) contentMarginAnimation = null;
+    })
+    .catch(() => {});
+  syncWithPanel(animation);
 }
 
 const DRAWER_VIEW_STORAGE_KEY = "showverse:detailModalView";
@@ -302,6 +374,8 @@ export default function DetailModalProvider({
   const activeDrawerView = savedOpen.drawerView ?? drawerView;
   const contentRef = useRef(null);
   const drawerWidthRef = useRef(null);
+  // ¿Había ficha abierta en el último commit? Lo actualiza el efecto del margen.
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -408,7 +482,14 @@ export default function DetailModalProvider({
     // dura el gesto las transiciones del contenido se apagan (ver
     // `[data-detail-page-content]` en globals.css) para que las tarjetas se
     // recoloquen pegadas al tirador en vez de animar cada cambio.
-    applyContentMargin(contentRef.current, `${width}px`);
+    //
+    // AL ABRIR, el primero en llegar aquí es el panel: sus efectos de layout
+    // corren antes que los del provider, así que es esta llamada la que pone el
+    // margen de la apertura. `wasOpenRef` aún dice "cerrado" en ese commit, y
+    // eso la distingue del arrastre o de un cambio de ancho con el panel ya
+    // abierto: el margen entra con el panel en vez de saltar de golpe.
+    const opening = !wasOpenRef.current && !isDrawerResizing();
+    applyContentMargin(contentRef.current, `${width}px`, opening ? SHEET_ENTER : null);
   }, [docked, activeItem, panelPlacement]);
 
   // Sin drawer no hay variable. `DetailModal` la escribe mientras está montado
@@ -442,12 +523,20 @@ export default function DetailModalProvider({
   // contenido saltaba a su sitio justo después de que el panel desapareciera.
   // La salida es una animación WAAPI de `transform` (ver `DetailModal`), así que
   // la reorganización de la página no la frena.
+  //
+  // Al abrir o cerrar (no al cambiar de vista con el panel abierto, donde el
+  // panel no se mueve) el margen acompaña al panel: misma duración, curva y
+  // arranque (ver `applyContentMargin`).
   useLayoutEffect(() => {
+    const isOpen = activeItem != null;
+    const toggled = isOpen !== wasOpenRef.current;
+    wasOpenRef.current = isOpen;
     if (!contentRef.current) return;
     if (docked && drawerWidthRef.current == null) return;
     applyContentMargin(
       contentRef.current,
       docked ? `${drawerWidthRef.current}px` : "",
+      toggled ? (isOpen ? SHEET_ENTER : SHEET_EXIT) : null,
     );
   }, [docked, activeItem]);
 

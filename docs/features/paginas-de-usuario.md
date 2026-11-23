@@ -136,6 +136,7 @@ En *Ajustes* (`DetailOpenSettings`) se elige:
 
 - **Al seleccionar un título:** ficha rápida (panel) o ficha completa.
 - **Posición:** centrada o lateral; en lateral, superpuesta o acoplada.
+  - **Acoplada:** el panel aparta la página con un `margin-right` en el contenedor `[data-detail-page-content]` de `DetailModalProvider`. Al abrir y al cerrar ese margen se anima con la misma duración, curva y arranque que el panel (`SHEET_ENTER`/`SHEET_EXIT` de `src/lib/ui/sectionSheetMotion.js`; la animación WAAPI del margen copia el `startTime` de la del `transform` de `.sv-drawer-panel`), así que el borde derecho de la rejilla, la cabecera y la barra de filtros va pegado al borde izquierdo del panel en cada fotograma, también con la vista teléfono. Al arrastrar el tirador o cambiar de vista con el panel abierto, el margen se aplica directamente.
 - **Contenido del panel:** la ficha o la **vista teléfono**, que incrusta la ficha móvil servida por `/embed/details/[...segments]` (con el estado de favorito/pendiente/nota adelantado en la URL, `src/lib/navigation/embeddedDetails.js`).
 - **Tamaño del panel lateral:** solo la ficha ancha se redimensiona arrastrando su borde izquierdo (el ancho se guarda en `showverse:detailModalWidth`). La vista teléfono no tiene tirador: va pegada a los bordes superior e inferior y su ancho sale de la proporción de teléfono (9:19,5) sobre el alto de la ventana, acotado por `clampMobileDetailsWidth` (`src/lib/ui/detailModalSizing.js`). Igual en el panel de temporada y episodio (`SubrouteDetailsPanel`).
 
