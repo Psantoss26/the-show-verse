@@ -3077,7 +3077,8 @@ function NavbarContent() {
             className="flex min-w-0 items-center gap-8 pl-6 -ml-10"
           >
             <Link href="/" className="block h-12 overflow-hidden flex-shrink-0">
-              <div className="h-full w-[120px] flex items-center justify-center overflow-hidden">
+              {/* Sombra en el envoltorio, como en móvil: se lee sobre fondos claros. */}
+              <div className="h-full w-[120px] flex items-center justify-center overflow-hidden drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
                 <OptimizedImage
                   src="/logo-TSV-sinFondo.png"
                   alt="The Show Verse"
@@ -3505,8 +3506,13 @@ function NavbarContent() {
                 midiendo ~44×38px, que es el tamaño con el que se diseñó la
                 barra— y el contenedor la RECORTA a 56px: así el botón no invade
                 el sitio del selector aunque la imagen escalada sea mucho más
-                ancha que su marco. */}
-            <span className="flex h-10 w-[56px] items-center justify-center overflow-hidden">
+                ancha que su marco.
+
+                Misma sombra oscura que los iconos de la barra, para que la
+                parte blanca del logo se lea sobre portadas y fondos claros. Va
+                en este envoltorio y no en la imagen: sobre la imagen escalada
+                ×2.8 la sombra crecería también. */}
+            <span className="flex h-10 w-[56px] items-center justify-center overflow-hidden drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
               <OptimizedImage
                 src="/logo-TSV-sinFondo.png"
                 alt=""
