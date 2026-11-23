@@ -998,31 +998,48 @@ const MOBILE_COVER_SHADE_SOFT = buildCoverShadeSoft(MOBILE_COVER_SHADE_LEAD_PX)
 
 // FRANJA DE LA BARRA DE ESTADO en la app de Android con la barra VISIBLE
 // (`data-android-statusbar`, `--sv-cover-strip`): la portada empieza justo
-// debajo y la franja lleva el póster prolongado hacia arriba, difuminado. Una
-// franja aparte que acabara en el borde de la portada dejaba una línea (de
-// imagen difuminada a imagen nítida de golpe), así que la capa difuminada baja
-// MOBILE_STATUS_STRIP_BAND_PX por dentro del póster y se desvanece ahí con
-// smootherstep, igual que la del borde inferior. Por arriba sobra
-// MOBILE_STATUS_STRIP_PAD_PX fuera de la pantalla: el desenfoque no mezcla con
-// transparente en el borde visible. La entrada sobre el póster es la mínima que
-// no deja línea (MOBILE_STATUS_STRIP_BAND_PX): el póster se ve casi entero.
-// La capa en sí baja más (MOBILE_STATUS_STRIP_LAYER_PX, oculta por la máscara)
-// por lo mismo que el relleno de arriba: si acabara donde la máscara, el canto
-// del desenfoque aclararía el pie de la franja y marcaría el corte.
+// debajo y la franja lleva el póster prolongado hacia arriba (reflejado),
+// difuminado. Pasar de golpe de difuminado a nítido en el borde de la portada
+// marcaba un corte horizontal, así que el DESENFOQUE ES PROGRESIVO: pleno solo
+// en la parte de arriba de la barra (hasta MOBILE_STATUS_STRIP_FULL_FRACTION de
+// su alto) y, desde ahí hasta MOBILE_STATUS_STRIP_BAND_PX dentro del póster,
+// capas con cada vez menos desenfoque (MOBILE_STATUS_STRIP_LAYERS) que se
+// relevan con smootherstep sobre una copia NÍTIDA del reflejo: al llegar al
+// póster ya casi no queda desenfoque y no se ve ni borde ni corte. Por arriba
+// sobra MOBILE_STATUS_STRIP_PAD_PX fuera de la pantalla, y las capas bajan
+// MOBILE_STATUS_STRIP_LAYER_PX (ocultas por su máscara): el desenfoque no
+// mezcla con transparente en ningún canto visible.
 const MOBILE_STATUS_STRIP_PAD_PX = 40
-const MOBILE_STATUS_STRIP_BAND_PX = 16
+const MOBILE_STATUS_STRIP_FULL_FRACTION = 0.2
+const MOBILE_STATUS_STRIP_BAND_PX = 10
 const MOBILE_STATUS_STRIP_LAYER_PX = 56
-const MOBILE_STATUS_STRIP_MASK = (() => {
-    const edge = `${MOBILE_STATUS_STRIP_PAD_PX}px + var(--sv-cover-strip, 0px)`
+// Posición (desde arriba de la capa) del punto `t` de la transición: 0 = fin
+// del desenfoque pleno, 1 = MOBILE_STATUS_STRIP_BAND_PX dentro del póster.
+const statusStripPos = (t) => {
+    const px = MOBILE_STATUS_STRIP_PAD_PX + MOBILE_STATUS_STRIP_BAND_PX * t
+    const f = MOBILE_STATUS_STRIP_FULL_FRACTION + (1 - MOBILE_STATUS_STRIP_FULL_FRACTION) * t
+    return `calc(${px.toFixed(2)}px + var(--sv-cover-strip, 0px) * ${f.toFixed(4)})`
+}
+const buildStatusStripMask = (from, to) => {
     const stops = Array.from({ length: 9 }, (_, i) => {
         const t = (i + 1) / 10
-        return `rgba(0, 0, 0, ${(1 - smootherstep(t)).toFixed(3)}) calc(${edge} + ${(MOBILE_STATUS_STRIP_BAND_PX * t).toFixed(1)}px)`
+        return `rgba(0, 0, 0, ${(1 - smootherstep(t)).toFixed(3)}) ${statusStripPos(from + (to - from) * t)}`
     }).join(',\n    ')
     return `linear-gradient(to bottom,
-    #000 calc(${edge}),
+    #000 ${statusStripPos(from)},
     ${stops},
-    transparent calc(${edge} + ${MOBILE_STATUS_STRIP_BAND_PX}px))`
-})()
+    transparent ${statusStripPos(to)})`
+}
+// De más a menos desenfoque (se pintan en orden inverso: la más fuerte encima).
+// Los tramos de fundido se solapan para que el relevo no tenga escalones. La
+// primera prolonga además la imagen a lo ancho (`wide`): con 12 px de
+// desenfoque, a ras de pantalla oscurecería los laterales.
+const MOBILE_STATUS_STRIP_LAYERS = [
+    { blur: 12, saturate: 1.1, wide: true, mask: buildStatusStripMask(0, 0.35) },
+    { blur: 6, saturate: 1.05, wide: false, mask: buildStatusStripMask(0.2, 0.6) },
+    { blur: 3, saturate: 1, wide: false, mask: buildStatusStripMask(0.45, 0.85) },
+    { blur: 1.5, saturate: 1, wide: false, mask: buildStatusStripMask(0.7, 1) },
+]
 
 // CONTRASTE ADAPTATIVO (`adaptiveContrast`, la ficha): el logo y los botones
 // son blancos sobre cristal, y con pósters claros (cielo, nieve, fondos
@@ -1153,17 +1170,48 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
 // MOBILE_COVER_SHADE_LEAD_PX). Las temporadas acortan los dos: su póster es la
 // imagen entera, con el título impreso abajo y sin logo encima, y el
 // difuminado y el velo, pensados para el logo de la ficha, lo apagaban.
+function StatusStripImages({ src, imgHeight, objectPosition, above, scaleX = 1 }) {
+    return (
+        <div className="absolute inset-0 overflow-hidden">
+            {/* Encima de la portada: su borde de arriba reflejado, así la
+                prolongación sigue el color de esa fila. */}
+            <div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: above }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                    src={src}
+                    alt=""
+                    decoding="async"
+                    className="absolute inset-x-0 bottom-0 w-full object-cover"
+                    style={{ height: imgHeight, objectPosition, transform: `scale(${scaleX}, -1)` }}
+                />
+            </div>
+            {/* La banda de arriba de la portada, en su sitio. */}
+            <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ top: above }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                    src={src}
+                    alt=""
+                    decoding="async"
+                    className="absolute inset-x-0 top-0 w-full object-cover"
+                    style={{ height: imgHeight, objectPosition, transform: scaleX === 1 ? undefined : `scaleX(${scaleX})` }}
+                />
+            </div>
+        </div>
+    )
+}
+
 // Franja de la barra de estado VISIBLE en la app de Android
-// (`data-android-statusbar`, ver MOBILE_STATUS_STRIP_MASK): la imagen de
+// (`data-android-statusbar`, ver MOBILE_STATUS_STRIP_LAYERS): la imagen de
 // arriba de la portada (`src`, con el alto `imgHeight` y el encuadre con que
-// se pinta en ella) prolongada hacia arriba y difuminada. Una capa difuminada
-// que baja por dentro de la portada y se desvanece ahí: no se ve ni borde ni
-// corte. Sobresale 24 px por cada lado: el desenfoque mezcla transparencia en
-// los cantos de la capa y, a ras de pantalla, oscurecía los laterales. Solo
-// existe en ese modo.
+// se pinta en ella) reflejada hacia arriba, nítida, y encima las capas de
+// desenfoque progresivo. Sobresale 24 px por cada lado (la capa ancha). Las
+// capas finas y la copia nítida van alineadas con la portada (`inset-x-6`
+// dentro de ese margen) para que el reflejo case con ella. Solo existe en ese
+// modo.
 function StatusStripExtension({ src, imgHeight, objectPosition }) {
     const strip = 'var(--sv-cover-strip, 0px)'
     const above = `calc(${strip} + ${MOBILE_STATUS_STRIP_PAD_PX}px)`
+    const images = { src, imgHeight, objectPosition, above }
     return (
         <div
             aria-hidden="true"
@@ -1171,42 +1219,39 @@ function StatusStripExtension({ src, imgHeight, objectPosition }) {
             style={{
                 top: `calc(-1 * ${above})`,
                 height: `calc(${strip} + ${MOBILE_STATUS_STRIP_PAD_PX + MOBILE_STATUS_STRIP_LAYER_PX}px)`,
-                filter: 'blur(14px) saturate(1.1)',
-                WebkitMaskImage: MOBILE_STATUS_STRIP_MASK,
-                maskImage: MOBILE_STATUS_STRIP_MASK,
             }}
         >
-            <div className="absolute inset-0 overflow-hidden">
-                {/* Encima de la portada: su borde de arriba reflejado, así la
-                    prolongación sigue el color de esa fila. */}
-                <div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: above }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        src={src}
-                        alt=""
-                        decoding="async"
-                        className="absolute inset-x-0 bottom-0 w-full object-cover"
-                        style={{ height: imgHeight, objectPosition, transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, -1)` }}
-                    />
-                </div>
-                {/* La banda de arriba de la portada, en su sitio. */}
-                <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ top: above }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        src={src}
-                        alt=""
-                        decoding="async"
-                        className="absolute inset-x-0 top-0 w-full object-cover"
-                        style={{ height: imgHeight, objectPosition, transform: `scaleX(${MOBILE_COVER_EXTEND_SCALE_X})` }}
-                    />
-                </div>
-                {/* Algo más oscuro bajo la hora y los iconos, que se apaga
-                    antes de llegar a la portada. */}
-                <div
-                    className="absolute inset-x-0 top-0"
-                    style={{ height: above, background: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 60%, rgba(0, 0, 0, 0))' }}
+            {/* Base nítida: solo el reflejo sobre la portada (debajo ya está
+                la portada de verdad). */}
+            <div className="absolute inset-x-6 top-0 overflow-hidden" style={{ height: above }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                    src={src}
+                    alt=""
+                    decoding="async"
+                    className="absolute inset-x-0 bottom-0 w-full object-cover"
+                    style={{ height: imgHeight, objectPosition, transform: 'scaleY(-1)' }}
                 />
             </div>
+            {[...MOBILE_STATUS_STRIP_LAYERS].reverse().map((layer) => (
+                <div
+                    key={layer.blur}
+                    className={`absolute top-0 bottom-0 ${layer.wide ? 'inset-x-0' : 'inset-x-6'}`}
+                    style={{
+                        filter: `blur(${layer.blur}px)${layer.saturate === 1 ? '' : ` saturate(${layer.saturate})`}`,
+                        WebkitMaskImage: layer.mask,
+                        maskImage: layer.mask,
+                    }}
+                >
+                    <StatusStripImages {...images} scaleX={layer.wide ? MOBILE_COVER_EXTEND_SCALE_X : 1} />
+                </div>
+            ))}
+            {/* Algo más oscuro bajo la hora y los iconos, que se apaga antes
+                de llegar a la portada. */}
+            <div
+                className="absolute inset-x-0 top-0"
+                style={{ height: above, background: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 60%, rgba(0, 0, 0, 0))' }}
+            />
         </div>
     )
 }
