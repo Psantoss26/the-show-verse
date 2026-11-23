@@ -4407,6 +4407,16 @@ export default function DetailsClient({
   const [traktBusy, setTraktBusy] = useState(""); // Accion en curso: 'watched' | 'watchlist' | 'history' | ''
   const [traktWatchedOpen, setTraktWatchedOpen] = useState(false); // Modal de historial de visionados abierto
   const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false); // Modal de episodios vistos abierto
+  // Cada apertura del modal de episodios lo monta de cero (estado interno
+  // limpio), pero el cierre conserva la instancia para que pueda animar su
+  // salida de vuelta al botón (useActionModalMotion). Antes la `key` cambiaba
+  // también al cerrar y el modal desaparecía de golpe.
+  const [traktEpisodesSession, setTraktEpisodesSession] = useState(0);
+  const [traktEpisodesWasOpen, setTraktEpisodesWasOpen] = useState(false);
+  if (traktEpisodesOpen !== traktEpisodesWasOpen) {
+    setTraktEpisodesWasOpen(traktEpisodesOpen);
+    if (traktEpisodesOpen) setTraktEpisodesSession((n) => n + 1);
+  }
   const traktEpisodesWasOpenRef = useRef(false);
 
   // Máquina de "episodios vistos" (series) COMPARTIDA con la ficha rápida del
@@ -10266,7 +10276,7 @@ export default function DetailsClient({
       {/* Modal de episodios de Trakt - Para marcar episodios de series como vistos */}
       {/* Incluye gestión de runs de rewatch y visualización por temporadas */}
       <TraktEpisodesWatchedModal
-        key={`${id}-episodes-${traktEpisodesOpen ? "open" : "closed"}`}
+        key={`${id}-episodes-${traktEpisodesSession}`}
         open={traktEpisodesOpen}
         onClose={closeTraktEpisodesModal}
         mediaType={type}

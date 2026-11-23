@@ -2211,6 +2211,14 @@ export default function DetailModal({
   // Modal de episodios vistos (solo series). Su máquina de estado vive en el
   // hook compartido; aquí solo controlamos abrir/cerrar.
   const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false);
+  // Igual que en DetailsClient: la `key` cambia solo al ABRIR, para que el
+  // cierre conserve la instancia y anime su salida (useActionModalMotion).
+  const [traktEpisodesSession, setTraktEpisodesSession] = useState(0);
+  const [traktEpisodesWasOpen, setTraktEpisodesWasOpen] = useState(false);
+  if (traktEpisodesOpen !== traktEpisodesWasOpen) {
+    setTraktEpisodesWasOpen(traktEpisodesOpen);
+    if (traktEpisodesOpen) setTraktEpisodesSession((n) => n + 1);
+  }
   const episodesWatched = useTraktEpisodesWatched({
     mediaType,
     tmdbId: item?.id,
@@ -3438,7 +3446,7 @@ export default function DetailModal({
           que DetailsClient. */}
       {mediaType === "tv" && (
         <TraktEpisodesWatchedModal
-          key={`${item?.id}-episodes-${traktEpisodesOpen ? "open" : "closed"}`}
+          key={`${item?.id}-episodes-${traktEpisodesSession}`}
           open={traktEpisodesOpen}
           onClose={() => {
             setTraktEpisodesOpen(false);

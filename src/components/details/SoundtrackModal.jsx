@@ -4,6 +4,7 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useState, useRef } from "react";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import {
   Loader2,
   Music2,
@@ -250,7 +251,8 @@ export default function SoundtrackModal({
     return `${min}:${sec < 10 ? "0" : ""}${sec}`;
   };
 
-  if (!open) return null;
+  const actionMotion = useActionModalMotion(open);
+  if (!actionMotion.present) return null;
 
   const selectedTrack =
     trackQueue.find((track) => track.id === selectedId) ||
@@ -282,9 +284,10 @@ export default function SoundtrackModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+    <div className={`fixed inset-0 z-[10000] flex items-center justify-center p-4${actionMotion.closing ? " pointer-events-none" : ""}`}>
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-lg transition-opacity duration-300 animate-in fade-in"
+        ref={actionMotion.backdropRef}
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -292,7 +295,8 @@ export default function SoundtrackModal({
       <div
         // En pantallas bajas el reproductor (con el interruptor de reproducción
         // automática) no cabe: se desplaza por dentro en vez de salirse.
-        className={`relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[460px] flex-col overflow-y-auto overscroll-contain rounded-[2rem] [scrollbar-width:none] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        ref={actionMotion.panelRef}
+        className={`relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[460px] flex-col overflow-y-auto overscroll-contain rounded-[2rem] [scrollbar-width:none] ${LIQUID_GLASS_PANEL}`}
         role="dialog"
         aria-modal="true"
         aria-label={`Soundtrack de ${title || "este título"}`}

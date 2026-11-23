@@ -3,6 +3,7 @@ import { useServerOnline } from "@/context/ServerStatusContext";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useMemo, useState } from "react";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import useModalGuard from "@/hooks/useModalGuard";
 import CalendarPickerModal from "@/components/trakt/CalendarPickerModal";
 import ListToggleConfirmModal from "@/components/details/ListToggleConfirmModal";
@@ -294,7 +295,8 @@ export default function TraktWatchedModal({
     setConfirmRemove(null);
   }, [open]);
 
-  if (!open) return null;
+  const actionMotion = useActionModalMotion(open);
+  if (!actionMotion.present) return null;
 
   // Handlers
   const startEdit = (id, watchedAtIso) => {
@@ -340,17 +342,19 @@ export default function TraktWatchedModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[10050] flex items-center justify-center p-4 sm:p-6">
+    <div className={`fixed inset-0 z-[10050] flex items-center justify-center p-4 sm:p-6${actionMotion.closing ? " pointer-events-none" : ""}`}>
       {/* Backdrop con Blur y Fade */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
+        ref={actionMotion.backdropRef}
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Modal Container */}
       <div
-        className={`relative flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        ref={actionMotion.panelRef}
+        className={`relative flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
         role="dialog"
         aria-modal="true"
         aria-label="Historial de visionados"

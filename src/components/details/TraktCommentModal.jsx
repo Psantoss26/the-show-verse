@@ -3,6 +3,7 @@ import OnlineOnlyForm from "@/components/OnlineOnlyForm";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useState, useRef } from "react";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { X, Loader2, Calendar, Pencil, Trash2, AlertTriangle } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
 import ListToggleConfirmModal from "@/components/details/ListToggleConfirmModal";
@@ -55,7 +56,8 @@ export default function TraktCommentModal({
     }
   }, [open, editingCommentId]);
 
-  if (!open) return null;
+  const actionMotion = useActionModalMotion(open);
+  if (!actionMotion.present) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -126,18 +128,19 @@ export default function TraktCommentModal({
 
   return (
     <div
-      className="fixed inset-0 h-[100dvh] z-[9999] flex items-center justify-center p-4"
+      className={`fixed inset-0 h-[100dvh] z-[9999] flex items-center justify-center p-4${actionMotion.closing ? " pointer-events-none" : ""}`}
       role="dialog"
       aria-modal="true"
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-lg transition-opacity duration-300 animate-in fade-in"
+        ref={actionMotion.backdropRef}
+        className="absolute inset-0 bg-black/70 backdrop-blur-lg"
         onClick={onClose}
       />
 
       {/* Modal Card */}
-      <div className={`relative w-full max-w-xl flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}>
+      <div ref={actionMotion.panelRef} className={`relative w-full max-w-xl flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}>
         {/* Header */}
         <div className={`flex w-full items-center justify-between px-5 py-4 sm:px-6 sm:py-6 ${LIQUID_GLASS_MODAL_HEADER} shrink-0`}>
           <div>

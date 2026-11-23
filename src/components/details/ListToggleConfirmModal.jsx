@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { createPortal } from "react-dom";
 import { BookmarkMinus, BookmarkPlus, Heart, HeartOff, Trash2, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -84,7 +85,8 @@ export default function ListToggleConfirmModal({
   useEffect(() => setPortalReady(true), []);
   useModalGuard({ open, onClose });
 
-  if (!open || !portalReady) return null;
+  const actionMotion = useActionModalMotion(open);
+  if (!actionMotion.present || !portalReady) return null;
 
   const config = KINDS[kind] || KINDS.favorite;
   const Icon = active ? config.RemoveIcon : config.AddIcon;
@@ -99,12 +101,13 @@ export default function ListToggleConfirmModal({
     // hasta la tarjeta o la ficha que contiene el botón.
     <div
       data-detail-modal-layer=""
-      className={`fixed inset-0 ${layerClassName} flex items-center justify-center p-4`}
+      className={`fixed inset-0 ${layerClassName} flex items-center justify-center p-4${actionMotion.closing ? " pointer-events-none" : ""}`}
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
+        ref={actionMotion.backdropRef}
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -114,7 +117,8 @@ export default function ListToggleConfirmModal({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={textId}
-        className={`relative flex w-full max-w-sm flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        ref={actionMotion.panelRef}
+        className={`relative flex w-full max-w-sm flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
       >
         <div className={`flex w-full shrink-0 items-center justify-between gap-3 ${LIQUID_GLASS_MODAL_HEADER} p-6`}>
           <div className="flex min-w-0 items-center gap-3">

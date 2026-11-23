@@ -44,6 +44,7 @@ import Link from "next/link";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion, AnimatePresence } from "framer-motion";
 import useModalGuard from "@/hooks/useModalGuard";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import CalendarPickerModal, { formatPickerValue } from "@/components/trakt/CalendarPickerModal";
 import {
   dismissLocalProgress,
@@ -322,6 +323,12 @@ export default function TraktEpisodesWatchedModal({
   const [optimisticPlays, setOptimisticPlays] = useState([]); // array de ISO strings
 
   const panelRef = useRef(null);
+  // Entrada desde el botón pulsado y salida de vuelta a él (ver useActionModalMotion).
+  const actionMotion = useActionModalMotion(open);
+  const setPanelNode = useCallback((node) => {
+    panelRef.current = node;
+    actionMotion.panelRef.current = node;
+  }, [actionMotion.panelRef]);
   const wasOpenRef = useRef(false);
 
   const isMovie = mediaType === "movie";
@@ -1269,7 +1276,7 @@ export default function TraktEpisodesWatchedModal({
     [router, tmdbId, mediaType, onClose],
   );
 
-  if (!open) return null;
+  if (!actionMotion.present) return null;
 
   // La ficha de episodios mantiene una altura estable antes de cargar. Ambos
   // modales de episodios se limitan a 90dvh para respirar un 5% por arriba y
@@ -1284,18 +1291,17 @@ export default function TraktEpisodesWatchedModal({
     return (
       <div
         data-mobile-page-swipe-ignore=""
-        className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
+        className={`fixed inset-0 z-[99999] flex items-center justify-center p-4${actionMotion.closing ? " pointer-events-none" : ""}`}
       >
         <div
+          ref={actionMotion.backdropRef}
           className="absolute inset-0 bg-black/60 backdrop-blur-lg"
           onClick={onClose}
           aria-hidden="true"
         />
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
+        <div
+          ref={setPanelNode}
           className={`${PanelClass} sm:max-w-lg sm:h-auto`}
           role="dialog"
           aria-modal="true"
@@ -1399,7 +1405,7 @@ export default function TraktEpisodesWatchedModal({
               </>
             )}
           </div>
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -1408,20 +1414,17 @@ export default function TraktEpisodesWatchedModal({
   return (
     <div
       data-mobile-page-swipe-ignore=""
-      className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
+      className={`fixed inset-0 z-[99999] flex items-center justify-center p-4${actionMotion.closing ? " pointer-events-none" : ""}`}
     >
       <div
+        ref={actionMotion.backdropRef}
         className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      <motion.div
-        ref={panelRef}
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.98 }}
-        transition={{ duration: 0.2 }}
+      <div
+        ref={setPanelNode}
         className={PanelClass}
         role="dialog"
         aria-modal="true"
@@ -2786,7 +2789,7 @@ export default function TraktEpisodesWatchedModal({
             </div>
           )}
         </FadePresence>
-      </motion.div>
+      </div>
     </div>
   );
 }

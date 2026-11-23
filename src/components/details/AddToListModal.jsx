@@ -2,6 +2,7 @@
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 import { useMemo } from "react";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import Link from "next/link";
 import {
   X,
@@ -85,22 +86,24 @@ export default function AddToListModal(props) {
     });
   }, [lists, membershipMap]);
 
-  if (!open) return null;
+  const actionMotion = useActionModalMotion(open);
+  if (!actionMotion.present) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      className={`fixed inset-0 z-[9999] flex items-center justify-center p-4${actionMotion.closing ? " pointer-events-none" : ""}`}
       role="dialog"
       aria-modal="true"
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-lg transition-opacity duration-300 animate-in fade-in"
+        ref={actionMotion.backdropRef}
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className={`relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}>
+      <div ref={actionMotion.panelRef} className={`relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}>
         {/* Header */}
         <div className={`flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER} shrink-0`}>
           <div>

@@ -8,7 +8,8 @@ import {
 } from "@/lib/ui/liquidGlass";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import Image from "next/image";
 import { X, PlayCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { videoEmbedUrl, videoExternalUrl } from "@/lib/details/videos";
@@ -63,10 +64,15 @@ function getPlayerEmbedUrl(video) {
 export default function VideoModal({
   open,
   onClose,
-  video,
+  video: videoProp,
   videos = [],
   onVideoChange,
 }) {
+  // Quien cierra suele vaciar también el vídeo activo en el mismo clic; el
+  // último se conserva mientras el panel vuelve al botón (salida animada).
+  const [lastVideo, setLastVideo] = useState(videoProp);
+  if (videoProp && videoProp !== lastVideo) setLastVideo(videoProp);
+  const video = videoProp ?? (open ? null : lastVideo);
   const iframeRef = useRef(null);
   const skippedVideoKeysRef = useRef(new Set());
   const videoKey = getVideoIdentity(video);
@@ -210,16 +216,18 @@ export default function VideoModal({
 
   useModalGuard({ open, onClose });
 
-  if (!open || !video) return null;
+  const actionMotion = useActionModalMotion(open && !!video);
+  if (!actionMotion.present || !video) return null;
 
   const embed = getPlayerEmbedUrl(video);
   const ext = videoExternalUrl(video);
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center px-4 py-1 sm:p-6">
+    <div className={`fixed inset-0 z-[10000] flex items-center justify-center px-4 py-1 sm:p-6${actionMotion.closing ? " pointer-events-none" : ""}`}>
       {/* BACKDROP: Estilo cristal con desenfoque + Animación de fade */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-lg transition-opacity duration-300 animate-in fade-in"
+        ref={actionMotion.backdropRef}
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -229,6 +237,7 @@ export default function VideoModal({
           lado el hueco de los botones (`lg:max-w`) para que no se salgan de la
           pantalla en ventanas estrechas. */}
       <div
+        ref={actionMotion.panelRef}
         className={`relative w-full max-w-7xl ${
           total > 1 ? "lg:max-w-[min(80rem,calc(100vw-13rem))]" : ""
         }`}
@@ -250,7 +259,7 @@ export default function VideoModal({
 
       {/* MODAL CONTAINER: Liquid Glass */}
       <div
-        className={`relative w-full max-h-[calc(100dvh-0.5rem)] flex flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        className={`relative w-full max-h-[calc(100dvh-0.5rem)] flex flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
         role="dialog"
         aria-modal="true"
       >

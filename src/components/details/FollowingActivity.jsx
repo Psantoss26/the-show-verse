@@ -13,6 +13,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { createPortal } from "react-dom";
 import {
   BookmarkPlus,
@@ -295,23 +296,26 @@ export function FollowingActivityModal({ open, onClose, data, mediaType }) {
   const [portalReady, setPortalReady] = useState(false);
   useModalGuard({ open, onClose });
   useEffect(() => setPortalReady(true), []);
-  if (!open || !portalReady || !hasFollowingActivity(data)) return null;
+  const actionMotion = useActionModalMotion(open);
+  if (!actionMotion.present || !portalReady || !hasFollowingActivity(data)) return null;
 
   return createPortal(
     <div
       data-detail-modal-layer=""
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+      className={`fixed inset-0 z-[10000] flex items-center justify-center p-4${actionMotion.closing ? " pointer-events-none" : ""}`}
       aria-modal="true"
       role="dialog"
       aria-labelledby="following-activity-title"
     >
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
+        ref={actionMotion.backdropRef}
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
         aria-hidden="true"
       />
       <div
-        className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        ref={actionMotion.panelRef}
+        className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
       >
         <div className={`flex w-full shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
           <div className="min-w-0">

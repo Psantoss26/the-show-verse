@@ -2,6 +2,7 @@
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useState } from "react";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { createPortal } from "react-dom";
 import { Loader2, RotateCw, X } from "lucide-react";
 
@@ -119,7 +120,8 @@ export default function EpisodeRatingsModal({
     showId,
   ]);
 
-  if (!mounted || !open) return null;
+  const actionMotion = useActionModalMotion(open);
+  if (!mounted || !actionMotion.present) return null;
 
   const closeFromEvent = (event) => {
     stopModalEvent(event);
@@ -129,21 +131,23 @@ export default function EpisodeRatingsModal({
   return createPortal(
     <div
       data-detail-modal-layer=""
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6"
+      className={`fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6${actionMotion.closing ? " pointer-events-none" : ""}`}
       onPointerDown={stopModalEvent}
       onMouseDown={stopModalEvent}
       onClick={stopModalEvent}
     >
       {/* BACKDROP: Estilo cristal con desenfoque + Animación de fade */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-lg transition-opacity duration-300 animate-in fade-in"
+        ref={actionMotion.backdropRef}
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={closeFromEvent}
         aria-hidden="true"
       />
 
       {/* MODAL CONTAINER: Liquid Glass */}
       <div
-        className={`relative flex h-fit max-h-[90dvh] w-full min-w-0 max-w-full flex-col overflow-hidden rounded-[2rem] sm:w-fit sm:min-w-[min(20rem,calc(100%_-_2rem))] sm:max-w-[min(78rem,calc(100%_-_2rem))] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        ref={actionMotion.panelRef}
+        className={`relative flex h-fit max-h-[90dvh] w-full min-w-0 max-w-full flex-col overflow-hidden rounded-[2rem] sm:w-fit sm:min-w-[min(20rem,calc(100%_-_2rem))] sm:max-w-[min(78rem,calc(100%_-_2rem))] ${LIQUID_GLASS_PANEL}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

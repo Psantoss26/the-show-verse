@@ -6,6 +6,7 @@ import useModalGuard from "@/hooks/useModalGuard";
 import { useLinksWithWikipedia } from "@/lib/details/useWikipediaLink";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 import { useEffect, useState } from "react";
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { createPortal } from "react-dom";
 import { ExternalLink, MonitorPlay, X } from 'lucide-react'
 
@@ -49,20 +50,22 @@ export default function ExternalLinksModal({
     // Igual que los modales de las acciones: el cristal y su animación CSS se
     // aplican en el primer frame. Framer Motion los aplicaba después del montaje
     // y, en móvil, dejaba ver una entrada sin el acabado final.
-    if (!open) return null
+    const actionMotion = useActionModalMotion(open);
+    if (!actionMotion.present) return null
     if (!portalReady) return null
 
     return createPortal(
         <div
             data-detail-modal-layer=""
-            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+            className={`fixed inset-0 z-[10000] flex items-center justify-center p-4${actionMotion.closing ? " pointer-events-none" : ""}`}
             aria-modal="true"
             role="dialog"
             aria-labelledby="external-links-title"
         >
             {/* Mismo velo que los modales de las acciones principales. */}
             <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
+                ref={actionMotion.backdropRef}
+                className="absolute inset-0 bg-black/60 backdrop-blur-lg"
                 onClick={onClose}
                 aria-hidden="true"
             />
@@ -70,7 +73,8 @@ export default function ExternalLinksModal({
             {/* Tarjeta centrada: comparte estructura, cristal y escala de
                 entrada con los modales de tráiler, lista y soundtrack. */}
             <div
-                className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+                ref={actionMotion.panelRef}
+                className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
             >
                         <div className={`flex w-full shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
                             <div className="min-w-0">

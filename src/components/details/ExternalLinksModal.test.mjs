@@ -4,15 +4,16 @@ import test from "node:test";
 
 const sourceUrl = new URL("./ExternalLinksModal.jsx", import.meta.url);
 
-test("el modal de plataformas monta el cristal con la transición inicial común", async () => {
+test("el modal de plataformas entra y sale con el movimiento común de los modales de acción", async () => {
   const source = await readFile(sourceUrl, "utf8");
 
-  assert.match(source, /if \(!open\) return null/);
-  assert.match(source, /backdrop-blur-lg animate-in fade-in duration-300/);
-  assert.match(
-    source,
-    /\$\{LIQUID_GLASS_PANEL\} animate-in zoom-in-95 duration-300 ease-out/,
-  );
+  // Nace del botón pulsado y vuelve a él (WAAPI en el primer frame, sin Framer).
+  assert.match(source, /useActionModalMotion\(open\)/);
+  assert.match(source, /if \(!actionMotion\.present\) return null/);
+  assert.match(source, /ref=\{actionMotion\.backdropRef\}/);
+  assert.match(source, /ref=\{actionMotion\.panelRef\}/);
+  // El panel no lleva animaciones CSS propias que compitan con la del hook.
+  assert.doesNotMatch(source, /animate-in zoom-in-95/);
   assert.doesNotMatch(source, /AnimatePresence|motion\./);
 });
 
