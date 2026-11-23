@@ -1170,31 +1170,61 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
 // MOBILE_COVER_SHADE_LEAD_PX). Las temporadas acortan los dos: su póster es la
 // imagen entera, con el título impreso abajo y sin logo encima, y el
 // difuminado y el velo, pensados para el logo de la ficha, lo apagaban.
-function StatusStripImages({ src, imgHeight, objectPosition, above, scaleX = 1 }) {
+// Lo que va ENCIMA de la portada (alto `above`): SOLO la franja de arriba del
+// póster, tan alta como la barra (`--sv-cover-strip`), reflejada; y por
+// encima, en el relleno fuera de pantalla, su última fila estirada. Antes el
+// reflejo seguía MOBILE_STATUS_STRIP_PAD_PX más abajo y el desenfoque de
+// 12 px traía a la barra colores de dentro del póster (el copo de Frozen) que
+// no casaban con lo que asoma bajo la barra superior.
+// `insetX`: margen lateral de la capa respecto a la portada. La imagen va con
+// el ANCHO DE LA PORTADA y se ensancha después con `scaleX`: si llenase la
+// capa ancha, `object-cover` la recortaría por otro sitio (unos 70 px más
+// abajo) y la franja pintaría otra zona del póster.
+const statusStripImg = ({ src, imgHeight, objectPosition, insetX, style }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+        src={src}
+        alt=""
+        decoding="async"
+        className="absolute object-cover"
+        style={{ left: insetX, width: `calc(100% - ${insetX * 2}px)`, height: imgHeight, objectPosition, ...style }}
+    />
+)
+
+function StatusStripMirror({ src, imgHeight, objectPosition, above, scaleX = 1, insetX = 0 }) {
+    const strip = 'var(--sv-cover-strip, 0px)'
+    const img = (style) => statusStripImg({ src, imgHeight, objectPosition, insetX, style })
+    return (
+        <div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: above }}>
+            {/* El borde de arriba reflejado, así la prolongación sigue el
+                color de esa fila. */}
+            <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ height: strip }}>
+                {img({ bottom: 0, transform: `scale(${scaleX}, -1)` })}
+            </div>
+            {/* Relleno: la fila más honda del reflejo (la que toca su borde
+                de arriba), estirada. 2 px escalados desde abajo. */}
+            <div
+                className="absolute inset-x-0 overflow-hidden"
+                style={{
+                    bottom: `calc(${strip} - 1px)`,
+                    height: 2,
+                    transformOrigin: 'bottom',
+                    transform: `scaleY(${(MOBILE_STATUS_STRIP_PAD_PX + 2) / 2})`,
+                }}
+            >
+                {img({ top: `calc(2px - ${strip})`, transform: scaleX === 1 ? undefined : `scaleX(${scaleX})` })}
+            </div>
+        </div>
+    )
+}
+
+function StatusStripImages({ src, imgHeight, objectPosition, above, scaleX = 1, insetX = 0 }) {
     return (
         <div className="absolute inset-0 overflow-hidden">
-            {/* Encima de la portada: su borde de arriba reflejado, así la
-                prolongación sigue el color de esa fila. */}
-            <div className="absolute inset-x-0 top-0 overflow-hidden" style={{ height: above }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                    src={src}
-                    alt=""
-                    decoding="async"
-                    className="absolute inset-x-0 bottom-0 w-full object-cover"
-                    style={{ height: imgHeight, objectPosition, transform: `scale(${scaleX}, -1)` }}
-                />
-            </div>
+            <StatusStripMirror src={src} imgHeight={imgHeight} objectPosition={objectPosition} above={above} scaleX={scaleX} insetX={insetX} />
             {/* La banda de arriba de la portada, en su sitio. */}
             <div className="absolute inset-x-0 bottom-0 overflow-hidden" style={{ top: above }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                    src={src}
-                    alt=""
-                    decoding="async"
-                    className="absolute inset-x-0 top-0 w-full object-cover"
-                    style={{ height: imgHeight, objectPosition, transform: scaleX === 1 ? undefined : `scaleX(${scaleX})` }}
-                />
+                {statusStripImg({ src, imgHeight, objectPosition, insetX, style: { top: 0, transform: scaleX === 1 ? undefined : `scaleX(${scaleX})` } })}
             </div>
         </div>
     )
@@ -1223,15 +1253,8 @@ function StatusStripExtension({ src, imgHeight, objectPosition }) {
         >
             {/* Base nítida: solo el reflejo sobre la portada (debajo ya está
                 la portada de verdad). */}
-            <div className="absolute inset-x-6 top-0 overflow-hidden" style={{ height: above }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                    src={src}
-                    alt=""
-                    decoding="async"
-                    className="absolute inset-x-0 bottom-0 w-full object-cover"
-                    style={{ height: imgHeight, objectPosition, transform: 'scaleY(-1)' }}
-                />
+            <div className="absolute inset-x-6 top-0" style={{ height: above }}>
+                <StatusStripMirror {...images} />
             </div>
             {[...MOBILE_STATUS_STRIP_LAYERS].reverse().map((layer) => (
                 <div
@@ -1243,7 +1266,7 @@ function StatusStripExtension({ src, imgHeight, objectPosition }) {
                         maskImage: layer.mask,
                     }}
                 >
-                    <StatusStripImages {...images} scaleX={layer.wide ? MOBILE_COVER_EXTEND_SCALE_X : 1} />
+                    <StatusStripImages {...images} scaleX={layer.wide ? MOBILE_COVER_EXTEND_SCALE_X : 1} insetX={layer.wide ? 24 : 0} />
                 </div>
             ))}
             {/* Algo más oscuro bajo la hora y los iconos, que se apaga antes
