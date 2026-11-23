@@ -129,20 +129,28 @@ const morphEase = cubicBezier(PEEK_MORPH_CURVE);
 // portada simple es un póster 2:3 en `object-cover` centrado en una caja algo
 // más baja: la imagen sobresale (recortada) lo mismo por arriba que por abajo.
 // La compuesta (episodios) llena su caja.
+//
+// Con decimales, de las cajas en pantalla deshaciendo la transformación de la
+// tarjeta (traslación + escala desde su centro, que no mueve el centro):
+// `offsetWidth`/`offsetTop` van redondeados y la tarjeta acababa hasta 1 px
+// fuera de la portada de la ficha, que el ajuste final tenía que corregir.
 function peekImageBox(card, cover, { fullPoster }) {
   const vw = window.innerWidth;
-  const vh = window.visualViewport?.height || window.innerHeight;
-  const width = card.offsetWidth;
-  const cardTop = (vh - card.offsetHeight) / 2;
-  const coverTop = cardTop + cover.offsetTop - card.scrollTop;
-  const coverHeight = cover.offsetHeight;
+  const t = currentCardTransform(card);
+  const cardRect = card.getBoundingClientRect();
+  const coverRect = cover.getBoundingClientRect();
+  const width = cardRect.width / t.scale;
+  const cy = cardRect.top + cardRect.height / 2 - t.ty;
+  const cardTop = cy - cardRect.height / t.scale / 2;
+  const coverTop = cardTop + (coverRect.top - cardRect.top) / t.scale;
+  const coverHeight = coverRect.height / t.scale;
   const imageHeight = fullPoster
     ? Math.max(coverHeight, width * 1.5)
     : coverHeight;
   return {
     vw,
-    cx: vw / 2,
-    cy: cardTop + card.offsetHeight / 2,
+    cx: cardRect.left + cardRect.width / 2 - t.tx,
+    cy,
     width,
     top: coverTop - (imageHeight - coverHeight) / 2,
   };
@@ -194,10 +202,13 @@ function untransformedRect(node, card) {
     current = current.offsetParent;
   }
   if (current !== card) return null;
-  const vh = window.visualViewport?.height || window.innerHeight;
+  // Esquina de la tarjeta sin transformar, con la misma cuenta que
+  // `peekImageBox` (las dos tienen que casar).
+  const t = currentCardTransform(card);
+  const cardRect = card.getBoundingClientRect();
   return {
-    left: (window.innerWidth - card.offsetWidth) / 2 + x,
-    top: (vh - card.offsetHeight) / 2 + y - card.scrollTop,
+    left: cardRect.left + cardRect.width / 2 - t.tx - cardRect.width / t.scale / 2 + x,
+    top: cardRect.top + cardRect.height / 2 - t.ty - cardRect.height / t.scale / 2 + y - card.scrollTop,
     width: node.offsetWidth,
     height: node.offsetHeight,
   };
@@ -260,14 +271,28 @@ function cancelTransformAnimations(node) {
 // Dónde pinta la ficha cada pieza, por tamaño de pantalla: logo, botones y
 // marcador van a la misma distancia del navbar inferior en cualquier ficha
 // (ver useMobileDetailsHero con `fitCover`). Del logo se guarda el pie, el
-// centro y sus límites, porque su tamaño depende de su proporción.
-const PART_TARGETS_KEY = "sv:peek-handoff-parts:v1";
+// centro y sus límites, porque su tamaño depende de su proporción. También
+// dónde pinta la imagen de su portada cada tipo de ficha (`cover:title`,
+// `cover:season`, `cover:episode`): así el primer tramo ya vuela a su sitio
+// exacto y el ajuste final no mueve nada.
+//
+// La clave lleva el modo de la barra de notificaciones de la app de Android:
+// con la barra visible la portada empieza bajo ella y es más baja (ver
+// `--sv-cover-strip` en globals.css), con la misma ventana. En localStorage:
+// en la app la pantalla no cambia, y basta con aprenderlo una vez.
+const PART_TARGETS_KEY = "sv:peek-handoff-parts:v2";
+const statusBarMode = () => {
+  const root = document.documentElement;
+  if (root.hasAttribute("data-android-statusbar")) return "bar";
+  if (root.hasAttribute("data-android-immersive")) return "immersive";
+  return "web";
+};
 const viewportKey = () =>
-  `${window.innerWidth}x${Math.round(window.visualViewport?.height || window.innerHeight)}`;
+  `${window.innerWidth}x${Math.round(window.visualViewport?.height || window.innerHeight)}:${statusBarMode()}`;
 
 function readPartTargets() {
   try {
-    const all = JSON.parse(window.sessionStorage.getItem(PART_TARGETS_KEY) || "{}");
+    const all = JSON.parse(window.localStorage.getItem(PART_TARGETS_KEY) || "{}");
     return all[viewportKey()] || null;
   } catch {
     return null;
@@ -276,12 +301,76 @@ function readPartTargets() {
 
 function rememberPartTargets(targets) {
   try {
-    const all = JSON.parse(window.sessionStorage.getItem(PART_TARGETS_KEY) || "{}");
+    const all = JSON.parse(window.localStorage.getItem(PART_TARGETS_KEY) || "{}");
     all[viewportKey()] = targets;
-    window.sessionStorage.setItem(PART_TARGETS_KEY, JSON.stringify(all));
+    window.localStorage.setItem(PART_TARGETS_KEY, JSON.stringify(all));
   } catch {
-    // Sin almacenamiento: la próxima vez las piezas esperan quietas.
+    // Sin almacenamiento: la próxima vez se estima y se ajusta al final.
   }
+}
+
+// Tipo de ficha de `href`, para recordar dónde pinta su portada.
+export function peekHandoffKind(href) {
+  try {
+    const { pathname } = new URL(href, window.location.origin);
+    if (/\/season\/[^/]+\/episode\/[^/]+\/?$/.test(pathname)) return "episode";
+    if (/\/season\/[^/]+\/?$/.test(pathname)) return "season";
+    return "title";
+  } catch {
+    return "title";
+  }
+}
+
+// Píxeles de una variable CSS de <html> (0 si no está o no es una longitud).
+function rootPx(name) {
+  const value = parseFloat(
+    window.getComputedStyle(document.documentElement).getPropertyValue(name),
+  );
+  return Number.isFinite(value) ? value : 0;
+}
+
+// Caja en pantalla de lo que PINTA una imagen con `object-fit` (no la de su
+// elemento): la portada de la ficha es `object-cover` en una caja que no tiene
+// por qué ser 2:3 (`--mobile-cover-h` se ajusta al hueco), así que el póster
+// puede salirse por los lados o por arriba.
+function paintedImageBox(img) {
+  const rect = img.getBoundingClientRect();
+  if (!rect.width || !img.naturalWidth || !img.naturalHeight) return null;
+  const style = window.getComputedStyle(img);
+  let width = rect.width;
+  let height = rect.height;
+  if (style.objectFit === "cover" || style.objectFit === "contain") {
+    const k = (style.objectFit === "cover" ? Math.max : Math.min)(
+      rect.width / img.naturalWidth,
+      rect.height / img.naturalHeight,
+    );
+    width = img.naturalWidth * k;
+    height = img.naturalHeight * k;
+  }
+  const [px, py] = (style.objectPosition || "50% 50%").split(/\s+/).map((part) => {
+    const n = parseFloat(part);
+    return part.endsWith("%") && Number.isFinite(n) ? n / 100 : 0.5;
+  });
+  return {
+    left: rect.left + (rect.width - width) * px,
+    top: rect.top + (rect.height - height) * (py ?? 0.5),
+    width,
+    height,
+  };
+}
+
+// Dónde pinta la ficha la imagen de su portada (`target`, la caja marcada en
+// MobileHeroCover). Con un póster (`fullPoster`), la caja de su <img>; con la
+// portada compuesta de episodios, la de la caja.
+function coverPaintBox(target, { fullPoster }) {
+  const rect = target?.getBoundingClientRect();
+  if (!rect?.width) return null;
+  if (fullPoster) {
+    const img = [...target.querySelectorAll("img")].find((node) => node.naturalWidth > 0);
+    const painted = img && paintedImageBox(img);
+    if (painted) return painted;
+  }
+  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
 }
 
 // Límite de tamaño (`max-width`/`max-height`) en px; los porcentajes, sobre
@@ -337,7 +426,7 @@ function predictPartTarget(name, screen, measured, targets) {
 // enderezan, las piezas (`parts`) van a donde las pintará la ficha (o se
 // quedan quietas si aún no se sabe) y lo demás de la tarjeta (`fadeNodes`) se
 // desvanece.
-export function morphPeekCard(card, cover, { parts = [], fadeNodes = [], overscan = 1, fullPoster = true, reduceMotion = false } = {}) {
+export function morphPeekCard(card, cover, { href = null, parts = [], fadeNodes = [], overscan = 1, fullPoster = true, reduceMotion = false } = {}) {
   if (!card || !cover || typeof card.animate !== "function") return;
   const current = window.getComputedStyle(card);
   const fromCard = currentCardTransform(card);
@@ -370,8 +459,17 @@ export function morphPeekCard(card, cover, { parts = [], fadeNodes = [], oversca
     card.style.overflow = "visible";
     cover.style.overflow = "visible";
   }
-  const width = box.vw * overscan;
-  const to = cardTransformTo(box, { left: (box.vw - width) / 2, top: 0, width });
+  const targets = readPartTargets();
+  // Adónde: donde la ficha pinta su portada, si ya se sabe para esta pantalla
+  // y este tipo de ficha; si no, todo el ancho con su sobrebarrido, bajo la
+  // franja de la barra de notificaciones si la app la enseña (0 si no).
+  const known = targets?.[`cover:${peekHandoffKind(href || window.location.href)}`];
+  const width = known?.width || box.vw * overscan;
+  const to = cardTransformTo(box, {
+    left: known ? known.left : (box.vw - width) / 2,
+    top: known ? known.top : rootPx("--sv-cover-strip"),
+    width,
+  });
   card.animate(
     [
       { transform: fromCard.css, opacity: fromOpacity, borderRadius: current.borderRadius },
@@ -379,7 +477,6 @@ export function morphPeekCard(card, cover, { parts = [], fadeNodes = [], oversca
     ],
     { duration: PEEK_MORPH_MS, easing: PEEK_MORPH_EASING, fill: "forwards" },
   );
-  const targets = readPartTargets();
   for (const { name, animated, layout, screen } of liveParts) {
     const goal = predictPartTarget(name, screen, animated, targets) || screen;
     cancelTransformAnimations(animated);
@@ -400,11 +497,12 @@ export function settlePeekCard(card, cover, target, { fullPoster = true, reduceM
   if (!card || !cover || reduceMotion) return 0;
   if (typeof card.animate !== "function") return 0;
   const box = peekImageBox(card, cover, { fullPoster });
-  const rect = target?.getBoundingClientRect();
+  const rect = coverPaintBox(target, { fullPoster });
   const fromCard = currentCardTransform(card);
   const cardT = rect?.width
     ? cardTransformTo(box, { left: rect.left, top: rect.top, width: rect.width })
     : fromCard;
+  const kind = peekHandoffKind(window.location.href);
   // Las piezas, desde donde estén (el primer tramo puede no haber acabado).
   const flights = [];
   const targets = {};
@@ -425,8 +523,17 @@ export function settlePeekCard(card, cover, target, { fullPoster = true, reduceM
       }),
     });
   }
-  if (flights.length) rememberPartTargets({ ...readPartTargets(), ...targets });
-  if (rect?.width) {
+  if (rect?.width && window.scrollY === 0) {
+    targets[`cover:${kind}`] = { left: rect.left, top: rect.top, width: rect.width };
+  }
+  if (Object.keys(targets).length) rememberPartTargets({ ...readPartTargets(), ...targets });
+  // Ya en su sitio (el primer tramo fue a la caja recordada): nada que mover.
+  const cardMoves =
+    rect?.width &&
+    (Math.abs(cardT.tx - fromCard.tx) > 0.25 ||
+      Math.abs(cardT.ty - fromCard.ty) > 0.25 ||
+      Math.abs(cardT.scale - fromCard.scale) * box.width > 0.25);
+  if (cardMoves) {
     cancelTransformAnimations(card);
     card.animate(
       [
@@ -440,7 +547,7 @@ export function settlePeekCard(card, cover, target, { fullPoster = true, reduceM
     cancelTransformAnimations(animated);
     animated.animate(frames, { duration: PEEK_SETTLE_MS, easing: "linear", fill: "forwards" });
   }
-  return rect?.width || flights.length ? PEEK_SETTLE_MS : 0;
+  return cardMoves || flights.length ? PEEK_SETTLE_MS : 0;
 }
 
 // Primer nodo a la vista que cumple `selector`, fuera de la vista previa (que

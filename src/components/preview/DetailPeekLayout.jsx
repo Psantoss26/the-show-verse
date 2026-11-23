@@ -294,6 +294,7 @@ export default function DetailPeekLayout({
     const pieces = [logoRef.current, actionsRef.current, scoreboardRef.current];
     const keepParts = peekHrefKeepsParts(prefetchHref);
     morphPeekCard(cardRef.current, coverRef.current, {
+      href: prefetchHref,
       parts: keepParts ? pieces : [],
       fadeNodes: keepParts ? [logoShadeRef.current] : [logoShadeRef.current, ...pieces],
       overscan: MOBILE_POSTER_OVERSCAN,
