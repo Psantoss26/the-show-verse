@@ -2059,7 +2059,7 @@ function TopBarGlass({ className = "", dataScrolled }) {
 //
 // Ahora solo se DESLIZA al cambiar directamente de una sección a otra. Si antes
 // no había ninguna activa, aparece ya en su sitio con un fundido.
-function BottomNavActiveLens({ activeKey, circleClassName }) {
+function BottomNavActiveLens({ activeKey, circleClassName, tone }) {
   const lensRef = useRef(null);
   const shownRef = useRef(false);
 
@@ -2128,7 +2128,7 @@ function BottomNavActiveLens({ activeKey, circleClassName }) {
       aria-hidden="true"
       className="pointer-events-none absolute left-0 top-0 z-0 flex items-center justify-center opacity-0"
     >
-      <span className={circleClassName} />
+      <span className={circleClassName} data-nav-tone={tone || "blue"} />
     </span>
   );
 }
@@ -2721,49 +2721,13 @@ function NavbarContent() {
     "h-6 w-6 md:h-7 md:w-7 shrink-0 transform-gpu transition-all duration-300 ease-out drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]";
   const MOBILE_BOTTOM_ICON_STROKE = 2.2;
 
-  // Lente de la sección activa: un CÍRCULO de cristal líquido (Liquid Glass) con
-  // desenfoque de fondo, iluminación especular en el canto, refracción óptica y
-  // resplandor tonal adaptado a la identidad de cada sección. La coloca y la
-  // mueve <BottomNavActiveLens>; aquí solo se decide su aspecto.
-  const getMobileBottomLensCircleClass = (tone = "blue") => {
-    const TONE_CONFIGS = {
-      gold: {
-        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(252,211,77,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
-        bg: "bg-black/25 bg-amber-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
-      },
-      blue: {
-        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(56,189,248,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
-        bg: "bg-black/25 bg-sky-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
-      },
-      purple: {
-        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(232,121,249,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
-        bg: "bg-black/25 bg-fuchsia-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
-      },
-      green: {
-        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(52,211,153,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
-        bg: "bg-black/25 bg-emerald-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
-      },
-      indigo: {
-        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(129,140,248,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
-        bg: "bg-black/25 bg-indigo-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
-      },
-      lime: {
-        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(190,242,100,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
-        bg: "bg-black/25 bg-lime-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
-      },
-      red: {
-        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(248,113,113,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
-        bg: "bg-black/25 bg-red-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
-      },
-      pink: {
-        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(244,114,182,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
-        bg: "bg-black/25 bg-pink-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
-      },
-    };
-
-    const config = TONE_CONFIGS[tone] || TONE_CONFIGS.blue;
-    return `block aspect-square h-[88%] rounded-full backdrop-blur-[14px] backdrop-saturate-[200%] backdrop-contrast-[1.1] ${config.bg} ${config.glow}`;
-  };
+  // Lente de la sección activa: un CÍRCULO de cristal con la receta de los
+  // botones de acción de las fichas (`.sv-lg-btn`): tinte del color de la
+  // sección, brillo interior que se apaga antes del borde y halo exterior, sin
+  // sombras `inset` que dibujen un aro. Ver `.sv-nav-lens` en globals.css. La
+  // coloca y la mueve <BottomNavActiveLens>; el tono llega en `data-nav-tone`.
+  const MOBILE_BOTTOM_LENS_CIRCLE_CLASS =
+    "sv-nav-lens block aspect-square h-[88%] rounded-full";
 
   // Las fichas conservan siempre la presencia compacta de su entrada. Así el
   // progreso del hero no vuelve a agrandar los controles antes de que el resto
@@ -3686,9 +3650,8 @@ function NavbarContent() {
 
         <BottomNavActiveLens
           activeKey={mobileBottomActive?.href || null}
-          circleClassName={getMobileBottomLensCircleClass(
-            mobileBottomActive?.tone,
-          )}
+          circleClassName={MOBILE_BOTTOM_LENS_CIRCLE_CLASS}
+          tone={mobileBottomActive?.tone}
         />
 
         {mobileBottomItems.map((item) => {
@@ -3769,9 +3732,8 @@ function NavbarContent() {
 
         <BottomNavActiveLens
           activeKey={mobileBottomActive?.href || null}
-          circleClassName={getMobileBottomLensCircleClass(
-            mobileBottomActive?.tone,
-          )}
+          circleClassName={MOBILE_BOTTOM_LENS_CIRCLE_CLASS}
+          tone={mobileBottomActive?.tone}
         />
 
         {mobileBottomItems.map((item, index) => {
