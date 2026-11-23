@@ -44,7 +44,13 @@ import {
   playArtworkRowEntrance,
   preloadArtworkImages,
 } from "@/lib/details/artworkRowTransition";
-import SectionSheet, { SHEET_CONTROL, SectionSheetEmpty, SectionSheetGroupTitle } from "./SectionSheet";
+import SectionSheet, {
+  SHEET_CONTROL,
+  SectionSheetEmpty,
+  SectionSheetGroupTitle,
+  SectionSheetPresence,
+  useSheetPresence,
+} from "./SectionSheet";
 import { ListRow, PersonRow, TitleRow, TrackRow, VideoRow } from "./SectionSheetRows";
 import { AwardRow } from "@/components/details/AwardCard";
 import SeasonCard from "@/components/details/SeasonCard";
@@ -89,12 +95,22 @@ export function openSectionSheet(store, id) {
   store?.set(SECTIONS[id] ? id : null);
 }
 
+/** ¿Tiene vista lateral la sección `id`? */
+export function hasSectionSheet(id) {
+  return Boolean(SECTIONS[id]);
+}
+
 export default function DetailsSectionSheets({ store, data }) {
   const openId = useSyncExternalStore(store.subscribe, store.get, serverSnapshot);
-  const close = () => store.set(null);
-  if (!openId || !SECTIONS[openId]) return null;
+  const close = useCallback(() => store.set(null), [store]);
+  const { shownId, presence } = useSheetPresence(openId && SECTIONS[openId] ? openId : null);
+  if (!shownId) return null;
   // `key`: cada apertura empieza con su pestaña y su búsqueda limpias.
-  return <SheetContent key={openId} id={openId} data={data} onClose={close} />;
+  return (
+    <SectionSheetPresence.Provider value={presence}>
+      <SheetContent key={shownId} id={shownId} data={data} onClose={close} />
+    </SectionSheetPresence.Provider>
+  );
 }
 
 function SheetContent({ id, data, onClose }) {

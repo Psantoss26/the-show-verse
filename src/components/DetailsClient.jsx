@@ -153,6 +153,7 @@ import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
 import TraktCommentCard from "@/components/details/TraktCommentCard";
 import DetailsSectionSheets, {
+  hasSectionSheet,
   openSectionSheet,
 } from "@/components/details/sectionSheet/DetailsSectionSheets";
 import { getSoundtrackSourceBadge } from "@/lib/details/soundtrackSource";
@@ -1179,9 +1180,13 @@ function useDesktopBackgroundSize(path, enabled) {
 // Menú de secciones con la sección activa suscrita al almacén del scroll-spy:
 // al cambiar de sección se re-renderiza este menú y nada más (ver
 // `activeSectionStore` en DetailsClient).
-function StickySectionMenu({ store, items, onChange }) {
+// Con una vista lateral abierta marca su sección (el menú sigue a la vista
+// sobre el panel en el teléfono).
+const noSheet = () => null;
+function StickySectionMenu({ store, sheetStore, items, onChange }) {
   const activeId = useSyncExternalStore(store.subscribe, store.get, store.get);
-  return <DetailsSectionMenu items={items} activeId={activeId} onChange={onChange} />;
+  const sheetId = useSyncExternalStore(sheetStore.subscribe, sheetStore.get, noSheet);
+  return <DetailsSectionMenu items={items} activeId={sheetId || activeId} onChange={onChange} />;
 }
 
 /**
@@ -8663,6 +8668,25 @@ export default function DetailsClient({
     [menuH, STICKY_TOP, setActiveSectionId],
   );
 
+  // Menú de secciones con una vista lateral abierta (sigue a la vista en el
+  // teléfono): una sección con vista cambia de panel; otra cierra el panel y
+  // desplaza la página cuando ya no está bloqueada.
+  const onSectionMenuChange = useCallback(
+    (sid) => {
+      if (!sectionSheetStore.get()) {
+        scrollToSection(sid);
+        return;
+      }
+      if (hasSectionSheet(sid)) {
+        openSectionSheet(sectionSheetStore, sid);
+        return;
+      }
+      sectionSheetStore.set(null);
+      requestAnimationFrame(() => scrollToSection(sid));
+    },
+    [sectionSheetStore, scrollToSection],
+  );
+
   // Scroll-spy (qué sección está “activa”)
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -11681,8 +11705,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             desaparecían durante la animación y aparecían de golpe al final. */}
         <div data-details-transition-part="content" className="mt-2 sm:mt-10">
           {/* Menú de navegación sticky que se queda fijo debajo del navbar al hacer scroll */}
+          {/* `data-sv-sheet-anchor`: las vistas laterales de las secciones
+              (SectionSheet) empiezan justo debajo en el teléfono, así el menú
+              sigue a la vista; `data-sv-sheet-keep`: conserva su cristal. */}
           <div
             ref={menuStickyRef}
+            data-sv-sheet-anchor=""
+            data-sv-sheet-keep=""
             className="sticky z-30 py-2"
             style={{
               top: STICKY_TOP,
@@ -11696,8 +11725,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             >
               <StickySectionMenu
                 store={activeSectionStore}
+                sheetStore={sectionSheetStore}
                 items={sectionItems}
-                onChange={scrollToSection}
+                onChange={onSectionMenuChange}
               />
             </div>
             {/* Anterior / siguiente de la lista de origen: flechas a los lados

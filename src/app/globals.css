@@ -659,29 +659,6 @@ html:not([data-avatar-boot]) .alerts-boot {
   animation: sv-fade-in 200ms ease-out;
 }
 
-/* Vista lateral de una sección de la ficha (details/sectionSheet): entra desde
-   la derecha SOLO con transform. Un fundido de opacidad haría del panel una
-   raíz de backdrop y aplanaría su cristal mientras dura. */
-@keyframes sv-sheet-in {
-  from {
-    transform: translate3d(100%, 0, 0);
-  }
-
-  to {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-.sv-sheet-in {
-  animation: sv-sheet-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sv-sheet-in {
-    animation: none;
-  }
-}
-
 /* Hoja inferior de filtros y vista de las páginas en móvil
    (ui/MobileOptionsSheet): sube desde abajo y baja al cerrar, SOLO con
    transform, por lo mismo que la vista lateral. */
@@ -4002,8 +3979,8 @@ html[data-details-sequence-transition] .sv-topbar {
    nota la diferencia. Solo a los hijos de <body> que no son capas de modal ni
    menús (`.sv-inline-menu` va en un portal propio). */
 @media (max-width: 639.98px) {
-  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu),
-  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu) * {
+  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu, [data-sv-sheet-keep]),
+  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu) :not([data-sv-sheet-keep], [data-sv-sheet-keep] *) {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     will-change: auto !important;
@@ -4012,8 +3989,16 @@ html[data-details-sequence-transition] .sv-topbar {
   /* `transform-gpu` solo fuerza una capa con un translateZ(0) vacío: en
      Tailwind v4 translate/rotate/scale van en sus propias propiedades, así que
      anular `transform` no mueve nada. */
-  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu) .transform-gpu {
+  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu) .transform-gpu:not([data-sv-sheet-keep], [data-sv-sheet-keep] *) {
     transform: none !important;
+  }
+
+  /* Con el panel anclado bajo el menú de secciones (la vista lateral no tapa
+     la barra superior ni el menú, `data-sv-sheet-keep` arriba: conservan su
+     cristal y sus animaciones), la barra inferior flota POR ENCIMA del panel:
+     sigue a mano y su cristal desenfoca el panel en vez de quedar oculta. */
+  :root[data-sv-sheet-anchored] .sv-navbar-bottom-shift {
+    z-index: 10001;
   }
 }
 

@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
 import MobileOptionsSheet, { SheetAction, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
-import SectionSheet, { SHEET_CONTROL, SectionSheetEmpty } from "./SectionSheet";
+import SectionSheet, { SHEET_CONTROL, SectionSheetEmpty, SectionSheetPresence, useSheetPresence } from "./SectionSheet";
 import { TitleRow } from "./SectionSheetRows";
 import useCardPoster from "@/lib/hooks/useCardPoster";
 import FilmographySheet from "./FilmographySheet";
@@ -77,9 +77,15 @@ export function openActorSectionSheet(store, id) {
 export default function ActorSectionSheets({ store, data }) {
   const openId = useSyncExternalStore(store.subscribe, store.get, serverSnapshot);
   const close = () => store.set(null);
-  if (!openId || !SECTIONS[openId]) return null;
+  // Sigue montado mientras sale (ver SectionSheet).
+  const { shownId, presence } = useSheetPresence(openId && SECTIONS[openId] ? openId : null);
+  if (!shownId) return null;
   // `key`: cada apertura empieza con su pestaña y su búsqueda limpias.
-  return <SheetContent key={openId} id={openId} data={data} onClose={close} />;
+  return (
+    <SectionSheetPresence.Provider value={presence}>
+      <SheetContent key={shownId} id={shownId} data={data} onClose={close} />
+    </SectionSheetPresence.Provider>
+  );
 }
 
 function SheetContent({ id, data, onClose }) {

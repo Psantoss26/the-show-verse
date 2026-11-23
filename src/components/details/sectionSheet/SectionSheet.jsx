@@ -4,17 +4,61 @@
 // de arriba abajo, como los paneles laterales de trakt.tv (personas, reseñas…).
 // Se abre al pulsar el título de la sección (SectionTitle `onOpen`).
 //
-// Panel a la derecha (pantalla completa en el teléfono) con cabecera fija:
-// título, pestañas opcionales, buscador opcional y cerrar. Entra deslizándose
-// solo con `transform`: un fundido de opacidad sobre el panel lo convertiría en
-// raíz de backdrop y aplanaría el cristal mientras dura (ver liquidGlass).
+// Panel a la derecha con cabecera fija: título, pestañas opcionales, buscador
+// opcional y cerrar. En el teléfono ocupa todo el ancho y, si la página tiene
+// un menú de secciones (`data-sv-sheet-anchor`, el de DetailsClient), empieza
+// justo debajo de él: la barra superior y el menú siguen a la vista y la barra
+// inferior queda por encima del panel. Entra y sale deslizándose solo con
+// `transform` (WAAPI, curvas en lib/ui/sectionSheetMotion): un fundido de
+// opacidad sobre el panel lo convertiría en raíz de backdrop y aplanaría el
+// cristal mientras dura (ver liquidGlass).
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { placeTabPill } from "@/lib/details/artworkRowTransition";
+import {
+  SHEET_ANCHOR_MAX_WIDTH,
+  SHEET_ENTER,
+  SHEET_EXIT,
+  SHEET_PANEL_FRAMES,
+  SHEET_SCRIM_FRAMES,
+  sheetAnchorPlacement,
+} from "@/lib/ui/sectionSheetMotion";
+
+// Quien monta y desmonta los paneles (DetailsSectionSheets, ActorSectionSheets)
+// los deja montados mientras salen: `closing` cierra el panel aunque su vista
+// siga pasando `open`, `onExited` avisa al acabar la salida para desmontarlo e
+// `instant` (cambiar de un panel a otro) entra sin deslizarse.
+export const SectionSheetPresence = createContext(null);
+
+/**
+ * Presencia de los paneles de un almacén «qué sección está abierta»: sigue
+ * dando el último `id` mientras su panel sale y marca `instant` al pasar de
+ * un panel abierto a otro (sin deslizar de nuevo).
+ */
+export function useSheetPresence(openId) {
+  const [state, setState] = useState(() => ({ shownId: openId, instant: false, lastOpen: openId }));
+  if (openId !== state.lastOpen) {
+    setState(
+      openId
+        ? { shownId: openId, instant: Boolean(state.lastOpen), lastOpen: openId }
+        : { shownId: state.shownId, instant: false, lastOpen: null },
+    );
+  }
+  const onExited = useCallback(
+    () => setState((prev) => (prev.lastOpen ? prev : { ...prev, shownId: null })),
+    [],
+  );
+  const closing = !openId;
+  const presence = useMemo(
+    () => ({ closing, instant: state.instant, onExited }),
+    [closing, state.instant, onExited],
+  );
+  return { shownId: openId || state.shownId, presence };
+}
 
 // Superficie de los controles del panel (barra de pestañas, buscador, botones
 // de filtros): la misma de cristal que los desplegables de filtros
@@ -106,31 +150,140 @@ export default function SectionSheet({
   const close = () => {
     if (!closeDisabled) onClose?.();
   };
-  // Bloquea el scroll de la ficha y cierra con Escape.
-  useModalGuard({ open, onClose: close });
-  // Marca la vista lateral abierta: en móvil, mientras tapa toda la pantalla,
-  // la ficha de debajo deja de componer su cristal (`data-sv-sheet-open` en
-  // globals.css). Sin esto, cada toque dentro del panel reorganizaba ~300
-  // capas de la página tapada y en el móvil parpadeaba la pantalla entera.
-  useEffect(() => {
-    if (!open) return;
-    const root = document.documentElement;
-    root.setAttribute("data-sv-sheet-open", "");
-    return () => root.removeAttribute("data-sv-sheet-open");
-  }, [open]);
+  const presence = useContext(SectionSheetPresence);
+  const isOpen = Boolean(open) && !presence?.closing;
+  // Sigue montado mientras sale; se desmonta al acabar la animación.
+  const [present, setPresent] = useState(isOpen);
+  if (isOpen && !present) setPresent(true);
+  const layerRef = useRef(null);
+  const scrimRef = useRef(null);
+  // Borde superior del panel en el teléfono (bajo el menú de secciones), o
+  // `null` a pantalla completa. Se mide al abrir, antes de pintar.
+  const [anchorTop, setAnchorTop] = useState(null);
 
-  if (!open || !portalReady) return null;
+  // Antes de bloquear el scroll (useModalGuard lo hace en un efecto, después
+  // de este): si el menú de secciones aún no está pegado bajo la barra, se
+  // sube la página lo justo para que lo esté, y el panel empieza debajo.
+  useLayoutEffect(() => {
+    if (!isOpen || !portalReady) return undefined;
+    if (!window.matchMedia?.(`(max-width: ${SHEET_ANCHOR_MAX_WIDTH}px)`).matches) {
+      setAnchorTop(null);
+      return undefined;
+    }
+    const anchor = document.querySelector("[data-sv-sheet-anchor]");
+    const rect = anchor?.getBoundingClientRect();
+    const stickyTop = anchor ? parseFloat(getComputedStyle(anchor).top) : NaN;
+    const placement = rect?.height ? sheetAnchorPlacement(rect, stickyTop, window.innerHeight) : null;
+    if (!placement) {
+      setAnchorTop(null);
+      return undefined;
+    }
+    if (placement.scrollBy) window.scrollBy({ top: placement.scrollBy, behavior: "instant" });
+    // Medida real tras desplazar (la página puede no dar para todo el salto).
+    setAnchorTop(Math.round(anchor.getBoundingClientRect().bottom));
+    return undefined;
+  }, [isOpen, portalReady]);
+  // Panel anclado bajo el menú: la barra inferior sube por encima y la barra
+  // superior y el menú conservan su cristal (globals.css). Hasta que acaba
+  // la salida, para que la barra no se esconda tras el panel que se va.
+  const anchoredShown = present && portalReady && anchorTop != null;
+  useLayoutEffect(() => {
+    if (!anchoredShown) return undefined;
+    const root = document.documentElement;
+    root.setAttribute("data-sv-sheet-anchored", "");
+    return () => root.removeAttribute("data-sv-sheet-anchored");
+  }, [anchoredShown]);
+
+  // Bloquea el scroll de la ficha y cierra con Escape.
+  useModalGuard({ open: isOpen, onClose: close });
+
+  // Entrada y salida con WAAPI (en el compositor; solo transform y el
+  // velo). Al terminar la entrada se marca la página tapada
+  // (`data-sv-sheet-open`, globals.css): en el teléfono deja de componer su
+  // cristal y pausa sus animaciones. Se marca al acabar y se desmarca al
+  // empezar a salir: hacerlo en el primer fotograma recalculaba los estilos de
+  // toda la ficha justo cuando arrancaba el deslizamiento (tirón de entrada).
+  const instant = Boolean(presence?.instant);
+  useLayoutEffect(() => {
+    if (!present) return undefined;
+    const panel = layerRef.current?.querySelector("[data-sv-sheet-panel]");
+    const scrim = scrimRef.current;
+    if (!panel) return undefined;
+    const root = document.documentElement;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const animations = [];
+    let cancelled = false;
+    const run = (el, frames, timing, direction) => {
+      if (!el?.animate) return null;
+      const animation = el.animate(frames, { ...timing, direction, fill: "both" });
+      animations.push(animation);
+      return animation;
+    };
+    if (isOpen) {
+      const markCovered = () => {
+        if (!cancelled) root.setAttribute("data-sv-sheet-open", "");
+      };
+      if (reduce || instant) {
+        markCovered();
+      } else {
+        run(scrim, SHEET_SCRIM_FRAMES, SHEET_ENTER, "normal");
+        const enter = run(panel, SHEET_PANEL_FRAMES, SHEET_ENTER, "normal");
+        if (enter) enter.finished.then(markCovered, () => {});
+        else markCovered();
+      }
+    } else {
+      root.removeAttribute("data-sv-sheet-open");
+      const done = () => {
+        if (cancelled) return;
+        setPresent(false);
+        presence?.onExited?.();
+      };
+      if (reduce) {
+        done();
+      } else {
+        run(scrim, SHEET_SCRIM_FRAMES, SHEET_EXIT, "reverse");
+        const exit = run(panel, SHEET_PANEL_FRAMES, SHEET_EXIT, "reverse");
+        if (exit) exit.finished.then(done, () => {});
+        else done();
+      }
+    }
+    return () => {
+      cancelled = true;
+      // `fill: both` sostiene el estado final solo mientras viva la animación:
+      // al cancelarla (abrir a mitad de una salida) vuelve al estilo base.
+      for (const animation of animations) animation.cancel();
+    };
+    // `presence` cambia de objeto en cada render del padre; solo importa el
+    // sentido (abrir/cerrar) y que el panel exista.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, present, portalReady]);
+  // Al desmontar sin salida (otra página, cambio de panel). De layout: al
+  // cambiar de un panel a otro, el nuevo marca la página en su efecto de
+  // layout y una limpieza pasiva del viejo, que corre después, la desmarcaba.
+  useLayoutEffect(() => () => document.documentElement.removeAttribute("data-sv-sheet-open"), []);
+
+  if (!present || !portalReady) return null;
+
+  const anchored = anchorTop != null;
 
   return createPortal(
     <div
+      ref={layerRef}
       data-detail-modal-layer=""
-      className="fixed inset-0 z-[10000] flex justify-end"
+      data-sv-sheet-anchored={anchored ? "" : undefined}
+      className={`fixed inset-x-0 bottom-0 z-[10000] flex justify-end ${isOpen ? "" : "pointer-events-none"}`}
+      style={{ top: anchored ? anchorTop : 0 }}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
+      inert={isOpen ? undefined : true}
     >
+      {/* Velo: en el teléfono sin desenfoque. El panel ocupa todo el ancho y
+          solo se ve mientras se desliza; desenfocar toda la pantalla en cada
+          fotograma del fundido costaba fotogramas en la app de Android. */}
       <div
-        className="absolute inset-0 bg-black/55 backdrop-blur-sm sv-fade-in"
+        ref={scrimRef}
+        className="absolute inset-0 bg-black/55 sm:backdrop-blur-sm"
         onClick={close}
         aria-hidden="true"
       />
@@ -138,9 +291,10 @@ export default function SectionSheet({
       <Panel
         {...panelProps}
         ref={panelRef}
-        className={`relative flex h-full w-full flex-col overflow-hidden outline-none sm:w-[30rem] sm:rounded-l-[2rem] lg:w-[34rem] ${LIQUID_GLASS_PANEL} sv-sheet-in`}
+        data-sv-sheet-panel=""
+        className={`relative flex h-full w-full flex-col overflow-hidden outline-none will-change-transform sm:w-[30rem] sm:rounded-l-[2rem] lg:w-[34rem] ${anchored ? "rounded-t-[1.75rem]" : ""} ${LIQUID_GLASS_PANEL}`}
       >
-        <header className={`shrink-0 ${LIQUID_GLASS_MODAL_HEADER} px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6`}>
+        <header className={`shrink-0 ${LIQUID_GLASS_MODAL_HEADER} px-5 pb-4 ${anchored ? "pt-5" : "pt-[max(1.25rem,env(safe-area-inset-top))]"} sm:px-6 sm:pt-6`}>
           <div className="flex items-start gap-3">
             {leading ? (
               <span className="mt-0.5 shrink-0">{leading}</span>
@@ -253,12 +407,14 @@ export default function SectionSheet({
             (~2.200 imágenes pintadas por despliegue en «Portadas y fondos») y
             en el móvil las tarjetas parpadeaban; con ella solo se desplaza.
             No aplana el cristal: eso lo hace `opacity`, no `transform`. */}
-        <div className="details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,var(--sv-safe-bottom,0px))] pt-1 will-change-transform sm:px-6">
+        {/* Anclado bajo el menú, la barra inferior flota encima del panel: el
+            final de la lista deja su hueco para no quedar debajo. */}
+        <div className={`details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 ${anchored && !footer ? "pb-[calc(5.5rem+var(--sv-safe-bottom,0px))]" : "pb-[max(1.5rem,var(--sv-safe-bottom,0px))]"} pt-1 will-change-transform sm:px-6`}>
           {children}
         </div>
 
         {footer ? (
-          <div className="shrink-0 border-t border-white/5 px-4 pb-[max(1rem,var(--sv-safe-bottom,0px))] pt-4 sm:px-6">
+          <div className={`shrink-0 border-t border-white/5 px-4 ${anchored ? "pb-[calc(5.5rem+var(--sv-safe-bottom,0px))]" : "pb-[max(1rem,var(--sv-safe-bottom,0px))]"} pt-4 sm:px-6`}>
             {footer}
           </div>
         ) : null}
