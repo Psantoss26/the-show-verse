@@ -56,9 +56,9 @@ export default function StarRating({
   const clearFn = onClear || onClearRating;
 
   const hasRating = typeof rating === "number" && Number.isFinite(rating);
-  // Puntuación decimal (p. ej. "8.5"): se mide con las métricas reales de la
-  // fuente para centrarla con precisión, ver `useCenteredGlyphOffset`.
-  const { ref: ratingRef, offsetPx: ratingOffsetPx } = useCenteredGlyphOffset(
+  // Puntuación decimal (p. ej. "8.5"): se mide su tinta real para centrarla
+  // en los dos ejes, ver `useCenteredGlyphOffset`.
+  const { ref: ratingRef, style: ratingStyle } = useCenteredGlyphOffset(
     hasRating ? fmt(rating) : "",
   );
 
@@ -188,7 +188,7 @@ export default function StarRating({
         ) : hasRating ? (
           <span
             ref={ratingRef}
-            style={{ transform: `translateY(${ratingOffsetPx}px)` }}
+            style={ratingStyle}
             // Misma tipografía que el número de visionados del botón de visto
             // (LiquidButton → playsCount): fuente de la app en negrita, una
             // cifra en text-2xl y más en text-xl apretado.

@@ -4336,3 +4336,191 @@ html[data-details-sequence-transition] .sv-topbar {
 .sv-trim-end > :last-child > :last-child > :last-child {
   margin-bottom: 0;
 }
+
+/* ═══ BOTONES DE ACCIÓN DE CRISTAL (LiquidButton `liquidGlass`) ═══
+   Los de la fila de acciones de todas las fichas (DetailsClient, DetailModal,
+   temporada/episodio, actor). Tres estados, todos en CSS y sin estado de React:
+
+   REPOSO  — el cristal de la familia (LIQUID_GLASS_SURFACE_CARD + capas
+             ópticas) más `.sv-lg-sheen`: luz difusa arriba y sombra interior
+             abajo, que dan volumen sin trazar un aro. Activo = cristal TEÑIDO
+             del color de la acción (`.sv-lg-tint`), sin aro, con halo fijo; ya
+             no hay pulso ni brillo infinitos.
+   HOVER   — solo con ratón (`hover: hover` + `pointer: fine`, así en táctil no
+             se queda pegado): sube un poco y un reflejo especular sigue al
+             puntero (--lg-mx/--lg-my, escritas por LiquidButton).
+   PULSAR  — `data-pressed` desde pointerdown: se hunde rápido y un destello
+             nace en el punto de contacto (--lg-px/--lg-py); al soltar vuelve
+             con un muelle ligero. Igual en ratón y en táctil.
+
+   Solo se transicionan transform y opacidades de capas: nada de box-shadow ni
+   backdrop-filter, que en nueve botones de cristal es lo caro (ver el comentario
+   de LiquidButton sobre `transition-all`). */
+.sv-lg-btn {
+  --lg-scale: 1;
+  --lg-lift: 0px;
+  --lg-mx: 50%;
+  --lg-my: 0%;
+  --lg-px: 50%;
+  --lg-py: 50%;
+  transform: translate3d(0, var(--lg-lift), 0) scale(var(--lg-scale));
+  transition:
+    transform 460ms cubic-bezier(0.34, 1.45, 0.64, 1),
+    color 220ms ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.sv-lg-btn > div > .sv-lg-tint,
+.sv-lg-btn > div > .sv-lg-sheen,
+.sv-lg-btn > div > .sv-lg-spec,
+.sv-lg-btn > div > .sv-lg-press {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* SIN CANTOS MARCADOS. Nada en estos botones sigue el contorno: ni sombras
+   interiores (`inset …` dibuja una línea clara arriba y otra oscura abajo que
+   recorren el círculo), ni aro de 1 px en el activo, ni el canto de refracción
+   de LiquidGlassOpticalLayers (en una pieza de 40-56 px su franja se lee como
+   un aro claro). El volumen lo dan degradados que nacen DENTRO y se apagan
+   antes de llegar al borde, así el límite del botón es solo el cambio de
+   cristal a fondo. */
+.sv-lg-btn .sv-glass-rim {
+  display: none;
+}
+
+/* Volumen en reposo: un lóbulo de luz en la mitad de arriba que muere antes
+   del borde, y una penumbra muy suave abajo. */
+.sv-lg-sheen {
+  background:
+    radial-gradient(
+      90% 60% at 50% 12%,
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.03) 55%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    radial-gradient(
+      100% 55% at 50% 100%,
+      rgba(0, 0, 0, 0.1) 0%,
+      rgba(0, 0, 0, 0) 100%
+    );
+}
+
+/* Activo: el cristal toma el color de la acción, más intenso arriba (donde
+   entra la luz) y con un resplandor interior del mismo tono. */
+.sv-lg-tint {
+  opacity: 0;
+  background:
+    radial-gradient(
+      120% 95% at 50% 0%,
+      rgba(var(--lg-rgb2), 0.34) 0%,
+      rgba(var(--lg-rgb), 0.26) 48%,
+      rgba(var(--lg-rgb), 0.16) 100%
+    );
+  transition: opacity 280ms ease;
+}
+.sv-lg-btn[data-active]:not([data-solid]) .sv-lg-tint {
+  opacity: 1;
+}
+.sv-lg-btn[data-active]:not([data-solid]) {
+  box-shadow:
+    0 16px 40px -8px rgba(0, 0, 0, 0.75),
+    0 0 24px -2px rgba(var(--lg-rgb), 0.42);
+}
+
+/* Reflejo que sigue al puntero (hover) y destello de pulsación. */
+.sv-lg-spec {
+  opacity: 0;
+  background:
+    radial-gradient(
+      circle at var(--lg-mx) var(--lg-my),
+      rgba(255, 255, 255, 0.24) 0%,
+      rgba(255, 255, 255, 0.07) 34%,
+      rgba(255, 255, 255, 0) 62%
+    ),
+    linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05));
+  transition: opacity 260ms ease;
+}
+.sv-lg-press {
+  opacity: 0;
+  background: radial-gradient(
+    circle at var(--lg-px) var(--lg-py),
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.1) 40%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  transition: opacity 520ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sv-lg-btn:not(:disabled):hover {
+    --lg-scale: 1.06;
+    --lg-lift: -1px;
+    color: #fff;
+  }
+  .sv-lg-btn.labeled:not(:disabled):hover {
+    --lg-scale: 1.025;
+  }
+  .sv-lg-btn:not(:disabled):hover .sv-lg-spec {
+    opacity: 1;
+  }
+}
+
+.sv-lg-btn[data-pressed]:not(:disabled),
+.sv-lg-btn:not(:disabled):focus-visible:active {
+  --lg-scale: 0.92;
+  --lg-lift: 0px;
+  transition:
+    transform 110ms cubic-bezier(0.3, 0, 0.5, 1),
+    color 220ms ease;
+}
+.sv-lg-btn.labeled[data-pressed]:not(:disabled) {
+  --lg-scale: 0.965;
+}
+.sv-lg-btn[data-pressed]:not(:disabled) .sv-lg-press,
+.sv-lg-btn:not(:disabled):focus-visible:active .sv-lg-press {
+  opacity: 1;
+  transition: opacity 70ms ease-out;
+}
+
+.sv-lg-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 3px;
+}
+
+/* Relleno blanco (tráiler, soundtrack): perla en reposo, reflejo y destello en
+   oscuro, que es lo que se ve sobre blanco. */
+.sv-lg-btn[data-solid] .sv-lg-sheen {
+  background: radial-gradient(
+    100% 55% at 50% 100%,
+    rgba(0, 0, 0, 0.08) 0%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+.sv-lg-btn[data-solid] .sv-lg-spec {
+  background: radial-gradient(
+    circle at var(--lg-mx) var(--lg-my),
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(0, 0, 0, 0) 55%
+  ),
+  linear-gradient(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.04));
+}
+.sv-lg-btn[data-solid] .sv-lg-press {
+  background: radial-gradient(
+    circle at var(--lg-px) var(--lg-py),
+    rgba(0, 0, 0, 0.16) 0%,
+    rgba(0, 0, 0, 0.06) 55%,
+    rgba(0, 0, 0, 0.03) 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-lg-btn,
+  .sv-lg-btn[data-pressed] {
+    --lg-scale: 1 !important;
+    --lg-lift: 0px !important;
+  }
+}

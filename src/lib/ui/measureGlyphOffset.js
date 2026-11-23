@@ -1,65 +1,140 @@
 // src/lib/ui/measureGlyphOffset.js
-// Centra VERTICALMENTE un texto (números de los botones de acción: veces
-// vista, progreso de serie, puntuación decimal) usando las métricas REALES de
-// la fuente en vez de un desplazamiento fijo "a ojo" (translate-y-[0.05em]).
+// Centra la TINTA de un texto (números de los botones de acción: veces vista,
+// progreso de serie con "%", puntuación decimal) dentro de su botón, en los
+// dos ejes.
 //
-// `line-height: 1` + flexbox (`items-center`) centra la CAJA DE LÍNEA de la
-// fuente, no el glifo dibujado: la mayoría de fuentes reservan más espacio de
-// ascendente que de descendente en su caja de línea (para tildes, mayúsculas,
-// letras con descendente como "g"/"y"...), así que un número (sin
-// descendentes) centrado por caja de línea queda visualmente por ENCIMA de su
-// centro real. Cuánto hay que compensar depende del texto exacto (1 ó 2
-// dígitos, con coma decimal o "%") y del tamaño de fuente real (cambia por
-// breakpoint vía container queries), así que no existe una única constante
-// válida para todos los casos -- de ahí medir con Canvas en vez de adivinar.
+// Flexbox centra CAJAS, no lo que se dibuja: la caja de línea de la fuente
+// reserva más arriba (tildes, mayúsculas) que abajo, cada cifra tiene sus
+// márgenes laterales, el `tracking-tighter` deja un espaciado negativo
+// DESPUÉS de la última cifra y el "%" pequeño pesa a la derecha. Medido en
+// capturas reales (botón de 52 px): con el centrado anterior —solo vertical y
+// con métricas teóricas— la tinta quedaba hasta 1,25 px arriba y 1,25 px a la
+// derecha según el número.
+//
+// Por eso se mide en el DOM dónde empieza cada trozo de texto y dónde cae su
+// línea base (sonda de 0×0 alineada a la base), y con Canvas qué ocupa la
+// tinta desde ese origen (`actualBoundingBox*`, con el mismo `letter-spacing`).
+// El desplazamiento lleva la unión de esas tintas al centro del contenedor.
+
 let sharedCtx = null;
 function getContext() {
   if (typeof document === "undefined") return null;
-  if (!sharedCtx) {
-    const canvas = document.createElement("canvas");
-    sharedCtx = canvas.getContext("2d");
-  }
+  if (!sharedCtx) sharedCtx = document.createElement("canvas").getContext("2d");
   return sharedCtx;
 }
 
-const cache = new Map();
+const metricsCache = new Map();
+
+// Canvas redondea la caja de tinta HACIA FUERA al píxel entero: a 20-24 px eso
+// es hasta 1 px de error, y como las cifras apoyan en la base (descendente
+// ~0,2 → 1) sesgaba el centrado medio píxel hacia arriba. Se mide a 10× y se
+// divide: el redondeo queda en 0,1 px.
+const MEASURE_SCALE = 10;
+
+function measureInk(cs, text) {
+  const ctx = getContext();
+  if (!ctx) return null;
+  const size = parseFloat(cs.fontSize) || 16;
+  const spacing = parseFloat(cs.letterSpacing) || 0; // "normal" → 0
+  const k = MEASURE_SCALE;
+  const font = `${cs.fontStyle} ${cs.fontWeight} ${size * k}px ${cs.fontFamily}`;
+  const key = `${font}|${spacing}|${text}`;
+  if (metricsCache.has(key)) return metricsCache.get(key);
+  ctx.font = font;
+  if ("letterSpacing" in ctx) ctx.letterSpacing = `${spacing * k}px`;
+  const m = ctx.measureText(text);
+  const ink = {
+    left: (m.actualBoundingBoxLeft ?? 0) / k,
+    right: (m.actualBoundingBoxRight ?? m.width) / k,
+    ascent: (m.actualBoundingBoxAscent ?? 0) / k,
+    descent: (m.actualBoundingBoxDescent ?? 0) / k,
+  };
+  metricsCache.set(key, ink);
+  return ink;
+}
 
 /**
- * Desplazamiento vertical (px, positivo = hacia abajo) para que el centro
- * VISUAL de `text` coincida con el centro de una caja de línea de altura
- * `line-height: 1` con la fuente `font` (shorthand CSS: "<peso> <tamaño>
- * <familia>", tal cual devuelve `getComputedStyle`), cuando ambos se centran
- * con flexbox. Se basa en `TextMetrics.actualBoundingBox*` (glifo real) vs.
- * `fontBoundingBox*` (caja de línea de la fuente). Devuelve 0 si no se puede
- * medir (SSR, o navegador sin soporte de `fontBoundingBox*`) -- no hay salto
- * visual: simplemente se queda con el centrado de caja de línea por defecto.
+ * Parte pura (testeable): dado el centro del contenedor y los trozos de texto
+ * —cada uno con su origen (x de inicio, y de la línea base) y su tinta medida
+ * desde ese origen—, el desplazamiento {x, y} que centra la unión de tintas.
+ * `current` es el desplazamiento que ya lleva aplicado el elemento (las
+ * medidas lo incluyen) y `scale` la escala del botón en ese instante (hover,
+ * pulsado): todo se devuelve en px CSS sin escalar, en cuartos de píxel.
  */
-export function getGlyphCenterOffset(font, text) {
-  if (!font || !text) return 0;
-  const key = `${font}__${text}`;
-  if (cache.has(key)) return cache.get(key);
-
-  const ctx = getContext();
-  if (!ctx) return 0;
-
-  ctx.font = font;
-  const metrics = ctx.measureText(text);
-
-  const actualAscent = metrics.actualBoundingBoxAscent ?? 0;
-  const actualDescent = metrics.actualBoundingBoxDescent ?? 0;
-  const fontAscent = metrics.fontBoundingBoxAscent;
-  const fontDescent = metrics.fontBoundingBoxDescent;
-  // Sin soporte de fontBoundingBox* (Safari < 17 aprox.) no hay forma fiable
-  // de saber la caja de línea real: no hay base para corregir, offset 0.
-  if (fontAscent == null || fontDescent == null) {
-    cache.set(key, 0);
-    return 0;
+export function inkCenterShift({ center, runs, current = { x: 0, y: 0 }, scale = 1 }) {
+  if (!runs?.length) return { x: 0, y: 0 };
+  let left = Infinity;
+  let right = -Infinity;
+  let top = Infinity;
+  let bottom = -Infinity;
+  for (const r of runs) {
+    left = Math.min(left, r.originX - r.ink.left * scale);
+    right = Math.max(right, r.originX + r.ink.right * scale);
+    top = Math.min(top, r.baselineY - r.ink.ascent * scale);
+    bottom = Math.max(bottom, r.baselineY + r.ink.descent * scale);
   }
+  const dx = (center.x - (left + right) / 2) / scale;
+  const dy = (center.y - (top + bottom) / 2) / scale;
+  const q = (v) => Math.round(v * 4) / 4 || 0;
+  return { x: q(current.x + dx), y: q(current.y + dy) };
+}
 
-  // Centro del glifo real vs. centro de la caja de línea de la fuente,
-  // medidos ambos desde la línea base (más abajo = positivo).
-  const offset = (fontDescent - actualDescent - (fontAscent - actualAscent)) / 2;
+function textRuns(root) {
+  const runs = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.nodeValue.trim();
+    if (text) runs.push({ node, text });
+  }
+  return runs;
+}
 
-  cache.set(key, offset);
-  return offset;
+/**
+ * Desplazamiento {x, y} (px CSS) para centrar la tinta de `el` dentro del área
+ * de contenido de su padre. `current` es el que ya tiene aplicado. Devuelve
+ * null si no se puede medir (SSR, nada que medir o elemento oculto).
+ */
+export function measureInkCenterShift(el, current = { x: 0, y: 0 }) {
+  const container = el?.parentElement;
+  if (!container || typeof document === "undefined") return null;
+  const box = container.getBoundingClientRect();
+  // Medidas de layout SIN redondear: `offsetWidth`/`clientWidth` van en px
+  // enteros y en el móvil el botón mide 41,2 px, lo que torcía la escala y el
+  // centro unas décimas siempre hacia el mismo lado.
+  const style = getComputedStyle(container);
+  const px = (v) => parseFloat(v) || 0;
+  const padX = px(style.paddingLeft) + px(style.paddingRight);
+  const padY = px(style.paddingTop) + px(style.paddingBottom);
+  const borderX = px(style.borderLeftWidth) + px(style.borderRightWidth);
+  const borderY = px(style.borderTopWidth) + px(style.borderBottomWidth);
+  const borderBox = style.boxSizing === "border-box";
+  const width = px(style.width);
+  const height = px(style.height);
+  const outerW = borderBox ? width : width + padX + borderX;
+  if (!box.width || !outerW) return null;
+  const scale = box.width / outerW;
+  const contentW = borderBox ? width - padX - borderX : width;
+  const contentH = borderBox ? height - padY - borderY : height;
+  const center = {
+    x: box.left + (px(style.borderLeftWidth) + px(style.paddingLeft) + contentW / 2) * scale,
+    y: box.top + (px(style.borderTopWidth) + px(style.paddingTop) + contentH / 2) * scale,
+  };
+
+  const runs = [];
+  for (const { node, text } of textRuns(el)) {
+    const host = node.parentElement;
+    const ink = measureInk(getComputedStyle(host), text);
+    if (!ink) return null;
+    // Sonda 0×0 en la línea base justo antes del texto: su esquina inferior
+    // izquierda es el origen de dibujo del primer glifo.
+    const probe = document.createElement("span");
+    probe.style.cssText =
+      "display:inline-block;width:0;height:0;vertical-align:baseline;padding:0;margin:0;border:0";
+    host.insertBefore(probe, node);
+    const p = probe.getBoundingClientRect();
+    probe.remove();
+    runs.push({ originX: p.left, baselineY: p.bottom, ink });
+  }
+  if (!runs.length) return null;
+  return inkCenterShift({ center, runs, current, scale });
 }

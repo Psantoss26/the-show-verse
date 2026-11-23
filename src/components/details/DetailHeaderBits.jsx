@@ -80,7 +80,7 @@ export function CompactBadge({
       aria-label={titleText}
     >
       <span
-        className={`grid h-6 shrink-0 place-items-center ${large ? "phone-sb:h-[calc(28*var(--sb-u,1px))] phone-sb:min-w-[calc(32*var(--sb-u,1px))]" : ""} ${logoWrapClassName}`}
+        className={`grid h-6 shrink-0 place-items-center ${phone ? "" : "lg:h-7 lg:min-w-7"} ${large ? "phone-sb:h-[calc(28*var(--sb-u,1px))] phone-sb:min-w-[calc(32*var(--sb-u,1px))]" : ""} ${logoWrapClassName}`}
       >
         <OptimizedImage
           src={logo}
@@ -88,6 +88,7 @@ export function CompactBadge({
           draggable="false"
           className={`
             max-h-5 max-w-6 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110
+            ${phone ? "" : "lg:max-h-6 lg:max-w-7"}
             ${large ? "phone-sb:max-h-[calc(24*var(--sb-u,1px))] phone-sb:max-w-[calc(32*var(--sb-u,1px))]" : ""}
             ${logoClassName}
           `}

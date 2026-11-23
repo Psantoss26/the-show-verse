@@ -191,7 +191,7 @@ export function DetailsRatingsBadges({
         <CompactBadge
           key={scoreStateKey("tmdb", score)}
           logo="/logo-TMDb.png"
-          logoClassName={`h-5 sm:h-5 ${spread ? "phone-sb:h-[calc(24*var(--sb-u,1px))]" : ""}`}
+          logoClassName={`h-5 sm:h-5 ${phone ? "" : "lg:h-6"} ${spread ? "phone-sb:h-[calc(24*var(--sb-u,1px))]" : ""}`}
           phone={phone}
           large={spread}
           value={resolvedValue(score)}
@@ -239,11 +239,11 @@ export function DetailsRatingsBadges({
         <CompactBadge
           key={scoreStateKey("imdb", score)}
           logo="/logo-IMDb.svg"
-          logoWrapClassName="min-w-[28px]"
+          logoWrapClassName={`min-w-[28px] ${phone ? "" : "lg:min-w-[34px]"}`}
           logoClassName={
             phone
               ? `!h-5 !max-h-none !max-w-[34px] ${spread ? "phone-sb:!h-[calc(24*var(--sb-u,1px))] phone-sb:!max-w-[calc(42*var(--sb-u,1px))]" : ""}`
-              : `!h-5 sm:!h-[22px] !max-h-none !max-w-[34px] ${spread ? "phone-sb:!h-[calc(24*var(--sb-u,1px))] phone-sb:!max-w-[calc(42*var(--sb-u,1px))]" : ""}`
+              : `!h-5 sm:!h-[22px] lg:!h-[26px] !max-h-none !max-w-[34px] lg:!max-w-[40px] ${spread ? "phone-sb:!h-[calc(24*var(--sb-u,1px))] phone-sb:!max-w-[calc(42*var(--sb-u,1px))]" : ""}`
           }
           phone={phone}
           large={spread}

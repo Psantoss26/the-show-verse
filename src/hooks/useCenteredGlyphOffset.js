@@ -2,44 +2,49 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { getGlyphCenterOffset } from "@/lib/ui/measureGlyphOffset";
+import { measureInkCenterShift } from "@/lib/ui/measureGlyphOffset";
+
+const ZERO = { x: 0, y: 0 };
 
 /**
- * `ref` (a asignar al <span> del número) + `offsetPx` (a aplicar como
- * `transform: translateY(offsetPx)`) para centrar VISUALMENTE `text` --
- * dígitos, coma decimal, "%"... ver `measureGlyphOffset` para el porqué hace
- * falta medir en vez de usar un desplazamiento fijo -- dentro de su caja.
+ * `ref` (al elemento que contiene el número: un <span> o el grupo número+"%")
+ * y `style` (su `transform`) para que la TINTA del texto quede centrada en los
+ * dos ejes dentro del padre que la centra con flexbox. Ver
+ * `measureInkCenterShift` para el porqué de medir en vez de fijar un ajuste.
  *
- * Se recalcula si cambia el texto, si el elemento cambia de tamaño
- * (ResizeObserver: cubre el salto de tamaño de fuente entre el breakpoint
- * móvil y el de escritorio, resuelto por container queries) y una vez más
- * cuando las fuentes terminan de cargar (`document.fonts.ready`), por si la
- * primera medición se hizo con una fuente de reserva. Empieza en 0 (sin
- * offset) hasta la primera medición para que la salida del primer render en
- * cliente coincida con el HTML de servidor -- `useLayoutEffect` corrige antes
- * de pintar, así que no hay parpadeo visible.
+ * Se vuelve a medir si cambia `text`, si cambia el tamaño del elemento o del
+ * botón (container queries por breakpoint, tamaños `md`/`lg`), y cuando
+ * terminan de cargar las fuentes. Empieza sin desplazamiento para que el
+ * primer render coincida con el HTML del servidor; `useLayoutEffect` corrige
+ * antes de pintar.
  */
 export function useCenteredGlyphOffset(text) {
   const ref = useRef(null);
-  const [offsetPx, setOffsetPx] = useState(0);
+  const appliedRef = useRef(ZERO);
+  const [shift, setShift] = useState(ZERO);
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || !text) {
-      setOffsetPx(0);
+      appliedRef.current = ZERO;
+      setShift(ZERO);
       return undefined;
     }
 
     const measure = () => {
-      const cs = window.getComputedStyle(el);
-      const font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-      setOffsetPx(getGlyphCenterOffset(font, text));
+      const next = measureInkCenterShift(el, appliedRef.current);
+      if (!next) return;
+      const prev = appliedRef.current;
+      if (next.x === prev.x && next.y === prev.y) return;
+      appliedRef.current = next;
+      setShift(next);
     };
 
     measure();
 
     const ro = new ResizeObserver(measure);
     ro.observe(el);
+    if (el.parentElement) ro.observe(el.parentElement);
 
     let cancelled = false;
     document.fonts?.ready?.then(() => {
@@ -52,5 +57,11 @@ export function useCenteredGlyphOffset(text) {
     };
   }, [text]);
 
-  return { ref, offsetPx };
+  return {
+    ref,
+    style:
+      shift.x || shift.y
+        ? { transform: `translate(${shift.x}px, ${shift.y}px)` }
+        : undefined,
+  };
 }

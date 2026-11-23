@@ -32,16 +32,15 @@ export default function LiquidButton({
 }) {
   const buttonRef = useRef(null);
   const canvasRef = useRef(null);
-  // Texto del número que se muestra en el badge (veces vista o progreso de
-  // serie sin el "%") -- se mide con las métricas reales de la fuente para
-  // centrarlo con precisión, ver `useCenteredGlyphOffset`.
+  // Texto del badge (veces vista, o progreso de serie con su "%"): se mide su
+  // tinta real para centrarla en los dos ejes, ver `useCenteredGlyphOffset`.
   const badgeText =
     playsCount > 0
       ? String(playsCount)
       : progressPercent && progressPercent !== "100%"
-        ? progressPercent.replace("%", "")
+        ? progressPercent
         : "";
-  const { ref: badgeRef, offsetPx: badgeOffsetPx } =
+  const { ref: badgeRef, style: badgeStyle } =
     useCenteredGlyphOffset(badgeText);
   const [isHovered, setIsHovered] = useState(false);
   const [ripples, setRipples] = useState([]);
@@ -202,7 +201,9 @@ export default function LiquidButton({
   // Escuchar eventos de otros botones
   useEffect(() => {
     const button = buttonRef.current;
-    if (!button) return;
+    // El cristal de las fichas no participa en las ondas de grupo (ver
+    // `.sv-lg-btn` en globals.css): sus estados son CSS y no escuchan a nadie.
+    if (!button || liquidGlass) return;
 
     const handleLiquidSpread = (e) => {
       if (e.detail.groupId !== groupId) return;
@@ -276,7 +277,7 @@ export default function LiquidButton({
       document.removeEventListener("liquid-click", handleLiquidClick);
       document.removeEventListener("liquid-proximity", handleLiquidProximity);
     };
-  }, [createRipple, groupId, disabled]);
+  }, [createRipple, groupId, disabled, liquidGlass]);
 
   // Animación del canvas optimizada
   useEffect(() => {
@@ -465,8 +466,38 @@ export default function LiquidButton({
     toRgba,
   ]);
 
+  // ESTADOS DEL CRISTAL (variante `liquidGlass`, la de las fichas).
+  // Nada de estado de React: el puntero escribe variables CSS y atributos en el
+  // propio botón y `.sv-lg-btn` (globals.css) pinta el reflejo, el hundimiento y
+  // el destello. Así un hover o un toque no re-renderiza la fila entera.
+  const setGlassPoint = (e, xVar, yVar) => {
+    const el = buttonRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    el.style.setProperty(xVar, `${e.clientX - rect.left}px`);
+    el.style.setProperty(yVar, `${e.clientY - rect.top}px`);
+  };
+  const releaseGlass = () => {
+    buttonRef.current?.removeAttribute("data-pressed");
+  };
+  const glassHandlers = liquidGlass
+    ? {
+        onPointerMove: (e) => {
+          if (e.pointerType === "mouse") setGlassPoint(e, "--lg-mx", "--lg-my");
+        },
+        onPointerDown: (e) => {
+          if (disabled || loading || readOnly || e.button > 0) return;
+          setGlassPoint(e, "--lg-px", "--lg-py");
+          buttonRef.current?.setAttribute("data-pressed", "");
+        },
+        onPointerUp: releaseGlass,
+        onPointerCancel: releaseGlass,
+        onPointerLeave: releaseGlass,
+      }
+    : null;
+
   const handleMouseMove = (e) => {
-    if (disabled) return;
+    if (disabled || liquidGlass) return;
 
     const rect = buttonRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -498,7 +529,7 @@ export default function LiquidButton({
   };
 
   const handleMouseEnter = (e) => {
-    if (disabled) return;
+    if (disabled || liquidGlass) return;
     setIsHovered(true);
     const rect = buttonRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -514,6 +545,10 @@ export default function LiquidButton({
 
   const handleClick = (e) => {
     if (disabled || loading) return;
+    if (liquidGlass) {
+      if (onClick) onClick(e);
+      return;
+    }
 
     const rect = buttonRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -555,6 +590,10 @@ export default function LiquidButton({
   const elevationClass = liquidGlass
     ? LIQUID_GLASS_ELEVATION
     : "shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]";
+  // Botones de relleno blanco (tráiler, soundtrack): su cristal es opaco, así
+  // que el tinte de color del estado activo no se les aplica y el reflejo y el
+  // destello de pulsación van en oscuro (ver `[data-solid]` en globals.css).
+  const isSolid = liquidGlass && className.includes("!bg-white");
 
   return (
     <button
@@ -563,25 +602,31 @@ export default function LiquidButton({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onMouseMove={handleMouseMove}
+      {...glassHandlers}
       disabled={disabled || loading || readOnly}
       data-online-only={readOnly ? "true" : undefined}
       aria-label={title}
       data-liquid-button="true"
       data-group-id={groupId}
+      data-active={liquidGlass && active && !disabled ? "" : undefined}
+      data-solid={isSolid ? "" : undefined}
       className={`
         relative group/liquid
         w-12 h-12 rounded-full
         flex items-center justify-center text-white
         ${surfaceClass}
+        ${liquidGlass ? "sv-lg-btn" : ""}
         ${
           disabled
             ? "text-white/30 cursor-not-allowed"
-            : active
-              ? elevationClass
+            : active || liquidGlass
+              ? `${elevationClass} ${active ? "" : "text-zinc-100"}`
               : `${elevationClass} text-zinc-200 hover:bg-white/10 hover:text-white`
         }
         ${
-          isExploding
+          liquidGlass
+            ? ""
+            : isExploding
             ? ""
             // `transition-all` incluía `backdrop-filter` y `box-shadow`, que en
             // una fila de botones de cristal son de lo más caro que hay: cada
@@ -592,7 +637,11 @@ export default function LiquidButton({
         }
         ${className}
       `}
-      style={{
+      style={liquidGlass ? {
+        "--lg-rgb": currentColors.rgb.join(","),
+        "--lg-rgb2": currentColors.secondary.join(","),
+        color: active && !disabled && !isSolid ? secondaryColor : undefined,
+      } : {
         transform: `scale(${finalScale}) ${isExploding ? (isLabeled ? "rotate(0.5deg)" : "rotate(1.5deg)") : ""}`,
         transition: isExploding
           ? "transform 0.12s cubic-bezier(0.25, 1, 0.5, 1)"
@@ -610,7 +659,16 @@ export default function LiquidButton({
       <div className="absolute inset-0 overflow-hidden rounded-full pointer-events-none">
         {liquidGlass && <LiquidGlassOpticalLayers />}
 
-        <canvas
+        {liquidGlass && (
+          <>
+            <span aria-hidden="true" className="sv-lg-tint" />
+            <span aria-hidden="true" className="sv-lg-sheen" />
+            <span aria-hidden="true" className="sv-lg-spec" />
+            <span aria-hidden="true" className="sv-lg-press" />
+          </>
+        )}
+
+        {!liquidGlass && <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full pointer-events-none"
           style={{
@@ -622,9 +680,9 @@ export default function LiquidButton({
                   : Math.max(0.3, proximityGlow),
             transition: "opacity 0.3s",
           }}
-        />
+        />}
 
-        {(isHovered || active || proximityGlow > 0.3 || isExploding) &&
+        {!liquidGlass && (isHovered || active || proximityGlow > 0.3 || isExploding) &&
           !disabled && (
             <div
               className="absolute inset-0 rounded-full pointer-events-none"
@@ -646,7 +704,7 @@ export default function LiquidButton({
             />
           )}
 
-        {(isHovered || active || proximityGlow > 0.2 || isExploding) &&
+        {!liquidGlass && (isHovered || active || proximityGlow > 0.2 || isExploding) &&
           !disabled && (
             <div
               className="absolute inset-0 rounded-full pointer-events-none"
@@ -679,7 +737,7 @@ export default function LiquidButton({
         ) : playsCount > 0 ? (
           <span
             ref={badgeRef}
-            style={{ transform: `translateY(${badgeOffsetPx}px)` }}
+            style={badgeStyle}
             className={`font-black leading-none ${
               String(playsCount).length === 1
                 ? "text-2xl"
@@ -698,17 +756,17 @@ export default function LiquidButton({
             const numberPart = progressPercent.replace("%", "");
             // El "%" es relativo al número para mantener aire lateral, pero el
             // valor principal conserva el tamaño de la puntuación de usuario.
-            // El offset se mide sobre el NÚMERO (dominante) y se aplica al
-            // grupo entero para que "%" se mueva con él manteniendo su
-            // alineación de línea base.
+            // Se centra la tinta del GRUPO (número + "%"), no solo la del
+            // número: el "%" también pesa en el equilibrio horizontal.
             const fontSizeClass =
               numberPart.length >= 2 ? "text-xl tracking-tighter" : "text-2xl";
             return (
               <div
-                style={{ transform: `translateY(${badgeOffsetPx}px)` }}
+                ref={badgeRef}
+                style={badgeStyle}
                 className={`flex items-baseline leading-none gap-px ${fontSizeClass}`}
               >
-                <span ref={badgeRef} className="font-black drop-shadow-md">
+                <span className="font-black drop-shadow-md">
                   {numberPart}
                 </span>
                 <span className="font-bold text-[0.5em] text-white drop-shadow-sm">
