@@ -21,7 +21,7 @@
 //
 // Solo en teléfonos táctiles, que son los que tienen el gesto.
 
-const CLEAN_BACK_KEY = "svCleanBack";
+export const CLEAN_BACK_KEY = "svCleanBack";
 const TOUCH_PHONE_QUERY = "(max-width: 767px) and (hover: none) and (pointer: coarse)";
 
 export function isCleanBackEntry() {
@@ -75,6 +75,9 @@ let held = false;
 let skipping = false;
 export function holdCleanBackEntry(value) {
   held = value;
+}
+export function isCleanBackEntryHeld() {
+  return held;
 }
 
 if (typeof window !== "undefined") {

@@ -7,12 +7,20 @@ import { useEffect, useRef } from "react";
 // cerrar SOLO el de encima, no todos a la vez.
 const escapeStack = [];
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
+import {
+  closeModalEntry,
+  openModalEntry,
+  usesModalBackEntry,
+} from "@/lib/navigation/modalBackEntry";
 
 // Comportamiento COMÚN de todos los diálogos modales de la app, en un solo sitio:
 //   1. Bloqueo del scroll de la página de fondo mientras el modal está abierto
 //      (vía useBodyScrollLock: contador global para modales apilados + compensa
 //      el ancho de la scrollbar, así el layout no "salta" al abrir/cerrar).
 //   2. Cierre con la tecla Escape.
+//   3. Con `closeOnBack`, en pantallas táctiles, cierre con atrás (gesto de
+//      Android, botón de la APK): el modal empuja su entrada de historial y
+//      atrás cierra solo el modal (ver lib/navigation/modalBackEntry).
 //
 // El backdrop (bloquear la interacción con el fondo y CERRAR al pulsar fuera) lo
 // aporta cada modal con su overlay `fixed inset-0 onClick={onClose}`; este hook
@@ -26,6 +34,7 @@ export default function useModalGuard({
   // Si es false NO se bloquea el scroll de fondo (p. ej. el drawer derecho de las
   // páginas de usuario, que permite seguir navegando por debajo). Esc sigue activo.
   lockScroll = true,
+  closeOnBack = false,
 } = {}) {
   // Debe llamarse SIEMPRE (regla de hooks); internamente solo bloquea si `open`.
   useBodyScrollLock(open && lockScroll);
@@ -38,6 +47,12 @@ export default function useModalGuard({
   }, [onClose]);
 
   const hasOnClose = typeof onClose === "function";
+
+  useEffect(() => {
+    if (!open || !closeOnBack || !hasOnClose || !usesModalBackEntry()) return undefined;
+    const record = openModalEntry(() => onCloseRef.current?.());
+    return () => closeModalEntry(record);
+  }, [open, closeOnBack, hasOnClose]);
 
   useEffect(() => {
     if (!open || !closeOnEsc || !hasOnClose) return undefined;

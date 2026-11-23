@@ -83,7 +83,7 @@ export default function ListToggleConfirmModal({
 }) {
   const [portalReady, setPortalReady] = useState(false);
   useEffect(() => setPortalReady(true), []);
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose, closeOnBack: true });
 
   const actionMotion = useActionModalMotion(open);
   if (!actionMotion.present || !portalReady) return null;

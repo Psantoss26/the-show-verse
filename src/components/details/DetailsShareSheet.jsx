@@ -348,7 +348,7 @@ export default function DetailsShareSheet({
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoAttempt, setVideoAttempt] = useState(0);
 
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose, closeOnBack: true });
   useEffect(() => setPortalReady(true), []);
   // Entrada y salida como los demás modales de acción: nace del botón de
   // compartir y vuelve a él. `present` sigue en true durante la salida, así que

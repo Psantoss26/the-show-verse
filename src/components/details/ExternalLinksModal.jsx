@@ -40,7 +40,7 @@ export default function ExternalLinksModal({
     const FallbackIcon = isPlatformsMode ? MonitorPlay : ExternalLink
 
     // Bloquea scroll de fondo + cierra con Escape mientras el modal está abierto.
-    useModalGuard({ open, onClose })
+    useModalGuard({ open, onClose, closeOnBack: true })
 
     // DetalleModal crea su propio contexto de apilado. El portal evita que el
     // velo quede por detrás de esa ficha y permite difuminar el viewport entero,

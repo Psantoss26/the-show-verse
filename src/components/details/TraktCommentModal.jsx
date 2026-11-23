@@ -31,7 +31,7 @@ export default function TraktCommentModal({
   const textareaRef = useRef(null);
 
   // Bloquea scroll de fondo + cierra con Escape mientras el modal está abierto.
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose, closeOnBack: true });
 
   // Reset fields on modal open
   useEffect(() => {

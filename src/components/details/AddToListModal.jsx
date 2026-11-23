@@ -53,7 +53,7 @@ export default function AddToListModal(props) {
   };
 
   // Bloquea scroll de fondo + cierra con Escape mientras el modal está abierto.
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose, closeOnBack: true });
 
   // Manejo de errores seguro
   const safeError = useMemo(() => {

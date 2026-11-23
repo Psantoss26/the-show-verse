@@ -294,7 +294,7 @@ function PersonRow({ item, mediaType, onNavigate }) {
  */
 export function FollowingActivityModal({ open, onClose, data, mediaType }) {
   const [portalReady, setPortalReady] = useState(false);
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose, closeOnBack: true });
   useEffect(() => setPortalReady(true), []);
   const actionMotion = useActionModalMotion(open);
   if (!actionMotion.present || !portalReady || !hasFollowingActivity(data)) return null;

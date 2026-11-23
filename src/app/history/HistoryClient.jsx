@@ -2692,7 +2692,7 @@ function ExpandedGroupView({ open, entry, onCollapse, onRemoveFromHistory, busyI
     panelRef: modalPanelRef,
     backdropRef: modalBackdropRef,
   } = useActionModalMotion(open);
-  useModalGuard({ open, onClose: onCollapse });
+  useModalGuard({ open, onClose: onCollapse, closeOnBack: true });
   if (!modalPresent || typeof document === "undefined") return null;
   return (
     <ExpandedGroupPanel

@@ -283,7 +283,7 @@ export default function TraktWatchedModal({
   const [confirmRemove, setConfirmRemove] = useState(null); // { id, date } del visionado a eliminar
 
   // Bloqueo de scroll de fondo + cierre con Escape
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose, closeOnBack: true });
 
   useEffect(() => {
     if (!open) return;

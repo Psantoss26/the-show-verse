@@ -58,6 +58,7 @@ import {
   isDetailsNavigation,
   pushCleanBackEntry,
 } from "@/lib/navigation/backGestureCapture";
+import { wasModalHistoryPop } from "@/lib/navigation/modalBackEntry";
 
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { PEEK_OVER_PAGE_Z, isInsidePageOverlay } from "@/lib/ui/pageModal";
@@ -259,6 +260,8 @@ export default function MobileTitlePeek() {
   // se cierra sin su salida animada.
   useEffect(() => {
     const onPopState = () => {
+      // Atrás que solo cierra un modal abierto encima de la vista previa.
+      if (wasModalHistoryPop()) return;
       if (ignorePopRef.current) {
         ignorePopRef.current = false;
         return;

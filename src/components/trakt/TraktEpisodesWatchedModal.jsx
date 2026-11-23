@@ -588,7 +588,7 @@ export default function TraktEpisodesWatchedModal({
   }, [open, usableSeasons, isMovie, movieWatchedAt, resolvedOnChangeView]);
 
   // Bloqueo de scroll de fondo + cierre con Escape
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose, closeOnBack: true });
 
   useEffect(() => {
     if (!viewMenuOpen) return;

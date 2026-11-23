@@ -47,7 +47,7 @@ export default function EpisodeRatingsModal({
 
   useEffect(() => setMounted(true), []);
 
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose, closeOnBack: true });
 
   useEffect(() => {
     if (!open || !showId) return undefined;

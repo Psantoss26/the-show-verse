@@ -49,6 +49,7 @@ import { readDetailOpen, withDetailOpen } from "@/lib/ui/detailOpenPreferences";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useIsMobile, useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { isInsidePageModal } from "@/lib/ui/pageModal";
+import { wasModalHistoryPop } from "@/lib/navigation/modalBackEntry";
 
 const DetailModalContext = createContext({
   openDetailModal: null,
@@ -590,6 +591,9 @@ export default function DetailModalProvider({
   // popstate (Atrás/Adelante): hace POP de un nivel. Al vaciarse, cierra.
   useEffect(() => {
     const onPopState = () => {
+      // Atrás que solo cierra un modal abierto encima (lib/navigation/
+      // modalBackEntry): no es nuestro.
+      if (wasModalHistoryPop()) return;
       if (closingRef.current) {
         // Es el popstate de nuestro propio history.go al cerrar: ignorar.
         closingRef.current = false;

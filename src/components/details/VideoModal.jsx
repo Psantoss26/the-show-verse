@@ -214,7 +214,7 @@ export default function VideoModal({
     };
   }, [open, skipBrokenVideo, video, videoKey]);
 
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose, closeOnBack: true });
 
   const actionMotion = useActionModalMotion(open && !!video);
   if (!actionMotion.present || !video) return null;

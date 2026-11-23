@@ -176,7 +176,7 @@ export default function SoundtrackModal({
     setOptionsOpen(false);
   }, [initialTrackId, open, trackQueue]);
 
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose, closeOnBack: true });
 
   // Sincronizar volumen e inicializar el reproductor con el volumen correcto
   useEffect(() => {

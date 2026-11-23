@@ -78,7 +78,7 @@ export default function StarRating({
   }, [hasRating, rating]);
 
   // Comportamiento común del modal: bloqueo de scroll de fondo + cierre con Esc.
-  useModalGuard({ open, onClose: () => setOpen(false) });
+  useModalGuard({ open, onClose: () => setOpen(false), closeOnBack: true });
   // Nace del botón de puntuar y vuelve a él al cerrar (como los demás modales
   // de los botones de acción de las fichas).
   const {
