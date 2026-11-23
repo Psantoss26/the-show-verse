@@ -33,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 
+import useActionModalMotion from "@/hooks/useActionModalMotion";
 import useModalGuard from "@/hooks/useModalGuard";
 import {
   canShareFileFromApp,
@@ -349,6 +350,13 @@ export default function DetailsShareSheet({
 
   useModalGuard({ open, onClose });
   useEffect(() => setPortalReady(true), []);
+  // Entrada y salida como los demás modales de acción: nace del botón de
+  // compartir y vuelve a él. `present` sigue en true durante la salida, así que
+  // lo que se vacía al cerrar espera a que acabe (si no, el panel cambiaría de
+  // contenido mientras se encoge). Con `portalReady`: la hoja se monta ya
+  // abierta en el primer clic, antes de poder pintar el portal, y la entrada
+  // debe lanzarse cuando el panel ya está en el DOM.
+  const { present, closing, panelRef, backdropRef } = useActionModalMotion(open && portalReady);
 
   // DATOS DEL VÍDEO QUE LA FICHA NO TIENE CARGADOS. Se piden al abrir la hoja
   // (no al cargar la ficha, que no los necesita): el progreso de «Continuar
@@ -357,11 +365,11 @@ export default function DetailsShareSheet({
   const extrasKey = kind === "details" && story?.tmdbId ? `${story.type}:${story.tmdbId}` : "";
   const [storyExtras, setStoryExtras] = useState(null);
   useEffect(() => {
-    if (!open) {
+    if (!present) {
       setStoryExtras(null);
       return undefined;
     }
-    if (!extrasKey) return undefined;
+    if (!open || !extrasKey) return undefined;
     let cancelled = false;
     const tmdbId = Number(story.tmdbId);
     (async () => {
@@ -402,7 +410,7 @@ export default function DetailsShareSheet({
     };
     // `story` se lee al pedir; su identidad (tipo + id) va en `extrasKey`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, extrasKey]);
+  }, [open, present, extrasKey]);
   const extrasReady = !extrasKey || storyExtras?.key === extrasKey;
 
   const cardKey = card ? JSON.stringify(card) : "";
@@ -515,12 +523,12 @@ export default function DetailsShareSheet({
   useEffect(() => {
     if (open) {
       if (portalReady) closeRef.current?.focus({ preventScroll: true });
-    } else {
+    } else if (!present) {
       setBusy(null);
       setDone(null);
       setMessage("");
     }
-  }, [open, portalReady]);
+  }, [open, present, portalReady]);
 
   const flashDone = useCallback((key, note) => {
     setDone(key);
@@ -626,7 +634,7 @@ export default function DetailsShareSheet({
     setDone(null);
   };
 
-  if (!open || !portalReady) return null;
+  if (!present || !portalReady) return null;
 
   // La principal es la primera forma de mandar la imagen o el vídeo que haya.
   const primaryAction = showShareMedia ? "share" : showCopyImage ? "copy" : showSave ? "save" : null;
@@ -642,19 +650,21 @@ export default function DetailsShareSheet({
   return createPortal(
     <div
       data-detail-modal-layer=""
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+      className={`fixed inset-0 z-[10000] flex items-center justify-center p-4${closing ? " pointer-events-none" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
     >
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
+        ref={backdropRef}
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
         aria-hidden="true"
       />
 
       <div
-        className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        ref={panelRef}
+        className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
       >
         <div className={`flex w-full shrink-0 items-center justify-between gap-3 ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
           <div className="min-w-0">
