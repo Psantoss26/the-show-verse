@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Modal de episodios vistos en el móvil y la app de Android: al llegar al final de la lista (y de la vista de tabla) queda un margen corto bajo el último episodio (24 px en vez de 80), sin el hueco vacío de antes. → [componentes](docs/frontend/components.md)
 - App de Android: deslizar hacia abajo desde arriba de la página ya no la recarga; el gesto está quitado en todas las vistas, así que ya no se recarga por accidente al bajar el dedo. Tras un error de carga sigue el botón «Reintentar». Requiere actualizar la app. → [app de Android](android-companion/README.md)
 - App de Android: con un modal abierto en una ficha (botones de acción y vistas laterales de las secciones), el gesto de atrás mueve solo el modal: mientras deslizas, el modal se encoge, se aparta del borde y redondea las esquinas sobre su fondo difuminado; al soltar se cierra desde ahí con su animación de siempre y, si cancelas, vuelve a su sitio. Antes no se movía nada hasta soltar, y con la app sin actualizar se veía además la animación de vuelta a la página anterior. Requiere actualizar la app. → [hooks](docs/frontend/lib/lib-hooks.md), [app de Android](android-companion/README.md)
 - Historial: el botón de papelera de cada episodio del modal de episodios agrupados ya no tiene el borde marcado ni la sombra; es un círculo con un relleno muy suave que se tiñe de rojo al pasar el ratón. → [páginas de usuario](docs/features/paginas-de-usuario.md)

@@ -1976,7 +1976,7 @@ export default function TraktEpisodesWatchedModal({
                 onTouchCancel={() => {
                   seasonSwipeStartRef.current = null;
                 }}
-                className="relative flex-1 overflow-y-auto scroll-smooth p-4 pb-20 touch-pan-y no-scrollbar sm:pb-4 md:touch-auto"
+                className="relative flex-1 overflow-y-auto scroll-smooth p-4 pb-6 touch-pan-y no-scrollbar sm:pb-4 md:touch-auto"
               >
                 {/* Temporada elegida aún cargando con la anterior ya fuera. */}
                 {!seasonExitPending &&
@@ -2169,7 +2169,7 @@ export default function TraktEpisodesWatchedModal({
             </>
           ) : (
             // TABLE MODE
-            <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4 pb-20 sm:pb-4">
+            <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4 pb-6 sm:pb-4">
               {seasonsFilteredForTable.map((s) => {
                 const sn = s.season_number;
                 const total = getAvailableEpisodeTotal(s);
