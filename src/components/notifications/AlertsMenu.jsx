@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Activity,
   Bell,
@@ -55,6 +55,49 @@ import { canScrollInDirection } from "@/lib/ui/touchScrollGuard";
 
 // Icono y tono de cada acción: los MISMOS que la Actividad del perfil, para
 // que una acción se reconozca igual en los dos sitios.
+// ENTRADA Y SALIDA del desplegable: nace de la campana (transform-origin en el
+// icono), baja y crece con la curva de los demás menús de la barra; el
+// contenido llega un instante después, ya con el cristal puesto. La salida es
+// más corta y se recoge hacia la campana. Solo transform + opacity en el
+// PROPIO panel: la opacidad en un ANCESTRO del cristal lo aplanaría.
+const PANEL_EASE_OUT = [0.22, 1, 0.36, 1];
+const PANEL_EASE_IN = [0.4, 0, 1, 1];
+const PANEL_VARIANTS = {
+  hidden: { opacity: 0, y: -10, scale: 0.92 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      y: { duration: 0.32, ease: PANEL_EASE_OUT },
+      scale: { duration: 0.32, ease: PANEL_EASE_OUT },
+      opacity: { duration: 0.16, ease: "linear" },
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -6,
+    scale: 0.95,
+    transition: { duration: 0.16, ease: PANEL_EASE_IN },
+  },
+};
+const PANEL_CONTENT_VARIANTS = {
+  hidden: { opacity: 0, y: -4 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { delay: 0.06, duration: 0.24, ease: PANEL_EASE_OUT },
+  },
+  exit: { opacity: 0, transition: { duration: 0.1, ease: "linear" } },
+};
+// Con «reducir movimiento», solo un fundido corto.
+const PANEL_VARIANTS_REDUCED = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.12 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+};
+const PANEL_CONTENT_VARIANTS_REDUCED = { hidden: {}, visible: {}, exit: {} };
+
 const ACTIONS = {
   watched: { Icon: Eye, tone: "text-emerald-400" },
   watchlist: { Icon: BookmarkPlus, tone: "text-sky-400", filled: true },
@@ -357,6 +400,7 @@ export default function AlertsMenu({
   const wrapperRef = useRef(null);
   const buttonRef = useRef(null);
   const panelRef = useRef(null);
+  const reduceMotion = useReducedMotion();
   const lastFetchAtRef = useRef(0);
   const requestRef = useRef(0);
 
@@ -562,13 +606,18 @@ export default function AlertsMenu({
             : window.innerHeight - padding;
         maxHeight = Math.max(160, Math.round(floor - 12 - top));
       }
-      const next = { top, left, width, maxHeight };
+      // Origen de la animación: el centro de la campana, en coordenadas del panel.
+      const bellRect = buttonRef.current?.getBoundingClientRect() || rect;
+      const originX = Math.round(bellRect.left + bellRect.width / 2 - left);
+      const transformOrigin = `${originX}px ${Math.round(bellRect.bottom - top)}px`;
+      const next = { top, left, width, maxHeight, transformOrigin };
       setPosition((current) =>
         current &&
         current.top === top &&
         current.left === left &&
         current.width === width &&
-        current.maxHeight === maxHeight
+        current.maxHeight === maxHeight &&
+        current.transformOrigin === transformOrigin
           ? current
           : next,
       );
@@ -648,15 +697,18 @@ export default function AlertsMenu({
                 role="menu"
                 aria-label={label}
                 style={position}
-                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                variants={reduceMotion ? PANEL_VARIANTS_REDUCED : PANEL_VARIANTS}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
                 // MISMO CRISTAL, FORMA Y RELLENO que el desplegable de secciones
                 // de Perfil (Navbar): LIQUID_GLASS_PANEL, rounded-2xl y p-2.
                 className={`fixed z-[99999] flex flex-col overflow-hidden rounded-2xl p-2 text-white ${LIQUID_GLASS_PANEL}`}
               >
-                <div className="flex min-h-0 flex-col">
+                <motion.div
+                  variants={reduceMotion ? PANEL_CONTENT_VARIANTS_REDUCED : PANEL_CONTENT_VARIANTS}
+                  className="flex min-h-0 flex-col"
+                >
                   <div
                     className={`min-h-0 overflow-y-auto overscroll-contain no-scrollbar ${
                       variant === "mobile" ? "" : "max-h-[65vh]"
@@ -709,7 +761,7 @@ export default function AlertsMenu({
                       </Link>
                     </>
                   ) : null}
-                </div>
+                </motion.div>
               </motion.div>
             ) : null}
           </AnimatePresence>,
