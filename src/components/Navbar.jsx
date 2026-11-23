@@ -2985,6 +2985,10 @@ function NavbarContent() {
           sobre el hero, con un velo oscuro mínimo para que los botones se vean;
           al hacer scroll aparece el fondo glass difuminado. */}
       <nav
+        // Con una vista lateral abierta en el móvil (`data-sv-sheet-open`)
+        // conserva su cristal y sus animaciones: la zona superior (barra
+        // superior y franja de la barra de notificaciones) no cambia.
+        data-sv-sheet-keep=""
         // Compactado por scroll en móvil/tablet: solo con `transform`, igual que
         // la barra inferior. Ver `.sv-topbar` en globals.css.
         data-compact={isScrolled && !isImmersiveRoute ? "" : undefined}

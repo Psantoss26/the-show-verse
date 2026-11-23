@@ -3977,10 +3977,12 @@ html[data-details-sequence-transition] .sv-topbar {
    página tapada no desenfoca ni promueve capas, y sus animaciones se pausan (no
    se anulan: al cerrar no vuelven a empezar). Bajo 16px de desenfoque no se
    nota la diferencia. Solo a los hijos de <body> que no son capas de modal ni
-   menús (`.sv-inline-menu` va en un portal propio). */
+   menús (`.sv-inline-menu` va en un portal propio). La barra superior
+   (`data-sv-sheet-keep`) sí conserva su cristal: sin él la zona superior
+   —barra y franja de la barra de notificaciones— cambiaba de aspecto. */
 @media (max-width: 639.98px) {
-  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu),
-  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu) * {
+  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu, [data-sv-sheet-keep]),
+  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu) :not([data-sv-sheet-keep], [data-sv-sheet-keep] *) {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     will-change: auto !important;
@@ -3989,7 +3991,7 @@ html[data-details-sequence-transition] .sv-topbar {
   /* `transform-gpu` solo fuerza una capa con un translateZ(0) vacío: en
      Tailwind v4 translate/rotate/scale van en sus propias propiedades, así que
      anular `transform` no mueve nada. */
-  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu) .transform-gpu {
+  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu) .transform-gpu:not([data-sv-sheet-keep], [data-sv-sheet-keep] *) {
     transform: none !important;
   }
 }

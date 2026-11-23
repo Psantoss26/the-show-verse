@@ -15,8 +15,14 @@ test("en el teléfono el panel ocupa siempre la pantalla completa", () => {
   assert.match(sheet, /className=\{`fixed inset-0 z-\[10000\]/);
   assert.doesNotMatch(sheet, /data-sv-sheet-anchor|anchorTop|window\.scrollBy/);
   assert.doesNotMatch(read("components/DetailsClient.jsx"), /data-sv-sheet-(anchor|keep)/);
-  assert.doesNotMatch(read("components/Navbar.jsx"), /data-sv-sheet-keep/);
-  assert.doesNotMatch(read("app/globals.css"), /data-sv-sheet-(anchored|keep)/);
+  assert.doesNotMatch(read("app/globals.css"), /data-sv-sheet-anchored/);
+});
+
+test("con un panel abierto la barra superior conserva su cristal", () => {
+  assert.equal(read("components/Navbar.jsx").match(/data-sv-sheet-keep=""/g)?.length, 1);
+  const css = read("app/globals.css");
+  assert.match(css, /body > :not\(\[data-detail-modal-layer\], \.sv-inline-menu, \[data-sv-sheet-keep\]\)/);
+  assert.match(css, /:not\(\[data-sv-sheet-keep\], \[data-sv-sheet-keep\] \*\)/);
 });
 
 test("entrada y salida: una sola definición, solo transform en el panel", () => {
