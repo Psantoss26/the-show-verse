@@ -94,9 +94,12 @@ const nextConfig: NextConfig = {
     // a 48 GB, y al leerla y compactarla el next-server se comía los 24 núcleos
     // y 31 GB de RAM. Tras borrarla volvió a 11 GB en dos minutos. Sin ella, el
     // primer arranque compila de cero (algo más lento) y lo demás va igual.
-    // El tope hace que Turbopack libere memoria en vez de crecer sin límite.
+    //
+    // NO poner `turbopackMemoryLimit` con la caché en disco apagada: Turbopack
+    // solo libera memoria volcándola a esa caché, así que con un tope por debajo
+    // de lo que ocupa se queda intentando liberar en bucle (medido: 1.300 % de
+    // CPU constante sin ediciones ni peticiones; sin el tope, 0 % y 2,7 GB).
     turbopackFileSystemCacheForDev: false,
-    turbopackMemoryLimit: 6 * 1024 ** 3,
   },
   images: {
     // Optimización de imágenes de Vercel DESACTIVADA a propósito.
