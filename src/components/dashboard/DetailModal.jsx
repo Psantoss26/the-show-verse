@@ -181,7 +181,7 @@ import { pickExternalIds, withTitleExternalLinks } from "@/lib/details/titleExte
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): MISMO componente presentacional que la ficha
 // completa (DetailsClient) para que la fila sea IDÉNTICA.
-import DetailActionsRow from "@/components/details/DetailActionsRow";
+import DetailActionsRow, { DETAIL_ACTION_DESKTOP_SIZE_CLASS } from "@/components/details/DetailActionsRow";
 // Sección de pestañas (Detalles/Producción/Sinopsis) compartida con la
 // ficha completa: renderiza EXACTAMENTE las mismas tarjetas que DetailsClient.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
@@ -3082,6 +3082,10 @@ export default function DetailModal({
           // Vista previa: la separación de la ficha móvil (DetailsClient).
           mobileGapClass={peek ? "gap-1" : "gap-1.5"}
           forceMobile={phoneLayout}
+          // Escritorio: los botones de la ficha (DetailsClient), 52 px con
+          // iconos de 24 px y 8 px entre ellos. La vista teléfono conserva
+          // los suyos.
+          className={phoneLayout ? "" : DETAIL_ACTION_DESKTOP_SIZE_CLASS}
           onTrailer={handleToggleTrailer}
           trailerAvailable
           trailerLoading={trailerLoading}
@@ -3202,6 +3206,7 @@ export default function DetailModal({
           <DetailActionsRow
             mobileGapClass={peek ? "gap-1" : "gap-1.5"}
             forceMobile={phoneLayout}
+            className={phoneLayout ? "" : DETAIL_ACTION_DESKTOP_SIZE_CLASS}
             onTrailer={handleToggleTrailer}
             trailerAvailable
             trailerLoading={trailerLoading}
