@@ -72,7 +72,14 @@ function TraktStatBadge({
       {/* Teléfono del drawer: iconos y cifras del tamaño de escritorio, pero
           sin la etiqueta de texto, que es lo que no cabe en ese ancho. */}
       <div className={`grid min-w-0 grid-rows-[auto_auto] items-center ${phone ? "grid-cols-[1.25rem_auto] gap-x-2" : "grid-cols-[1rem_auto] gap-x-1 sm:grid-cols-[1.25rem_auto] sm:gap-x-2"} ${large ? "phone-sb:grid-cols-[calc(18*var(--sb-su,1px))_auto] phone-sb:gap-x-[calc(6*var(--sb-su,1px))]" : ""}`}>
-        <Icon className={`col-start-1 row-start-1 shrink-0 self-center text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 ${phone ? "h-5 w-5" : "h-4 w-4 sm:h-5 sm:w-5"} ${large ? "phone-sb:h-[calc(18*var(--sb-su,1px))] phone-sb:w-[calc(18*var(--sb-su,1px))]" : ""}`} />
+        {/* Trazo de 2 px EXACTOS a 20 px (2,4 en la rejilla de 24 de lucide).
+            El trazo relativo (2 → 1,67 px) caía siempre entre dos píxeles y
+            pintaba cada línea con dos medios tonos: a 1x el icono se veía
+            borroso junto a las cifras. La caja ya cae en píxel entero (Chrome
+            redondea la maquetación); un `translate` para «ajustarla» la saca
+            del píxel y lo empeora. El marcador de teléfono (`large`, 18 px en
+            pantallas densas) conserva el trazo relativo. */}
+        <Icon className={`col-start-1 row-start-1 shrink-0 self-center text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 ${phone ? "h-5 w-5 [stroke-width:2.4]" : "h-4 w-4 sm:h-5 sm:w-5 sm:[stroke-width:2.4]"} ${large ? "phone-sb:h-[calc(18*var(--sb-su,1px))] phone-sb:w-[calc(18*var(--sb-su,1px))] phone-sb:[stroke-width:2]" : ""}`} />
         <span className={`col-start-2 row-start-1 block self-center font-bold leading-none tracking-tight text-white/90 [font-variant-numeric:tabular-nums] [text-box:trim-both_cap_alphabetic] ${phone ? "text-sm" : "text-[11px] sm:text-sm"} ${large ? "phone-sb:text-[length:calc(14*var(--sb-su,1px))]" : ""}`}>
           {/* CARGANDO ≠ SIN DATO. Mientras la consulta está en vuelo el hueco
               se reserva con un valor INVISIBLE: ocupa lo mismo, pero no afirma
