@@ -137,7 +137,8 @@ import {
   hasFollowingActivity,
   useFollowingActivity,
 } from "@/components/details/FollowingActivity";
-import useRatingLinks from "@/lib/details/useRatingLinks";
+import useRatingLinks, { useRatingScores } from "@/lib/details/useRatingLinks";
+import { audienceScoreBadge } from "@/lib/details/ratingScores";
 import {
   buildTmdbHref,
   buildTraktHref,
@@ -636,23 +637,28 @@ export default function DetailModal({
     tmdbId: item?.id,
     enabled: !isEpisode,
   });
-  // Insignia de Rotten Tomatoes / Metacritic para el marcador.
+  const ratingScores = useRatingScores({
+    type: mediaType,
+    tmdbId: item?.id,
+    enabled: !isEpisode && !phoneLayout,
+  });
+  // Insignia de Rotten Tomatoes / Metacritic para el marcador: la nota del
+  // PÚBLICO (Popcornmeter / User Score) leída de su ficha, en escala 10 y con
+  // sus votos (`audienceScoreBadge`).
   //
-  // Las dos llegan en la MISMA respuesta que la nota de IMDb, así que
-  // `imdbRatingResolved` es también su señal de "ya se sabe si hay dato". Mientras
-  // no se sabe se manda `pending` en lugar de `null`: así la insignia reserva su
-  // hueco en vez de ocupar cero. Sin eso, la barra nacía con las puntuaciones
-  // ausentes, los botones de la derecha recibían más ancho del que les va a tocar
-  // y se pintaban con etiqueta hasta que llegaban las notas y se compactaban de
-  // golpe. Ya resuelto y sin dato vuelve a ser `null`: la insignia no se pinta, que
-  // es lo correcto para una película sin nota en esos sitios.
-  const optionalScoreBadge = (value, href) => {
+  // Mientras no se sabe si hay dato se manda `pending` en lugar de `null`: así
+  // la insignia reserva su hueco en vez de ocupar cero. Sin eso, la barra nacía
+  // con las puntuaciones ausentes, los botones de la derecha recibían más ancho
+  // del que les va a tocar y se pintaban con etiqueta hasta que llegaban las
+  // notas y se compactaban de golpe. Ya resuelto y sin dato vuelve a ser `null`:
+  // la insignia no se pinta, que es lo correcto para un título sin nota allí.
+  const optionalScoreBadge = (scores, href) => {
     // Fuera de la ficha de teléfono: cinco insignias no caben en ese ancho y
-    // empujaban los botones de la derecha fuera del panel. Las tres que se
-    // conservan (TMDb, Trakt e IMDb) son las que llevan votos.
-    if (phoneLayout) return null;
-    if (value != null) return { value: Math.round(value), href };
-    return data.imdbRatingResolved ? null : { pending: true };
+    // empujaban los botones de la derecha fuera del panel. Tampoco en
+    // episodios: esas fichas son de la serie, no del episodio.
+    if (phoneLayout || isEpisode) return null;
+    if (!ratingScores.ready) return { pending: true };
+    return audienceScoreBadge(scores, href);
   };
 
   const backdropPath = data.backdropPath || item?.backdrop_path || null;
@@ -3274,9 +3280,9 @@ export default function DetailModal({
       traktPublic={null}
       imdb={scoreboardImdb}
       // Ver `optionalScoreBadge`: fuera de la ficha de teléfono, y con
-      // hueco reservado mientras la respuesta de OMDb está en vuelo.
-      rt={optionalScoreBadge(data.rtScore, ratingLinks.rt)}
-      mc={optionalScoreBadge(data.mcScore, ratingLinks.mc)}
+      // hueco reservado mientras se leen las fichas de RT y Metacritic.
+      rt={optionalScoreBadge(ratingScores.rt, ratingLinks.rt)}
+      mc={optionalScoreBadge(ratingScores.mc, ratingLinks.mc)}
       mobileScoresOnly={phoneLayout}
       // En tablet la ventana supera `sm` aunque el drawer sea
       // estrecho: sin esto el marcador salía con la disposición

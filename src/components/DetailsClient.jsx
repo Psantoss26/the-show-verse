@@ -321,7 +321,8 @@ import {
   DETAILS_MOBILE_COVER_PROPS,
   useMobileDetailsHero,
 } from "@/components/details/MobileDetailsHero";
-import useRatingLinks from "@/lib/details/useRatingLinks";
+import useRatingLinks, { useRatingScores } from "@/lib/details/useRatingLinks";
+import { audienceScoreBadge } from "@/lib/details/ratingScores";
 import { buildShareCardPayload } from "@/lib/details/shareCard";
 import {
   buildTmdbHref,
@@ -6833,6 +6834,7 @@ export default function DetailsClient({
     mcScore: null,
   }));
   const ratingLinks = useRatingLinks({ type: endpointType, tmdbId: id });
+  const ratingScores = useRatingScores({ type: endpointType, tmdbId: id });
   const [externalScoresLoading, setExternalScoresLoading] = useState(() => restoredValue(backSnapshot, "externalScoresLoading", true));
   // Se recupera el getter (antes descartado). Arranca en `true`: los premios se
   // piden SIEMPRE al montar, así que desde el primer frame el menú puede
@@ -11510,28 +11512,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 trakt={scoreboardTrakt}
                 traktPublic={null}
                 imdb={scoreboardImdb}
+                // RT y Metacritic: nota del PÚBLICO (Popcornmeter / User
+                // Score) leída de su ficha, en escala 10 con sus votos. Sin
+                // ella, el Popcornmeter que trae Trakt (sin recuento).
                 rt={
-                  tScoreboard?.external?.rtAudience != null ||
-                  extras.rtScore != null
+                  audienceScoreBadge(ratingScores.rt, ratingLinks.rt) ??
+                  (tScoreboard?.external?.rtAudience != null
                     ? {
+                        value: (Math.round(tScoreboard.external.rtAudience) / 10).toFixed(1),
                         href: ratingLinks.rt,
-                        value:
-                          tScoreboard?.external?.rtAudience != null
-                            ? Math.round(tScoreboard.external.rtAudience)
-                            : extras.rtScore != null
-                              ? Math.round(extras.rtScore)
-                              : null,
                       }
-                    : null
+                    : null)
                 }
-                mc={
-                  extras.mcScore != null
-                    ? {
-                        value: Math.round(extras.mcScore),
-                        href: ratingLinks.mc,
-                      }
-                    : null
-                }
+                mc={audienceScoreBadge(ratingScores.mc, ratingLinks.mc)}
                 externalLinks={isBackdropPoster ? scoreboardExternalLinks : null}
                 externalLinksWikipedia={wikipediaQuery}
                 onMoreLinks={isBackdropPoster ? () => setExternalLinksOpen(true) : undefined}

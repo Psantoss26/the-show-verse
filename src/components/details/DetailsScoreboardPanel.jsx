@@ -16,8 +16,8 @@
 //   trakt:       { value, sub, href } | null   (badge Trakt "conectado")
 //   traktPublic: { value, sub } | null         (badge Trakt público sin conexión)
 //   imdb:        { value, sub, href } | null    (badge IMDb)
-//   rt:          { value, href } | null               (badge Rotten Tomatoes, solo >= sm)
-//   mc:          { value, href } | null               (badge Metacritic, solo >= sm)
+//   rt:          { value, sub, href } | null          (badge Rotten Tomatoes, solo >= sm)
+//   mc:          { value, sub, href } | null          (badge Metacritic, solo >= sm)
 //   stats:       { watchers, plays, lists, favorited } | null  (fila de stats)
 //   showFavoritedStat: boolean                  (oculta Favoritos cuando no aplica)
 //   toolbarActions: ReactNode | null            (acciones inline al final)
@@ -150,9 +150,8 @@ export function DetailsRatingsBadges({
   // se compactaban de golpe en cuanto llegaban las puntuaciones. Con el hueco
   // reservado, la barra nace ya con su disposición final.
   // `placeholder` son las cifras de relleno, con la forma típica de cada
-  // insignia: nota y recuento ("8,4" · "12 k") en TMDb/Trakt/IMDb, y solo el
-  // porcentaje en Rotten Tomatoes y Metacritic, que no llevan recuento —pasarles
-  // uno les añadiría una segunda línea y cambiaría el ALTO de la barra. Así el
+  // insignia: nota y recuento ("8,4" · "12 k"), igual en las cinco (RT y
+  // Metacritic enseñan la nota del público en escala 10 con sus votos). Así el
   // hueco reservado mide prácticamente lo que va a medir el real. Sin `href` la
   // insignia no es un enlace, así que tampoco entra en el orden de tabulación.
   const scoreSlot = (score, render, placeholder = { value: "0.0", sub: "00 k" }) => {
@@ -267,7 +266,8 @@ export function DetailsRatingsBadges({
 
       {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm), y se
           retira además cuando la barra se queda estrecha (ver `.optionalScore`
-          en el módulo CSS): es de las dos que no traen recuento de votos. */}
+          en el módulo CSS). Nota del público (Popcornmeter) en escala 10, con
+          sus votos como `sub`, leída de la ficha de RT. */}
       {scoreSlot(
         rt,
         (score) => (
@@ -275,7 +275,7 @@ export function DetailsRatingsBadges({
             <CompactBadge
               logo="/logo-RottenTomatoes.png"
               value={score.value}
-              suffix="%"
+              sub={score.sub}
               href={score.href}
               disableHoverLift
               roomy={roomy}
@@ -283,10 +283,10 @@ export function DetailsRatingsBadges({
             />
           </div>
         ),
-        { value: "00" },
       )}
 
-      {/* Badge de Metacritic - mismo criterio que Rotten Tomatoes. */}
+      {/* Badge de Metacritic - mismo criterio que Rotten Tomatoes, con la
+          nota de los usuarios (User Score). */}
       {scoreSlot(
         mc,
         (score) => (
@@ -294,7 +294,7 @@ export function DetailsRatingsBadges({
             <CompactBadge
               logo="/logo-Metacritic.png"
               value={score.value}
-              suffix="%"
+              sub={score.sub}
               href={score.href}
               disableHoverLift
               roomy={roomy}
@@ -302,7 +302,6 @@ export function DetailsRatingsBadges({
             />
           </div>
         ),
-        { value: "00" },
       )}
     </div>
   );
