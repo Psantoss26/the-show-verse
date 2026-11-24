@@ -3316,7 +3316,7 @@ export default function DetailModal({
       <div className={`@container/sbrow ${className}`}>
         <div className="sv-score-row flex items-stretch gap-3">
           {panel}
-          <div className="sv-score-tiles flex shrink-0 flex-col gap-2 @4xl/sbrow:flex-row @4xl/sbrow:gap-3">
+          <div className="sv-score-tiles flex shrink-0 flex-col gap-2 @4xl/sbrow:flex-row @4xl/sbrow:gap-2">
             <ScoreboardTile
               wideBy="container"
               icon={MonitorPlay}

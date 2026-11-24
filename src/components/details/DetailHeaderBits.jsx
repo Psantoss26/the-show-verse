@@ -444,12 +444,12 @@ const SCOREBOARD_TILE_BASE = `${LIQUID_GLASS_SURFACE} sv-score-tile group/tile r
 // ventana (`xl`); el panel de DetailModal, que se estrecha arrastrando, por el
 // ancho de su fila (contenedor `@container/sbrow`, 56rem).
 const SCOREBOARD_TILE_WIDE = {
-  viewport: "xl:w-28 xl:flex-none xl:flex-col",
-  container: "@4xl/sbrow:w-28 @4xl/sbrow:flex-none @4xl/sbrow:flex-col",
+  viewport: "xl:w-[6.5rem] xl:flex-none xl:flex-col",
+  container: "@4xl/sbrow:w-[6.5rem] @4xl/sbrow:flex-none @4xl/sbrow:flex-col",
 };
 const SCOREBOARD_TILE_ICON_WIDE = {
-  viewport: "xl:h-7 xl:w-7",
-  container: "@4xl/sbrow:h-7 @4xl/sbrow:w-7",
+  viewport: "xl:h-6 xl:w-6",
+  container: "@4xl/sbrow:h-6 @4xl/sbrow:w-6",
 };
 export const SCOREBOARD_TILE_CLASS = `${SCOREBOARD_TILE_BASE} ${SCOREBOARD_TILE_WIDE.viewport}`;
 

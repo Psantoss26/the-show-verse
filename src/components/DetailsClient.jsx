@@ -11552,7 +11552,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // bloque junto a Enlaces y Compartir (más abajo).
                 />
                 {!isBackdropPoster && (
-                  <div className={`sv-score-tiles hidden sm:flex sm:shrink-0 sm:flex-col ${showFollowingActivity ? "sm:gap-2" : "sm:gap-3"} xl:flex-row xl:gap-3`}>
+                  <div className={`sv-score-tiles hidden sm:flex sm:shrink-0 sm:flex-col ${showFollowingActivity ? "sm:gap-2" : "sm:gap-3"} xl:flex-row xl:gap-2`}>
                     {/* Actividad: solo si alguien a quien sigues ha tocado
                         el título; abre el mismo modal que los avatares. */}
                     {showFollowingActivity && (
