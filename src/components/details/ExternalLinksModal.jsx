@@ -84,7 +84,7 @@ export default function ExternalLinksModal({
             >
                         <div className={`flex w-full shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
                             <div className="flex min-w-0 items-center gap-3">
-                                <ModalTitleIcon icon={isPlatformsMode ? MonitorPlay : Link2} tone="yellow" />
+                                <ModalTitleIcon icon={isPlatformsMode ? MonitorPlay : Link2} tone="neutral" />
                                 <div className="min-w-0">
                                     <h2
                                         id="external-links-title"

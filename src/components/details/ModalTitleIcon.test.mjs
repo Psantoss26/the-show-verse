@@ -8,10 +8,10 @@ const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 // icono de ese botón, con el mismo componente que favoritos y pendientes.
 const MODALS = [
   ["./ListToggleConfirmModal.jsx", /<ModalTitleIcon icon=\{Icon\} tone=\{config\.iconTone\}/],
-  ["./EpisodeRatingsModal.jsx", /<ModalTitleIcon icon=\{BarChart3\} tone="yellow"/],
-  ["./ExternalLinksModal.jsx", /<ModalTitleIcon icon=\{isPlatformsMode \? MonitorPlay : Link2\} tone="yellow"/],
-  ["./FollowingActivity.jsx", /<ModalTitleIcon icon=\{UsersRound\} tone="yellow"/],
-  ["./DetailsShareSheet.jsx", /<ModalTitleIcon icon=\{Share2\} tone="yellow"/],
+  ["./EpisodeRatingsModal.jsx", /<ModalTitleIcon icon=\{BarChart3\} tone="neutral"/],
+  ["./ExternalLinksModal.jsx", /<ModalTitleIcon icon=\{isPlatformsMode \? MonitorPlay : Link2\} tone="neutral"/],
+  ["./FollowingActivity.jsx", /<ModalTitleIcon icon=\{UsersRound\} tone="neutral"/],
+  ["./DetailsShareSheet.jsx", /<ModalTitleIcon icon=\{Share2\} tone="neutral"/],
   ["./TraktCommentModal.jsx", /<ModalTitleIcon icon=\{MessageSquare\} tone="orange"/],
   ["./AddToListModal.jsx", /<ModalTitleIcon icon=\{ListVideo\} tone="purple"/],
   ["../StarRating.jsx", /<ModalTitleIcon icon=\{Star\} tone="yellow"/],

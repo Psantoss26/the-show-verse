@@ -166,7 +166,7 @@ export default function EpisodeRatingsModal({
 
         <header className={`flex shrink-0 items-center justify-between gap-4 ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6`}>
           <div className="flex min-w-0 items-center gap-3">
-            <ModalTitleIcon icon={BarChart3} tone="yellow" />
+            <ModalTitleIcon icon={BarChart3} tone="neutral" />
             <div className="min-w-0">
               <p className="mb-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-amber-300">
                 Serie
