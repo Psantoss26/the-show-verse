@@ -16,7 +16,9 @@ import {
   H,
   PANEL_TOP,
   POSTER_H,
+  PosterWithBlurredEdge,
   PosterWithContinuation,
+  SEASON_EDGE_TAIL,
   SCORE_LOGOS,
   SCORE_PANEL_W,
   SHADE,
@@ -25,6 +27,7 @@ import {
   W,
   actionButtonWidth,
   loadAmbientBase,
+  loadPosterEdgeLayers,
   loadAmbientLayers,
   loadLocalAssets,
   loadLogo,
@@ -124,7 +127,7 @@ function StillStack({ stills }) {
   );
 }
 
-function Card({ card, poster, stills, ambient, ambientBase, coverBlur, logo, assets, fonts }) {
+function Card({ card, poster, stills, ambient, ambientBase, coverBlur, edgeLayers, logo, assets, fonts }) {
   const buttons = shareCardActionButtons(card);
   const scores = ["tmdb", "trakt", "imdb"].filter((key) => card.scores[key]);
   const rowWidth =
@@ -136,8 +139,9 @@ function Card({ card, poster, stills, ambient, ambientBase, coverBlur, logo, ass
   const burnedTitle = Boolean(!stills.length && poster && !logo && !card.showTitle);
   const size = poster?.size?.width && poster?.size?.height ? poster.size : { width: 2, height: 3 };
   const fit = burnedTitle
-    ? posterFit({ ratio: size.height / size.width, stackTop })
+    ? posterFit({ ratio: size.height / size.width, stackTop, ...(card.season ? { tail: SEASON_EDGE_TAIL } : {}) })
     : null;
+  const [edgeExtend, edgeUnderlay, edgeExtendRow] = edgeLayers || [];
 
   return (
     <div
@@ -151,7 +155,9 @@ function Card({ card, poster, stills, ambient, ambientBase, coverBlur, logo, ass
         fontFamily: fonts ? FONT : "sans-serif",
       }}
     >
-      {burnedTitle ? (
+      {burnedTitle && card.season ? (
+        <PosterWithBlurredEdge cover={poster} extend={edgeExtend} extendRow={edgeExtendRow} underlay={edgeUnderlay} fit={fit} />
+      ) : burnedTitle ? (
         <PosterWithContinuation cover={poster} coverBlur={coverBlur} fit={fit} />
       ) : (
         <>
@@ -299,7 +305,7 @@ export async function POST(request) {
 }
 
 async function renderCard(card) {
-  const [fonts, assets, poster, stills, [ambient, ambientBase], coverBlur, logo] = await Promise.all([
+  const [fonts, assets, poster, stills, [ambient, ambientBase], coverBlur, edgeLayers, logo] = await Promise.all([
     loadShareFonts(),
     loadLocalAssets(),
     // Con portada de bandas (episodio), el póster no se pinta: no se pide.
@@ -309,11 +315,13 @@ async function renderCard(card) {
     // póster con el título impreso (`PosterWithContinuation`).
     loadAmbientLayers(card.posterPath),
     loadAmbientBase(card.posterPath),
+    // Pie del póster de la temporada (el de su página, `PosterWithBlurredEdge`).
+    card.season && !card.stillPaths.length ? loadPosterEdgeLayers(card.posterPath) : null,
     loadLogo(card.logoPath),
   ]);
 
   return new ImageResponse(
-    <Card card={card} poster={poster} stills={stills} ambient={ambient} ambientBase={ambientBase} coverBlur={coverBlur} logo={logo} assets={assets} fonts={Boolean(fonts)} />,
+    <Card card={card} poster={poster} stills={stills} ambient={ambient} ambientBase={ambientBase} coverBlur={coverBlur} edgeLayers={edgeLayers} logo={logo} assets={assets} fonts={Boolean(fonts)} />,
     {
       width: W,
       height: H,

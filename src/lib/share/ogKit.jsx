@@ -358,6 +358,7 @@ for (let value = 0; value < 256; value += 1) {
   const c = value / 255;
   SRGB_TO_LINEAR[value] = Math.round(65535 * (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
 }
+const SRGB_IDENTITY = Uint8Array.from({ length: 65536 }, (_, value) => Math.round(value / 257));
 let linearToSrgb = null;
 function linearToSrgbTable() {
   if (!linearToSrgb) {
@@ -381,10 +382,12 @@ function toneMatrix({ brightness = 1, saturate = 1 }) {
 }
 
 /**
- * `tone`: { brightness, saturate, blur, box }. `blur` va en px del LIENZO (el
+ * `tone`: { brightness, saturate, blur, box, lastRow, srgb }. `blur` va en px del LIENZO (el
  * de `filter: blur()`) y se pasa a px de la foto con lo que se amplía al
  * cubrir `box` ({ width, height }, `objectFit: cover`).
  */
+const LAST_ROW_HEIGHT = 64;
+
 async function toneImage(image, tone) {
   const sharp = await loadSharp();
   if (!sharp || !tone) return image;
@@ -397,7 +400,10 @@ async function toneImage(image, tone) {
     const { width, height } = info;
     const pixels = width * height;
     let linear = new Uint16Array(pixels * 3);
-    for (let index = 0; index < pixels * 3; index += 1) linear[index] = SRGB_TO_LINEAR[data[index]];
+    // `srgb`: desenfoque y filtros sobre los valores sRGB, como los `filter`
+    // CSS de Chrome (lo que hay que imitar cuando la capa copia una página).
+    const toLinear = tone.srgb ? (value) => value * 257 : (value) => SRGB_TO_LINEAR[value];
+    for (let index = 0; index < pixels * 3; index += 1) linear[index] = toLinear(data[index]);
 
     if (tone.blur) {
       const box = tone.box || { width: W, height: H };
@@ -415,7 +421,7 @@ async function toneImage(image, tone) {
     }
 
     const [r, g, b] = toneMatrix(tone);
-    const toSrgb = linearToSrgbTable();
+    const toSrgb = tone.srgb ? SRGB_IDENTITY : linearToSrgbTable();
     const out = Buffer.alloc(pixels * 3);
     const clamp = (value) => (value <= 0 ? 0 : value >= 65535 ? 65535 : Math.round(value));
     for (let index = 0; index < pixels * 3; index += 3) {
@@ -426,10 +432,19 @@ async function toneImage(image, tone) {
       out[index + 1] = toSrgb[clamp(g[0] * R + g[1] * G + g[2] * B)];
       out[index + 2] = toSrgb[clamp(b[0] * R + b[1] * G + b[2] * B)];
     }
-    const buffer = await sharp(out, { raw: { width, height, channels: 3 } })
-      .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
-      .toBuffer();
-    return { buffer, mime: "image/jpeg", size: { width, height }, toned: true };
+    // `lastRow`: solo la última fila, repetida (LAST_ROW_HEIGHT px), para
+    // estirarla en el render. Un `transform: scaleY()` grande rompe el
+    // rasterizado de Satori, y una fila de 1 px ampliada deja una raya al final.
+    let pipeline = sharp(out, { raw: { width, height, channels: 3 } });
+    if (tone.lastRow) {
+      const row = await pipeline.extract({ left: 0, top: height - 1, width, height: 1 }).raw().toBuffer();
+      pipeline = sharp(Buffer.concat(Array.from({ length: LAST_ROW_HEIGHT }, () => row)), {
+        raw: { width, height: LAST_ROW_HEIGHT, channels: 3 },
+      });
+    }
+    const buffer = await pipeline.jpeg({ quality: 92, chromaSubsampling: "4:4:4" }).toBuffer();
+    const size = tone.lastRow ? { width, height: LAST_ROW_HEIGHT } : { width, height };
+    return { buffer, mime: "image/jpeg", size, toned: true };
   } catch {
     return image;
   }
@@ -980,11 +995,11 @@ export const POSTER_MAX_SHIFT = 140;
 export const MIRROR_FADE_PX = 150;
 
 /** Encaje del póster a sangre de proporción `ratio` (alto/ancho) sobre `stackTop`. */
-export function posterFit({ ratio = 1.5, stackTop }) {
+export function posterFit({ ratio = 1.5, stackTop, tail = POSTER_FADE_TAIL }) {
   const height = Math.round(W * ratio);
   // Dónde debería acabar el póster y cuánto hay que subirlo para ello (nada si
   // ya cabe: un póster más bajo no se baja, se queda pegado arriba).
-  const end = stackTop + POSTER_FADE_TAIL;
+  const end = stackTop + tail;
   const shift = Math.max(0, Math.min(POSTER_MAX_SHIFT, height - end));
   const bottom = height - shift;
   const fadeStart = Math.max(0, Math.min(bottom, stackTop) - POSTER_FADE_LEAD);
@@ -1082,6 +1097,190 @@ export function PosterWithContinuation({ cover, coverBlur, fit }) {
           height: fit.height,
           objectFit: "cover",
           maskImage: `linear-gradient(180deg, #000 0%, #000 ${fade}%, rgba(0,0,0,0.55) ${mid}%, rgba(0,0,0,0) 100%)`,
+        }}
+      />
+    </div>
+  );
+}
+
+// --- PIE DEL PÓSTER DE LA TEMPORADA: el de su página móvil (MobileHeroCover
+// con `blurredUnderlay` y la franja corta de SeasonDetailsClient), capa por
+// capa y a la escala de la imagen (`EDGE_SCALE`, el teléfono de 400 px a
+// 1080). El póster NO se desvanece: llega nítido a su borde y encima entra
+// poco a poco (smootherstep) una copia difuminada que lo prolonga hacia abajo
+// estirando su última fila; detrás, su parte central muy difuminada y
+// oscurecida hasta el pie, y un velo suave bajo los botones. Los desenfoques
+// vienen hechos de sharp (`loadPosterEdgeLayers`): el `blur` de Satori se
+// recorta a la caja de cada imagen y oscurece sus bordes.
+const EDGE_SCALE = W / 400;
+const edgePx = (value) => Math.round(value * EDGE_SCALE);
+// Medidas de la página (px CSS del teléfono).
+export const SEASON_EDGE = Object.freeze({ bandPx: 44, shadeLeadPx: 32 });
+const EDGE_EXTEND_PX = 100; // MOBILE_COVER_EXTEND_SHORT_PX
+const EDGE_EXTEND_BLUR = 12;
+const EDGE_UNDERLAY_BLUR = 32;
+const EDGE_SCALE_X = 1.12; // MOBILE_COVER_EXTEND_SCALE_X
+// El borde de la portada cae a ~77 % del alto de los botones (la página:
+// botones de 48 px, borde 37 px por debajo de su parte de arriba).
+export const SEASON_EDGE_TAIL = Math.round(BUTTON * 0.77);
+
+const smootherstep = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+// Sin paradas a 0 del todo: Satori, al acercarse a una parada transparente,
+// deja pasar de más (una raya clara justo antes); 0,001 no se ve.
+const maskStop = (alpha, at) => `rgba(0,0,0,${Math.max(alpha, 0.001).toFixed(3)}) ${Math.round(at)}px`;
+
+/**
+ * Las copias difuminadas del pie, ya tratadas: prolongación, fondo y la
+ * última fila de la prolongación (la que se estira hacia abajo).
+ */
+export function loadPosterEdgeLayers(posterPath) {
+  if (!posterPath) return Promise.resolve([null, null, null]);
+  const box = { width: Math.round(W * EDGE_SCALE_X), height: 1 };
+  return Promise.all([
+    fetchImage(`${TMDB}/w342${posterPath}`, 4000, null, { blur: edgePx(EDGE_EXTEND_BLUR), box, srgb: true }),
+    fetchImage(`${TMDB}/w342${posterPath}`, 4000, null, {
+      blur: edgePx(EDGE_UNDERLAY_BLUR),
+      brightness: 0.7,
+      saturate: 1.15,
+      box,
+      srgb: true,
+    }),
+    fetchImage(`${TMDB}/w342${posterPath}`, 4000, null, { blur: edgePx(EDGE_EXTEND_BLUR), box, srgb: true, lastRow: true }),
+  ]);
+}
+
+export function PosterWithBlurredEdge({ cover, extend, extendRow, underlay, fit, bandPx = SEASON_EDGE.bandPx, shadeLeadPx = SEASON_EDGE.shadeLeadPx }) {
+  const edge = fit.top + fit.height;
+  const band = edgePx(bandPx);
+  const extendH = edgePx(EDGE_EXTEND_PX);
+  const wideW = Math.round(W * EDGE_SCALE_X);
+  const wideLeft = -Math.round((wideW - W) / 2);
+  // Prolongación: caja desde `band` por encima del borde hasta `extendH` por
+  // debajo; su máscara es la de buildCoverExtendMaskSmooth.
+  const extendTop = edge - band;
+  const extendMask = [
+    maskStop(0, 0),
+    ...Array.from({ length: 9 }, (_, i) => maskStop(smootherstep((i + 1) / 10), band * ((i + 1) / 10))),
+    maskStop(1, band),
+    maskStop(1, band + edgePx(16)),
+    maskStop(0.784, band + extendH * 0.35),
+    maskStop(0.5, band + extendH * 0.55),
+    maskStop(0.216, band + extendH * 0.75),
+    maskStop(0.058, band + extendH * 0.9),
+    maskStop(0, band + extendH),
+  ].join(", ");
+  // Fondo difuminado: entra en los 48 px sobre el borde y llega pleno 8 px
+  // por debajo (MOBILE_COVER_UNDERLAY_MASK).
+  const underlayTop = edge - edgePx(48);
+  const underlayH = H - underlayTop;
+  // Velo de los botones (buildCoverShadeSoft).
+  const lead = edgePx(shadeLeadPx);
+  const shadeTop = edge - lead;
+  const shade = (alpha) => rgba([10, 10, 10], alpha);
+  const fallbackFilter = (image, filter) => (image?.toned ? {} : { filter });
+
+  return (
+    <div style={{ position: "absolute", top: 0, left: 0, width: W, height: H, display: "flex" }}>
+      {underlay ? (
+        <div
+          style={{
+            position: "absolute",
+            top: underlayTop,
+            left: 0,
+            width: W,
+            height: underlayH,
+            display: "flex",
+            overflow: "hidden",
+            maskImage: `linear-gradient(180deg, rgba(0,0,0,0) 0px, #000 ${edgePx(56)}px)`,
+          }}
+        >
+          {/* `cover` al ancho del lienzo y luego ensanchado, como la página. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={underlay.src}
+            width={W}
+            height={underlayH}
+            alt=""
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: W,
+              height: underlayH,
+              objectFit: "cover",
+              objectPosition: "50% 50%",
+              transform: `scaleX(${EDGE_SCALE_X})`,
+              ...fallbackFilter(underlay, `blur(${edgePx(EDGE_UNDERLAY_BLUR)}px) brightness(0.7) saturate(1.15)`),
+            }}
+          />
+        </div>
+      ) : null}
+
+      {/* El póster, nítido hasta su borde. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={cover.src}
+        width={W}
+        height={fit.height}
+        alt=""
+        style={{ position: "absolute", top: fit.top, left: 0, width: W, height: fit.height, objectFit: "cover" }}
+      />
+
+      {extend ? (
+        <div
+          style={{
+            position: "absolute",
+            top: extendTop,
+            left: 0,
+            width: W,
+            height: band + extendH,
+            display: "flex",
+            overflow: "hidden",
+            maskImage: `linear-gradient(180deg, ${extendMask})`,
+          }}
+        >
+          {/* El póster difuminado, en su sitio y ensanchado solo a lo ancho
+              (`fill`, como el `scaleX` de la página: sus filas siguen
+              alineadas con las del póster nítido). */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={extend.src}
+            width={wideW}
+            height={fit.height}
+            alt=""
+            style={{
+              position: "absolute",
+              top: fit.top - extendTop,
+              left: wideLeft,
+              width: wideW,
+              height: fit.height,
+              objectFit: "fill",
+              ...fallbackFilter(extend, `blur(${edgePx(EDGE_EXTEND_BLUR)}px)`),
+            }}
+          />
+          {/* Su última fila, estirada hasta el final de la caja. */}
+          {extendRow?.toned ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={extendRow.src}
+              width={wideW}
+              height={extendH}
+              alt=""
+              style={{ position: "absolute", top: band, left: wideLeft, width: wideW, height: extendH }}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      <div
+        style={{
+          position: "absolute",
+          top: shadeTop,
+          left: 0,
+          width: W,
+          height: H - shadeTop,
+          display: "flex",
+          backgroundImage: `linear-gradient(180deg, ${shade(0)} 0px, ${shade(0.08)} ${Math.round(lead * 0.5)}px, ${shade(0.2)} ${lead}px, ${shade(0.36)} ${lead + edgePx(90)}px, ${shade(0.46)} ${lead + edgePx(220)}px, ${shade(0.52)} 100%)`,
         }}
       />
     </div>
