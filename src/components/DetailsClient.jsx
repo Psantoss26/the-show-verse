@@ -8360,6 +8360,8 @@ export default function DetailsClient({
   const canAccessFollowingActivity = authenticated || hasBackendSession;
   const followingActivity = useFollowingActivity(type, id, {
     enabled: canAccessFollowingActivity,
+    // Hasta saber la sesión vale la copia de la última visita (ver el hook).
+    pending: !authHydrated,
   });
   const showFollowingActivity = hasFollowingActivity(followingActivity);
 

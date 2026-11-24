@@ -12,7 +12,7 @@
 // nada: ninguna deja hueco vacío.
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { createPortal } from "react-dom";
 import {
@@ -36,8 +36,10 @@ import {
   activityMarks,
   episodeLabel,
   primaryMark,
+  readStoredFollowing,
   relativeTime,
   summarySentence,
+  writeStoredFollowing,
 } from "@/lib/details/followingActivity";
 
 // ─────────────────────────────────────────────
@@ -56,18 +58,46 @@ function fetchFollowing(type, id) {
     .then((res) => (res.ok ? res.json() : null))
     .catch(() => null)
     .then((data) => {
-      if (data) cache.set(key, { at: Date.now(), data });
-      else cache.delete(key);
+      if (data) {
+        cache.set(key, { at: Date.now(), data });
+        writeStoredFollowing(browserStorage(), key, data);
+      } else cache.delete(key);
       return data;
     });
   cache.set(key, { promise });
   return promise;
 }
 
-/** Actividad de tus seguidos con un título (null mientras carga o si no hay sesión). */
-export function useFollowingActivity(type, id, { enabled = true } = {}) {
+function browserStorage() {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/**
+ * Actividad de tus seguidos con un título (null mientras carga o si no hay
+ * sesión).
+ *
+ * `pending`: la sesión aún no se sabe (AuthContext sin hidratar; el token es
+ * httpOnly, así que la ficha no lo ve en el primer render). Mientras tanto vale
+ * la copia guardada de la última visita: al recargar, el botón Actividad sale a
+ * la vez que Enlaces y Compartir y no aparece después, cuando llegan la sesión
+ * y la petición. La copia se lee en un efecto de layout (antes de pintar la
+ * ficha hidratada) y no en el estado inicial, que el servidor no puede saber.
+ */
+export function useFollowingActivity(type, id, { enabled = true, pending = false } = {}) {
   const key = `${type}:${id}`;
   const [state, setState] = useState(() => ({ key, data: cache.get(key)?.data || null }));
+  useIsomorphicLayoutEffect(() => {
+    if (!id || (type !== "movie" && type !== "tv")) return;
+    if (cache.get(key)?.data) return;
+    const stored = readStoredFollowing(browserStorage(), key);
+    if (stored) setState((prev) => (prev.key === key && prev.data ? prev : { key, data: stored }));
+  }, [type, id, key]);
   useEffect(() => {
     if (!enabled || !id || (type !== "movie" && type !== "tv")) return undefined;
     let active = true;
@@ -79,7 +109,7 @@ export function useFollowingActivity(type, id, { enabled = true } = {}) {
     };
   }, [enabled, type, id, key]);
   // Al cambiar de título no se enseña la actividad del anterior.
-  return enabled && state.key === key ? state.data : null;
+  return (enabled || pending) && state.key === key ? state.data : null;
 }
 
 export function hasFollowingActivity(data) {

@@ -156,3 +156,40 @@ export function primaryMark(item, mediaType = "movie") {
     null
   );
 }
+
+// Copia guardada (localStorage) de la última respuesta por título. Al recargar
+// la ficha, el botón Actividad sale con el resto en vez de esperar a la sesión
+// y a la petición. Va por cuenta sin hacer nada más: AuthContext vacía
+// localStorage al cambiar de cuenta o cerrar sesión.
+export const FOLLOWING_STORAGE_KEY = "showverse:followingActivity:v1";
+export const FOLLOWING_STORAGE_MAX = 60;
+
+function readAll(storage) {
+  try {
+    const parsed = JSON.parse(storage?.getItem(FOLLOWING_STORAGE_KEY) || "null");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Última actividad guardada de `key` ("movie:155"), o null. */
+export function readStoredFollowing(storage, key) {
+  if (!storage) return null;
+  return readAll(storage)[key]?.data ?? null;
+}
+
+/** Guarda la actividad de `key` y deja solo los FOLLOWING_STORAGE_MAX más recientes. */
+export function writeStoredFollowing(storage, key, data, now = Date.now()) {
+  if (!storage) return;
+  const all = readAll(storage);
+  all[key] = { at: now, data };
+  const keys = Object.keys(all).sort((a, b) => (all[b]?.at || 0) - (all[a]?.at || 0));
+  const kept = {};
+  for (const k of keys.slice(0, FOLLOWING_STORAGE_MAX)) kept[k] = all[k];
+  try {
+    storage.setItem(FOLLOWING_STORAGE_KEY, JSON.stringify(kept));
+  } catch {
+    // Cuota llena o modo privado: sin copia, como antes.
+  }
+}

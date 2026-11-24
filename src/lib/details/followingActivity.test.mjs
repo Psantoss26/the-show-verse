@@ -10,6 +10,10 @@ import {
   statusLabel,
   summaryChips,
   summarySentence,
+  FOLLOWING_STORAGE_KEY,
+  FOLLOWING_STORAGE_MAX,
+  readStoredFollowing,
+  writeStoredFollowing,
 } from "./followingActivity.js";
 
 const person = (name, extra = {}) => ({ user: { username: name.toLowerCase(), displayName: name }, ...extra });
@@ -81,4 +85,41 @@ test("marcas con el lenguaje de la actividad y la del avatar", () => {
   assert.equal(primaryMark(person("Eva", { status: "planned", watchlist: true })).id, "watchlist");
   // Película vista sin nota: el ojo.
   assert.equal(primaryMark(person("Leo", { status: "rewatched", watched: { plays: 2 } })).label, "Vista 2 veces");
+});
+
+function memoryStorage() {
+  const map = new Map();
+  return {
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    setItem: (k, v) => map.set(k, String(v)),
+    removeItem: (k) => map.delete(k),
+  };
+}
+
+test("copia guardada: lo escrito se lee por título", () => {
+  const storage = memoryStorage();
+  const data = { items: [person("Ana")] };
+  writeStoredFollowing(storage, "movie:155", data, 1000);
+  assert.deepEqual(readStoredFollowing(storage, "movie:155"), data);
+  assert.equal(readStoredFollowing(storage, "tv:155"), null);
+});
+
+test("copia guardada: sin almacenamiento o con JSON roto devuelve null", () => {
+  assert.equal(readStoredFollowing(null, "movie:1"), null);
+  const storage = memoryStorage();
+  storage.setItem(FOLLOWING_STORAGE_KEY, "{roto");
+  assert.equal(readStoredFollowing(storage, "movie:1"), null);
+  writeStoredFollowing(storage, "movie:1", { items: [] }, 1);
+  assert.deepEqual(readStoredFollowing(storage, "movie:1"), { items: [] });
+});
+
+test("copia guardada: se queda con los títulos más recientes", () => {
+  const storage = memoryStorage();
+  for (let i = 0; i < FOLLOWING_STORAGE_MAX + 5; i += 1) {
+    writeStoredFollowing(storage, `movie:${i}`, { items: [] }, i);
+  }
+  assert.equal(readStoredFollowing(storage, "movie:0"), null);
+  assert.equal(readStoredFollowing(storage, "movie:4"), null);
+  assert.deepEqual(readStoredFollowing(storage, "movie:5"), { items: [] });
+  assert.deepEqual(readStoredFollowing(storage, `movie:${FOLLOWING_STORAGE_MAX + 4}`), { items: [] });
 });
