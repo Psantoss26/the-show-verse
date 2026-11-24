@@ -392,7 +392,7 @@ export default function ScoreboardBar({
 
           {imdb?.rating != null || imdb?.id ? (
             <CompactBadge
-              logo="/logo-IMDb.svg"
+              logo="/logo-IMDb.png"
               logoWrapClassName="min-w-[28px]"
               logoClassName="!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
               value={

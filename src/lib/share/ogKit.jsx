@@ -650,7 +650,7 @@ export async function loadLogo(logoPath) {
 export const LOCAL_ASSETS = {
   tmdb: { file: "logo-TMDb.png", mime: "image/png" },
   trakt: { file: "logo-Trakt.png", mime: "image/png" },
-  imdb: { file: "logo-IMDb.svg", mime: "image/svg+xml" },
+  imdb: { file: "logo-IMDb.png", mime: "image/png" },
   brand: { file: "logo-TSV-sinFondo.png", mime: "image/png" },
 };
 let localAssetsPromise = null;

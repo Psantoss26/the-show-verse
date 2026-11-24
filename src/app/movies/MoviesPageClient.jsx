@@ -1099,7 +1099,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
                   typeof extras?.imdbRating === "number" && (
                   <span className="inline-flex items-center gap-1.5">
                     <OptimizedImage
-                      src="/logo-IMDb.svg"
+                      src="/logo-IMDb.png"
                       alt="IMDb"
                       className="h-4 w-auto"
                       loading="lazy"

@@ -112,7 +112,7 @@ export default function ImdbImportPanel({ className = "" }) {
       <div>
         <div className="mb-4 flex items-start gap-4">
           <div className="shrink-0 h-12 w-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
-            <img src="/logo-IMDb.png" alt="" className="h-8 w-8 object-contain" />
+            <img src="/logo-IMDb.png" alt="" className="h-auto w-12 object-contain" />
           </div>
           <div className="min-w-0">
             <h3 className="text-base font-extrabold text-white tracking-wide">Importar desde IMDb</h3>

@@ -230,7 +230,7 @@ export default function SeasonCard({
               ) : null}
               {imdbScore != null ? (
                 <span className="flex items-center gap-1.5" title="Nota en IMDb">
-                  <OptimizedImage src="/logo-IMDb.svg" alt="IMDb" className="h-4 w-auto" />
+                  <OptimizedImage src="/logo-IMDb.png" alt="IMDb" className="h-4 w-auto" />
                   {imdbScore.toFixed(1)}
                 </span>
               ) : null}

@@ -1215,7 +1215,7 @@ function GroupDivider({
                   <StatBox
                     label="IMDb"
                     value={formatAvg(stats.imdb.avg)}
-                    imgSrc="/logo-IMDb.svg"
+                    imgSrc="/logo-IMDb.png"
                     horizontal={renderSticky}
                   />
                 )}

@@ -2376,7 +2376,7 @@ export default function ActorDetails({
         ? {
             id: "imdb",
             label: "IMDb",
-            icon: "/logo-IMDb.svg",
+            icon: "/logo-IMDb.png",
             href: socials.imdb,
             iconSize: { width: 42, height: 22 },
             iconClassName:

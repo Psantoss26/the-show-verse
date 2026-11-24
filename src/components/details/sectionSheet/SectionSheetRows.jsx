@@ -226,7 +226,7 @@ export function TitleRow({
             {shouldShowImdb ? (
               <span className="inline-flex items-center gap-1.5">
                 <OptimizedImage
-                  src="/logo-IMDb.svg"
+                  src="/logo-IMDb.png"
                   alt="IMDb"
                   className="h-3.5 w-auto"
                 />

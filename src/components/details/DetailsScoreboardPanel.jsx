@@ -253,7 +253,7 @@ export function DetailsRatingsBadges({
       {scoreSlot(imdb, (score) => (
         <CompactBadge
           key={scoreStateKey("imdb", score)}
-          logo="/logo-IMDb.svg"
+          logo="/logo-IMDb.png"
           logoWrapClassName={`min-w-[28px] ${phone ? "" : roomy ? "lg:min-w-[34px] xl:min-w-[40px]" : "lg:min-w-[34px]"}`}
           logoClassName={
             phone
