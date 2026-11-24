@@ -92,7 +92,7 @@ Logo de IMDb: todos los sitios (marcadores, tarjetas de temporada y episodio, fi
 | `EpisodeRatingsModal.jsx` | Modal que envuelve `EpisodeRatingsGrid` para ver valoraciones por temporada. |
 | `AddToListModal.jsx` | Modal para añadir un título a una o varias listas propias. El buscador usa el mismo relleno translúcido que las tarjetas de lista (`bg-white/[0.03]`, esquinas `rounded-2xl`) y marca el foco con un anillo amarillo interior, el acento del modal. |
 | `TraktCommentModal.jsx` | Modal para crear/editar/borrar un comentario de Trakt. Debajo del formulario, la sección «Historial» lista tus comentarios anteriores del título, sin contador. |
-| `VideoModal.jsx` | Modal de reproducción de tráiler (YouTube IFrame API / Vimeo). |
+| `VideoModal.jsx` | Modal de reproducción de tráiler (YouTube IFrame API / Vimeo). Desde `sm` su tamaño es proporcional al espacio disponible (`.sv-video-modal` en globals.css): el ancho sale del alto disponible —vídeo 16:9 más cabecera y pie, medidos con `ResizeObserver` en `--sv-video-modal-chrome`— y crece en proporción a la pantalla: como mucho el 80 % del ancho (menos el hueco de Anterior/Siguiente en `lg`) y un margen arriba y abajo del 8 % del alto (mínimo 2,5 rem). En móvil, igual que el resto. |
 
 ## `lists/`
 

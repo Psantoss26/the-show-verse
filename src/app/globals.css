@@ -2514,6 +2514,42 @@ html[data-android-app] {
   max-height: var(--sv-modal-max-h);
 }
 
+/* MODAL DE VÍDEO (tráileres de los botones de acción): crece en proporción
+   a la pantalla en vez de quedarse en 1280 px. Desde `sm` ocupa como mucho
+   el 80 % del ancho y deja arriba y abajo un 8 % del alto (mínimo 2,5 rem);
+   dentro de eso, el ancho sale del alto —vídeo 16:9 más la cabecera y el
+   pie, que VideoModal mide en --sv-video-modal-chrome— para que todo quepa
+   sin desplazar. Con Anterior/Siguiente (`lg`), cede además a los lados el
+   hueco de los botones. En móvil sigue como los demás modales. */
+.sv-video-modal {
+  --sv-video-modal-gap: max(2.5rem, 8dvh);
+  --sv-video-modal-max-h: calc(
+    100dvh - var(--sv-safe-top, 0px) - var(--sv-safe-bottom, 0px) - 2 *
+      var(--sv-video-modal-gap)
+  );
+  --sv-video-modal-chrome: 164px;
+  --sv-video-modal-fit-w: calc(
+    (var(--sv-video-modal-max-h) - var(--sv-video-modal-chrome)) * 16 / 9
+  );
+  max-width: 80rem;
+}
+
+@media (min-width: 40rem) {
+  .sv-video-modal {
+    max-width: min(80vw, var(--sv-video-modal-fit-w));
+  }
+
+  .sv-video-modal > [role="dialog"] {
+    max-height: var(--sv-video-modal-max-h);
+  }
+}
+
+@media (min-width: 64rem) {
+  .sv-video-modal-steps {
+    max-width: min(80vw, calc(100vw - 13rem), var(--sv-video-modal-fit-w));
+  }
+}
+
 /* Modal que ocupa siempre todo ese alto (no solo como tope). */
 .sv-modal-h {
   height: var(--sv-modal-max-h);

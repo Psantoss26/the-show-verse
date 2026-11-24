@@ -8,7 +8,14 @@ import {
 } from "@/lib/ui/liquidGlass";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import useActionModalMotion from "@/hooks/useActionModalMotion";
 import Image from "next/image";
 import { X, PlayCircle, ChevronLeft, ChevronRight } from "lucide-react";
@@ -217,13 +224,37 @@ export default function VideoModal({
   useModalGuard({ open, onClose, closeOnBack: true });
 
   const actionMotion = useActionModalMotion(open && !!video);
+
+  // El ancho del modal sale del alto disponible (`.sv-video-modal` en
+  // globals.css): vídeo 16:9 + cabecera + pie. Cabecera y pie se miden
+  // porque el título puede ocupar varias líneas.
+  const headerRef = useRef(null);
+  const footerRef = useRef(null);
+  const { panelRef } = actionMotion;
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    const header = headerRef.current;
+    const footer = footerRef.current;
+    if (!panel || !header || !footer || typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+    const sync = () => {
+      const chrome = header.offsetHeight + footer.offsetHeight;
+      panel.style.setProperty("--sv-video-modal-chrome", `${chrome}px`);
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(header);
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, [panelRef, actionMotion.present, video]);
   if (!actionMotion.present || !video) return null;
 
   const embed = getPlayerEmbedUrl(video);
   const ext = videoExternalUrl(video);
 
   return (
-    <div className={`fixed inset-0 z-[10000] flex items-center justify-center px-4 py-1 sm:p-6${actionMotion.closing ? " pointer-events-none" : ""}`}>
+    <div className={`fixed inset-0 z-[10000] flex items-center justify-center px-4 py-1 sm:px-6 sm:py-0${actionMotion.closing ? " pointer-events-none" : ""}`}>
       {/* BACKDROP: Estilo cristal con desenfoque + Animación de fade */}
       <div
         ref={actionMotion.backdropRef}
@@ -238,8 +269,8 @@ export default function VideoModal({
           pantalla en ventanas estrechas. */}
       <div
         ref={actionMotion.panelRef}
-        className={`relative w-full max-w-7xl ${
-          total > 1 ? "lg:max-w-[min(80rem,calc(100vw-13rem))]" : ""
+        className={`sv-video-modal relative w-full${
+          total > 1 ? " sv-video-modal-steps" : ""
         }`}
       >
       {total > 1 && (
@@ -267,7 +298,10 @@ export default function VideoModal({
             fuente (YouTube) a la izquierda en un hueco de 44 px, título
             centrado en mayúsculas pequeñas —entero, en varias líneas si hace
             falta— con el tipo y la posición debajo, y cerrar a la derecha. */}
-        <div className={`flex w-full items-center justify-between gap-2 px-6 pt-6 pb-5 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER}`}>
+        <div
+          ref={headerRef}
+          className={`flex w-full items-center justify-between gap-2 px-6 pt-6 pb-5 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER}`}
+        >
           {ext ? (
             <a
               href={ext}
@@ -342,7 +376,10 @@ export default function VideoModal({
             cabía: en teléfonos con poco alto útil el modal recortaba la
             segunda). Ordenador (lg): la fecha, y la navegación fuera del panel,
             a los lados. YouTube y la posición («1 de 8») van en la cabecera. */}
-        <div className={`flex items-center gap-3 px-6 py-3 sm:px-8 sm:py-6 ${LIQUID_GLASS_MODAL_FOOTER}`}>
+        <div
+          ref={footerRef}
+          className={`flex items-center gap-3 px-6 py-3 sm:px-8 sm:py-6 ${LIQUID_GLASS_MODAL_FOOTER}`}
+        >
           {total > 1 && (
             <VideoStepButton
               direction="prev"
