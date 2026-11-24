@@ -123,3 +123,33 @@
     display: none;
   }
 }
+
+/* Ficha de episodio (`narrowStatLabels="few"`, tres stats, sin Favoritos):
+   las etiquetas no se quitan nunca. Con etiquetas caben en una línea hasta
+   ~24rem de panel (medido); por debajo, dos columnas a la medida de su
+   contenido y repartidas a los extremos (la de «REPRODUCCIONES» mide
+   ~110 px), sin relleno lateral y con icono y cifra más juntos. */
+@container detail-scoreboard (width < 24rem) {
+  .narrowStatsTrackFew {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    justify-content: space-between;
+    width: 100%;
+    column-gap: 0.5rem;
+    row-gap: 0.625rem;
+  }
+  .narrowStatsTrackFew > div {
+    padding-inline: 0;
+  }
+  .narrowStatsTrackFew > div > div {
+    column-gap: 0.375rem;
+  }
+}
+
+/* Si ni las dos columnas caben (~15,5rem de panel), una debajo de otra. */
+@container detail-scoreboard (width < 15.5rem) {
+  .narrowStatsTrackFew {
+    grid-template-columns: max-content;
+    row-gap: 0.5rem;
+  }
+}

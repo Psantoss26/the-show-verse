@@ -376,7 +376,7 @@ export function DetailsStatsRow({
       ? ""
       : "sm:pl-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.25rem+env(safe-area-inset-right))] md:overflow-x-visible"
   }`;
-  const statsTrackClass = `${compactTrailing ? styles.compactStatsTrack : ""} ${narrowLabels ? styles.narrowStatsTrack : ""} py-2.5 flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 ${
+  const statsTrackClass = `${compactTrailing ? styles.compactStatsTrack : ""} ${narrowLabels === "few" ? styles.narrowStatsTrackFew : narrowLabels ? styles.narrowStatsTrack : ""} py-2.5 flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 ${
     phone ? "" : compactTrailing ? "sm:w-full sm:flex-nowrap sm:gap-x-2" : "sm:w-full sm:flex-wrap"
   } ${spread ? `phone-sb:w-full phone-sb:justify-evenly phone-sb:gap-x-2.5 ${styles.spreadStats}` : ""}`;
 
@@ -915,7 +915,9 @@ export default function DetailsScoreboardPanel({
   compactStatsTrailing = false,
   // Panel acortado (ficha normal con Enlaces y Compartir fuera): si el panel
   // es estrecho, las stats pierden su etiqueta (queda en el tooltip) antes de
-  // partirse en dos líneas. Ver `.narrowStatsTrack` en el módulo CSS.
+  // partirse en dos líneas. Ver `.narrowStatsTrack` en el módulo CSS. Con
+  // "few" (ficha de episodio, tres stats) no se quitan: pasan a dos columnas
+  // o a una (`.narrowStatsTrackFew`).
   narrowStatLabels = false,
   // Puntuaciones algo mayores desde `xl` (ver DetailsRatingsBadges). Activo en
   // todos los marcadores; las mini-puntuaciones del destacado y de las tarjetas

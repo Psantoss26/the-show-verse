@@ -1984,6 +1984,9 @@ export default function EpisodeDetailsClient({
             <DetailsScoreboardPanel
               className="sm:min-w-0 sm:flex-1"
               mobileScoresOnly
+              // Sin etiquetas de stats solo si el panel baja de 24rem (tres
+              // stats; ver `.narrowStatsTrackFew`).
+              narrowStatLabels="few"
               loading={tScoreboard.loading}
               tmdb={{
                 value: vote?.toFixed(1),
