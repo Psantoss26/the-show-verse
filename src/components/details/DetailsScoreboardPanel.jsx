@@ -30,13 +30,15 @@ import { Fragment } from "react";
 import styles from "./DetailsScoreboardPanel.module.css";
 import { motion, useReducedMotion } from "framer-motion";
 import NextImage from "next/image";
-import { Eye, Play, List, Heart, MoreHorizontal, MonitorPlay, UsersRound } from "lucide-react";
+import { Eye, Play, List, Heart, MoreHorizontal, MonitorPlay, UsersRound, Link2 } from "lucide-react";
 
 import {
   CompactBadge,
   ExternalLinkButton,
   ActionShareButton,
   SCOREBOARD_PILL_CLASS,
+  GLASS_ICON_BUTTON_CLASS,
+  GlassIconLayers,
 } from "@/components/details/DetailHeaderBits";
 import { formatShortNumber } from "@/lib/details/formatters";
 import { useLinksWithWikipedia } from "@/lib/details/useWikipediaLink";
@@ -565,7 +567,27 @@ function DetailsToolbarActions({
   const hasInlineActions =
     hasDesktopInlineActions || hasPlatformAction;
 
-  const shareButton = share ? (
+  // Portada backdrop de la ficha (`shareIconOnly` fuera del teléfono): los
+  // botones redondos del marcador llevan el cristal de la fila de acciones.
+  const glassIconActions = shareIconOnly && !phone;
+
+  // Con cristal, Compartir queda fuera del grupo Actividad/Enlaces y lo separa
+  // el hueco de la fila (`sm:gap-4`, 16 px), no el del grupo (`sm:gap-3`,
+  // 12 px): `-ml-1` lo deja a la misma distancia que los otros dos. Sin ese
+  // grupo, `ml-auto` lo sigue llevando a la derecha.
+  const shareButton = share && glassIconActions ? (
+    <div className={`${platformsMenuOnly ? "" : hasInlineActions ? "-ml-1" : "ml-auto"} shrink-0`}>
+      <ActionShareButton
+        variant="glass"
+        title={share.title}
+        text={share.text}
+        url={share.url}
+        card={share.card}
+        story={share.story}
+        kind={share.kind}
+      />
+    </div>
+  ) : share ? (
     <div className={`${platformsMenuOnly ? "" : "ml-auto"} shrink-0 ${phone ? "[&>button]:!rounded-full [&>button>svg]:!h-5 [&>button>svg]:!w-5" : ""} max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/[0.04] max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-transparent max-sm:[&>button]:!to-black/10 max-sm:[&>button]:!backdrop-blur-[6px] max-sm:[&>button]:!shadow-none max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/[0.08] hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0`}>
       <ActionShareButton
         title={share.title}
@@ -687,15 +709,12 @@ function DetailsToolbarActions({
                 type="button"
                 onClick={onActivity}
                 aria-haspopup="dialog"
-                className="relative isolate hidden h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 sm:flex"
+                className={`${GLASS_ICON_BUTTON_CLASS} max-sm:!hidden`}
                 title="Actividad"
                 aria-label="Ver la actividad de quienes sigues"
               >
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
-                />
-                <UsersRound className="relative z-10 h-5 w-5" />
+                <GlassIconLayers />
+                <UsersRound className="relative z-10 h-[22px] w-[22px]" />
               </button>
             )}
             {onMoreLinks && !compactToolbar && (
@@ -712,15 +731,23 @@ function DetailsToolbarActions({
                     ? { duration: 0 }
                     : { layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }
                 }
-                className={`${hasMobilePlatformAction ? "hidden sm:flex" : externalLinksMenuOnly ? "flex" : "sm:hidden"} relative isolate h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${showExternalLinksLabel ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : ""}`}
+                className={glassIconActions ? `${GLASS_ICON_BUTTON_CLASS} ${hasMobilePlatformAction ? "max-sm:!hidden" : externalLinksMenuOnly ? "" : "sm:!hidden"}` : `${hasMobilePlatformAction ? "hidden sm:flex" : externalLinksMenuOnly ? "flex" : "sm:hidden"} relative isolate h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${showExternalLinksLabel ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : ""}`}
                 title="Enlaces"
                 aria-label="Abrir enlaces externos"
               >
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
-                />
-                <MoreHorizontal className="relative z-10 h-5 w-5" />
+                {glassIconActions ? (
+                  <GlassIconLayers />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
+                  />
+                )}
+                {glassIconActions ? (
+                  <Link2 aria-hidden="true" className="relative z-10 h-[22px] w-[22px]" />
+                ) : (
+                  <MoreHorizontal className="relative z-10 h-5 w-5" />
+                )}
                 {showExternalLinksLabel && (
                   <span className="relative z-10 hidden text-sm font-medium sm:block">
                     Enlaces

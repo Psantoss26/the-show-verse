@@ -11,7 +11,11 @@ import { useDetailsStaticMotion } from "@/components/details/AnimatedSection";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import DetailsShareSheet, { prefetchShare } from "@/components/details/DetailsShareSheet";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
+import {
+  LIQUID_GLASS_SURFACE,
+  LIQUID_GLASS_SURFACE_CARD,
+  LIQUID_GLASS_ELEVATION,
+} from "@/lib/ui/liquidGlass";
 
 export function CompactBadge({
   logo,
@@ -459,6 +463,25 @@ export function ScoreboardTile({ icon: Icon, label, onClick, wideBy = "viewport"
   );
 }
 
+// Botón redondo de cristal con la receta de los botones de acción de la ficha
+// (`LiquidButton liquidGlass` → `.sv-lg-btn` de globals.css): mismo cristal,
+// elevación, reflejo, brillo y hundimiento al pulsar. Lo usan Actividad,
+// Enlaces y Compartir dentro del marcador con portada backdrop, para que no
+// sean círculos planos distintos de la fila de acciones de encima.
+export const GLASS_ICON_BUTTON_CLASS = `${LIQUID_GLASS_SURFACE_CARD} ${LIQUID_GLASS_ELEVATION} sv-lg-btn flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-zinc-100 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40`;
+
+export function GlassIconLayers() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+      <LiquidGlassOpticalLayers />
+      <span className="sv-lg-tint" />
+      <span className="sv-lg-sheen" />
+      <span className="sv-lg-spec" />
+      <span className="sv-lg-press" />
+    </div>
+  );
+}
+
 export function ActionShareButton({ title, text, url, card = null, story = null, kind = "details", iconOnly = false, animateEntrance = true, variant = "default", tileWideBy = "viewport", className = "" }) {
   const { handleShare, sheet, copied, buttonRef, warmProps } = useShareAction({ title, text, url, card, story, kind });
   const prefersReducedMotion = useReducedMotion();
@@ -483,6 +506,31 @@ export function ActionShareButton({ title, text, url, card = null, story = null,
             <Share2 aria-hidden="true" className={`sv-score-tile-icon relative z-10 h-5 w-5 shrink-0 transition-transform duration-300 group-hover/tile:scale-110 ${SCOREBOARD_TILE_ICON_WIDE[tileWideBy]}`} />
           )}
           <span className="sv-score-tile-label relative z-10">{copied ? "Copiado" : "Compartir"}</span>
+        </button>
+        {sheet}
+      </>
+    );
+  }
+
+  if (variant === "glass") {
+    return (
+      <>
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={handleShare}
+          {...warmProps}
+          aria-haspopup={card ? "dialog" : undefined}
+          aria-label={copied ? "¡Enlace copiado!" : "Compartir"}
+          title={copied ? "Copiado" : "Compartir"}
+          className={`${GLASS_ICON_BUTTON_CLASS} ${className}`}
+        >
+          <GlassIconLayers />
+          {copied ? (
+            <Check aria-hidden="true" className="relative z-10 h-[22px] w-[22px] shrink-0" />
+          ) : (
+            <Share2 aria-hidden="true" className="relative z-10 h-[22px] w-[22px] shrink-0" />
+          )}
         </button>
         {sheet}
       </>
