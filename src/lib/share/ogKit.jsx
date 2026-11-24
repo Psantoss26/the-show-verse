@@ -5,6 +5,7 @@
 //
 // Solo servidor: lee los logos de `public/` y descarga las imágenes de TMDb.
 
+import { actionButtonFill, actionButtonSurface } from "./actionButtonGlass.js";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -675,22 +676,9 @@ export function ActionButton({ button, size = BUTTON }) {
         ? "rgba(255, 255, 255, 0.3)"
         : "#e4e4e7";
 
-  // Igual que LiquidButton: el cristal siempre; activo, su color al 30% como
-  // fondo, el brillo diagonal y el aro de color; `!bg-white` en los de
-  // reproducción. El halo sustituye a la elevación cuando hay estado.
-  const backgroundColor = isSolid ? "#ffffff" : isActive ? rgba(color.rgb, 0.3) : GLASS_TINT;
-  const backgroundImage = isSolid
-    ? undefined
-    : isActive
-      ? `linear-gradient(135deg, ${rgba(color.secondary, 0.2)} 0%, rgba(0,0,0,0) 40%, ${rgba(color.rgb, 0.1)} 60%, rgba(0,0,0,0) 100%), ${GLASS_LAYERS}`
-      : GLASS_LAYERS;
-  const boxShadow = isSolid
-    ? `0 0 ${px(20)}px rgba(234, 179, 8, 0.5)`
-    : isActive
-      ? `0 0 ${px(20)}px ${rgba(color.rgb, 0.5)}, inset 0 0 0 ${px(1.5)}px ${rgba(color.rgb, 0.45)}`
-      : isDisabled
-        ? undefined
-        : GLASS_ELEVATION;
+  // Misma receta que los botones de acción de la ficha (`.sv-lg-btn`), sin
+  // bordes: ver actionButtonGlass.js.
+  const surface = actionButtonSurface(button, color, px);
 
   const fill = isActive && Number.isFinite(button.fill) && button.fill > 0 ? Math.min(100, button.fill) : 0;
   const iconSize = Math.round(size * 0.46);
@@ -707,10 +695,8 @@ export function ActionButton({ button, size = BUTTON }) {
         width,
         height: size,
         borderRadius: size,
-        backgroundColor,
-        // Satori no admite propiedades a `undefined`: solo se pasan si existen.
-        ...(backgroundImage ? { backgroundImage } : {}),
-        ...(boxShadow ? { boxShadow } : {}),
+        // Satori no admite propiedades a `undefined`: `surface` solo trae las que existen.
+        ...surface,
         overflow: "hidden",
       }}
     >
@@ -723,7 +709,7 @@ export function ActionButton({ button, size = BUTTON }) {
             width: "100%",
             height: `${fill}%`,
             display: "flex",
-            backgroundImage: `linear-gradient(to top, ${rgba(color.rgb, 0.4)}, ${rgba(color.rgb, 0.15)})`,
+            ...actionButtonFill(color, px),
           }}
         />
       ) : null}
