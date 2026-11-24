@@ -1871,8 +1871,10 @@ export default function TraktEpisodesWatchedModal({
             </div>
           ) : viewMode === "list" ? (
             <>
-              {/* Sidebar Temporadas (Desktop) */}
-              <div className="hidden w-64 flex-col overflow-y-auto bg-white/[0.02] backdrop-blur-xl no-scrollbar md:flex">
+              {/* Sidebar Temporadas (Desktop). Sin fondo ni desenfoque propios:
+                  sobre el cristal del panel dibujaban un rectángulo con los
+                  cantos superior y derecho a la vista. */}
+              <div className="hidden w-64 flex-col overflow-y-auto no-scrollbar md:flex">
                 <div className="p-3 space-y-1">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
