@@ -36,7 +36,7 @@ import {
   mergeCollectionLikes,
   readCollectionLikes,
 } from "@/lib/lists/collectionLikesCache";
-import { formatPageTitle } from "@/lib/pageTitle";
+import { usePageTitle } from "@/lib/hooks/usePageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import {
   titleStateKey,
@@ -1956,9 +1956,7 @@ export default function ListsClient({ initialSource = DEFAULT_LISTS_SOURCE }) {
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
 
-  useEffect(() => {
-    document.title = formatPageTitle("Listas");
-  }, []);
+  usePageTitle("Listas");
   const deferredQuery = useDeferredValue(query);
   const [sortMode, setSortMode] = useState("items_desc");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);

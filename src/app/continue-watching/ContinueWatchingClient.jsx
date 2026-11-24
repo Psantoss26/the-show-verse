@@ -43,7 +43,7 @@ import {
   searchProgressTitles,
 } from "@/lib/api/progressClient";
 import { watchProgressRefresh } from "@/lib/api/progressRefresh";
-import { formatPageTitle } from "@/lib/pageTitle";
+import { usePageTitle } from "@/lib/hooks/usePageTitle";
 import {
   cacheAddHistory,
   clearWatchDerivedCaches,
@@ -1066,9 +1066,7 @@ export default function ContinueWatchingClient() {
   const [busyId, setBusyId] = useState(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
 
-  useEffect(() => {
-    document.title = formatPageTitle("Continuar viendo");
-  }, []);
+  usePageTitle("Continuar viendo");
 
   useEffect(() => {
     const v = typeof window !== "undefined" && window.localStorage.getItem("showverse:cw:viewMode");

@@ -34,7 +34,7 @@ import {
   traktGetInProgress,
   traktGetCompleted,
 } from "@/lib/api/traktClient";
-import { formatPageTitle } from "@/lib/pageTitle";
+import { usePageTitle } from "@/lib/hooks/usePageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import WatchingSectionNav from "@/components/WatchingSectionNav";
 import { useAuth } from "@/context/AuthContext";
@@ -1444,13 +1444,7 @@ export default function InProgressClient({
     window.localStorage.setItem("showverse:inprogress:groupBy", groupBy);
   }, [groupBy, uiReady]);
 
-  // Update document title when tab changes
-  useEffect(() => {
-    document.title =
-      activeTab === "completed"
-        ? formatPageTitle("Completadas")
-        : formatPageTitle("En progreso");
-  }, [activeTab]);
+  usePageTitle(activeTab === "completed" ? "Completadas" : "En progreso");
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1024px)");

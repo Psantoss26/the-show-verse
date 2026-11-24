@@ -33,7 +33,7 @@ import {
   Star,
   X,
 } from "lucide-react";
-import { formatPageTitle } from "@/lib/pageTitle";
+import { usePageTitle } from "@/lib/hooks/usePageTitle";
 import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
 import {
   normalizeSearchText,
@@ -937,9 +937,7 @@ export default function DashboardSectionClient({
     setEntryAnimations(true);
   }, []);
 
-  useEffect(() => {
-    document.title = formatPageTitle(data?.title || initialTitle || "Dashboard");
-  }, [data?.title, initialTitle]);
+  usePageTitle(data?.title || initialTitle || "Dashboard");
 
   // Vista guardada antes de que existiera la cookie (solo localStorage): se
   // recupera aquí una vez y, desde entonces, la cookie la trae el servidor.

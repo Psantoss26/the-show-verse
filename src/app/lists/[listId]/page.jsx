@@ -13,7 +13,7 @@ import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPost
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import ListItemRemoveControl from '@/components/lists/ListItemRemoveControl'
 import ListActionModal, { MODAL_FIELD_CLASS, MODAL_LABEL_CLASS, ModalButton, ModalToggleRow } from '@/components/lists/ListActionModal'
-import { formatPageTitle } from '@/lib/pageTitle'
+import { usePageTitle } from '@/lib/hooks/usePageTitle'
 import {
     findListInIndexCache,
     getPersonalListDetailsCacheKey,
@@ -317,9 +317,7 @@ export default function ListDetailsPage() {
         load()
     }, [listId])
 
-    useEffect(() => {
-        document.title = formatPageTitle(data?.name || 'Lista')
-    }, [data?.name])
+    usePageTitle(data?.name || 'Lista')
 
     // Search debounce
     useEffect(() => {

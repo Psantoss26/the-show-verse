@@ -10,7 +10,7 @@ import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import ListLikeButton from '@/components/community/ListLikeButton'
 import { useAuth } from '@/context/AuthContext'
-import { formatPageTitle } from '@/lib/pageTitle'
+import { usePageTitle } from '@/lib/hooks/usePageTitle'
 import { ratingSummaryBadge } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
 import {
@@ -174,9 +174,7 @@ export default function TraktListDetailsClient({ username, listId }) {
         return `/api/community/lists/${encodeURIComponent(listId)}`
     }, [listId])
 
-    useEffect(() => {
-        document.title = formatPageTitle(state.list?.name || 'Lista')
-    }, [state.list?.name])
+    usePageTitle(state.list?.name || 'Lista')
 
     const fetchPage = useCallback(
         async (pageToLoad) => {

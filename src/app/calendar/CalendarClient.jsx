@@ -65,7 +65,7 @@ import {
   writeCalendarSettingCookie,
   writeCalendarTimeZoneCookie,
 } from "@/lib/calendar/calendarWindow";
-import { formatPageTitle } from "@/lib/pageTitle";
+import { usePageTitle } from "@/lib/hooks/usePageTitle";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useAuth } from "@/context/AuthContext";
@@ -1131,9 +1131,7 @@ export default function CalendarClient({
     ),
   );
 
-  useEffect(() => {
-    document.title = formatPageTitle("Calendario");
-  }, []);
+  usePageTitle("Calendario");
 
   // El "hoy" del servidor no es el del navegador (zona horaria sin cookie aún,
   // o la página abierta justo al cambiar de mes): se corrige al de aquí.

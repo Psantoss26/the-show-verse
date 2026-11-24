@@ -21,7 +21,7 @@ import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayou
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
 import ListLikeButton from '@/components/community/ListLikeButton'
 import useCollectionLike from '@/hooks/useCollectionLike'
-import { formatPageTitle } from '@/lib/pageTitle'
+import { usePageTitle } from '@/lib/hooks/usePageTitle'
 import {
     collectionPreviewFromIndex,
     findListInIndexCache,
@@ -245,9 +245,7 @@ export default function CollectionDetailsClient({ collectionId }) {
     const artworkOverride = readCollectionArtworkOverride(preferences, collectionId)
     // Solo las imágenes son personalizables; nombre y descripción, los de TMDb.
     const collection = applyCollectionCustomization(state.collection, artworkOverride)
-    useEffect(() => {
-        document.title = formatPageTitle(collection?.name || 'Colección')
-    }, [collection?.name])
+    usePageTitle(collection?.name || 'Colección')
 
     const loadDoneRef = useRef(false)
     useRevealSkippedEffect(() => {
