@@ -4269,10 +4269,13 @@ export default function DetailModal({
             </motion.div>
             </div>
 
-            {/* Dark overlay that increases as we scroll */}
+            {/* Oscurecido que crece con el scroll. Lleva la MISMA máscara que
+                la imagen (`sv-hero-fade`): sin ella acababa en seco en el
+                borde inferior del contenedor y, en cuanto subía su opacidad,
+                ese canto se veía como una línea horizontal sobre el panel. */}
             <motion.div
               style={{ opacity: darkOverlayOpacity, willChange: "opacity" }}
-              className="pointer-events-none absolute inset-0 bg-black/60 z-10"
+              className="sv-hero-fade pointer-events-none absolute inset-0 bg-black/60 z-10"
             />
             </>
             )}
