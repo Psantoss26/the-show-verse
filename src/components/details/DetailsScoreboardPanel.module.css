@@ -54,27 +54,20 @@
 /* 40rem = las cinco insignias con los botones ya compactados. Por debajo, la
    fila empezaría a apretarse: antes de eso se van estas dos. */
 @container detail-scoreboard (width < 40rem) {
-  .panel:not(.fitAllScores) .optionalScore {
+  .panel:not(.fitAllScores):not(.scoresOnly) .optionalScore {
     display: none;
   }
 }
 
-/* PORTADA BACKDROP (DetailsClient): los botones de la barra son solo iconos
-   (enlaces y compartir), así que las cinco insignias, el separador y los dos
-   botones redondos piden ~36rem. El panel de ~37,5rem las muestra todas y RT y
-   Metacritic solo se retiran si de verdad no caben. */
-@container detail-scoreboard (width < 36.5rem) {
-  .fitAllScores .optionalScore {
-    display: none;
-  }
-}
+/* Sin botones en la barra (`.scoresOnly`, ficha con portada vertical) RT y
+   Metacritic no se retiran: la fila de puntuaciones se escala para caber
+   (`useFitScoresZoom` en DetailsScoreboardPanel.jsx). */
 
-/* Con el botón de Actividad son tres botones redondos (40px + hueco de 12px
-   más): RT y Metacritic se retiran ~3,25rem antes. */
-@container detail-scoreboard (width < 39.75rem) {
-  .fitAllScores.hasActivityAction .optionalScore {
-    display: none;
-  }
+/* PORTADA BACKDROP (`.fitAllScores`): Rotten Tomatoes y Metacritic solo se
+   ven con la portada vertical; en backdrop el marcador muestra TMDb, Trakt e
+   IMDb junto a los botones redondos. */
+.fitAllScores .optionalScore {
+  display: none;
 }
 
 /* MÓVIL DE LA FICHA (`mobileScoresOnly`): puntuaciones y stats repartidas a todo

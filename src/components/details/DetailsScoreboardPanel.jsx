@@ -26,7 +26,7 @@
 // ficha: formatCountShort para los sub-labels). Las stats se formatean aquí con
 // formatShortNumber para garantizar que ambos consumidores rindan igual.
 
-import { Fragment } from "react";
+import { Fragment, useLayoutEffect, useRef } from "react";
 import styles from "./DetailsScoreboardPanel.module.css";
 import { motion, useReducedMotion } from "framer-motion";
 import NextImage from "next/image";
@@ -166,6 +166,7 @@ export function DetailsRatingsBadges({
 
   return (
     <div
+      data-scoreboard-ratings=""
       className={`flex items-center gap-3 shrink-0 ${
         compact
           // BARRA ESTRECHA: las puntuaciones ENVUELVEN en vez de recorrerse.
@@ -815,6 +816,77 @@ export function ScoreboardPillRow({ children, className = "" }) {
 // (DetailsClient) como el modal del dashboard.
 // `children` se renderiza al final (p. ej. la fila de "plataformas disponibles").
 // ---------------------------------------------------------------------------
+// FICHA CON PORTADA VERTICAL (`.scoresOnly`): la barra solo lleva puntuaciones,
+// pero el panel se estrecha según los bloques que tenga al lado (Actividad,
+// Enlaces, Compartir). En vez de retirar Rotten Tomatoes y Metacritic, la fila
+// de puntuaciones se ESCALA (`zoom`, que sí cambia su caja de maquetación)
+// hasta caber en el ancho útil de la barra. Se mide a zoom 1 y se descuentan
+// márgenes, huecos del flex y lo que ocupen otros ítems visibles.
+function flexItems(el) {
+  return [...el.children].flatMap((child) =>
+    getComputedStyle(child).display === "contents" ? flexItems(child) : [child],
+  );
+}
+
+function useFitScoresZoom(toolbarRef, enabled) {
+  useLayoutEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!enabled || !toolbar) return undefined;
+    let frame = 0;
+    const fit = () => {
+      frame = 0;
+      const ratings = toolbar.querySelector("[data-scoreboard-ratings]");
+      if (!ratings) return;
+      ratings.style.zoom = "";
+      // Por debajo de `sm` la barra es la de teléfono, con su propia escala.
+      if (window.matchMedia("(max-width: 639.98px)").matches) return;
+      const natural = ratings.getBoundingClientRect().width;
+      const style = getComputedStyle(toolbar);
+      const gap = parseFloat(style.columnGap) || 0;
+      const items = flexItems(toolbar).filter((item) => {
+        if (item === ratings) return true;
+        const itemStyle = getComputedStyle(item);
+        return itemStyle.position !== "absolute" && itemStyle.display !== "none";
+      });
+      let others = 0;
+      for (const item of items) {
+        if (item === ratings) continue;
+        // Los botones por lo que ocupan: una caja `flex-1 min-w-0` puede medir 0.
+        const controls = [...item.querySelectorAll("a, button")]
+          .map((node) => node.getBoundingClientRect())
+          .filter((rect) => rect.width > 0);
+        others += controls.length
+          ? Math.max(...controls.map((r) => r.right)) - Math.min(...controls.map((r) => r.left))
+          : item.getBoundingClientRect().width;
+      }
+      const available =
+        toolbar.clientWidth -
+        (parseFloat(style.paddingLeft) || 0) -
+        (parseFloat(style.paddingRight) || 0) -
+        others -
+        gap * Math.max(0, items.length - 1);
+      const zoom = natural > 0 ? Math.min(1, available / natural) : 1;
+      if (zoom < 1) ratings.style.zoom = String(Math.max(0.5, Math.floor(zoom * 1000) / 1000));
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(fit);
+    };
+    fit();
+    const resize = new ResizeObserver(schedule);
+    resize.observe(toolbar);
+    // Llegan puntuaciones (pendiente → real) o cambian los botones.
+    const mutations = new MutationObserver(schedule);
+    mutations.observe(toolbar, { childList: true, subtree: true, characterData: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      resize.disconnect();
+      mutations.disconnect();
+      const ratings = toolbar.querySelector("[data-scoreboard-ratings]");
+      if (ratings) ratings.style.zoom = "";
+    };
+  }, [toolbarRef, enabled]);
+}
+
 export default function DetailsScoreboardPanel({
   loading = false,
   tmdb = null,
@@ -909,6 +981,16 @@ export default function DetailsScoreboardPanel({
     Array.isArray(externalLinks) && externalLinks.length > 0;
   const hasStreamingProviders =
     Array.isArray(streamingProviders) && streamingProviders.length > 0;
+  // Sin botones en la barra de escritorio (ficha con portada vertical: Enlaces
+  // y Compartir van en bloques aparte) las puntuaciones tienen toda la línea
+  // para ellas: RT y Metacritic no se retiran, la fila se escala para caber
+  // (ver `useFitScoresZoom` y `.scoresOnly` en el módulo CSS).
+  const hasDesktopToolbarActions =
+    hasExternalLinks ||
+    hasStreamingProviders ||
+    (typeof onMorePlatforms === "function" && platformsMenuOnly) ||
+    typeof onActivity === "function" ||
+    !!toolbarActions;
   const hasToolbar =
     hasRatings ||
     hasExternalLinks ||
@@ -917,6 +999,12 @@ export default function DetailsScoreboardPanel({
     !!share ||
     !!toolbarActions;
 
+  const toolbarRef = useRef(null);
+  useFitScoresZoom(
+    toolbarRef,
+    !hasDesktopToolbarActions && !fitAllScores && !phoneLayout && !compactToolbar && hasToolbar,
+  );
+
   // `statsPending` cuenta como contenido: si no, el panel entero no se montaría
   // hasta que llegasen las stats y aparecería de golpe, que es justo el salto
   // que se quiere evitar.
@@ -924,7 +1012,7 @@ export default function DetailsScoreboardPanel({
 
   return (
     <div
-      className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${styles.panel} ${fitAllScores ? styles.fitAllScores : ""} ${typeof onActivity === "function" ? styles.hasActivityAction : ""} ${className}`}
+      className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${styles.panel} ${fitAllScores ? styles.fitAllScores : ""} ${hasDesktopToolbarActions ? "" : styles.scoresOnly} ${className}`}
       data-phone-scoreboard={mobileScoresOnly && phoneLayout ? "" : undefined}
     >
       {/* Refracción, reflejo especular y luz difusa compartidos con InfoTabs. */}
@@ -932,6 +1020,7 @@ export default function DetailsScoreboardPanel({
 
       {hasToolbar && (
         <div
+          ref={toolbarRef}
           data-scoreboard-toolbar=""
           className={
             mobileScoresOnly
