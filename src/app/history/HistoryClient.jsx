@@ -4,6 +4,7 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from "react";
+import { useDrawerWidth } from "@/lib/ui/drawerWidthVar";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -2837,6 +2838,7 @@ function ExpandedGroupPanel({
   panelRef,
   backdropRef,
 }) {
+  const drawerWidth = useDrawerWidth();
   const title = getMainTitle(entry);
   const tmdbId = getTmdbId(entry);
   const episodes = Array.isArray(entry?._group) ? entry._group : [];
@@ -2854,12 +2856,12 @@ function ExpandedGroupPanel({
     <div
       // z-[10000] > z-[9999] de DetailModal: el modal de grupo tapa una preview
       // abierta antes; la que se abre DESDE él sube a z-[10001] (`overModal`) y
-      // queda encima. Con el drawer derecho abierto, `right: var(--sv-drawer-width)`
+      // queda encima. Con el drawer derecho abierto, `right` = ancho del drawer (`useDrawerWidth`)
       // restringe su zona (y su fondo difuminado) al espacio LIBRE a la izquierda,
-      // así se centra ahí y NO tapa la preview. Sin drawer la var es 0px → ventana
+      // así se centra ahí y NO tapa la preview. Sin drawer es 0px → ventana
       // completa (centrado normal). El cambio de anchura se anima con transition.
       className={`fixed inset-0 z-[10000] flex items-center justify-center p-4 transition-[right] duration-300 ease-out sm:p-6${closing ? " pointer-events-none" : ""}`}
-      style={{ right: "var(--sv-drawer-width, 0px)" }}
+      style={{ right: `${drawerWidth}px` }}
       // Marca de "capa de modal": el drawer derecho de DetailModal se cierra con un
       // listener global de click salvo dentro de `[data-detail-modal-layer]`. Sin
       // esto, cualquier clic en este modal (backdrop o panel) cerraría la preview.

@@ -866,7 +866,7 @@ export default function DetailModal({
     return () => window.removeEventListener("resize", onResize);
   }, [isRightPlacement, clampPanelWidth, mobileDetails]);
 
-  // Ancho del drawer en `--sv-drawer-width` para los overlays superpuestos
+  // Ancho del drawer para los overlays superpuestos (`useDrawerWidth`)
   // (dueño compartido con el panel de temporada/episodio: ver el hook).
   useDrawerWidthVar(isRightPlacement, panelWidth);
 

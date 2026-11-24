@@ -1021,7 +1021,7 @@ export default function DetailsScoreboardPanel({
 
   return (
     <div
-      className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${styles.panel} ${fitAllScores ? styles.fitAllScores : ""} ${hasDesktopToolbarActions ? "" : styles.scoresOnly} ${className}`}
+      className={`sv-score-panel w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${styles.panel} ${fitAllScores ? styles.fitAllScores : ""} ${hasDesktopToolbarActions ? "" : styles.scoresOnly} ${className}`}
       data-phone-scoreboard={mobileScoresOnly && phoneLayout ? "" : undefined}
     >
       {/* Refracción, reflejo especular y luz difusa compartidos con InfoTabs. */}

@@ -168,20 +168,35 @@ function markDrawerReflow(ms = DRAWER_REFLOW_MS) {
 // la página recuperaba su ancho con el panel aún encima. Luego se animó el
 // propio `margin-right`, y la rejilla se reorganizaba en cada fotograma: las
 // tarjetas cambiaban de tamaño a saltos y el contenido parpadeaba.
-function applyContentMargin(el, value, motion = null) {
-  if (!el) return;
+//
+// `alongside`: otra escritura que debe caer en el MISMO recálculo que el margen
+// (el hueco del navbar en <html>). Todo lo que se escribe en <html> —esa
+// variable, `data-sv-drawer-reflow`— obliga a recalcular el estilo del
+// documento entero (~20.000 elementos en una página de usuario, 60-90 ms). Si
+// se escribe antes de que el FLIP tome sus primeras medidas, esa medición paga
+// un recálculo completo y la segunda otro; escrito dentro de `mutate`, uno.
+function applyContentMargin(el, value, motion = null, alongside = null) {
+  if (!el) {
+    alongside?.();
+    return;
+  }
   // Mismo valor (el panel vuelve a informar de su ancho mientras entra): no se
   // toca, y el movimiento en curso sigue.
-  if (el.style.marginRight === value) return;
+  if (el.style.marginRight === value) {
+    alongside?.();
+    return;
+  }
   if (!motion) {
+    alongside?.();
     stopDrawerContentFlip();
     el.style.marginRight = value;
     // El arrastre del tirador ya tiene su propio modo (`data-sv-drawer-resizing`).
     if (!isDrawerResizing()) markDrawerReflow();
     return;
   }
-  markDrawerReflow(motion.duration + 120);
   flipDrawerContent(el, () => {
+    alongside?.();
+    markDrawerReflow(motion.duration + 120);
     el.style.marginRight = value;
   }, motion);
 }
@@ -419,8 +434,10 @@ export default function DetailModalProvider({
     // El margen del contenido solo aplica ACOPLADO; la variable se publica
     // siempre, porque el navbar tiene que apartarse en los dos modos: el panel
     // tapa el borde derecho igual esté acoplado o superpuesto.
-    publishDrawerInset(width);
-    if (!docked || !contentRef.current) return;
+    if (!docked || !contentRef.current) {
+      publishDrawerInset(width);
+      return;
+    }
 
     // ACOPLADO Y ARRASTRANDO: el margen SIGUE al tirador en directo, y la
     // página se reorganiza mientras se redimensiona, no al soltar.
@@ -439,20 +456,13 @@ export default function DetailModalProvider({
     // eso la distingue del arrastre o de un cambio de ancho con el panel ya
     // abierto: el margen entra con el panel en vez de saltar de golpe.
     const opening = !wasOpenRef.current && !isDrawerResizing();
-    applyContentMargin(contentRef.current, `${width}px`, opening ? SHEET_ENTER : null);
+    applyContentMargin(
+      contentRef.current,
+      `${width}px`,
+      opening ? SHEET_ENTER : null,
+      () => publishDrawerInset(width),
+    );
   }, [docked, activeItem, panelPlacement]);
-
-  // Sin drawer no hay variable. `DetailModal` la escribe mientras está montado
-  // (vía `updateDrawerWidth`), así que aquí solo hay que retirarla al cerrar
-  // —y al desmontar el provider, por si se navega con la ficha abierta—.
-  // Con DEPENDENCIAS: antes se ejecutaba en cada render, y cada pasada competía
-  // con el panel que aún se está cerrando por quién escribe la variable. El hueco
-  // solo depende de si hay ficha abierta y de dónde se coloca, así que basta con
-  // reaccionar a esos dos.
-  useLayoutEffect(() => {
-    if (activeItem != null && panelPlacement === "right") return;
-    publishDrawerInset(null);
-  }, [activeItem, panelPlacement]);
 
   useEffect(() => () => {
     publishDrawerInset(null);
@@ -487,8 +497,27 @@ export default function DetailModalProvider({
       contentRef.current,
       docked ? `${drawerWidthRef.current}px` : "",
       toggled ? (isOpen ? SHEET_ENTER : SHEET_EXIT) : null,
+      // Al cerrar, el hueco del navbar se retira con el margen (un solo
+      // recálculo del documento, ver `applyContentMargin`); el efecto de
+      // abajo ya lo encuentra retirado.
+      isOpen ? null : () => publishDrawerInset(null),
     );
   }, [docked, activeItem]);
+
+  // Sin drawer no hay variable. Va DESPUÉS del efecto del margen: al cerrar
+  // acoplado, el margen ya la ha retirado dentro de su FLIP. `DetailModal` la
+  // escribe mientras está montado (vía `updateDrawerWidth`), así que aquí solo
+  // hay que retirarla al cerrar
+  // —y al desmontar el provider, por si se navega con la ficha abierta—.
+  // Con DEPENDENCIAS: antes se ejecutaba en cada render, y cada pasada competía
+  // con el panel que aún se está cerrando por quién escribe la variable. El hueco
+  // solo depende de si hay ficha abierta y de dónde se coloca, así que basta con
+  // reaccionar a esos dos.
+  useLayoutEffect(() => {
+    if (activeItem != null && panelPlacement === "right") return;
+    publishDrawerInset(null);
+  }, [activeItem, panelPlacement]);
+
 
   // ¿La entrada actual es un CAMBIO (mismo nivel o profundizar) con la ficha ya
   // abierta? Dispara fundido cruzado (en vez de deslizar). Se pasa como `custom`
@@ -716,34 +745,41 @@ export default function DetailModalProvider({
         {children}
       </div>
 
-      <AnimatePresence custom={switching}>
-        {activeItem && (
-          <ActiveDetailPanel
-            // La colocación forma parte de la identidad: al cambiar de centrado
-            // a lateral (o al revés) sale el panel de una forma y entra el de la
-            // otra, cada uno con su propia animación de entrada y salida.
-            key={`${previewToken(activeItem)}:${panelPlacement}`}
-            item={activeItem}
-            onClose={closeDetailModal}
-            onOpenDetail={openDetailModal}
-            placement={panelPlacement}
-            onPlacementChange={!isMobile && !phoneOnlyPanel ? changePlacement : undefined}
-            drawerView={activeDrawerView}
-            contentView={effectiveContentView}
-            tabletViewport={isTablet}
-            onContentViewChange={phoneOnlyPanel ? undefined : changeContentView}
-            onDrawerViewChange={changeDrawerView}
-            onDrawerWidthChange={updateDrawerWidth}
-            // `custom` de AnimatePresence solo llega al panel que SALE. El que
-            // ENTRA usa el `custom` de su propio motion.div, así que hay que
-            // pasarle `switching` explícitamente; sin esto, al cambiar de título
-            // el panel entrante caía en la rama `else` (deslizar) en vez de hacer
-            // el fundido cruzado que corresponde a un cambio con el drawer abierto.
-            switching={switching}
-            overModal={overModal}
-          />
-        )}
-      </AnimatePresence>
+      {/* Hermano FIJO del contenido (display: contents, no crea caja). Si el
+          panel se insertara como hermano directo, el contenido dejaría de ser
+          `:last-child` al abrirlo, y reglas como `.sv-trim-end > :last-child >
+          :last-child` obligan a Chrome a recalcular TODO su subárbol (~20.000
+          elementos en una página de usuario llena: ~90 ms en el clic). */}
+      <div className="contents">
+        <AnimatePresence custom={switching}>
+          {activeItem && (
+            <ActiveDetailPanel
+              // La colocación forma parte de la identidad: al cambiar de centrado
+              // a lateral (o al revés) sale el panel de una forma y entra el de la
+              // otra, cada uno con su propia animación de entrada y salida.
+              key={`${previewToken(activeItem)}:${panelPlacement}`}
+              item={activeItem}
+              onClose={closeDetailModal}
+              onOpenDetail={openDetailModal}
+              placement={panelPlacement}
+              onPlacementChange={!isMobile && !phoneOnlyPanel ? changePlacement : undefined}
+              drawerView={activeDrawerView}
+              contentView={effectiveContentView}
+              tabletViewport={isTablet}
+              onContentViewChange={phoneOnlyPanel ? undefined : changeContentView}
+              onDrawerViewChange={changeDrawerView}
+              onDrawerWidthChange={updateDrawerWidth}
+              // `custom` de AnimatePresence solo llega al panel que SALE. El que
+              // ENTRA usa el `custom` de su propio motion.div, así que hay que
+              // pasarle `switching` explícitamente; sin esto, al cambiar de título
+              // el panel entrante caía en la rama `else` (deslizar) en vez de hacer
+              // el fundido cruzado que corresponde a un cambio con el drawer abierto.
+              switching={switching}
+              overModal={overModal}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </DetailModalContext.Provider>
   );
 }

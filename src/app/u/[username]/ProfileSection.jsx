@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDrawerWidth } from "@/lib/ui/drawerWidthVar";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
@@ -1394,6 +1395,7 @@ function DiaryGroupedEpisodeRow({ item, stillPath }) {
 }
 
 function DiaryGroupedEpisodesModal({ entry, onClose }) {
+  const drawerWidth = useDrawerWidth();
   const [mounted, setMounted] = useState(false);
   const previewClick = usePreviewOpen();
   const episodes = Array.isArray(entry?.episodeGroup) ? entry.episodeGroup : [];
@@ -1410,7 +1412,7 @@ function DiaryGroupedEpisodesModal({ entry, onClose }) {
   return createPortal(
     <motion.div
       className="fixed inset-0 z-[10000] flex items-center justify-center p-4 transition-[right] duration-300 ease-out sm:p-6"
-      style={{ right: "var(--sv-drawer-width, 0px)" }}
+      style={{ right: `${drawerWidth}px` }}
       data-detail-modal-layer=""
       onClick={(event) => event.stopPropagation()}
       initial={{ opacity: 0 }}

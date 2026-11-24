@@ -4625,7 +4625,12 @@ html[data-details-sequence-transition] .sv-topbar {
    para tres insignias (TMDb, Trakt, IMDb ≈ 17rem; su ancho intrínseco es 0
    por la contención de inline-size) y los bloques se estrechan hasta perder
    el nombre (regla de ancho de abajo). */
-.sv-score-row:not(:has([data-scoreboard-stats])) > :not(.sv-score-tiles) {
+/* `.sv-score-panel` (la raíz de DetailsScoreboardPanel) y NO
+   `> :not(.sv-score-tiles)`: un `:not()` a la derecha de un `:has()` hace que
+   Chrome invalide el documento ENTERO (~20.000 elementos, ~55 ms) cada vez que
+   se inserta un nodo en cualquier sitio, y abrir la ficha o el drawer lateral
+   iba a tirones (18 recálculos así durante la entrada). */
+.sv-score-row:not(:has([data-scoreboard-stats])) > .sv-score-panel {
   min-width: 18rem;
 }
 @container (width < 4.5rem) {
