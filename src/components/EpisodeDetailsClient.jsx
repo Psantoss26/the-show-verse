@@ -51,7 +51,7 @@ import DetailsScoreboardPanel, {
   ScoreboardPill,
   ScoreboardPillRow,
 } from "@/components/details/DetailsScoreboardPanel";
-import { ActionShareButton } from "@/components/details/DetailHeaderBits";
+import { ActionShareButton, ScoreboardTile } from "@/components/details/DetailHeaderBits";
 import { buildShareCardPayload } from "@/lib/details/shareCard";
 import EpisodeCard from "@/components/details/EpisodeCard";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
@@ -1977,7 +1977,12 @@ export default function EpisodeDetailsClient({
               {...(mobileScoreboardMode === "compact" ? heroStatsRevealProps : {})}
               {...(mobileScoreboardMode === "hidden" ? heroRevealProps : {})}
             >
+            {/* Escritorio: Enlaces y Compartir salen del marcador y van a su
+                derecha como dos bloques propios con el alto del panel, como
+                en la ficha con portada vertical (DetailsClient). */}
+            <div className="sv-score-row sm:flex sm:items-stretch sm:gap-3">
             <DetailsScoreboardPanel
+              className="sm:min-w-0 sm:flex-1"
               mobileScoresOnly
               loading={tScoreboard.loading}
               tmdb={{
@@ -2030,13 +2035,27 @@ export default function EpisodeDetailsClient({
               }
               showFavoritedStat={false}
               onMorePlatforms={() => setPlatformsOpen(true)}
-              share={{
-                title: shareTitle,
-                text: shareText,
-                card: shareCard,
-                story: shareStory,
-              }}
             />
+            {/* Mismo formato que la ficha con portada vertical: por debajo
+                de `xl`, uno encima de otro (icono y nombre en fila); desde
+                `xl`, bloques altos uno al lado del otro. */}
+            <div className="sv-score-tiles hidden sm:flex sm:shrink-0 sm:flex-col sm:gap-3 xl:flex-row xl:gap-2">
+              <ScoreboardTile
+                icon={Link2}
+                label="Enlaces"
+                onClick={() => setExternalLinksOpen(true)}
+                aria-haspopup="dialog"
+                aria-label="Abrir enlaces externos"
+              />
+              <ActionShareButton
+                variant="tile"
+                title={shareTitle}
+                text={shareText}
+                card={shareCard}
+                story={shareStory}
+              />
+            </div>
+            </div>
             </div>
 
             {/* MÓVIL: Plataformas, Enlaces y Compartir y las pestañas se

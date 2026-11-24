@@ -25,7 +25,7 @@ import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
 import DetailsScoreboardPanel, { ScoreboardPill, ScoreboardPillRow } from "@/components/details/DetailsScoreboardPanel";
-import { ActionShareButton } from "@/components/details/DetailHeaderBits";
+import { ActionShareButton, ScoreboardTile } from "@/components/details/DetailHeaderBits";
 import {
   MOBILE_ACTIONS_ENTRY_ANIMATION,
   MOBILE_REVEAL_BASE,
@@ -1822,8 +1822,14 @@ export default function SeasonDetailsClient({
               {...(mobileScoreboardMode === "compact" ? heroStatsRevealProps : {})}
               {...(mobileScoreboardMode === "hidden" ? heroRevealProps : {})}
             >
+            {/* Escritorio: Enlaces y Compartir salen del marcador y van a su
+                derecha como dos bloques propios con el alto del panel, como
+                en la ficha con portada vertical (DetailsClient). */}
+            <div className="sv-score-row sm:flex sm:items-stretch sm:gap-3">
             <DetailsScoreboardPanel
+              className="sm:min-w-0 sm:flex-1"
               mobileScoresOnly
+              narrowStatLabels
               loading={tScoreboard.loading}
               tmdb={{
                 value: seasonVote?.toFixed(1),
@@ -1869,13 +1875,24 @@ export default function SeasonDetailsClient({
               }
               showFavoritedStat={false}
               onMorePlatforms={() => setPlatformsOpen(true)}
-              share={{
-                title: shareTitle,
-                text: shareText,
-                card: shareCard,
-                story: shareStory,
-              }}
             />
+            <div className="sv-score-tiles hidden sm:flex sm:shrink-0 sm:flex-col sm:gap-3 xl:flex-row xl:gap-2">
+              <ScoreboardTile
+                icon={Link2}
+                label="Enlaces"
+                onClick={() => setExternalLinksOpen(true)}
+                aria-haspopup="dialog"
+                aria-label="Abrir enlaces externos"
+              />
+              <ActionShareButton
+                variant="tile"
+                title={shareTitle}
+                text={shareText}
+                card={shareCard}
+                story={shareStory}
+              />
+            </div>
+            </div>
             </div>
 
             {/* MÓVIL: Plataformas, Enlaces y Compartir (las píldoras de la
