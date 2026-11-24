@@ -19,17 +19,23 @@ test('el provider publica el ancho del drawer en <html>', async () => {
 
   assert.match(provider, new RegExp(`DRAWER_INSET_VAR = "${INSET_VAR}"`))
   assert.match(provider, /document\.documentElement/)
-  // Se publica también SUPERPUESTO: el panel tapa el borde derecho en los dos
-  // modos, no solo acoplado. La publicación va ANTES de la salida que atiende
-  // únicamente al modo acoplado, que es lo que garantiza que ocurra siempre.
-  const body = provider.slice(provider.indexOf("const updateDrawerWidth"));
-  const publish = body.indexOf("publishDrawerInset(width);");
-  const dockedOnly = body.indexOf("if (!docked || !contentRef.current) return;");
-  assert.ok(publish > -1, "el ancho ya no se publica");
-  assert.ok(dockedOnly > -1, "no se encontró la salida del modo acoplado");
-  assert.ok(
-    publish < dockedOnly,
+  // Se publica en los DOS modos: el panel tapa el borde derecho esté acoplado
+  // o superpuesto. Superpuesto, directamente; acoplado, dentro de la mutación
+  // del FLIP (`alongside` de applyContentMargin), en el mismo recálculo de
+  // estilos que el margen de la página.
+  const start = provider.indexOf("const updateDrawerWidth")
+  const body = provider.slice(start, provider.indexOf("}, [docked", start))
+  const overlay = body.slice(body.indexOf("if (!docked || !contentRef.current) {"))
+  assert.ok(overlay.length < body.length, "no se encontró la rama superpuesta")
+  assert.match(
+    overlay.slice(0, overlay.indexOf("return;")),
+    /publishDrawerInset\(width\);/,
     "superpuesto dejaría de publicar el ancho y el navbar no se apartaría",
+  )
+  assert.match(
+    body,
+    /applyContentMargin\([\s\S]*?\(\) => publishDrawerInset\(width\),?\s*\)/,
+    "acoplado dejaría de publicar el ancho y el navbar no se apartaría",
   )
   // Y se retira al cerrar, o la barra se quedaría apartada sin motivo.
   assert.match(provider, /publishDrawerInset\(null\)/)
