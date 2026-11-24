@@ -4,6 +4,7 @@ node_modules/
 
 # --- Builds / Bundles ---
 .next/
+.next-serve/
 out/
 dist/
 build/
