@@ -4,7 +4,13 @@ import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGl
 import { useEffect, useState } from "react";
 import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { createPortal } from "react-dom";
-import { Loader2, RotateCw, X } from "lucide-react";
+import {
+  Loader2,
+  RotateCw,
+  X,
+  BarChart3,
+} from "lucide-react";
+import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 
 import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
 import { getDetails } from "@/lib/api/tmdb";
@@ -159,22 +165,25 @@ export default function EpisodeRatingsModal({
         />
 
         <header className={`flex shrink-0 items-center justify-between gap-4 ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6`}>
-          <div className="min-w-0">
-            <p className="mb-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-amber-300">
-              Serie
-            </p>
-            <h2
-              id={titleId}
-              className="truncate text-lg font-black tracking-tight text-white sm:text-2xl"
-            >
-              Valoración de episodios
-            </h2>
-            <p
-              id={descriptionId}
-              className="truncate text-xs font-medium text-zinc-400 sm:text-sm"
-            >
-              {title || "Serie"} · puntuaciones por temporada
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <ModalTitleIcon icon={BarChart3} tone="yellow" />
+            <div className="min-w-0">
+              <p className="mb-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-amber-300">
+                Serie
+              </p>
+              <h2
+                id={titleId}
+                className="truncate text-lg font-black tracking-tight text-white sm:text-2xl"
+              >
+                Valoración de episodios
+              </h2>
+              <p
+                id={descriptionId}
+                className="truncate text-xs font-medium text-zinc-400 sm:text-sm"
+              >
+                {title || "Serie"} · puntuaciones por temporada
+              </p>
+            </div>
           </div>
 
           <button

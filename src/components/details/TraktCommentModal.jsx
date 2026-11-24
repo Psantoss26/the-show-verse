@@ -4,7 +4,16 @@ import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGl
 
 import { useEffect, useState, useRef } from "react";
 import useActionModalMotion from "@/hooks/useActionModalMotion";
-import { X, Loader2, Calendar, Pencil, Trash2, AlertTriangle } from "lucide-react";
+import {
+  X,
+  Loader2,
+  Calendar,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  MessageSquare,
+} from "lucide-react";
+import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 import useModalGuard from "@/hooks/useModalGuard";
 import ListToggleConfirmModal from "@/components/details/ListToggleConfirmModal";
 
@@ -143,13 +152,16 @@ export default function TraktCommentModal({
       <div ref={actionMotion.panelRef} className={`relative w-full max-w-xl flex flex-col sv-modal-max-h overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}>
         {/* Header */}
         <div className={`flex w-full items-center justify-between px-5 py-4 sm:px-6 sm:py-6 ${LIQUID_GLASS_MODAL_HEADER} shrink-0`}>
-          <div>
-            <h3 className="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
-              {editingCommentId ? "Editar comentario" : "Escribir comentario"}
-            </h3>
-            <p className="text-[10px] sm:text-xs text-zinc-500 mt-0.5 sm:mt-1 font-medium tracking-wide uppercase">
-              {title || "Trakt.tv"}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <ModalTitleIcon icon={MessageSquare} tone="orange" />
+            <div className="min-w-0">
+              <h3 className="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
+                {editingCommentId ? "Editar comentario" : "Escribir comentario"}
+              </h3>
+              <p className="text-[10px] sm:text-xs text-zinc-500 mt-0.5 sm:mt-1 font-medium tracking-wide uppercase">
+                {title || "Trakt.tv"}
+              </p>
+            </div>
           </div>
 
           <button

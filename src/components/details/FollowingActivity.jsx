@@ -27,7 +27,9 @@ import {
   MessageSquareQuote,
   Play,
   X,
+  UsersRound,
 } from "lucide-react";
+import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 
 import Avatar from "@/components/ui/Avatar";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -348,16 +350,19 @@ export function FollowingActivityModal({ open, onClose, data, mediaType }) {
         className={`relative flex sv-modal-max-h w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
       >
         <div className={`flex w-full shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
-          <div className="min-w-0">
-            <h2
-              id="following-activity-title"
-              className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent"
-            >
-              Actividad de amigos
-            </h2>
-            <p className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
-              {summarySentence(data)}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <ModalTitleIcon icon={UsersRound} tone="yellow" />
+            <div className="min-w-0">
+              <h2
+                id="following-activity-title"
+                className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent"
+              >
+                Actividad de amigos
+              </h2>
+              <p className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                {summarySentence(data)}
+              </p>
+            </div>
           </div>
           <button
             type="button"

@@ -33,6 +33,7 @@ import {
   Share2,
   X,
 } from "lucide-react";
+import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 
 import useActionModalMotion from "@/hooks/useActionModalMotion";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -720,16 +721,19 @@ export default function DetailsShareSheet({
         className={`relative flex sv-modal-max-h w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
       >
         <div ref={headRef} className={`flex w-full shrink-0 items-center justify-between gap-3 ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
-          <div className="min-w-0">
-            <h2
-              id={titleId}
-              className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent"
-            >
-              Compartir
-            </h2>
-            <p className="mt-1 truncate text-xs font-medium uppercase tracking-wide text-zinc-500">
-              {title}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <ModalTitleIcon icon={Share2} tone="yellow" />
+            <div className="min-w-0">
+              <h2
+                id={titleId}
+                className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent"
+              >
+                Compartir
+              </h2>
+              <p className="mt-1 truncate text-xs font-medium uppercase tracking-wide text-zinc-500">
+                {title}
+              </p>
+            </div>
           </div>
           <button
             ref={closeRef}

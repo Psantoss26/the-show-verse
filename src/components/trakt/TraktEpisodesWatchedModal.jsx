@@ -81,6 +81,7 @@ import {
   SlidersHorizontal,
   Star,
 } from "lucide-react";
+import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -1433,42 +1434,63 @@ export default function TraktEpisodesWatchedModal({
         <PanelGlass />
         {/* Header */}
         <div className={`z-30 flex shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6`}>
-          <div className="min-w-0 pr-4">
-            <h2 className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl">
-              Episodios vistos
-            </h2>
-            <p className="truncate text-xs text-white/55 sm:text-sm">{title}</p>
+          {/* Rejilla: el icono abarca solo las filas del título y la
+              descripción (`row-span-2`), así queda centrado respecto a ellas
+              y la barra de progreso va debajo, alineada con el texto. */}
+          <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 pr-4">
+            <ModalTitleIcon icon={Eye} tone="green" className="row-span-2" />
+            <div className="contents">
+              <h2 className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl">
+                Episodios vistos
+              </h2>
+              <p className="truncate text-xs text-white/55 sm:text-sm">{title}</p>
 
-            {totals.totalEpisodes > 0 && (
-              <div className="flex items-center gap-3 mt-2">
-                <div className="h-1.5 w-28 overflow-hidden rounded-full bg-black/35 backdrop-blur-md">
+              {totals.totalEpisodes > 0 && (
+                // Barra, porcentaje y vista con la misma familia que la
+                // insignia «Vistas» de TraktWatchedModal: pista hundida sin
+                // halo (el brillo difuminaba el borde), relleno en degradado,
+                // cifra tabular y etiqueta en píldora de 20 px, todo a la
+                // misma altura. La barra es flexible (64–144 px) y cede sitio a la
+                // etiqueta del rewatch, que nunca se recorta: si no cabe (móvil
+                // estrecho) baja a la línea siguiente. PT Sans solo
+                // trae 400 y 700 (`font-bold`).
+                <div className="col-start-2 mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
                   <div
-                    className={`h-full rounded-full shadow-[0_0_12px_currentColor] ${isRewatchView ? "bg-purple-300 text-purple-300" : "bg-emerald-300 text-emerald-300"}`}
-                    style={{ width: `${progressPct}%` }}
-                  />
-                </div>
-                <span className="text-[10px] font-bold text-white/70">
-                  {progressPct}%
-                </span>
+                    className="h-1.5 min-w-16 max-w-36 flex-1 overflow-hidden rounded-full bg-white/10 shadow-[inset_0_1px_1px_rgba(0,0,0,0.4)]"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={progressPct}
+                    aria-label="Episodios vistos"
+                  >
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r ${isRewatchView ? "from-purple-400 to-purple-300" : "from-emerald-400 to-emerald-300"}`}
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                  <span className="shrink-0 text-[11px] font-bold leading-none tabular-nums text-white/80">
+                    {progressPct}%
+                  </span>
 
-                <span
-                  className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                    isRewatchView
-                      ? "bg-purple-500/15 text-purple-100"
-                      : "bg-white/10 text-white/85 "
-                  }`}
-                  aria-label={
-                    isRewatchView
-                      ? "Vista rewatch (independiente)"
-                      : "Vista global"
-                  }
-                >
-                  {isRewatchView
-                    ? `Rewatch · ${formatDate(effectiveViewId)}`
-                    : "Global"}
-                </span>
-              </div>
-            )}
+                  <span
+                    className={`ml-1 inline-flex h-5 shrink-0 items-center whitespace-nowrap rounded-full px-2 text-[10px] font-bold uppercase leading-none tracking-wide ${
+                      isRewatchView
+                        ? "bg-purple-500/15 text-purple-200"
+                        : "bg-emerald-500/15 text-emerald-200"
+                    }`}
+                    title={
+                      isRewatchView
+                        ? "Vista rewatch (independiente)"
+                        : "Vista global"
+                    }
+                  >
+                    {isRewatchView
+                      ? `Rewatch · ${formatDate(effectiveViewId)}`
+                      : "Global"}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           <button

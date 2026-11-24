@@ -8,6 +8,7 @@ import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { useCenteredGlyphOffset } from "@/hooks/useCenteredGlyphOffset";
 import { createPortal } from "react-dom";
 import { Star, X, Minus, Plus, Loader2, Trash2 } from "lucide-react";
+import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 import LiquidButton from "./LiquidButton";
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -239,12 +240,15 @@ export default function StarRating({
               aria-labelledby={titleId}
             >
               <div className={`flex items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5`}>
-                <h2
-                  id={titleId}
-                  className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl"
-                >
-                  Puntuación
-                </h2>
+                <div className="flex min-w-0 items-center gap-3">
+                  <ModalTitleIcon icon={Star} tone="yellow" />
+                  <h2
+                    id={titleId}
+                    className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl"
+                  >
+                    Puntuación
+                  </h2>
+                </div>
                 <button
                   type="button"
                   onClick={closeFromEvent}

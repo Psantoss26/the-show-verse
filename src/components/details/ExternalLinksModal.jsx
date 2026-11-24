@@ -8,7 +8,13 @@ import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGl
 import { useEffect, useState } from "react";
 import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { createPortal } from "react-dom";
-import { ExternalLink, MonitorPlay, X } from 'lucide-react'
+import {
+  ExternalLink,
+  MonitorPlay,
+  X,
+  Link2,
+} from "lucide-react";
+import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 
 function hostLabel(href) {
     try {
@@ -77,16 +83,19 @@ export default function ExternalLinksModal({
                 className={`relative flex sv-modal-max-h w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
             >
                         <div className={`flex w-full shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
-                            <div className="min-w-0">
-                                <h2
-                                    id="external-links-title"
-                                    className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent"
-                                >
-                                    {modalTitle}
-                                </h2>
-                                <p className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                                    {modalSubtitle}
-                                </p>
+                            <div className="flex min-w-0 items-center gap-3">
+                                <ModalTitleIcon icon={isPlatformsMode ? MonitorPlay : Link2} tone="yellow" />
+                                <div className="min-w-0">
+                                    <h2
+                                        id="external-links-title"
+                                        className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent"
+                                    >
+                                        {modalTitle}
+                                    </h2>
+                                    <p className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                                        {modalSubtitle}
+                                    </p>
+                                </div>
                             </div>
 
                             <button

@@ -14,7 +14,9 @@ import {
   Search,
   ListPlus,
   FileText,
+  ListVideo,
 } from "lucide-react";
+import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 import useModalGuard from "@/hooks/useModalGuard";
 
 export default function AddToListModal(props) {
@@ -106,13 +108,16 @@ export default function AddToListModal(props) {
       <div ref={actionMotion.panelRef} className={`relative w-full max-w-xl flex flex-col sv-modal-max-h overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}>
         {/* Header */}
         <div className={`flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER} shrink-0`}>
-          <div>
-            <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
-              Añadir a una lista
-            </h3>
-            <p className="text-xs text-zinc-500 mt-1 font-medium tracking-wide uppercase">
-              Gestiona tu colección
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <ModalTitleIcon icon={ListVideo} tone="purple" />
+            <div className="min-w-0">
+              <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
+                Añadir a una lista
+              </h3>
+              <p className="text-xs text-zinc-500 mt-1 font-medium tracking-wide uppercase">
+                Gestiona tu colección
+              </p>
+            </div>
           </div>
 
           <button

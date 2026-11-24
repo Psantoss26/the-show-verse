@@ -5,6 +5,7 @@ import useActionModalMotion from "@/hooks/useActionModalMotion";
 import { createPortal } from "react-dom";
 import { BookmarkMinus, BookmarkPlus, Heart, HeartOff, Trash2, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
+import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 import useHeldWhileOpen from "@/hooks/useHeldWhileOpen";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
@@ -21,7 +22,7 @@ const KINDS = {
     removeText: (subject) => `¿Quieres quitar ${subject} de tus favoritos?`,
     AddIcon: Heart,
     RemoveIcon: HeartOff,
-    iconClass: "bg-red-500/15 text-red-300",
+    iconTone: "red",
     confirmClass:
       "bg-red-500/85 bg-gradient-to-b from-red-400/90 to-red-600/90 shadow-[0_0_18px_rgba(239,68,68,0.35),inset_0_1px_1px_rgba(255,255,255,0.25)] hover:from-red-400 hover:to-red-500 focus-visible:outline-red-300",
   },
@@ -32,7 +33,7 @@ const KINDS = {
     removeText: (subject) => `¿Quieres quitar ${subject} de tu lista de pendientes?`,
     AddIcon: BookmarkPlus,
     RemoveIcon: BookmarkMinus,
-    iconClass: "bg-blue-500/15 text-blue-300",
+    iconTone: "blue",
     confirmClass:
       "bg-blue-500/85 bg-gradient-to-b from-blue-400/90 to-blue-600/90 shadow-[0_0_18px_rgba(59,130,246,0.35),inset_0_1px_1px_rgba(255,255,255,0.25)] hover:from-blue-400 hover:to-blue-500 focus-visible:outline-blue-300",
   },
@@ -41,7 +42,7 @@ const KINDS = {
     removeText: (subject) => `¿Quieres eliminar ${subject}? No se puede deshacer.`,
     removeLabel: "Eliminar",
     RemoveIcon: Trash2,
-    iconClass: "bg-red-500/15 text-red-300",
+    iconTone: "red",
     confirmClass:
       "bg-red-500/85 bg-gradient-to-b from-red-400/90 to-red-600/90 shadow-[0_0_18px_rgba(239,68,68,0.35),inset_0_1px_1px_rgba(255,255,255,0.25)] hover:from-red-400 hover:to-red-500 focus-visible:outline-red-300",
   },
@@ -50,7 +51,7 @@ const KINDS = {
     removeText: (subject) => `¿Quieres eliminar ${subject} de tu historial? No se puede deshacer.`,
     removeLabel: "Eliminar",
     RemoveIcon: Trash2,
-    iconClass: "bg-red-500/15 text-red-300",
+    iconTone: "red",
     confirmClass:
       "bg-red-500/85 bg-gradient-to-b from-red-400/90 to-red-600/90 shadow-[0_0_18px_rgba(239,68,68,0.35),inset_0_1px_1px_rgba(255,255,255,0.25)] hover:from-red-400 hover:to-red-500 focus-visible:outline-red-300",
   },
@@ -130,11 +131,7 @@ export default function ListToggleConfirmModal({
       >
         <div className={`flex w-full shrink-0 items-center justify-between gap-3 ${LIQUID_GLASS_MODAL_HEADER} p-6`}>
           <div className="flex min-w-0 items-center gap-3">
-            <span
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] ${config.iconClass}`}
-            >
-              <Icon className="h-5 w-5" aria-hidden="true" />
-            </span>
+            <ModalTitleIcon icon={Icon} tone={config.iconTone} />
             <div className="min-w-0">
               <h2
                 id={titleId}

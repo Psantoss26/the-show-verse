@@ -30,6 +30,7 @@ import {
   Eye,
   Hourglass,
 } from "lucide-react";
+import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 
 // --- Helpers de Fecha (Mismos que tenías) ---
 const todayYmd = () => new Date().toISOString().slice(0, 10);
@@ -360,35 +361,38 @@ export default function TraktWatchedModal({
         aria-label="Historial de visionados"
       >
         {/* Header Premium */}
-        <div className={`flex items-start justify-between px-6 py-5 sm:px-7 ${LIQUID_GLASS_MODAL_HEADER}`}>
-          <div>
-            <h3 className="text-xl font-black text-white drop-shadow-md">
-              Historial de Visionado
-            </h3>
-            <div className="flex items-center gap-2 mt-1">
-              {/* Indicador de nº de vistas: sin aro. El tinte, el color del
-                  texto y el check ya lo identifican; el contorno solo repetía
-                  esa información dibujando un canto. */}
-              <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200 backdrop-blur-md">
-                <Check className="w-3 h-3" />
-                {plays ? `${plays} Vistas` : "Sin ver"}
-              </span>
-              {progress && (
-                <span className="flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200 backdrop-blur-md">
-                  <Hourglass className="h-3 w-3" aria-hidden="true" />
-                  En curso
+        <div className={`relative z-10 flex items-start justify-between px-6 py-5 sm:px-7 ${LIQUID_GLASS_MODAL_HEADER}`}>
+          <div className="flex min-w-0 items-start gap-3">
+            <ModalTitleIcon icon={Eye} tone="green" />
+            <div className="min-w-0">
+              <h3 className="text-xl font-black text-white drop-shadow-md">
+                Historial de Visionado
+              </h3>
+              <div className="flex items-center gap-2 mt-1">
+                {/* Indicador de nº de vistas: sin aro. El tinte, el color del
+                    texto y el check ya lo identifican; el contorno solo repetía
+                    esa información dibujando un canto. */}
+                <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200 backdrop-blur-md">
+                  <Check className="w-3 h-3" />
+                  {plays ? `${plays} Vistas` : "Sin ver"}
                 </span>
-              )}
-              {traktUrl && (
-                <a
-                  href={traktUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1 text-[10px] font-bold text-white/50 transition hover:text-white"
-                >
-                  Trakt <ExternalLink className="w-2.5 h-2.5" />
-                </a>
-              )}
+                {progress && (
+                  <span className="flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200 backdrop-blur-md">
+                    <Hourglass className="h-3 w-3" aria-hidden="true" />
+                    En curso
+                  </span>
+                )}
+                {traktUrl && (
+                  <a
+                    href={traktUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 text-[10px] font-bold text-white/50 transition hover:text-white"
+                  >
+                    Trakt <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                )}
+              </div>
             </div>
           </div>
           <button
@@ -401,7 +405,15 @@ export default function TraktWatchedModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+        {/* Entre la cabecera y «Registrar nueva vista» quedan 24 px, lo mismo
+            que el margen lateral: el `py-5` de la cabecera y 4 px del cuerpo.
+            El cuerpo sube 32 px por debajo de la cabecera (`-mt-8`, que es casi
+            transparente y va encima con `z-10` para sus clics) y los compensa
+            con `pt-9`: así el halo del recuadro, que sobresale por arriba,
+            cabe dentro del área con scroll en vez de cortarse en una línea
+            recta. La máscara funde esa franja de 32 px: el halo se apaga sin
+            borde y el contenido desplazado se desvanece bajo el título. */}
+        <div className="-mt-8 flex-1 overflow-y-auto custom-scrollbar p-6 pt-9 space-y-8 [mask-image:linear-gradient(to_bottom,transparent,black_2rem)]">
           {/* SECCIÓN 1: AÑADIR NUEVO (Hero Section) */}
           <div className="relative group">
             <div className="absolute -inset-2 rounded-3xl bg-gradient-to-b from-emerald-400/15 to-transparent opacity-0 blur-lg transition duration-500 group-hover:opacity-100" />
