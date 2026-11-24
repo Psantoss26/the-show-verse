@@ -11322,11 +11322,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // 4px entre círculos: el ancho recuperado se reparte entre
                 // los botones para agrandarlos sin que lleguen a tocarse.
                 mobileGapClass="gap-1"
-                className={
-                  !isBackdropPoster
-                    ? DETAIL_ACTION_DESKTOP_SIZE_CLASS
-                    : undefined
-                }
+                // Mismo tamaño y formato con portada vertical o backdrop: el
+                // modo de imagen no cambia los botones.
+                className={DETAIL_ACTION_DESKTOP_SIZE_CLASS}
                 onTrailer={() => openVideo(preferredVideo)}
                 trailerAvailable={!!preferredVideo}
                 // Con el soundtrack sonando, el reproductor abre en la misma
