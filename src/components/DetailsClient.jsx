@@ -22,7 +22,6 @@ import SectionTitle from "@/components/details/SectionTitle";
 import { createValueStore } from "@/lib/details/valueStore";
 import useDeferredBelowHero from "@/lib/details/useDeferredBelowHero";
 import {
-  FollowingActivityAvatars,
   FollowingActivityModal,
   hasFollowingActivity,
   useFollowingActivity,
@@ -11504,6 +11503,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 mobileScoresOnly
                 compactStatsTrailing={isBackdropPoster}
                 narrowStatLabels={!isBackdropPoster}
+                roomyScores={!isBackdropPoster}
                 shareIconOnly={isBackdropPoster}
                 fitAllScores={isBackdropPoster}
                 loading={tScoreboard.loading}
@@ -11537,6 +11537,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 externalLinksWikipedia={wikipediaQuery}
                 onMoreLinks={isBackdropPoster ? () => setExternalLinksOpen(true) : undefined}
                 onMorePlatforms={() => setPlatformsOpen(true)}
+                onActivity={
+                  showFollowingActivity && isBackdropPoster
+                    ? () => setFollowingOpen(true)
+                    : undefined
+                }
                 externalLinksMenuOnly
                 share={
                   isBackdropPoster
@@ -11549,20 +11554,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     : null
                 }
                 stats={tScoreboard?.stats}
-                // Escritorio: tus amigos a la derecha de la fila de stats, solo
-                // avatar + su marca (nota, viéndola, pendiente…).
-                // Con portada vertical la actividad va en su propio bloque,
-                // junto a Enlaces y Compartir (más abajo).
-                statsTrailing={
-                  showFollowingActivity && isBackdropPoster ? (
-                    <FollowingActivityAvatars
-                      compact={isBackdropPoster}
-                      data={followingActivity}
-                      mediaType={type}
-                      onOpen={() => setFollowingOpen(true)}
-                    />
-                  ) : null
-                }
+                // La actividad de quienes sigues ya no va en la fila de stats:
+                // con portada backdrop es un botón redondo junto a «…» y
+                // Compartir (`onActivity`); con portada vertical, su propio
+                // bloque junto a Enlaces y Compartir (más abajo).
                 />
                 {!isBackdropPoster && (
                   <div className={`sv-score-tiles hidden sm:flex sm:shrink-0 sm:flex-col ${showFollowingActivity ? "sm:gap-2" : "sm:gap-3"} xl:flex-row xl:gap-3`}>

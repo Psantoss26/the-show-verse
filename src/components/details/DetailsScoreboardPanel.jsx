@@ -30,7 +30,7 @@ import { Fragment } from "react";
 import styles from "./DetailsScoreboardPanel.module.css";
 import { motion, useReducedMotion } from "framer-motion";
 import NextImage from "next/image";
-import { Eye, Play, List, Heart, MoreHorizontal, MonitorPlay } from "lucide-react";
+import { Eye, Play, List, Heart, MoreHorizontal, MonitorPlay, UsersRound } from "lucide-react";
 
 import {
   CompactBadge,
@@ -124,6 +124,9 @@ export function DetailsRatingsBadges({
   // a partes iguales, como el marcador de la imagen compartible (ver
   // `mobileScoresOnly` del panel).
   spread = false,
+  // Ficha con póster vertical: puntuaciones y logos un punto mayores desde
+  // `xl` (ver `roomy` en CompactBadge).
+  roomy = false,
 }) {
   const isPendingScore = (score) =>
     !!score && score.pending === true && score.value == null;
@@ -191,7 +194,7 @@ export function DetailsRatingsBadges({
         <CompactBadge
           key={scoreStateKey("tmdb", score)}
           logo="/logo-TMDb.png"
-          logoClassName={`h-5 sm:h-5 ${phone ? "" : "lg:h-6"} ${spread ? "phone-sb:h-[calc(24*var(--sb-u,1px))]" : ""}`}
+          logoClassName={`h-5 sm:h-5 ${phone ? "" : roomy ? "lg:h-6 xl:h-7" : "lg:h-6"} ${spread ? "phone-sb:h-[calc(24*var(--sb-u,1px))]" : ""}`}
           phone={phone}
           large={spread}
           value={resolvedValue(score)}
@@ -199,6 +202,7 @@ export function DetailsRatingsBadges({
           hideSubOnMobile={!!score.hideSubOnMobile}
           href={score.href}
           disableHoverLift
+          roomy={roomy}
           tooltip={score.href ? "Ver en TMDb" : "TMDb"}
         />
       ))}
@@ -212,6 +216,7 @@ export function DetailsRatingsBadges({
           sub={score.sub}
           href={score.href}
           disableHoverLift
+          roomy={roomy}
           onClick={undefined}
           tooltip={score.href ? "Ver en Trakt" : "Trakt"}
           phone={phone}
@@ -227,6 +232,7 @@ export function DetailsRatingsBadges({
           value={resolvedValue(score)}
           sub={score.sub}
           disableHoverLift
+          roomy={roomy}
           onClick={undefined}
           tooltip="Ver en Trakt"
           phone={phone}
@@ -239,11 +245,11 @@ export function DetailsRatingsBadges({
         <CompactBadge
           key={scoreStateKey("imdb", score)}
           logo="/logo-IMDb.svg"
-          logoWrapClassName={`min-w-[28px] ${phone ? "" : "lg:min-w-[34px]"}`}
+          logoWrapClassName={`min-w-[28px] ${phone ? "" : roomy ? "lg:min-w-[34px] xl:min-w-[40px]" : "lg:min-w-[34px]"}`}
           logoClassName={
             phone
               ? `!h-5 !max-h-none !max-w-[34px] ${spread ? "phone-sb:!h-[calc(24*var(--sb-u,1px))] phone-sb:!max-w-[calc(42*var(--sb-u,1px))]" : ""}`
-              : `!h-5 sm:!h-[22px] lg:!h-[26px] !max-h-none !max-w-[34px] lg:!max-w-[40px] ${spread ? "phone-sb:!h-[calc(24*var(--sb-u,1px))] phone-sb:!max-w-[calc(42*var(--sb-u,1px))]" : ""}`
+              : `!h-5 sm:!h-[22px] ${roomy ? "lg:!h-[26px] lg:!max-w-[40px] xl:!h-[30px] xl:!max-w-[46px]" : "lg:!h-[26px] lg:!max-w-[40px]"} !max-h-none !max-w-[34px] ${spread ? "phone-sb:!h-[calc(24*var(--sb-u,1px))] phone-sb:!max-w-[calc(42*var(--sb-u,1px))]" : ""}`
           }
           phone={phone}
           large={spread}
@@ -252,6 +258,7 @@ export function DetailsRatingsBadges({
           hideSubOnMobile={!!score.hideSubOnMobile}
           href={score.href}
           disableHoverLift
+          roomy={roomy}
           tooltip={score.href ? "Ver en IMDb" : "IMDb"}
         />
       ))}
@@ -269,6 +276,7 @@ export function DetailsRatingsBadges({
               suffix="%"
               href={score.href}
               disableHoverLift
+              roomy={roomy}
               tooltip={score.href ? "Ver en Rotten Tomatoes" : "Rotten Tomatoes"}
             />
           </div>
@@ -287,6 +295,7 @@ export function DetailsRatingsBadges({
               suffix="%"
               href={score.href}
               disableHoverLift
+              roomy={roomy}
               tooltip={score.href ? "Ver en Metacritic" : "Metacritic"}
             />
           </div>
@@ -364,7 +373,7 @@ export function DetailsStatsRow({
 
   if (hasCustomStats) {
     return (
-      <div data-scoreboard-stats="" className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
+      <div data-scoreboard-stats="" className="sv-scoreboard-stats relative z-10 rounded-b-2xl">
         <div className={statsScrollerClass}>
           <div className={statsTrackClass}>
             {customStatItems.map((item, index) => (
@@ -399,7 +408,7 @@ export function DetailsStatsRow({
   // Sin stats (ni pendientes) pero con contenido a la derecha: solo eso.
   if (!hasStats && !pending) {
     return (
-      <div data-scoreboard-stats="" className="relative z-10 hidden rounded-b-2xl border-t border-white/5 bg-black/[0.04] sm:block">
+      <div data-scoreboard-stats="" className="sv-scoreboard-stats relative z-10 hidden rounded-b-2xl sm:block">
         <div className={statsScrollerClass}>
           <div className={statsTrackClass}>{trailingNode}</div>
         </div>
@@ -408,7 +417,7 @@ export function DetailsStatsRow({
   }
 
   return (
-    <div data-scoreboard-stats="" className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
+    <div data-scoreboard-stats="" className="sv-scoreboard-stats relative z-10 rounded-b-2xl">
       {/* Scroller con padding + safe-area para que no se recorte en bordes */}
       <div className={statsScrollerClass}>
         <div className={statsTrackClass}>
@@ -532,6 +541,7 @@ function DetailsToolbarActions({
   streamingProviders = null,
   onMoreLinks,
   onMorePlatforms,
+  onActivity,
   platformsMenuOnly = false,
   externalLinksMenuOnly = false,
   showExternalLinksLabel = false,
@@ -670,6 +680,24 @@ function DetailsToolbarActions({
                 botón reaparecía: la barra acababa con tres acciones donde la
                 ficha tiene dos, y ese ancho de más es el que se estaba comiendo
                 la tercera puntuación. */}
+            {/* Actividad de quienes sigues (portada backdrop): botón redondo
+                como «…» y Compartir, en lugar de los avatares en las stats. */}
+            {typeof onActivity === "function" && !compactToolbar && !phone && (
+              <button
+                type="button"
+                onClick={onActivity}
+                aria-haspopup="dialog"
+                className="relative isolate hidden h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 sm:flex"
+                title="Actividad"
+                aria-label="Ver la actividad de quienes sigues"
+              >
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
+                />
+                <UsersRound className="relative z-10 h-5 w-5" />
+              </button>
+            )}
             {onMoreLinks && !compactToolbar && (
               <motion.button
                 type="button"
@@ -784,11 +812,15 @@ export default function DetailsScoreboardPanel({
   // es estrecho, las stats pierden su etiqueta (queda en el tooltip) antes de
   // partirse en dos líneas. Ver `.narrowStatsTrack` en el módulo CSS.
   narrowStatLabels = false,
+  // Ficha con póster vertical: puntuaciones algo mayores (ver DetailsRatingsBadges).
+  roomyScores = false,
   externalLinks = null,
   externalLinksWikipedia = null,
   streamingProviders = null,
   onMoreLinks,
   onMorePlatforms,
+  // Botón redondo de Actividad junto a «…» y Compartir (portada backdrop).
+  onActivity,
   platformsMenuOnly = false,
   externalLinksMenuOnly = false,
   showExternalLinksLabel = false,
@@ -864,7 +896,7 @@ export default function DetailsScoreboardPanel({
 
   return (
     <div
-      className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${styles.panel} ${fitAllScores ? styles.fitAllScores : ""} ${className}`}
+      className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${styles.panel} ${fitAllScores ? styles.fitAllScores : ""} ${typeof onActivity === "function" ? styles.hasActivityAction : ""} ${className}`}
       data-phone-scoreboard={mobileScoresOnly && phoneLayout ? "" : undefined}
     >
       {/* Refracción, reflejo especular y luz difusa compartidos con InfoTabs. */}
@@ -928,6 +960,7 @@ export default function DetailsScoreboardPanel({
               compact={compactToolbar}
               phone={phoneLayout}
               spread={mobileScoresOnly}
+              roomy={roomyScores}
             />
           </div>
 
@@ -940,6 +973,7 @@ export default function DetailsScoreboardPanel({
             streamingProviders={streamingProviders}
             onMoreLinks={onMoreLinks}
             onMorePlatforms={onMorePlatforms}
+            onActivity={onActivity}
             platformsMenuOnly={platformsMenuOnly}
             externalLinksMenuOnly={externalLinksMenuOnly}
             showExternalLinksLabel={showExternalLinksLabel}

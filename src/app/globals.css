@@ -4633,3 +4633,17 @@ html[data-details-sequence-transition] .sv-topbar {
     display: none;
   }
 }
+
+/* FILA DE STATS DEL MARCADOR (DetailsScoreboardPanel): sin filete entre
+   puntuaciones y estadísticas. El velo oscuro de la fila entra en degradado
+   desde transparente, así que el paso de una zona a otra no dibuja ninguna
+   línea (antes: `border-t border-white/5` + `bg-black/[0.04]` plano, cuyo
+   canto superior se leía como un filete). */
+.sv-scoreboard-stats {
+  background-image: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0) 0%,
+    rgb(0 0 0 / 0.05) 55%,
+    rgb(0 0 0 / 0.07) 100%
+  );
+}

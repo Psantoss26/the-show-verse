@@ -69,6 +69,14 @@
   }
 }
 
+/* Con el botón de Actividad son tres botones redondos (40px + hueco de 12px
+   más): RT y Metacritic se retiran ~3,25rem antes. */
+@container detail-scoreboard (width < 39.75rem) {
+  .fitAllScores.hasActivityAction .optionalScore {
+    display: none;
+  }
+}
+
 /* MÓVIL DE LA FICHA (`mobileScoresOnly`): puntuaciones y stats repartidas a todo
    el ancho, con un tamaño que SE AJUSTA AL HUECO DEL PANEL.
    ---------------------------------------------------------------
