@@ -17,8 +17,9 @@
 // salen la imagen y las capas del vídeo (lib/lists/shareList) y la historia
 // llega ya armada por la página.
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { fitSharePreviewHeight } from "@/lib/share/sharePreviewFit";
 import {
   AlertCircle,
   Check,
@@ -358,6 +359,58 @@ export default function DetailsShareSheet({
   // debe lanzarse cuando el panel ya está en el DOM.
   const { present, closing, panelRef, backdropRef } = useActionModalMotion(open && portalReady);
 
+  // ALTO DE LA VISTA PREVIA: el que deja libre el tope real del panel tras la
+  // cabecera, los botones y el selector, para que la imagen se vea entera sin
+  // desplazar el modal (sharePreviewFit.js). Se mide al abrir y cada vez que
+  // cambian la ventana o el alto de cabecera y botones (etiquetas en dos
+  // líneas, mensajes de estado).
+  const headRef = useRef(null);
+  const bodyRef = useRef(null);
+  const footRef = useRef(null);
+  const previewRef = useRef(null);
+  const [previewHeight, setPreviewHeight] = useState(null);
+  const measurePreviewRef = useRef(null);
+  // Tras cada render: lo de encima de la vista previa (selector Imagen/Vídeo)
+  // puede cambiar sin que cambie el tamaño de nada observado. Si el alto no
+  // cambia, React descarta el setState.
+  useLayoutEffect(() => {
+    measurePreviewRef.current?.();
+  });
+  useLayoutEffect(() => {
+    if (!present) return undefined;
+    const panel = panelRef.current;
+    const head = headRef.current;
+    const body = bodyRef.current;
+    const foot = footRef.current;
+    if (!panel || !head || !body || !foot) return undefined;
+    const measure = () => {
+      const preview = previewRef.current;
+      if (!preview) return;
+      const bodyStyle = getComputedStyle(body);
+      const h = fitSharePreviewHeight({
+        maxPanel: parseFloat(getComputedStyle(panel).maxHeight),
+        head: head.offsetHeight,
+        foot: foot.offsetHeight,
+        bodyExtra: preview.offsetTop - body.offsetTop,
+        width: body.clientWidth - parseFloat(bodyStyle.paddingLeft) - parseFloat(bodyStyle.paddingRight),
+        cap: preview.dataset.cap === "short" ? 512 : 544,
+      });
+      setPreviewHeight(h);
+    };
+    measurePreviewRef.current = measure;
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(head);
+    ro.observe(foot);
+    ro.observe(body);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+      measurePreviewRef.current = null;
+    };
+  }, [present, panelRef]);
+
   // DATOS DEL VÍDEO QUE LA FICHA NO TIENE CARGADOS. Se piden al abrir la hoja
   // (no al cargar la ficha, que no los necesita): el progreso de «Continuar
   // viendo» del título y, en las series, las notas que el usuario ha dado a sus
@@ -666,7 +719,7 @@ export default function DetailsShareSheet({
         ref={panelRef}
         className={`relative flex sv-modal-max-h w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
       >
-        <div className={`flex w-full shrink-0 items-center justify-between gap-3 ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
+        <div ref={headRef} className={`flex w-full shrink-0 items-center justify-between gap-3 ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
           <div className="min-w-0">
             <h2
               id={titleId}
@@ -689,14 +742,17 @@ export default function DetailsShareSheet({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-2 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto px-6 pt-2 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {showModeSwitch && <ModeSwitch mode={mode} onChange={changeMode} />}
 
           {/* Vista previa: lo que se va a compartir, sin marco. */}
           <div
+            ref={previewRef}
+            data-cap={showModeSwitch ? "short" : undefined}
             className={`relative mx-auto aspect-[9/16] max-w-full ${
               showModeSwitch ? "h-[min(calc(85dvh-21rem),32rem)]" : "h-[min(calc(85dvh-18rem),34rem)]"
             }`}
+            style={previewHeight ? { height: previewHeight } : undefined}
           >
             {isVideo ? (
               videoReady ? (
@@ -799,7 +855,7 @@ export default function DetailsShareSheet({
 
         </div>
 
-        <div className="shrink-0 px-5 pb-6 pt-5 sm:px-8 sm:pb-7">
+        <div ref={footRef} className="shrink-0 px-5 pb-6 pt-5 sm:px-8 sm:pb-7">
           <div className="grid auto-cols-fr grid-flow-col gap-2">
             {showShareMedia && (
               <ShareOption
