@@ -4606,13 +4606,30 @@ html[data-details-sequence-transition] .sv-topbar {
    apilados serían tiras sin nombre: entonces van SIEMPRE en fila, cada uno
    con su ancho de bloque alto (7rem) e icono encima del nombre, que encogen
    las reglas de arriba. `data-scoreboard-stats` es la fila de stats del panel
-   (también mientras carga). El :has() se evalúa solo dentro de la fila. */
+   (también mientras carga). El :has() solo mira dentro de la fila. */
 .sv-score-row:not(:has([data-scoreboard-stats])) .sv-score-tiles {
   flex-direction: row;
+  flex-shrink: 1;
+  min-width: 0;
   gap: 0.75rem;
 }
 .sv-score-row:not(:has([data-scoreboard-stats])) .sv-score-tile {
-  flex: none;
+  /* Ancho EXPLÍCITO: con `container-type: size` su ancho intrínseco es 0 y
+     con `auto` la fila los dejaría siempre al mínimo. */
+  flex: 0 1 auto;
   flex-direction: column;
   width: 7rem;
+  min-width: 2.75rem;
+}
+/* En fila ceden los BLOQUES, no las puntuaciones: el marcador guarda sitio
+   para tres insignias (TMDb, Trakt, IMDb ≈ 17rem; su ancho intrínseco es 0
+   por la contención de inline-size) y los bloques se estrechan hasta perder
+   el nombre (regla de ancho de abajo). */
+.sv-score-row:not(:has([data-scoreboard-stats])) > :not(.sv-score-tiles) {
+  min-width: 18rem;
+}
+@container (width < 4.5rem) {
+  .sv-score-tile .sv-score-tile-label {
+    display: none;
+  }
 }
