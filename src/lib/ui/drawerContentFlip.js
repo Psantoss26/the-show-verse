@@ -80,8 +80,7 @@ function isRigidPiece(first, last) {
   );
 }
 
-function parseOrigin(el) {
-  const value = window.getComputedStyle(el).transformOrigin || "";
+function parseOrigin(value = "") {
   const [x, y] = value.split(" ").map((part) => parseFloat(part));
   return { x: Number.isFinite(x) ? x : 0, y: Number.isFinite(y) ? y : 0 };
 }
@@ -94,24 +93,36 @@ function pausedAnimation(el, keyframes, composite) {
 }
 
 // `offset`: lo que ya desplazan los antepasados deformados (ver abajo); la
-// pieza se pinta en su caja de layout MÁS ese desplazamiento.
-function playFrom(el, first, last, scale, offset) {
+// pieza se pinta en su caja de layout MÁS ese desplazamiento. `own`: la
+// transformación y el origen que la pieza ya tenía (hover, entradas), leídos
+// antes de crear ninguna animación.
+function playFrom(el, first, last, scale, offset, own) {
   // La caja de layout es `last`; con `scale` alrededor del origen del elemento,
   // la esquina superior izquierda acaba en last + origen·(1 − s) + d. Se busca
   // la d que la lleva a `first`.
-  const origin = scale === 1 ? { x: 0, y: 0 } : parseOrigin(el);
+  const origin = scale === 1 ? { x: 0, y: 0 } : parseOrigin(own?.origin);
   const dx = first.left - last.left - offset.x - origin.x * (1 - scale);
   const dy = first.top - last.top - offset.y - origin.y * (1 - scale);
   if (scale === 1 && Math.abs(dx) < MOVE_EPSILON && Math.abs(dy) < MOVE_EPSILON) {
     return { animation: null, dx: 0, dy: 0 };
   }
-  const from = scale === 1
+  const move = scale === 1
     ? `translate(${dx}px, ${dy}px)`
     : `translate(${dx}px, ${dy}px) scale(${scale})`;
-  const to = scale === 1 ? "translate(0px, 0px)" : "translate(0px, 0px) scale(1)";
-  // `add`: se suma a la transformación que ya tenga la pieza (hover, entradas
-  // de las tarjetas) en vez de pisarla.
-  const animation = pausedAnimation(el, [{ transform: from }, { transform: to }], "add");
+  const rest = scale === 1 ? "translate(0px, 0px)" : "translate(0px, 0px) scale(1)";
+  // La transformación propia de la pieza va DELANTE, igual que la sumaría
+  // `composite: "add"`, pero escrita a mano y con `replace`: Chrome no lleva
+  // al compositor las animaciones `add` (motivo 16), así que las ~60 tarjetas
+  // se movían en el hilo principal, el mismo que monta la ficha a la vez, y
+  // la página iba a tirones. Lo que cambie esa transformación mientras viaja
+  // (un hover) se ve al acabar, 420 ms después.
+  const base = own?.transform;
+  const prefix = base && base !== "none" ? `${base} ` : "";
+  const animation = pausedAnimation(
+    el,
+    [{ transform: prefix + move }, { transform: prefix + rest }],
+    "replace",
+  );
   return { animation, dx, dy };
 }
 
@@ -129,13 +140,28 @@ function hasVisibleBox(el) {
 // la medida nueva en el primer fotograma y taparía a sus vecinas, que aún
 // vienen de camino. Al encoger no hay nada que recortar: la caja queda
 // anclada por la izquierda y sus vecinas llegan a su lado.
-function revealGrowth(el, first, last) {
+//
+// NUNCA se recorta la RAÍZ de la página ni una caja de una pantalla de alto o
+// más. Un `clip-path` recorta también a sus descendientes `position: fixed`, y
+// la raíz lleva el fondo de la página (`fixed inset-0`, que pasa por detrás de
+// la barra superior y la lateral). En una página corta o aún cargando la raíz
+// mide justo una pantalla (`min-h-screen`), y al cerrar el drawer acoplado su
+// fondo quedaba recortado a la caja de la página: las dos barras se veían
+// sobre el negro del <body> hasta acabar el viaje.
+export function growthClipInsets(first, last, viewportHeight, isPageRoot) {
+  if (isPageRoot) return null;
   const right = Math.max(0, last.width - first.width);
   const bottom = Math.max(0, last.height - first.height);
   if (right < SIZE_EPSILON && bottom < SIZE_EPSILON) return null;
-  // El fondo de la página entera (más alto que la pantalla) no se recorta.
-  if (Math.max(first.height, last.height) > (window.innerHeight || 0)) return null;
+  if (Math.max(first.height, last.height) >= viewportHeight) return null;
+  return { right, bottom };
+}
+
+function revealGrowth(el, first, last, isPageRoot) {
+  const insets = growthClipInsets(first, last, window.innerHeight || 0, isPageRoot);
+  if (!insets) return null;
   if (!hasVisibleBox(el)) return null;
+  const { right, bottom } = insets;
   const radius = window.getComputedStyle(el).borderRadius || "0px";
   return pausedAnimation(
     el,
@@ -153,9 +179,15 @@ function buildAnimations(root, firstRects) {
   // Todas las medidas nuevas ANTES de crear ninguna animación: una animación en
   // pausa ya pinta su primer fotograma, y medir un hijo después de animar a su
   // padre contaba dos veces el viaje del padre.
+  // La transformación y el origen de cada pieza también se leen aquí: leerlos
+  // después de animar otra obligaría a recalcular estilos una vez por pieza.
   const lastRects = new Map();
+  const ownTransforms = new Map();
   for (const el of firstRects.keys()) {
-    if (el.isConnected) lastRects.set(el, el.getBoundingClientRect());
+    if (!el.isConnected) continue;
+    lastRects.set(el, el.getBoundingClientRect());
+    const style = window.getComputedStyle(el);
+    ownTransforms.set(el, { transform: style.transform, origin: style.transformOrigin });
   }
   const animations = [];
   const walk = (el, depth, offset) => {
@@ -167,12 +199,12 @@ function buildAnimations(root, firstRects) {
       Math.abs(first.width - last.width) < SIZE_EPSILON &&
       Math.abs(first.height - last.height) < SIZE_EPSILON;
     if (sameSize) {
-      const { animation } = playFrom(el, first, last, 1, offset);
+      const { animation } = playFrom(el, first, last, 1, offset, ownTransforms.get(el));
       if (animation) animations.push(animation);
       return;
     }
     if (isRigidPiece(first, last) && sameAspect(first, last)) {
-      const { animation } = playFrom(el, first, last, first.width / last.width, offset);
+      const { animation } = playFrom(el, first, last, first.width / last.width, offset, ownTransforms.get(el));
       if (animation) animations.push(animation);
       return;
     }
@@ -180,9 +212,9 @@ function buildAnimations(root, firstRects) {
     // esquina superior izquierda, y sus hijos se miden contando con ese viaje.
     // Sin anclarla, la caja se quedaba en su sitio nuevo mientras su icono y
     // su texto venían del viejo, y se veían fuera de ella.
-    const { animation, dx, dy } = playFrom(el, first, last, 1, offset);
+    const { animation, dx, dy } = playFrom(el, first, last, 1, offset, ownTransforms.get(el));
     if (animation) animations.push(animation);
-    const clip = revealGrowth(el, first, last);
+    const clip = revealGrowth(el, first, last, depth === 0);
     if (clip) animations.push(clip);
     if (depth >= MAX_DEPTH) return;
     const childOffset = { x: offset.x + dx, y: offset.y + dy };
