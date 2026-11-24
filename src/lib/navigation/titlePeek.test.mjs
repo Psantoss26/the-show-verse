@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   exceedsPeekMoveTolerance,
+  isControlInsideLink,
   titlePeekAttrs,
   titlePeekEpisodeAttrs,
   titlePeekItemFromAttr,
@@ -103,4 +104,45 @@ test("un desplazamiento de más de 10 px cancela la pulsación larga", () => {
   const start = { x: 100, y: 100 };
   assert.equal(exceedsPeekMoveTolerance(start, { x: 106, y: 106 }), false);
   assert.equal(exceedsPeekMoveTolerance(start, { x: 100, y: 112 }), true);
+});
+
+// Nodo mínimo: `closest` sube por `parent` comparando con una lista de
+// coincidencias; `contains` recorre los descendientes por `parent`.
+function fakeNode(name, parent = null, matches = false) {
+  const node = {
+    name,
+    parent,
+    closest: (_selector) => {
+      for (let n = node; n; n = n.parent) if (n.matches) return n;
+      return null;
+    },
+    contains: (other) => {
+      for (let n = other; n; n = n.parent) if (n === node) return true;
+      return false;
+    },
+  };
+  node.matches = matches;
+  return node;
+}
+
+test("isControlInsideLink: botón dentro del enlace (papelera)", () => {
+  const link = fakeNode("a");
+  const button = fakeNode("button", link, true);
+  const icon = fakeNode("svg", button);
+  assert.equal(isControlInsideLink(icon, link), true);
+  assert.equal(isControlInsideLink(button, link), true);
+});
+
+test("isControlInsideLink: el resto de la tarjeta sigue siendo el título", () => {
+  const link = fakeNode("a");
+  const img = fakeNode("img", fakeNode("div", link));
+  assert.equal(isControlInsideLink(img, link), false);
+});
+
+test("isControlInsideLink: un enlace dentro de un botón no cuenta", () => {
+  const button = fakeNode("button", null, true);
+  const link = fakeNode("a", button);
+  const img = fakeNode("img", link);
+  assert.equal(isControlInsideLink(img, link), false);
+  assert.equal(isControlInsideLink(img, null), false);
 });

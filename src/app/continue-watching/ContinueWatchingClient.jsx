@@ -636,6 +636,9 @@ function DeleteConfirm({ show, action = "remove", busy, onCancel, onConfirm, rou
   return (
     <FadePresence
       show={show}
+      // Toque en el fondo de la confirmación: no es un toque en el título (ver
+      // isControlInsideLink en lib/navigation/titlePeek.mjs).
+      data-sv-no-link=""
       className={`absolute inset-0 z-40 flex items-center justify-center gap-2 px-3 bg-black/95 ${rounded}`}
       onClick={(e) => {
         e.preventDefault();

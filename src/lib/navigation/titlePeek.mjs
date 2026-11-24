@@ -145,3 +145,17 @@ export function exceedsPeekMoveTolerance(start, point) {
   const dy = point.y - start.y;
   return dx * dx + dy * dy > TITLE_PEEK_MOVE_TOLERANCE * TITLE_PEEK_MOVE_TOLERANCE;
 }
+
+// Controles propios DENTRO de un enlace a una ficha (la papelera o el ✓ de
+// Continuar viendo, su confirmación «¿Quitar?»…). El clic y la pulsación larga
+// que MobileTitlePeek escucha en captura no deben tratarlos como un toque en el
+// título: llegan antes que el `onClick` del botón y lo dejaban sin efecto
+// (navegaba a la ficha). `data-sv-no-link` marca zonas que no son botones.
+export const LINK_INNER_CONTROL_SELECTOR =
+  "button, [role='button'], input, select, textarea, label, [data-sv-no-link]";
+
+export function isControlInsideLink(target, link) {
+  if (!link || typeof target?.closest !== "function") return false;
+  const control = target.closest(LINK_INNER_CONTROL_SELECTOR);
+  return Boolean(control && control !== link && link.contains?.(control));
+}

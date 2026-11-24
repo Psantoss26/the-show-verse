@@ -73,6 +73,7 @@ import {
   TITLE_PEEK_HOLD_MS,
   TITLE_PEEK_SELECTOR,
   exceedsPeekMoveTolerance,
+  isControlInsideLink,
   titlePeekItemFromAttr,
   titlePeekItemFromHref,
 } from "@/lib/navigation/titlePeek.mjs";
@@ -185,6 +186,8 @@ function waitForKeyboardClose(done) {
 function resolvePeekTarget(node) {
   const target = node?.closest?.(TITLE_PEEK_SELECTOR);
   if (!target || target.closest("[data-sv-no-peek]")) return null;
+  // Un botón propio de la tarjeta (papelera…) no es una pulsación en el título.
+  if (isControlInsideLink(node, target)) return null;
   const item = target.hasAttribute(TITLE_PEEK_ATTR)
     ? titlePeekItemFromAttr(target.getAttribute(TITLE_PEEK_ATTR))
     : titlePeekItemFromHref(target.getAttribute("href"), window.location.origin);
@@ -598,6 +601,10 @@ export default function MobileTitlePeek() {
       }
       const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
       if (!link || link.hasAttribute("download")) return;
+      // Botón dentro del enlace (papelera de Continuar viendo…): su `onClick`
+      // corre después que esta captura y es quien decide; navegar aquí lo
+      // dejaba sin efecto.
+      if (isControlInsideLink(event.target, link)) return;
       const target = link.getAttribute("target");
       if (target && target !== "_self") return;
       const href = link.getAttribute("href");
