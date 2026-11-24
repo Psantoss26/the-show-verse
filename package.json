@@ -5,7 +5,6 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "live": "node scripts/live.mjs",
     "local:setup": "node scripts/setup-local.mjs",
     "build": "next build",
     "start": "next start",

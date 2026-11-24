@@ -29,9 +29,6 @@ const nextConfig: NextConfig = {
   // Salida "standalone" para autoalojar en Docker (imagen mínima con server.js).
   // Vercel la ignora sin problema, así que es seguro para ambos despliegues.
   output: "standalone",
-  // `npm run live` sirve una copia del build desde `.next-serve/…` para poder
-  // compilar el siguiente en `.next` sin romper el que está sirviendo.
-  distDir: process.env.SHOWVERSE_DIST_DIR || ".next",
 
   // NINGÚN DOCUMENTO (HTML/RSC) SE CACHEA EN CLOUDFLARE ENTRE DESPLIEGUES.
   //
