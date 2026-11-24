@@ -4565,3 +4565,54 @@ html[data-details-sequence-transition] .sv-topbar {
     --lg-lift: 0px !important;
   }
 }
+
+/* BLOQUES DEL MARCADOR (ScoreboardTile / ActionShareButton variant="tile").
+   ---------------------------------------------------------------
+   Su alto lo pone el marcador de al lado, que se encoge cuando no hay fila de
+   estadísticas (o al apilar los bloques). Cada bloque es contenedor de su
+   propio tamaño (solo sus hijos pueden consultarlo) y encoge icono y nombre según el alto que le queda,
+   para que nunca se salgan del botón. El ancho es fijo (w-28 / w-36), así que
+   la contención de tamaño no cambia nada más. Sin @layer: gana a las
+   utilidades de tamaño del icono (`xl:h-7`, `@4xl/sbrow:h-7`). */
+.sv-score-tile {
+  container-type: size;
+}
+
+@container (height < 5.5rem) {
+  .sv-score-tile .sv-score-tile-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .sv-score-tile .sv-score-tile-label {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+}
+
+@container (height < 3.25rem) {
+  .sv-score-tile .sv-score-tile-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+@container (height < 1.75rem) {
+  .sv-score-tile .sv-score-tile-label {
+    display: none;
+  }
+}
+
+/* Sin fila de estadísticas el marcador se queda bajo (~70px) y los bloques
+   apilados serían tiras sin nombre: entonces van SIEMPRE en fila, cada uno
+   con su ancho de bloque alto (7rem) e icono encima del nombre, que encogen
+   las reglas de arriba. `data-scoreboard-stats` es la fila de stats del panel
+   (también mientras carga). El :has() se evalúa solo dentro de la fila. */
+.sv-score-row:not(:has([data-scoreboard-stats])) .sv-score-tiles {
+  flex-direction: row;
+  gap: 0.75rem;
+}
+.sv-score-row:not(:has([data-scoreboard-stats])) .sv-score-tile {
+  flex: none;
+  flex-direction: column;
+  width: 7rem;
+}

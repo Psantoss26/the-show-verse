@@ -109,3 +109,16 @@
 [data-phone-scoreboard] .spreadStats {
   --sb-su: clamp(0.7px, calc((100cqi - 46px) / 272), 1px);
 }
+
+/* Ficha normal con Enlaces y Compartir fuera del panel (`narrowStatLabels`):
+   si el panel se queda estrecho, las stats siguen en UNA línea quitando su
+   etiqueta (el nombre sigue en el tooltip), en vez de partirse en dos y
+   estirar el panel y los bloques de al lado. */
+@container detail-scoreboard (width < 31rem) {
+  .narrowStatsTrack {
+    flex-wrap: nowrap;
+  }
+  .narrowStatsTrack > div > div > span:last-child {
+    display: none;
+  }
+}

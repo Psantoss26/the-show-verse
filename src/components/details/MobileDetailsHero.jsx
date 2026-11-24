@@ -996,6 +996,22 @@ const buildCoverShadeSoft = (leadPx) => `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.52) 100%)`
 const MOBILE_COVER_SHADE_SOFT = buildCoverShadeSoft(MOBILE_COVER_SHADE_LEAD_PX)
 
+// PROLONGACIÓN HASTA EL PIE (`edgeFill`, el hero destacado del dashboard): sin
+// reflejo de otro color debajo, la última fila del póster, estirada y
+// difuminada, sigue sin desvanecerse hasta el final del contenedor; solo el
+// velo la oscurece poco a poco. Así todo lo que hay bajo el póster es un mismo
+// difuminado que continúa su borde. El largo es fijo (el estirado de la franja
+// necesita un número) y sobra para cualquier pantalla: el contenedor recorta.
+const MOBILE_COVER_EDGE_FILL_PX = 1400
+const buildCoverEdgeFillMask = (bandPx) =>
+    (bandPx === MOBILE_COVER_BLUR_BAND_PX
+        ? buildCoverExtendMask(MOBILE_COVER_EDGE_FILL_PX, bandPx)
+        : buildCoverExtendMaskSmooth(MOBILE_COVER_EDGE_FILL_PX, bandPx)
+    ).replace(
+        /#000 calc\(var\(--mobile-cover-h\) \+ 16px\),[\s\S]*\)$/,
+        '#000 100%)',
+    )
+
 // FRANJA DE LA BARRA DE ESTADO en la app de Android con la barra VISIBLE
 // (`data-android-statusbar`, `--sv-cover-strip`): la portada empieza justo
 // debajo y la franja lleva el póster prolongado hacia arriba (reflejado),
@@ -1158,6 +1174,20 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.9) calc(var(--mobile-cover-h) * 0.86),
     rgb(10, 10, 10) calc(var(--mobile-cover-h) * 0.95))`
 
+// Pie del póster de la FICHA en móvil (DetailsClient), compartido con el hero
+// destacado del dashboard (FeaturedHero) para que ambos se vean igual: reflejo
+// difuminado debajo, oscurecido medido bajo el logo y los botones, y un poco
+// menos que lo común a las portadas con logo encima (franja de 64 px, velo
+// desde 48 px, oscurecido entero), sin llegar a lo de las temporadas (44/32 y
+// sin oscurecido), que dejaría el logo sin contraste.
+export const DETAILS_MOBILE_COVER_PROPS = Object.freeze({
+    blurredUnderlay: true,
+    adaptiveContrast: true,
+    contrastScale: 0.8,
+    edgeBandPx: 56,
+    shadeLeadPx: 40,
+})
+
 // `contrastScale` (0…1): rebaja el oscurecido medido. La ficha lo usa algo por
 // debajo de 1: con pósters claros el máximo dejaba un pie oscuro muy intenso.
 // `inPanel`: la portada de la ficha de teléfono del drawer (`usePanelHeroFit`).
@@ -1279,7 +1309,7 @@ function StatusStripExtension({ src, imgHeight, objectPosition }) {
     )
 }
 
-export function MobileHeroCover({ src, lowSrc, topEdge, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, contrastScale = 1, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX, shadeLeadPx = MOBILE_COVER_SHADE_LEAD_PX, ready, animate, inPanel = false, objectPosition = 'center bottom' }) {
+export function MobileHeroCover({ src, lowSrc, topEdge, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, edgeFill = false, adaptiveContrast = false, contrastScale = 1, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX, shadeLeadPx = MOBILE_COVER_SHADE_LEAD_PX, ready, animate, inPanel = false, objectPosition = 'center bottom' }) {
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
@@ -1307,8 +1337,10 @@ export function MobileHeroCover({ src, lowSrc, topEdge, imgRef, onLoad, onError,
     }
 
     const mask = hasImage ? undefined : 'var(--sv-poster-fade)'
-    const extendMask =
-        edgeBandPx === MOBILE_COVER_BLUR_BAND_PX
+    const extendPx = edgeFill ? MOBILE_COVER_EDGE_FILL_PX : MOBILE_COVER_EXTEND_PX
+    const extendMask = edgeFill
+        ? buildCoverEdgeFillMask(edgeBandPx)
+        : edgeBandPx === MOBILE_COVER_BLUR_BAND_PX
             ? (blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_MASK : MOBILE_COVER_EXTEND_MASK)
             : buildCoverExtendMaskSmooth(blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_PX : MOBILE_COVER_EXTEND_PX, edgeBandPx)
 
@@ -1428,7 +1460,7 @@ export function MobileHeroCover({ src, lowSrc, topEdge, imgRef, onLoad, onError,
                 <div
                     className="pointer-events-none absolute inset-x-0 top-0 blur-[12px]"
                     style={{
-                        height: `calc(var(--mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX}px)`,
+                        height: `calc(var(--mobile-cover-h) + ${extendPx}px)`,
                         WebkitMaskImage: extendMask,
                         maskImage: extendMask,
                     }}
@@ -1450,7 +1482,7 @@ export function MobileHeroCover({ src, lowSrc, topEdge, imgRef, onLoad, onError,
                         style={{
                             // 1px por encima del borde: sin hueco entre ambas.
                             top: 'calc(var(--mobile-cover-h) - 1px)',
-                            transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, ${(MOBILE_COVER_EXTEND_PX + 1) / 2})`,
+                            transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, ${(extendPx + 1) / 2})`,
                         }}
                     >
                         {/* Prolonga el borde VISIBLE del recorte, que al
@@ -1483,7 +1515,7 @@ export function MobileHeroCover({ src, lowSrc, topEdge, imgRef, onLoad, onError,
                     style={{
                         top: `calc(var(--mobile-cover-h) - ${shadeLeadPx}px)`,
                         // Con el reflejo, hasta el pie de la pantalla.
-                        height: blurredUnderlay
+                        height: blurredUnderlay || edgeFill
                             ? `calc(100lvh + ${shadeLeadPx}px)`
                             : MOBILE_COVER_EXTEND_PX + shadeLeadPx,
                         backgroundImage: shadeLeadPx === MOBILE_COVER_SHADE_LEAD_PX

@@ -130,7 +130,7 @@ import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
 import DetailsScoreboardPanel, { ScoreboardPill, ScoreboardPillRow } from "@/components/details/DetailsScoreboardPanel";
-import { ActionShareButton } from "@/components/details/DetailHeaderBits";
+import { ActionShareButton, ScoreboardTile } from "@/components/details/DetailHeaderBits";
 import {
   FollowingActivityAvatars,
   FollowingActivityModal,
@@ -3234,7 +3234,32 @@ export default function DetailModal({
   // Marcador de puntuaciones. Función y no constante porque lo pintan dos
   // diseños: la ficha (normal o de teléfono) y la vista previa de pulsación
   // larga, cada uno con su propia clase.
-  const renderScoreboardPanel = (className) => (
+  const shareTitleProps = {
+    title,
+    text: `Echa un vistazo a ${title} en The Show Verse`,
+    url:
+      typeof window !== "undefined" && item?.id
+        ? `${window.location.origin}/details/${mediaType}/${item.id}`
+        : undefined,
+    card: shareCard,
+    story: shareStory,
+  };
+  const openPlatformsFromPanel = (event) => {
+    stopNestedModalOpeningEvent(event);
+    setPlatformsOpen(true);
+  };
+  const openLinksFromPanel = (event) => {
+    stopNestedModalOpeningEvent(event);
+    setExternalLinksOpen(true);
+  };
+
+  // `separateTiles`: ficha de ESCRITORIO del panel. Plataformas, Enlaces y
+  // Compartir salen del marcador y van a su derecha como tres bloques de
+  // cristal con su mismo alto (como en la ficha normal). Deciden por el ancho
+  // de la fila (`@container/sbrow`), no por el de la ventana: el drawer se
+  // estrecha arrastrando. Estrecha = apilados; ancha = uno al lado del otro.
+  const renderScoreboardPanel = (className, { separateTiles = false } = {}) => {
+    const panel = (
     <DetailsScoreboardPanel
       loading={loading}
       // El pie de estadísticas de Trakt llega en su propia consulta
@@ -3257,32 +3282,18 @@ export default function DetailModal({
       // estrecho: sin esto el marcador salía con la disposición
       // ancha y puntuaciones y stats se partían en dos filas.
       phoneLayout={phoneLayout}
-      externalLinks={externalLinks}
+      externalLinks={separateTiles ? null : externalLinks}
       externalLinksWikipedia={wikipediaQuery}
-      onMorePlatforms={(event) => {
-        stopNestedModalOpeningEvent(event);
-        setPlatformsOpen(true);
-      }}
+      onMorePlatforms={separateTiles ? undefined : openPlatformsFromPanel}
       platformsMenuOnly
-      onMoreLinks={(event) => {
-        stopNestedModalOpeningEvent(event);
-        setExternalLinksOpen(true);
-      }}
+      onMoreLinks={separateTiles ? undefined : openLinksFromPanel}
       externalLinksMenuOnly
       showExternalLinksLabel
-      share={{
-        title,
-        text: `Echa un vistazo a ${title} en The Show Verse`,
-        url:
-          typeof window !== "undefined" && item?.id
-            ? `${window.location.origin}/details/${mediaType}/${item.id}`
-            : undefined,
-        card: shareCard,
-        story: shareStory,
-      }}
+      narrowStatLabels={separateTiles}
+      share={separateTiles ? null : shareTitleProps}
       stats={scoreStats}
       statsTrailing={
-        showFollowingActivity ? (
+        showFollowingActivity && !separateTiles ? (
           <FollowingActivityAvatars
             data={followingActivity}
             mediaType={mediaType}
@@ -3291,9 +3302,47 @@ export default function DetailModal({
         ) : null
       }
       showFavoritedStat={!isEpisode}
-      className={className}
+      className={separateTiles ? "min-w-0 flex-1" : className}
     />
-  );
+    );
+    if (!separateTiles) return panel;
+    return (
+      <div className={`@container/sbrow ${className}`}>
+        <div className="sv-score-row flex items-stretch gap-3">
+          {panel}
+          <div className="sv-score-tiles flex shrink-0 flex-col gap-2 @4xl/sbrow:flex-row @4xl/sbrow:gap-3">
+            <ScoreboardTile
+              wideBy="container"
+              icon={MonitorPlay}
+              label="Plataformas"
+              onClick={openPlatformsFromPanel}
+              aria-haspopup="dialog"
+              aria-label="Abrir plataformas"
+            />
+            {showFollowingActivity && (
+              <ScoreboardTile
+                wideBy="container"
+                icon={UsersRound}
+                label="Actividad"
+                onClick={openFollowingActivity}
+                aria-haspopup="dialog"
+                aria-label="Ver la actividad de quienes sigues"
+              />
+            )}
+            <ScoreboardTile
+              wideBy="container"
+              icon={Link2}
+              label="Enlaces"
+              onClick={openLinksFromPanel}
+              aria-haspopup="dialog"
+              aria-label="Abrir enlaces externos"
+            />
+            <ActionShareButton variant="tile" tileWideBy="container" {...shareTitleProps} />
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const modalLayer = (
     <>
@@ -4452,7 +4501,7 @@ export default function DetailModal({
               className={mobileDetails ? `mb-3 grid grid-cols-2 gap-x-3 ${PANEL_STATS_REVEAL_BASE}` : undefined}
               {...(mobileDetails ? { [PANEL_STATS_REVEAL_ATTR]: "hidden" } : null)}
             >
-              {renderScoreboardPanel(mobileDetails ? "col-span-2" : "max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]")}
+              {renderScoreboardPanel(mobileDetails ? "col-span-2" : "max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]", { separateTiles: !phoneLayout })}
               {/* TELÉFONO: Plataformas, Actividad (si tus amigos han tocado
                   el título), Enlaces y Compartir en una fila de iconos bajo
                   el marcador, como en la ficha móvil. Cada uno abre su modal. */}

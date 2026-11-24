@@ -22,6 +22,10 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import HeroSoundtrackPlayer from "@/components/dashboard/HeroSoundtrackPlayer";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
+import {
+  DETAILS_MOBILE_COVER_PROPS,
+  MobileHeroCover,
+} from "@/components/details/MobileDetailsHero";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 
@@ -75,6 +79,10 @@ import {
   getSpotlightBadge,
   formatRuntime,
 } from "@/lib/dashboard/media";
+
+// Fundido a negro del pie del hero en móvil (ver el div que lo usa): curva
+// smootherstep en 12 tramos, sin esquinas que se lean como banda.
+const HERO_MOBILE_FOOT_FADE = "linear-gradient(to top, #000 0, #000 2px, rgba(0,0,0,0.995) 8.3%, rgba(0,0,0,0.965) 16.7%, rgba(0,0,0,0.896) 25.0%, rgba(0,0,0,0.790) 33.3%, rgba(0,0,0,0.653) 41.7%, rgba(0,0,0,0.500) 50.0%, rgba(0,0,0,0.347) 58.3%, rgba(0,0,0,0.210) 66.7%, rgba(0,0,0,0.104) 75.0%, rgba(0,0,0,0.035) 83.3%, rgba(0,0,0,0.005) 91.7%, transparent)";
 
 // El backdrop se carga directamente desde TMDb. El <picture> usa `original`
 // únicamente cuando w1280 tendría que ampliarse (viewport ancho o pantalla de
@@ -1455,7 +1463,7 @@ function FeaturedSlide({
       {/* Fondo/Poster: en móvil se muestra arriba (relative), en escritorio de fondo (absolute) */}
       <div
         className={`w-full ${
-          showTrailer
+          showTrailer || isMobile
             ? "absolute inset-0 h-full aspect-auto"
             : "relative aspect-[2/3]"
         } hero-wide:absolute hero-wide:inset-0 hero-wide:h-full hero-wide:aspect-auto`}
@@ -1473,58 +1481,79 @@ function FeaturedSlide({
                 : "hero-backdrop-reveal-desktop"
             } ${loadedBackdropSrc === bgSrc ? "hero-backdrop-ready" : "hero-backdrop-loading"}`}
           >
-            <picture className="absolute inset-0 block h-full w-full">
-              {posterSrc && (
-                <source media={HERO_MOBILE_MEDIA} srcSet={posterSrc} />
-              )}
-              {maxBackdropSrc && (
-                <source
-                  media="(min-width: 1440px), (min-resolution: 1.5dppx)"
-                  srcSet={maxBackdropSrc}
-                />
-              )}
-              {backdropSrc && (
-                <source media={HERO_WIDE_QUERY} srcSet={backdropSrc} />
-              )}
-              {/* La selección responsive requiere <picture>; Next Image está
-                  configurado como unoptimized y no generaría srcset. */}
-              <img
-                src={bgSrc}
-                alt={title}
-                width={isMobile ? 780 : 1280}
-                height={isMobile ? 1170 : 720}
-                loading="eager"
-                decoding="async"
-                fetchPriority={isActive ? "high" : "low"}
+            {isMobile ? (
+              // Móvil: la MISMA portada que la ficha (details/MobileHeroCover
+              // con DETAILS_MOBILE_COVER_PROPS, los ajustes de DetailsClient): el
+              // póster entero a todo el ancho, su borde inferior prolongado y
+              // difuminado, el reflejo del póster debajo y el velo de
+              // contraste medido bajo el logo y los botones.
+              <MobileHeroCover
+                inPanel
+                src={posterSrc}
                 onLoad={() => setLoadedBackdropSrc(bgSrc)}
-                // Escritorio/tablet: `cover` para que el backdrop quede pegado
-                // a los cuatro bordes del hero con cualquier proporción de
-                // pantalla; se recorta lo que sobre, conservando la parte alta
-                // (caras y sujeto suelen estar arriba del centro).
-                className={`absolute inset-0 h-full w-full ${
-                  isMobile
-                    ? "object-contain object-top"
-                    : "object-cover object-[50%_25%]"
-                }`}
-                // Fundido mínimo en el borde inferior de la propia imagen para
-                // que su corte nunca sea una línea dura durante la carga.
-                style={
-                  isMobile
-                    ? {
-                        WebkitMaskImage:
-                          "linear-gradient(to bottom, black 90%, transparent 100%)",
-                        maskImage:
-                          "linear-gradient(to bottom, black 90%, transparent 100%)",
-                      }
-                    : {
-                        WebkitMaskImage:
-                          "linear-gradient(to bottom, black 92%, transparent 100%)",
-                        maskImage:
-                          "linear-gradient(to bottom, black 92%, transparent 100%)",
-                      }
-                }
+                ready
+                animate={false}
+                collage={null}
+                {...DETAILS_MOBILE_COVER_PROPS}
+                // Sin reflejo de otro color: bajo el póster, su borde
+                // difuminado sigue igual hasta el pie (ver `edgeFill`).
+                blurredUnderlay={false}
+                edgeFill
               />
-            </picture>
+            ) : (
+              <picture className="absolute inset-0 block h-full w-full">
+                {posterSrc && (
+                  <source media={HERO_MOBILE_MEDIA} srcSet={posterSrc} />
+                )}
+                {maxBackdropSrc && (
+                  <source
+                    media="(min-width: 1440px), (min-resolution: 1.5dppx)"
+                    srcSet={maxBackdropSrc}
+                  />
+                )}
+                {backdropSrc && (
+                  <source media={HERO_WIDE_QUERY} srcSet={backdropSrc} />
+                )}
+                {/* La selección responsive requiere <picture>; Next Image está
+                    configurado como unoptimized y no generaría srcset. */}
+                <img
+                  src={bgSrc}
+                  alt={title}
+                  width={isMobile ? 780 : 1280}
+                  height={isMobile ? 1170 : 720}
+                  loading="eager"
+                  decoding="async"
+                  fetchPriority={isActive ? "high" : "low"}
+                  onLoad={() => setLoadedBackdropSrc(bgSrc)}
+                  // Escritorio/tablet: `cover` para que el backdrop quede pegado
+                  // a los cuatro bordes del hero con cualquier proporción de
+                  // pantalla; se recorta lo que sobre, conservando la parte alta
+                  // (caras y sujeto suelen estar arriba del centro).
+                  className={`absolute inset-0 h-full w-full ${
+                    isMobile
+                      ? "object-contain object-top"
+                      : "object-cover object-[50%_25%]"
+                  }`}
+                  // Fundido mínimo en el borde inferior de la propia imagen para
+                  // que su corte nunca sea una línea dura durante la carga.
+                  style={
+                    isMobile
+                      ? {
+                          WebkitMaskImage:
+                            "linear-gradient(to bottom, black 90%, transparent 100%)",
+                          maskImage:
+                            "linear-gradient(to bottom, black 90%, transparent 100%)",
+                        }
+                      : {
+                          WebkitMaskImage:
+                            "linear-gradient(to bottom, black 92%, transparent 100%)",
+                          maskImage:
+                            "linear-gradient(to bottom, black 92%, transparent 100%)",
+                        }
+                  }
+                />
+              </picture>
+            )}
           </div>
           </div>
         )}
@@ -1620,11 +1649,26 @@ function FeaturedSlide({
           hover backdrop) se sustituye por la máscara `--sv-hero-fade` del wrapper:
           ahora el borde funde a TRANSPARENTE y revela lo que hay detrás sin corte. */}
 
+      {/* Pie del hero en móvil: funde a negro el fondo (portada, su
+          prolongación y el tráiler) solo al final, detrás del navbar inferior,
+          donde sigue la página (al hacer scroll no se ve corte). El
+          alto del hero cae en fracción de píxel (svh − rem), y lo que hubiera
+          debajo asomaba recortado en esa última fila como una línea clara;
+          aquí los últimos píxeles son negro sólido y la capa rebasa el borde
+          en 1 px, así que esa fila es siempre negra. Largo (15rem) y con
+          curva smootherstep: un fundido corto y lineal se veía como una banda
+          al hacer scroll. Va encima del fondo y debajo del contenido (z-10). */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 -bottom-px h-60 hero-wide:hidden"
+        style={{ background: HERO_MOBILE_FOOT_FADE }}
+      />
+
       {/* Contenido. Móvil/tablet vertical: franja inferior a todo el ancho con
           degradado. Layout ancho: bloque de ancho fijo de referencia anclado a
           la esquina inferior izquierda y escalado con --hero-ui-scale (ver
           .hero-info-panel en los estilos). */}
-      <div ref={infoPanelRef} className="hero-info-panel absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-3 pt-12">
+      <div ref={infoPanelRef} className="hero-info-panel absolute bottom-[calc(7.8rem+var(--sv-safe-bottom,0px))] left-0 right-0 z-10 w-full px-7 pb-3 pt-12">
         <div className="hero-info-inner flex max-w-full flex-col items-center text-center hero-wide:block hero-wide:text-left">
             {/* Solo el logo del título; no se muestra el título en texto. */}
             {logoSrc ? (
@@ -2064,10 +2108,6 @@ function FeaturedSlide({
             scale: var(--hero-ui-scale, 1);
             transform-origin: left bottom;
           }
-
-          .hero-info-panel::after {
-            display: none;
-          }
         }
 
         /* Tablet en VERTICAL (layout movil a mas ancho que un telefono): el
@@ -2120,21 +2160,6 @@ function FeaturedSlide({
           left: 0;
           right: 0;
           opacity: 0;
-          pointer-events: none;
-        }
-
-        /* Movil: el panel lleva un degradado a negro hasta el borde inferior.
-           Durante el FLIP el panel parte desplazado hacia arriba y dejaria un
-           hueco sin negro debajo; esta prolongacion lo tapa (el hero la
-           recorta con su overflow). */
-        .hero-info-panel::after {
-          content: "";
-          position: absolute;
-          top: 100%;
-          left: 0;
-          right: 0;
-          height: 100vh;
-          background: #000;
           pointer-events: none;
         }
 
@@ -2973,7 +2998,9 @@ export default function FeaturedHero({
     <>
       <section
         ref={heroSectionRef}
-        className="featured-hero-shell relative isolate w-full touch-pan-y overflow-hidden bg-black hero-wide:bg-transparent h-[calc(100svh-7.8rem-var(--sv-safe-bottom,0px))] hero-wide:h-[var(--hero-wide-height)]"
+        className="featured-hero-shell relative isolate w-full touch-pan-y overflow-hidden bg-black hero-wide:bg-transparent h-[100svh] hero-wide:h-[var(--hero-wide-height)]"
+        // Alto de la portada móvil (MobileHeroCover): el póster 2:3 a todo el ancho.
+        style={isMobile ? { "--mobile-cover-h": "150vw" } : undefined}
         aria-label="Contenido destacado"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -3030,6 +3057,24 @@ export default function FeaturedHero({
           </>
         )}
 
+        {/* Móvil: el hero ocupa la pantalla entera (también detrás del
+            navbar inferior) y el difuminado del borde del póster llega hasta
+            abajo sin ningún corte. Indicadores y flecha van dentro, justo
+            encima del navbar (4.3rem + zona segura); el contenido, 3.5rem más
+            arriba. */}
+        {isMobile && (
+          <div className="absolute inset-x-0 bottom-[calc(4.3rem+var(--sv-safe-bottom,0px))] z-20 h-14 hero-wide:hidden">
+            {indicators && (
+              <div className="absolute left-1/2 top-1 -translate-x-1/2">
+                {indicators}
+              </div>
+            )}
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2">
+              {scrollCue}
+            </div>
+          </div>
+        )}
+
         {!isMobile && (
           <div className="hero-wide-indicators absolute bottom-[4.25rem] left-1/2 z-20 -translate-x-1/2">
             {indicators && indicators}
@@ -3045,18 +3090,6 @@ export default function FeaturedHero({
         </div>
       )}
 
-      {isMobile && (
-        <div className="relative h-14 bg-black hero-wide:hidden">
-          {indicators && (
-            <div className="absolute left-1/2 top-1 -translate-x-1/2">
-              {indicators}
-            </div>
-          )}
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2">
-            {scrollCue}
-          </div>
-        </div>
-      )}
 
       <style jsx>{`
         /* Alto del hero en layout ancho: TODO el alto visible, sin franja

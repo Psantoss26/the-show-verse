@@ -313,12 +313,13 @@ import {
 // Sección de pestañas (Detalles/Producción/Sinopsis/Premios) compartida con la
 // ficha rápida del dashboard (DetailModal) para que rendericen las MISMAS tarjetas.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
-import { ActionShareButton, UnifiedRateButton } from "@/components/details/DetailHeaderBits";
+import { ActionShareButton, ScoreboardTile, UnifiedRateButton } from "@/components/details/DetailHeaderBits";
 import DetailsScoreboardPanel, { ScoreboardPill, ScoreboardPillRow } from "@/components/details/DetailsScoreboardPanel";
 import {
   MOBILE_SCOREBOARD_ENTRY_ANIMATION,
   MOBILE_STATS_REVEAL_BASE,
   MobileHeroCover,
+  DETAILS_MOBILE_COVER_PROPS,
   useMobileDetailsHero,
 } from "@/components/details/MobileDetailsHero";
 import useRatingLinks from "@/lib/details/useRatingLinks";
@@ -333,13 +334,6 @@ import {
 // ficha rápida del dashboard (DetailModal) para que la fila sea IDÉNTICA.
 import DetailActionsRow, { DETAIL_ACTION_DESKTOP_SIZE_CLASS } from "@/components/details/DetailActionsRow";
 
-// Pie del póster en móvil: un poco menos que lo común a las portadas con logo
-// encima (franja de 64 px, velo desde 48 px, oscurecido medido entero), sin
-// llegar a lo de las temporadas (44/32 y sin oscurecido), que dejaría el logo
-// sin contraste.
-const DETAILS_COVER_EDGE_BAND_PX = 56;
-const DETAILS_COVER_SHADE_LEAD_PX = 40;
-const DETAILS_COVER_CONTRAST_SCALE = 0.8;
 
 // -- Modales del componente --
 import AddToListModal from "@/components/details/AddToListModal";
@@ -10479,19 +10473,10 @@ export default function DetailsClient({
               ready={mobileHeroCoverReady}
               animate={!detailsRestored && !sequenceTransitionActive}
               collage={null}
-              // Bajo el póster, su parte central muy difuminada en vez del
-              // fondo casi negro de la página.
-              blurredUnderlay
-              // Logo y botones legibles sobre cualquier póster: se oscurece
-              // su zona según lo claro que sea (medido), nada en los oscuros.
-              adaptiveContrast
-              // Algo más suave que el resto de portadas con contraste
-              // adaptativo: con pósters claros el pie quedaba muy oscuro. La
-              // franja difuminada entra con la curva suave de las temporadas
-              // (smootherstep) y el velo de los botones sube menos.
-              contrastScale={DETAILS_COVER_CONTRAST_SCALE}
-              edgeBandPx={DETAILS_COVER_EDGE_BAND_PX}
-              shadeLeadPx={DETAILS_COVER_SHADE_LEAD_PX}
+              // Pie del póster de la ficha (reflejo difuminado debajo y
+              // oscurecido medido bajo el logo y los botones), el mismo que
+              // el hero destacado del dashboard en móvil.
+              {...DETAILS_MOBILE_COVER_PROPS}
             />
           </>
         ) : (
@@ -11507,11 +11492,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   ? { [PEEK_HANDOFF_PART_ATTR]: "scoreboard" }
                   : null)}
               >
+                {/* Ficha normal (portada vertical), escritorio: Enlaces y
+                    Compartir salen del marcador y van a su derecha como dos
+                    bloques propios con el alto del panel. El marcador se acorta
+                    lo que ocupan. Con portada backdrop siguen dentro. */}
+                <div className={isBackdropPoster ? "contents" : "sv-score-row sm:flex sm:items-stretch sm:gap-3"}>
                 <DetailsScoreboardPanel
+                className={isBackdropPoster ? "" : "sm:min-w-0 sm:flex-1"}
                 // Móvil: solo puntuaciones y stats, centradas y a todo el ancho
                 // como en la imagen compartible; las acciones van debajo.
                 mobileScoresOnly
                 compactStatsTrailing={isBackdropPoster}
+                narrowStatLabels={!isBackdropPoster}
                 shareIconOnly={isBackdropPoster}
                 fitAllScores={isBackdropPoster}
                 loading={tScoreboard.loading}
@@ -11541,23 +11533,28 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       }
                     : null
                 }
-                externalLinks={scoreboardExternalLinks}
+                externalLinks={isBackdropPoster ? scoreboardExternalLinks : null}
                 externalLinksWikipedia={wikipediaQuery}
-                onMoreLinks={() => setExternalLinksOpen(true)}
+                onMoreLinks={isBackdropPoster ? () => setExternalLinksOpen(true) : undefined}
                 onMorePlatforms={() => setPlatformsOpen(true)}
                 externalLinksMenuOnly
-                showExternalLinksLabel={!isBackdropPoster}
-                share={{
-                  title,
-                  text: `Echa un vistazo a ${title} en The Show Verse`,
-                  card: shareCard,
-                  story: shareStory,
-                }}
+                share={
+                  isBackdropPoster
+                    ? {
+                        title,
+                        text: `Echa un vistazo a ${title} en The Show Verse`,
+                        card: shareCard,
+                        story: shareStory,
+                      }
+                    : null
+                }
                 stats={tScoreboard?.stats}
                 // Escritorio: tus amigos a la derecha de la fila de stats, solo
                 // avatar + su marca (nota, viéndola, pendiente…).
+                // Con portada vertical la actividad va en su propio bloque,
+                // junto a Enlaces y Compartir (más abajo).
                 statsTrailing={
-                  showFollowingActivity ? (
+                  showFollowingActivity && isBackdropPoster ? (
                     <FollowingActivityAvatars
                       compact={isBackdropPoster}
                       data={followingActivity}
@@ -11567,6 +11564,36 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   ) : null
                 }
                 />
+                {!isBackdropPoster && (
+                  <div className={`sv-score-tiles hidden sm:flex sm:shrink-0 sm:flex-col ${showFollowingActivity ? "sm:gap-2" : "sm:gap-3"} xl:flex-row xl:gap-3`}>
+                    {/* Actividad: solo si alguien a quien sigues ha tocado
+                        el título; abre el mismo modal que los avatares. */}
+                    {showFollowingActivity && (
+                      <ScoreboardTile
+                        icon={UsersRound}
+                        label="Actividad"
+                        onClick={() => setFollowingOpen(true)}
+                        aria-haspopup="dialog"
+                        aria-label="Ver la actividad de quienes sigues"
+                      />
+                    )}
+                    <ScoreboardTile
+                      icon={Link2}
+                      label="Enlaces"
+                      onClick={() => setExternalLinksOpen(true)}
+                      aria-haspopup="dialog"
+                      aria-label="Abrir enlaces externos"
+                    />
+                    <ActionShareButton
+                      variant="tile"
+                      title={title}
+                      text={`Echa un vistazo a ${title} en The Show Verse`}
+                      card={shareCard}
+                      story={shareStory}
+                    />
+                  </div>
+                )}
+                </div>
               </div>
               <span
                 ref={heroSecondaryTriggerRef}

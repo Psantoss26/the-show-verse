@@ -426,10 +426,64 @@ export function useShareAction({ title, text, url, card = null, story = null, ki
   return { handleShare, sheet, copied, buttonRef, warmProps, open: sheetOpen };
 }
 
-export function ActionShareButton({ title, text, url, card = null, story = null, kind = "details", iconOnly = false, animateEntrance = true, variant = "default", className = "" }) {
+// Bloque de acción de escritorio a la derecha del marcador (ficha normal):
+// mismo cristal que el panel, alto completo del marcador (`self-stretch`),
+// icono grande encima y etiqueta debajo. Por debajo de `xl` los dos bloques
+// se apilan en una columna (medio alto cada uno, icono y etiqueta en fila)
+// para dejar ancho al marcador.
+const SCOREBOARD_TILE_BASE = `${LIQUID_GLASS_SURFACE} sv-score-tile group/tile relative flex w-36 min-h-0 flex-1 flex-row items-center justify-center gap-2 rounded-2xl text-sm font-bold text-white/80 [-webkit-tap-highlight-color:transparent] transition-[color,scale] duration-300 hover:text-white active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40`;
+// Cuándo pasan a ser bloques altos uno al lado del otro: la ficha decide por la
+// ventana (`xl`); el panel de DetailModal, que se estrecha arrastrando, por el
+// ancho de su fila (contenedor `@container/sbrow`, 56rem).
+const SCOREBOARD_TILE_WIDE = {
+  viewport: "xl:w-28 xl:flex-none xl:flex-col",
+  container: "@4xl/sbrow:w-28 @4xl/sbrow:flex-none @4xl/sbrow:flex-col",
+};
+const SCOREBOARD_TILE_ICON_WIDE = {
+  viewport: "xl:h-7 xl:w-7",
+  container: "@4xl/sbrow:h-7 @4xl/sbrow:w-7",
+};
+export const SCOREBOARD_TILE_CLASS = `${SCOREBOARD_TILE_BASE} ${SCOREBOARD_TILE_WIDE.viewport}`;
+
+export function ScoreboardTile({ icon: Icon, label, onClick, wideBy = "viewport", className = "", ...props }) {
+  return (
+    <button type="button" onClick={onClick} className={`${SCOREBOARD_TILE_BASE} ${SCOREBOARD_TILE_WIDE[wideBy]} ${className}`} {...props}>
+      <LiquidGlassOpticalLayers />
+      <Icon aria-hidden="true" className={`sv-score-tile-icon relative z-10 h-5 w-5 shrink-0 transition-transform duration-300 group-hover/tile:scale-110 ${SCOREBOARD_TILE_ICON_WIDE[wideBy]}`} />
+      <span className="sv-score-tile-label relative z-10">{label}</span>
+    </button>
+  );
+}
+
+export function ActionShareButton({ title, text, url, card = null, story = null, kind = "details", iconOnly = false, animateEntrance = true, variant = "default", tileWideBy = "viewport", className = "" }) {
   const { handleShare, sheet, copied, buttonRef, warmProps } = useShareAction({ title, text, url, card, story, kind });
   const prefersReducedMotion = useReducedMotion();
   const isStaticDetails = useDetailsStaticMotion();
+
+  if (variant === "tile") {
+    return (
+      <>
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={handleShare}
+          {...warmProps}
+          aria-haspopup={card ? "dialog" : undefined}
+          aria-label={copied ? "¡Enlace copiado!" : "Compartir"}
+          className={`${SCOREBOARD_TILE_BASE} ${SCOREBOARD_TILE_WIDE[tileWideBy]} ${className}`}
+        >
+          <LiquidGlassOpticalLayers />
+          {copied ? (
+            <Check aria-hidden="true" className={`sv-score-tile-icon relative z-10 h-5 w-5 shrink-0 ${SCOREBOARD_TILE_ICON_WIDE[tileWideBy]}`} />
+          ) : (
+            <Share2 aria-hidden="true" className={`sv-score-tile-icon relative z-10 h-5 w-5 shrink-0 transition-transform duration-300 group-hover/tile:scale-110 ${SCOREBOARD_TILE_ICON_WIDE[tileWideBy]}`} />
+          )}
+          <span className="sv-score-tile-label relative z-10">{copied ? "Copiado" : "Compartir"}</span>
+        </button>
+        {sheet}
+      </>
+    );
+  }
 
   if (variant === "pill") {
     return (
