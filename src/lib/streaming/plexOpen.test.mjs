@@ -86,6 +86,10 @@ test("en escritorio ambas entradas mantienen los detalles del servidor personal"
 test("el WebView recibe HTTPS, nunca un intent serializado como ACTION_VIEW", (t) => {
   device(t, { bridge: { isApp: () => true } });
   assert.equal(getPlexLink(links), watch);
+  // Tablet con ratón dentro de la app: sigue yendo a la ficha, no al servidor.
+  device(t, { desktop: true, bridge: { isApp: () => true } });
+  assert.equal(getPlexLink(links), watch);
+  assert.equal(getPlexLink({ web, universal: web }), web);
 });
 
 test("snapshots antiguos con slug se convierten al enlace HTTPS de la ficha", (t) => {

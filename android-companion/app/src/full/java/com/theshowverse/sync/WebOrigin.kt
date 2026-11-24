@@ -136,6 +136,31 @@ object WebOrigin {
         return scheme != "http" && scheme != "https"
     }
 
+    /** Paquete de la app de Plex para Android (móvil y tablet). */
+    const val PLEX_PACKAGE = "com.plexapp.android"
+
+    private val RUTA_FICHA_PLEX = Regex("^/(movie|show)/[^/]+/?$")
+
+    /**
+     * ¿Es la ficha pública de un título en Plex (https://watch.plex.tv/movie|show/<slug>)?
+     *
+     * La app de Plex declara esas URLs, pero no las tiene verificadas como App
+     * Links: un ACTION_VIEW implícito (o la pestaña personalizada) se queda en
+     * el navegador. Estas se lanzan dirigidas a [PLEX_PACKAGE], igual que el
+     * `intent://…;package=com.plexapp.android` que usa la PWA.
+     */
+    fun isPlexTitle(url: String?): Boolean {
+        val uri = try {
+            URI(url ?: return false)
+        } catch (e: Exception) {
+            return false
+        }
+        return uri.scheme?.lowercase() == "https" &&
+            uri.host?.lowercase() == "watch.plex.tv" &&
+            uri.port.let { it == -1 || it == 443 } &&
+            RUTA_FICHA_PLEX.matches(uri.rawPath.orEmpty())
+    }
+
     /**
      * URL con la que se autoriza el dispositivo cuando la web está tras el gate
      * de acceso privado. Devuelve null si no hay clave.

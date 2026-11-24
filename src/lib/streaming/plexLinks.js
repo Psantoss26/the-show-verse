@@ -26,6 +26,11 @@ export function getPlexLink(links) {
   if (typeof links === "string") return links;
   const web = links.web || "";
   const watch = watchUrlFromLinks(links);
+  // The Android app (phone or tablet, even with a mouse) opens the HTTPS title
+  // page in the native Plex app: WebAppActivity targets com.plexapp.android.
+  const nativeWrapper = typeof window !== "undefined" &&
+    typeof window.TSVAndroidBridge?.isApp === "function";
+  if (nativeWrapper) return watch || web || "#";
   const desktop = typeof window === "undefined" ||
     (typeof window.matchMedia === "function" && window.matchMedia(
       "(min-width: 64rem) and (hover: hover) and (pointer: fine)",
@@ -38,8 +43,7 @@ export function getPlexLink(links) {
 
   const android = typeof navigator !== "undefined" &&
     /Android/i.test(navigator.userAgent || "");
-  const nativeWrapper = typeof window.TSVAndroidBridge?.isApp === "function";
-  if (android && !nativeWrapper) {
+  if (android) {
     return `intent://${watch.slice("https://".length)}#Intent;scheme=https;package=com.plexapp.android;S.browser_fallback_url=${encodeURIComponent(watch)};end`;
   }
   return watch;

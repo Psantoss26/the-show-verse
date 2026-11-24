@@ -73,6 +73,19 @@ class WebOriginTest {
     }
 
     @Test
+    fun `solo las fichas de watch plex tv se mandan a la app de Plex`() {
+        assertTrue(WebOrigin.isPlexTitle("https://watch.plex.tv/movie/fight-club"))
+        assertTrue(WebOrigin.isPlexTitle("https://watch.plex.tv/show/the-sopranos/"))
+        assertTrue(WebOrigin.isPlexTitle("https://WATCH.plex.tv/movie/a%2Fb%23c"))
+        assertFalse(WebOrigin.isPlexTitle("http://watch.plex.tv/movie/fight-club"))
+        assertFalse(WebOrigin.isPlexTitle("https://watch.plex.tv/"))
+        assertFalse(WebOrigin.isPlexTitle("https://watch.plex.tv/movie/a/b"))
+        assertFalse(WebOrigin.isPlexTitle("https://watch.plex.tv.evil.example/movie/x"))
+        assertFalse(WebOrigin.isPlexTitle("https://app.plex.tv/desktop/#!/server/abc/details?key=1"))
+        assertFalse(WebOrigin.isPlexTitle(null))
+    }
+
+    @Test
     fun `solo se fuerzan al navegador paginas https`() {
         assertTrue(WebOrigin.isBrowserUrl("https://letterboxd.com/data/export"))
         assertFalse(WebOrigin.isBrowserUrl("http://letterboxd.com/data/export"))

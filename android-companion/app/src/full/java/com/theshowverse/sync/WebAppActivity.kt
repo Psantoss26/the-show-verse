@@ -293,6 +293,10 @@ class WebAppActivity : AppCompatActivity() {
                     abrirConElSistema(url)
                     true
                 }
+                WebOrigin.isPlexTitle(url) -> {
+                    abrirEnPlex(url)
+                    true
+                }
                 else -> {
                     abrirEnNavegador(url)
                     true
@@ -745,6 +749,23 @@ class WebAppActivity : AppCompatActivity() {
             val pestana = CustomTabsIntent.Builder().setShowTitle(true).build()
             if (navegador != null) pestana.intent.setPackage(navegador)
             pestana.launchUrl(this, Uri.parse(url))
+        } catch (e: ActivityNotFoundException) {
+            abrirEnNavegador(url)
+        }
+    }
+
+    /**
+     * Ficha de un título en Plex: se abre en la app de Plex si está instalada
+     * (en su ficha exacta, no en el inicio). El intent va dirigido al paquete
+     * porque Plex no tiene watch.plex.tv verificado como App Link y, sin
+     * dirigirlo, Android lo resuelve al navegador. Sin la app, la ficha web.
+     */
+    private fun abrirEnPlex(url: String) {
+        val plex = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            .addCategory(Intent.CATEGORY_BROWSABLE)
+            .setPackage(WebOrigin.PLEX_PACKAGE)
+        try {
+            startActivity(plex)
         } catch (e: ActivityNotFoundException) {
             abrirEnNavegador(url)
         }
