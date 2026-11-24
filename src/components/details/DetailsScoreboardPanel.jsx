@@ -124,7 +124,7 @@ export function DetailsRatingsBadges({
   // a partes iguales, como el marcador de la imagen compartible (ver
   // `mobileScoresOnly` del panel).
   spread = false,
-  // Ficha con póster vertical: puntuaciones y logos un punto mayores desde
+  // Marcador: puntuaciones y logos un punto mayores desde
   // `xl` (ver `roomy` en CompactBadge).
   roomy = false,
 }) {
@@ -812,8 +812,10 @@ export default function DetailsScoreboardPanel({
   // es estrecho, las stats pierden su etiqueta (queda en el tooltip) antes de
   // partirse en dos líneas. Ver `.narrowStatsTrack` en el módulo CSS.
   narrowStatLabels = false,
-  // Ficha con póster vertical: puntuaciones algo mayores (ver DetailsRatingsBadges).
-  roomyScores = false,
+  // Puntuaciones algo mayores desde `xl` (ver DetailsRatingsBadges). Activo en
+  // todos los marcadores; las mini-puntuaciones del destacado y de las tarjetas
+  // del inicio usan DetailsRatingsBadges directamente y no lo llevan.
+  roomyScores = true,
   externalLinks = null,
   externalLinksWikipedia = null,
   streamingProviders = null,

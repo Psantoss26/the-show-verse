@@ -37,8 +37,8 @@ export function CompactBadge({
   // ancho del panel para que nunca se salgan (ver `.spreadScores` en el módulo
   // CSS del marcador). Desde `sm` no cambia nada.
   large = false,
-  // Tamaño HOLGADO en escritorio (ficha con póster vertical): el marcador tiene
-  // ancho de sobra, así que desde `xl` cifra, votos y logo suben un punto (a 1024 px, sin fila de
+  // Tamaño HOLGADO en escritorio (los marcadores de ficha, vista rápida y
+  // episodio): desde `xl` cifra, votos y logo suben un punto (a 1024 px, sin fila de
   // estadísticas, IMDb ya no cabía).
   roomy = false,
 }) {
@@ -101,7 +101,7 @@ export function CompactBadge({
 
       <div className="flex flex-col justify-center leading-none min-w-0">
         <div className="flex items-baseline gap-1 min-w-0">
-          <span className={`${phone ? "text-lg" : roomy ? "text-lg sm:text-xl xl:text-2xl" : "text-lg sm:text-xl"} ${large ? "phone-sb:text-[length:calc(22*var(--sb-u,1px))]" : ""} font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors`}>
+          <span className={`${phone ? "text-lg" : roomy ? "text-lg sm:text-xl xl:text-[22px]" : "text-lg sm:text-xl"} ${large ? "phone-sb:text-[length:calc(22*var(--sb-u,1px))]" : ""} font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors`}>
             {value != null ? value : "-"}
           </span>
 

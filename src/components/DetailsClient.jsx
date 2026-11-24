@@ -11503,7 +11503,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 mobileScoresOnly
                 compactStatsTrailing={isBackdropPoster}
                 narrowStatLabels={!isBackdropPoster}
-                roomyScores={!isBackdropPoster}
                 shareIconOnly={isBackdropPoster}
                 fitAllScores={isBackdropPoster}
                 loading={tScoreboard.loading}
