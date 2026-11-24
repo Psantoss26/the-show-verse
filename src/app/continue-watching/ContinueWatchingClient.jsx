@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { useMetaRowFit, splitRemainingLabel } from "@/hooks/useMetaRowFit";
 import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 import {
   Tv,
@@ -764,6 +765,7 @@ const ProgressCard = memo(function ProgressCard({
     e.stopPropagation();
     setConfirmDel(false);
   };
+  const remaining = splitRemainingLabel(item.remainingLabel);
   const handleConfirm = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -776,17 +778,23 @@ const ProgressCard = memo(function ProgressCard({
       <motion.div initial={isBackNav ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: isBackNav ? 0 : animDelay, ease: "easeOut" }}>
         <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className="relative block overflow-hidden rounded-xl [-webkit-tap-highlight-color:transparent] bg-zinc-900/30 transition-colors group hover:bg-zinc-900/60 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
           <div className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 ${canDelete ? "pr-12 sm:pr-14" : ""}`}>
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
+            <div data-meta-thumb="" className="w-[var(--meta-thumb,180px)] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               <SmartImage item={item} kind="backdrop" alt={title} />
             </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5 pr-2.5 sm:pr-0">
               <h4 className={`text-white font-bold text-base leading-tight truncate group-hover:text-emerald-300 transition-colors ${confirmDel ? "invisible" : ""}`}>{title}</h4>
-              <div className="flex items-center gap-2 text-xs text-zinc-500 flex-wrap">
-                <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${colors.bg} ${colors.text}`}>{pct}%</span>
+              {/* En el móvil la fila va SIEMPRE entera en una línea: nada se
+                  recorta ni salta. useMetaRowFit (en la lista) la mide y, si
+                  no cabe, quita «Quedan», junta los separadores, acorta el
+                  tiempo, quita los «•» y, en último caso, estrecha las
+                  miniaturas de toda la lista. La plataforma va como icono.
+                  Desde sm, texto completo y puede saltar de línea. */}
+              <div data-meta-row="" className="group/meta flex items-center gap-1.5 data-[fit-gap]:gap-1 [&[data-fit-gap][data-fit-dots]]:gap-1.5 sm:gap-2 text-xs text-zinc-500 flex-nowrap sm:flex-wrap whitespace-nowrap">
+                <span className={`shrink-0 font-bold px-1.5 py-0.5 rounded text-[10px] ${colors.bg} ${colors.text}`}>{pct}%</span>
                 {code && (
                   <>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
+                    <span className="shrink-0 group-data-[fit-dots]/meta:hidden">•</span>
+                    <span className="flex shrink-0 items-center gap-1">
                       <Play className="w-3 h-3 text-emerald-400" fill="currentColor" />
                       <span className="text-zinc-300 font-semibold">{code}</span>
                     </span>
@@ -794,14 +802,28 @@ const ProgressCard = memo(function ProgressCard({
                 )}
                 {platform && (
                   <>
-                    <span>•</span>
-                    <span className="text-zinc-400">{platform}</span>
+                    <span className="shrink-0 group-data-[fit-dots]/meta:hidden">•</span>
+                    {platformIconUrl && (
+                      <OptimizedImage
+                        src={platformIconUrl}
+                        alt={platform}
+                        title={platform}
+                        width={16}
+                        height={16}
+                        className="h-4 w-4 shrink-0 rounded object-contain brightness-110 sm:hidden"
+                      />
+                    )}
+                    <span className={`shrink-0 text-zinc-400 ${platformIconUrl ? "hidden sm:inline" : ""}`}>{platform}</span>
                   </>
                 )}
-                {item.remainingLabel && (
+                {remaining && (
                   <>
-                    <span>•</span>
-                    <span className="text-emerald-400 font-bold">{item.remainingLabel}</span>
+                    <span className="shrink-0 group-data-[fit-dots]/meta:hidden">•</span>
+                    <span className="shrink-0 text-emerald-400 font-bold">
+                      {remaining.hasPrefix && <span className="group-data-[fit-quedan]/meta:hidden">Quedan </span>}
+                      <span className="group-data-[fit-short]/meta:hidden">{remaining.long}</span>
+                      <span className="hidden group-data-[fit-short]/meta:inline">{remaining.short}</span>
+                    </span>
                   </>
                 )}
               </div>
@@ -1236,6 +1258,10 @@ export default function ContinueWatchingClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentItems, q, sortBy, typeFilter, titleNamesVersion]);
 
+  // Vista Lista en el móvil: cada fila de metadatos cabe entera en una línea.
+  const compactListRef = useRef(null);
+  useMetaRowFit(compactListRef, [viewMode, filtered, editMode]);
+
   const stats = useMemo(() => {
     const list = Array.isArray(currentItems) ? currentItems : [];
     const movies = list.filter((x) => mediaTypeOf(x) === "movie").length;
@@ -1618,7 +1644,7 @@ export default function ContinueWatchingClient() {
                 </Fragment>
               </motion.div>
             ) : (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div ref={compactListRef} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {filtered.map((item, i) => <ProgressCard key={item.progressId || `${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="compact" editMode={editMode} busy={busyId === item.progressId} onRemove={handleRemove} onComplete={handleComplete} />)}
               </div>
             )}

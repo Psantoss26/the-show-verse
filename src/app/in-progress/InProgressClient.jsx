@@ -962,7 +962,9 @@ const InProgressCard = memo(function InProgressCard({
             </div>
 
             {/* Info - right side */}
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+            {/* En el móvil la columna deja 10 px a la derecha para que la barra
+                y los textos no lleguen pegados al borde de la tarjeta. */}
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5 pr-2.5 sm:pr-0">
               <h4 className="text-white font-bold text-base leading-tight truncate group-hover:text-emerald-300 transition-colors">
                 {title}
               </h4>
@@ -990,10 +992,11 @@ const InProgressCard = memo(function InProgressCard({
               </div>
 
               {/* Progress bar: en Completadas siempre sería 100 %, sobra.
-                  Margen derecho = hueco con la imagen (gap 8/24 px − padding
-                  de la fila 6/16 px), para que quede centrada. */}
+                  Margen derecho: en el móvil lo da la columna (pr-2.5); desde
+                  sm, hueco con la imagen (gap 24 px − padding de la fila
+                  16 px), para que quede centrada. */}
               {activeTab !== "completed" && (
-              <div className="h-1.5 mr-0.5 sm:mr-2 rounded-full bg-zinc-800 overflow-hidden relative">
+              <div className="h-1.5 sm:mr-2 rounded-full bg-zinc-800 overflow-hidden relative">
                 <motion.div
                   className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden`}
                   initial={{ width: 0 }}
