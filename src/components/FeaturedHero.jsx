@@ -79,6 +79,10 @@ import {
   getSpotlightBadge,
   formatRuntime,
 } from "@/lib/dashboard/media";
+import {
+  getCachedTrailerAspect,
+  getTrailerContentAspect,
+} from "@/lib/dashboard/trailerAspect";
 
 // Fundido a negro del pie del hero en móvil (ver el div que lo usa): curva
 // smootherstep en 12 tramos, sin esquinas que se lean como banda.
@@ -569,6 +573,11 @@ function FeaturedSlide({
   // encima y se desmonta al acabar el fundido.
   const [trailerStarted, setTrailerStarted] = useState(false);
   const [trailerMounted, setTrailerMounted] = useState(false);
+  // Proporción real de la imagen del tráiler (sin sus bandas negras), medida
+  // en sus fotogramas de YouTube. El relevo espera a tenerla para que el
+  // vídeo no aparezca con bandas y luego salte de tamaño.
+  const [trailerAspect, setTrailerAspect] = useState(null);
+  const trailerAspectReady = Boolean(trailer?.key) && trailerAspect?.key === trailer.key;
 
   useEffect(() => {
     if (showTrailer) {
@@ -621,7 +630,7 @@ function FeaturedSlide({
   }, [showTrailer, trailerStarted]);
 
   const trailerPhase = showTrailer
-    ? trailerStarted
+    ? trailerStarted && trailerAspectReady
       ? "playing"
       : "loading"
     : trailerMounted
@@ -1315,6 +1324,14 @@ function FeaturedSlide({
         setError("No hay trailer disponible.");
         return;
       }
+      const cachedAspect = getCachedTrailerAspect(t.key);
+      if (cachedAspect) {
+        setTrailerAspect({ key: t.key, value: cachedAspect });
+      } else {
+        getTrailerContentAspect(t.key).then((value) =>
+          setTrailerAspect({ key: t.key, value }),
+        );
+      }
       setTrailer(t);
       setShowTrailer(true);
       onTrailerVisibilityChange?.(true);
@@ -1565,7 +1582,14 @@ function FeaturedSlide({
                 className="hero-media-swap hero-media-trailer absolute inset-0 overflow-hidden"
                 data-trailer-phase={trailerPhase}
               >
-                <div className="hero-trailer-viewport absolute inset-0 overflow-hidden">
+                <div
+                  className="hero-trailer-viewport absolute inset-0 overflow-hidden"
+                  style={
+                    trailerAspectReady
+                      ? { "--hero-trailer-aspect": trailerAspect.value }
+                      : undefined
+                  }
+                >
                   <iframe
                     key={trailer.key}
                     ref={trailerIframeRef}
@@ -2049,31 +2073,25 @@ function FeaturedSlide({
           transform: scale(1.03);
         }
 
-        /* El hero puede ser mucho más ancho que 16:9 en pantallas panorámicas.
-           El contenedor anterior calculaba el ancho solo desde la altura y
-           dejaba una franja vacía a la izquierda. Estas unidades relativas al
-           propio contenedor mantienen el iframe en 16:9 y aplican un "cover"
-           real en cualquier proporción, con un pequeño overscan para ocultar
-           por completo el chrome y los bordes internos de YouTube.
-           Los tráileres de cine llegan en 16:9 con bandas negras de
-           panorámico (2,39:1) dentro del propio vídeo: si el "cover" se hace
-           sobre el 16:9, la banda superior queda visible detrás del navbar
-           como una franja negra. Por eso el cover se calcula sobre la zona
-           útil 2,39:1 (el iframe sigue siendo 16:9): la imagen real llega
-           siempre al borde superior y las bandas quedan fuera. */
+        /* Encaje del tráiler: "cover" exacto sobre la imagen útil del
+           vídeo, sin ampliación extra. Muchos tráileres son un 16:9 con
+           bandas negras de panorámico dentro (2:1, 2,39:1…);
+           --hero-trailer-aspect es la proporción de la imagen sin bandas,
+           medida en sus fotogramas (lib/dashboard/trailerAspect.js). El
+           iframe sigue siendo 16:9, pero se dimensiona para que esa zona útil
+           cubra el hero: siempre toca los cuatro bordes, las bandas quedan
+           fuera y solo se recorta lo imprescindible (arriba y abajo si el
+           hero es más ancho que la imagen, a los lados si es más alto).
+           Sin medida, 16:9. Los 2 px extra evitan una línea de subpíxel. */
         .hero-trailer-viewport {
           container-type: size;
-          --hero-trailer-scope: 2.39;
+          --hero-trailer-aspect: 1.7778;
         }
 
         .hero-trailer-iframe {
-          width: max(
-            108cqw,
-            calc(108cqh * var(--hero-trailer-scope))
-          );
-          height: calc(
-            max(108cqw, calc(108cqh * var(--hero-trailer-scope))) * 9 / 16
-          );
+          --hero-trailer-w: max(100cqw, 100cqh * var(--hero-trailer-aspect));
+          width: calc(var(--hero-trailer-w) + 2px);
+          height: calc(var(--hero-trailer-w) * 9 / 16 + 2px);
         }
 
         /* Solo opacidad y transform: los compone la GPU sin repintar. El
