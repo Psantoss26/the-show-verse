@@ -11,6 +11,9 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const IMAGE_WAIT_MS = 200;
 const EXIT_MS = 220;
 const NAVIGATION_WAIT_MS = 8000;
+// Fundido del fondo al pulsar: el del título siguiente entra en la copia
+// saliente mientras carga la ficha, en vez de esperar a la View Transition.
+const BACKDROP_FADE_MS = 380;
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
 // La ficha VISIBLE que casa con el selector. Desde la pila de pantallas
@@ -121,6 +124,37 @@ async function waitForImages(root, snapshot) {
   await Promise.race([settled, delay(IMAGE_WAIT_MS)]);
 }
 
+// El fondo del destino (ya elegido y decodificado por el precalentamiento)
+// se funde encima del de la copia en cuanto se pulsa. Antes el fondo viejo se
+// quedaba quieto hasta que la ficha nueva estaba lista (~1s) y entonces
+// cambiaba. Cuando llega la ficha, su fondo es la misma imagen: la View
+// Transition no cambia nada visible en el fondo.
+function fadeInTargetBackdrop(snapshot, path, reduced) {
+  if (!path || !matchMedia("(min-width: 640px)").matches) return;
+  const background = snapshot.querySelector(`[${PART}="background"]`);
+  const current = background?.querySelector("[data-details-background-preview]");
+  if (!current || getComputedStyle(current).backgroundImage.includes(path)) return;
+  const url = `https://image.tmdb.org/t/p/w1280${path}`;
+  const image = new Image();
+  image.src = url;
+  image.decode().then(() => {
+    if (!background.isConnected) return;
+    const layer = document.createElement("div");
+    layer.setAttribute("aria-hidden", "true");
+    Object.assign(layer.style, {
+      position: "absolute", inset: "0", backgroundImage: `url("${url}")`,
+      backgroundSize: "cover", backgroundPosition: "center top",
+    });
+    // Debajo de los sombreados de legibilidad, como el fondo real.
+    background.insertBefore(layer, background.querySelector(":scope > .sv-hero-scroll-shade"));
+    if (!reduced) {
+      layer.animate?.([{ opacity: 0 }, { opacity: 1 }], {
+        duration: BACKDROP_FADE_MS, easing: "cubic-bezier(.4,0,.2,1)", fill: "backwards",
+      });
+    }
+  }, () => {});
+}
+
 function focusTitle(root) {
   const heading = root?.querySelector("h1");
   if (!heading) return;
@@ -133,7 +167,7 @@ function focusTitle(root) {
 }
 
 /** Bloquea clics repetidos, pero conserva los enlaces modificados en el caller. */
-export async function navigateDetailsSequence({ href, direction, navigate }) {
+export async function navigateDetailsSequence({ href, direction, navigate, backdrop = null }) {
   if (activeTransition) return false;
   const source = visibleDetails("[data-details-root][data-details-href]");
   if (!source || window.parent !== window) {
@@ -144,9 +178,11 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
   activeTransition = operation;
   const from = location.pathname;
   const { snapshot, overlay } = captureDetails(source);
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  fadeInTargetBackdrop(snapshot, backdrop, reducedMotion);
   const html = document.documentElement;
   html.setAttribute(FLAG, direction === "previous" ? "previous" : "next");
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduced = reducedMotion;
   // En táctil (tablet) NO hay View Transition: capturar varias superficies de
   // cristal como imágenes y animarlas por separado sale caro en sus GPU. La
   // salida al pulsar SÍ es la misma que en escritorio. Antes se omitía y la

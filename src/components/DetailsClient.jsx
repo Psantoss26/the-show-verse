@@ -75,6 +75,7 @@ import {
 } from "@/lib/artworkApi";
 import Link from "next/link";
 import { isDetailsSequenceTransitionActive } from "@/lib/navigation/detailsSequenceTransition";
+import { getWarmedSequenceBackdrop } from "@/lib/navigation/detailsSequenceWarmup";
 import {
   PEEK_HANDOFF_PART_ATTR,
   PEEK_HANDOFF_PENDING_ATTR,
@@ -1166,6 +1167,38 @@ function useDesktopBackgroundSize(path, enabled) {
   return originalReady === path ? "original" : "w1280";
 }
 
+// Fundido entre fondos de escritorio. Cualquier cambio de imagen (la
+// selección definitiva que sustituye a la provisional, una elegida en
+// «Portadas y fondos») cambiaba el `background-image` en el sitio, de golpe.
+// Devuelve la capa anterior, que se desvanece encima en cuanto la nueva está
+// decodificada. Pasar de w1280 a original es la misma imagen: no funde.
+const BACKDROP_CROSSFADE_MS = 450;
+function useBackdropCrossfade(path, url) {
+  const [fade, setFade] = useState(null);
+  const shown = useRef({ path, url });
+  const latestUrl = useRef(url);
+  useEffect(() => {
+    latestUrl.current = url;
+    if (shown.current.path === path) shown.current = { path, url };
+  }, [path, url]);
+  useEffect(() => {
+    const before = shown.current;
+    shown.current = { path, url: latestUrl.current };
+    if (!before.path || !path || before.path === path || !before.url) return undefined;
+    setFade({ key: path, url: before.url, started: false });
+    let cancelled = false;
+    const start = () => {
+      if (!cancelled) setFade((current) => (current?.key === path ? { ...current, started: true } : current));
+    };
+    const image = new Image();
+    image.src = latestUrl.current;
+    image.decode().then(start, start);
+    return () => { cancelled = true; };
+  }, [path]);
+  const clear = useCallback(() => setFade(null), []);
+  return [fade, clear];
+}
+
 // Componente de badge de estadística con diseño premium optimizado y ultra-compacto (sin tarjeta/fondo)
 // =====================================================================
 // COMPONENTE PRINCIPAL: DetailsClient
@@ -1400,8 +1433,6 @@ export default function DetailsClient({
   const posterModeToggled = posterModeToggledId === id;
   // -- Imagen de fondo (background) con transicion suave --
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(() => restoredValue(backSnapshot, "selectedBackgroundPath", null));
-  const [prevBackgroundPath, setPrevBackgroundPath] = useState(null); // Fondo anterior (para crossfade)
-  const [isTransitioning, setIsTransitioning] = useState(false); // Animacion de cambio de fondo activa
 
   // -- Imagenes base: evitan SSR/primer render con un poster provisional --
   const [basePosterPath, setBasePosterPath] = useState(() => restoredValue(backSnapshot, "basePosterPath", null));
@@ -1617,6 +1648,14 @@ export default function DetailsClient({
   })));
   const detailsEntryReady =
     detailsEntry.key === detailsEntryKey && detailsEntry.ready;
+  // Fondo ya elegido y precargado por DetailsSequenceNav para este destino.
+  // Solo al llegar con la transición (navegación en cliente, sin hidratar) y
+  // fijado al montar: no cambia cuando la transición termina.
+  const [sequenceWarm] = useState(() => ({
+    key: detailsEntryKey,
+    path: sequenceTransitionActive ? getWarmedSequenceBackdrop(`/details/${endpointType}/${id}`) : null,
+  }));
+  const sequenceWarmBackdrop = sequenceWarm.key === detailsEntryKey ? sequenceWarm.path : null;
 
   useRestorableEffect(backSnapshot, "detailsEntry", () => {
     let firstFrame = 0;
@@ -3967,7 +4006,10 @@ export default function DetailsClient({
         allowMainFallback: false,
         // Si ya se conoce una selección del usuario, manda ella (la
         // instantánea de overrides la resuelve en el primer efecto de layout).
-        preferredPaths: [selectedBackgroundPath, communityBackgroundPath],
+        // Llegando con Anterior/Siguiente, después va el fondo que eligió el
+        // precalentamiento con la galería COMPLETA: la del SSR llega filtrada
+        // y elegía otra imagen, que se sustituía de golpe ~80ms más tarde.
+        preferredPaths: [selectedBackgroundPath, communityBackgroundPath, sequenceWarmBackdrop],
       });
     }
 
@@ -3975,7 +4017,9 @@ export default function DetailsClient({
     // el de los datos del servidor. Sin este respaldo quedaba un hueco justo al
     // terminar la inicialización —la selección definitiva todavía sin resolver—
     // en el que el fondo desaparecía y los paneles volvían a verse planos.
-    const desktop = displayBackdropPath || data?.backdrop_path || null;
+    // Llegando con Anterior/Siguiente, antes que la portada principal va el
+    // fondo precalentado: es el que ya se fundió al pulsar.
+    const desktop = displayBackdropPath || sequenceWarmBackdrop || data?.backdrop_path || null;
 
     // Movil series: usar solo poster con idioma null. Si no existe, no caer
     // al poster base porque puede venir localizado.
@@ -4012,6 +4056,10 @@ export default function DetailsClient({
   const heroBackgroundSize = isMobileViewport
     ? (mobilePosterOriginalRequestReady && posterHighLoaded ? "original" : "w500")
     : desktopBackgroundSize;
+  const [backdropFade, clearBackdropFade] = useBackdropCrossfade(
+    useBackdrop && !isMobileViewport ? heroBackgroundPath : null,
+    heroBackgroundPath ? `https://image.tmdb.org/t/p/${heroBackgroundSize}${heroBackgroundPath}` : null,
+  );
 
   // =====================================================================
   // ESTADOS DE CUENTA (TMDb)
@@ -7390,10 +7438,7 @@ export default function DetailsClient({
 
   // Selecciona una imagen de fondo con transicion crossfade suave
   const handleSelectBackground = (filePath) => {
-    // Guardar la imagen anterior para el fade
-    setPrevBackgroundPath(displayBackdropPath);
-    setIsTransitioning(true);
-
+    // El fundido lo hace useBackdropCrossfade al cambiar la ruta del fondo.
     setSelectedBackgroundPath(filePath);
     persistArtworkPreference(backgroundStorageKey, filePath);
     cacheArtworkOverrides?.({
@@ -7407,12 +7452,6 @@ export default function DetailsClient({
       kind: "background",
       filePath,
     });
-
-    // Terminar transicion de crossfade despues de 600ms
-    setTimeout(() => {
-      setIsTransitioning(false);
-      setPrevBackgroundPath(null);
-    }, 600);
   };
 
   // Resetea todas las selecciones de artwork a los valores por defecto
@@ -10367,33 +10406,6 @@ export default function DetailsClient({
       <div data-details-transition-part="background" className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
         {useBackdrop && heroBackgroundPath ? (
           <>
-            {/* Imagen anterior (fade out) */}
-            {isTransitioning && prevBackgroundPath && (
-              <>
-                <div
-                  className="absolute inset-0 bg-cover bg-center transition-opacity duration-500"
-                  style={{
-                    backgroundImage: `url(https://image.tmdb.org/t/p/${heroBackgroundSize}${prevBackgroundPath})`,
-                    transform: "scale(1)",
-                    filter: "brightness(0.75) saturate(1.03)",
-                    opacity: 0,
-                    willChange: "opacity",
-                  }}
-                />
-                <div
-                  className="absolute inset-0 bg-cover transition-opacity duration-500"
-                  style={{
-                    backgroundImage: `url(https://image.tmdb.org/t/p/${heroBackgroundSize}${prevBackgroundPath})`,
-                    backgroundPosition: "center top",
-                    transform: "scale(1)",
-                    transformOrigin: "center top",
-                    opacity: 0,
-                    willChange: "opacity",
-                  }}
-                />
-              </>
-            )}
-
             {/* Capa base: siempre cubre (evita marcos laterales).
 
                 MÓVIL: oculta hasta que carga el póster de portada. Antes pintaba
@@ -10456,6 +10468,25 @@ export default function DetailsClient({
                 willChange: "opacity",
               }}
             />
+
+            {/* Fondo anterior fundiéndose sobre el nuevo (solo escritorio).
+                Espera a que el nuevo esté decodificado: hasta entonces tapa
+                del todo y no se ve un fondo a medio cargar. */}
+            {backdropFade && (
+              <div
+                key={backdropFade.key}
+                aria-hidden="true"
+                className="absolute inset-0 bg-cover max-sm:hidden motion-reduce:hidden"
+                style={{
+                  backgroundImage: `url(${backdropFade.url})`,
+                  backgroundPosition: "center top",
+                  animation: backdropFade.started
+                    ? `sv-backdrop-fade-out ${BACKDROP_CROSSFADE_MS}ms cubic-bezier(.4,0,.2,1) forwards`
+                    : "none",
+                }}
+                onAnimationEnd={clearBackdropFade}
+              />
+            )}
 
             {/* MÓVIL: PÓSTER NÍTIDO como capa FIJA, la portada de listas,
                 colecciones y temporadas (details/MobileHeroCover): el póster

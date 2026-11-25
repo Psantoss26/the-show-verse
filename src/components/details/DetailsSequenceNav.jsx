@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { navigateDetailsSequence } from "@/lib/navigation/detailsSequenceTransition";
-import { warmDetailsSequenceTarget } from "@/lib/navigation/detailsSequenceWarmup";
+import { getWarmedSequenceBackdrop, warmDetailsSequenceTarget } from "@/lib/navigation/detailsSequenceWarmup";
 import { getDetails } from "@/lib/api/tmdb";
 import { getUserDetailsSequence } from "@/lib/navigation/userDetailsSequence";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
@@ -210,7 +210,12 @@ export default function DetailsSequenceNav() {
     handleIntent(href);
     // Mismo router que el gesto móvil: respeta la ficha embebida y el modo
     // sin conexión.
-    void navigateDetailsSequence({ href, direction, navigate: router.push }).catch(() => {});
+    void navigateDetailsSequence({
+      href,
+      direction,
+      navigate: router.push,
+      backdrop: getWarmedSequenceBackdrop(href),
+    }).catch(() => {});
   };
 
   return (

@@ -3938,6 +3938,12 @@ html[data-details-sequence-transition] [data-details-root] {
 ::view-transition-new(details-sequence-content) {
   mix-blend-mode: normal;
 }
+/* Fondo de la ficha: el anterior se desvanece sobre el nuevo (DetailsClient,
+   useBackdropCrossfade). */
+@keyframes sv-backdrop-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
 @keyframes sv-sequence-reveal {
   from { opacity: 0; }
   to { opacity: 1; }

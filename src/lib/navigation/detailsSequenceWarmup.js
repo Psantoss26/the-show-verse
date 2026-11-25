@@ -7,6 +7,10 @@ import { readPersistedArtworkOverride } from "@/lib/artworkApi";
 import { pickHeroBackdropPath, pickLadderPoster } from "@/lib/details/tmdbImages";
 
 const warmed = new Map();
+// Fondo elegido para cada destino ya calentado (href → file_path). La ficha
+// nueva lo usa como fondo provisional y la transición lo funde al pulsar: así
+// el fondo que entra es desde el principio el definitivo, sin relevo después.
+const warmedBackdrops = new Map();
 // Mantiene vivas las peticiones en curso: un `Image` sin referencias puede
 // recogerse antes de terminar la descarga.
 const inFlight = new Set();
@@ -72,6 +76,7 @@ export function warmDetailsSequenceTarget(href) {
       // Coincide con las primeras capas que pinta DetailsClient.
       posters.forEach((path) => preloadImage("w342", path));
       preloadImage("w1280", backdrop);
+      if (backdrop) warmedBackdrops.set(href, backdrop);
       // Fotos de las tarjetas del Reparto Principal (misma URL que la ficha).
       profiles.forEach((path) => preloadImage("w342", path));
     })
@@ -82,4 +87,9 @@ export function warmDetailsSequenceTarget(href) {
 
   warmed.set(href, task);
   return task;
+}
+
+/** Fondo ya elegido (y precargado en w1280) para un destino de la secuencia. */
+export function getWarmedSequenceBackdrop(href) {
+  return warmedBackdrops.get(href) || null;
 }
