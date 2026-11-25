@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isRatingLinksIdentity, resolveRatingLinks } from "@/lib/details/resolveRatingLinks";
 import { parseMetacriticScores, parseRottenTomatoesScores } from "@/lib/details/ratingScores";
+import { fetchLetterboxdScore } from "@/lib/details/letterboxdScore";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,9 @@ export const runtime = "nodejs";
 // con su recuento de votos. Las URL salen SIEMPRE de Wikidata por
 // identidad TMDb (resolveRatingLinks), nunca del cliente: así la ruta solo puede
 // pedir fichas de esos dos sitios.
+// Letterboxd (`lb`, solo películas): media 0–5 y valoraciones, por su API
+// oficial si hay credenciales o por la ficha web que da Wikidata (ver
+// lib/details/letterboxdScore.js).
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const EMPTY_TTL_MS = 60 * 60 * 1000;
 const PAGE_TIMEOUT_MS = 8_000;
@@ -37,19 +41,20 @@ async function readScores(url, parse) {
 }
 
 async function loadScores(type, tmdbId) {
-  const key = `v1:${type}:${tmdbId}`;
+  const key = `v2:${type}:${tmdbId}`;
   const hit = cache.get(key);
   if (hit && hit.expires > Date.now()) return hit.data;
   if (inflight.has(key)) return inflight.get(key);
   const promise = (async () => {
     const links = await resolveRatingLinks({ type, tmdbId });
-    const [rt, mc] = await Promise.all([
+    const [rt, mc, lb] = await Promise.all([
       readScores(links.rt, parseRottenTomatoesScores),
       readScores(links.mc, parseMetacriticScores),
+      type === "movie" ? fetchLetterboxdScore({ tmdbId, webUrl: links.lb }) : null,
     ]);
-    const data = { rt, mc };
+    const data = { rt, mc, lb };
     if (cache.size >= 1000) cache.delete(cache.keys().next().value);
-    cache.set(key, { data, expires: Date.now() + (rt || mc ? CACHE_TTL_MS : EMPTY_TTL_MS) });
+    cache.set(key, { data, expires: Date.now() + (rt || mc || lb ? CACHE_TTL_MS : EMPTY_TTL_MS) });
     return data;
   })().finally(() => inflight.delete(key));
   inflight.set(key, promise);
@@ -70,7 +75,7 @@ export async function GET(request) {
     });
   } catch {
     return NextResponse.json(
-      { rt: null, mc: null },
+      { rt: null, mc: null, lb: null },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }

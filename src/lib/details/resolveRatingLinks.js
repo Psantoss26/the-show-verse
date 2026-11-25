@@ -1,5 +1,7 @@
 // Wikidata links are matched by TMDb identity, never by a guessed title slug.
-// Properties: P4947 (movie), P4983 (series), P1258 (RT), P1712 (Metacritic).
+// Properties: P4947 (movie), P4983 (series), P1258 (RT), P1712 (Metacritic),
+// P6127 (Letterboxd film slug) and P345 (IMDb id, Letterboxd's /imdb/ fallback).
+// Letterboxd only lists films: series never get a Letterboxd link.
 const TMDB_PROPERTIES = { movie: "P4947", tv: "P4983" };
 
 export function isRatingLinksIdentity(type, tmdbId) {
@@ -17,7 +19,7 @@ function claimValues(entity, property) {
 }
 
 export function pickRatingLinks(entities, { type, tmdbId }) {
-  const empty = { rt: null, mc: null };
+  const empty = { rt: null, mc: null, lb: null };
   if (!isRatingLinksIdentity(type, tmdbId)) return empty;
   const matches = Object.values(entities || {}).filter((entity) =>
     claimValues(entity, TMDB_PROPERTIES[type]).includes(String(tmdbId)),
@@ -32,9 +34,14 @@ export function pickRatingLinks(entities, { type, tmdbId }) {
   };
   const rt = unique("P1258", rtPattern);
   const mc = unique("P1712", mcPattern);
+  const lbSlug = type === "movie" ? unique("P6127", /^[a-z0-9][a-z0-9-]*$/) : null;
+  const imdb = type === "movie" && !lbSlug ? unique("P345", /^tt\d{7,10}$/) : null;
   return {
     rt: rt ? `https://www.rottentomatoes.com/${rt}` : null,
     mc: mc ? `https://www.metacritic.com/${mc}/` : null,
+    lb: lbSlug
+      ? `https://letterboxd.com/film/${lbSlug}/`
+      : imdb ? `https://letterboxd.com/imdb/${imdb}/` : null,
   };
 }
 
@@ -60,7 +67,7 @@ export async function resolveRatingLinks({ type, tmdbId }, fetchImpl = fetch) {
   });
   if (!Array.isArray(search.query?.search)) throw new Error("Invalid rating links response");
   const ids = search.query.search.map((item) => item.title).filter((id) => /^Q\d+$/.test(id));
-  if (!ids.length) return { rt: null, mc: null };
+  if (!ids.length) return { rt: null, mc: null, lb: null };
   const data = await get({ action: "wbgetentities", ids: ids.join("|"), props: "claims" });
   if (!data.entities) throw new Error("Invalid rating links entities");
   return pickRatingLinks(data.entities, { type, tmdbId });

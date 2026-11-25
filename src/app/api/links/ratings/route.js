@@ -17,7 +17,7 @@ export async function GET(request) {
     });
   } catch {
     return NextResponse.json(
-      { rt: null, mc: null },
+      { rt: null, mc: null, lb: null },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }

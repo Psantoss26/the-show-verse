@@ -324,6 +324,7 @@ import {
 } from "@/components/details/MobileDetailsHero";
 import useRatingLinks, { useRatingScores } from "@/lib/details/useRatingLinks";
 import { audienceScoreBadge } from "@/lib/details/ratingScores";
+import { letterboxdScoreBadge } from "@/lib/details/letterboxdScore";
 import { buildShareCardPayload } from "@/lib/details/shareCard";
 import {
   buildTmdbHref,
@@ -11556,6 +11557,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     : null)
                 }
                 mc={audienceScoreBadge(ratingScores.mc, ratingLinks.mc)}
+                // Letterboxd: media 0–5 de sus miembros (solo películas).
+                lb={letterboxdScoreBadge(ratingScores.lb, ratingScores.lb?.url || ratingLinks.lb)}
                 externalLinks={isBackdropPoster ? scoreboardExternalLinks : null}
                 externalLinksWikipedia={wikipediaQuery}
                 onMoreLinks={isBackdropPoster ? () => setExternalLinksOpen(true) : undefined}

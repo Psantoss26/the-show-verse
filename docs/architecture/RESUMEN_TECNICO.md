@@ -980,6 +980,10 @@ TRAKT_REDIRECT_URI=http://localhost:3000/api/trakt/oauth/callback
 # OMDb (opcional)
 OMDB_API_KEY=your_omdb_api_key
 
+# Letterboxd (opcional; sin ellas se lee la ficha pública)
+LETTERBOXD_CLIENT_ID=
+LETTERBOXD_CLIENT_SECRET=
+
 # Base URL
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ```

@@ -17,7 +17,9 @@
 //   traktPublic: { value, sub } | null         (badge Trakt público sin conexión)
 //   imdb:        { value, sub, href } | null    (badge IMDb)
 //   rt:          { value, sub, href } | null          (badge Rotten Tomatoes, solo >= sm)
-//   mc:          { value, sub, href } | null          (badge Metacritic, solo >= sm)
+//   mc:          { value, sub, href } | null          (badge Metacritic, solo >= sm;
+//                                                     no se pinta si hay `lb`)
+//   lb:          { value, suffix, sub, href } | null  (badge Letterboxd 0–5, solo >= sm)
 //   stats:       { watchers, plays, lists, favorited } | null  (fila de stats)
 //   showFavoritedStat: boolean                  (oculta Favoritos cuando no aplica)
 //   toolbarActions: ReactNode | null            (acciones inline al final)
@@ -109,7 +111,7 @@ function TraktStatBadge({
 }
 
 // ---------------------------------------------------------------------------
-// A. RATINGS - Fila de badges de puntuaciones (TMDb, Trakt, IMDb, RT, Metacritic)
+// A. RATINGS - Fila de badges de puntuaciones (TMDb, Trakt, IMDb, RT, Metacritic, Letterboxd)
 //    Markup VERBATIM del bloque original; los datos vienen por props.
 // ---------------------------------------------------------------------------
 export function DetailsRatingsBadges({
@@ -120,6 +122,7 @@ export function DetailsRatingsBadges({
   imdb = null,
   rt = null,
   mc = null,
+  lb = null,
   // Dentro de un carril que se desplaza (ver `compactToolbar`), la fila tiene
   // que medir lo que miden sus insignias. Sin esto es un contenedor de bloque
   // que ocupa el ancho del carril, sus hijos se reparten menos espacio del que
@@ -294,9 +297,11 @@ export function DetailsRatingsBadges({
       )}
 
       {/* Badge de Metacritic - mismo criterio que Rotten Tomatoes, con la
-          nota de los usuarios (User Score). */}
+          nota de los usuarios (User Score). Si hay Letterboxd (o se está
+          esperando), Letterboxd ocupa su sitio: en películas manda Letterboxd
+          y Metacritic queda para series y películas sin nota allí. */}
       {scoreSlot(
-        mc,
+        lb ? null : mc,
         (score) => (
           <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
             <CompactBadge
@@ -310,6 +315,27 @@ export function DetailsRatingsBadges({
             />
           </div>
         ),
+      )}
+
+      {/* Badge de Letterboxd - en el hueco de Metacritic, con su propia
+          escala (media 0–5, `suffix` "/5"). Solo películas. */}
+      {scoreSlot(
+        lb,
+        (score) => (
+          <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
+            <CompactBadge
+              logo="/logo-Letterboxd.png"
+              value={score.value}
+              suffix={score.suffix}
+              sub={score.sub}
+              href={score.href}
+              disableHoverLift
+              roomy={roomy}
+              tooltip={score.href ? "Ver en Letterboxd" : "Letterboxd"}
+            />
+          </div>
+        ),
+        { value: "0.0", suffix: "/5", sub: "00 k" },
       )}
     </div>
   );
@@ -902,6 +928,7 @@ export default function DetailsScoreboardPanel({
   imdb = null,
   rt = null,
   mc = null,
+  lb = null,
   stats = null,
   statItems = null,
   showFavoritedStat = true,
@@ -973,7 +1000,7 @@ export default function DetailsScoreboardPanel({
   // cuenta lo que de verdad se va a ver.
   const hasVisibleScore = (score) =>
     !!score && !(score.pending === true && score.value == null);
-  const hasRatings = [tmdb, trakt, traktPublic, imdb, rt, mc].some(
+  const hasRatings = [tmdb, trakt, traktPublic, imdb, rt, mc, lb].some(
     hasVisibleScore,
   );
   const hasStats = Object.values(stats || {}).some(
@@ -1083,6 +1110,7 @@ export default function DetailsScoreboardPanel({
               imdb={imdb}
               rt={rt}
               mc={mc}
+              lb={lb}
               compact={compactToolbar}
               phone={phoneLayout}
               spread={mobileScoresOnly}

@@ -139,6 +139,7 @@ import {
 } from "@/components/details/FollowingActivity";
 import useRatingLinks, { useRatingScores } from "@/lib/details/useRatingLinks";
 import { audienceScoreBadge } from "@/lib/details/ratingScores";
+import { letterboxdScoreBadge } from "@/lib/details/letterboxdScore";
 import {
   buildTmdbHref,
   buildTraktHref,
@@ -652,13 +653,13 @@ export default function DetailModal({
   // del que les va a tocar y se pintaban con etiqueta hasta que llegaban las
   // notas y se compactaban de golpe. Ya resuelto y sin dato vuelve a ser `null`:
   // la insignia no se pinta, que es lo correcto para un título sin nota allí.
-  const optionalScoreBadge = (scores, href) => {
+  const optionalScoreBadge = (scores, href, toBadge = audienceScoreBadge) => {
     // Fuera de la ficha de teléfono: cinco insignias no caben en ese ancho y
     // empujaban los botones de la derecha fuera del panel. Tampoco en
     // episodios: esas fichas son de la serie, no del episodio.
     if (phoneLayout || isEpisode) return null;
     if (!ratingScores.ready) return { pending: true };
-    return audienceScoreBadge(scores, href);
+    return toBadge(scores, href);
   };
 
   const backdropPath = data.backdropPath || item?.backdrop_path || null;
@@ -3288,6 +3289,8 @@ export default function DetailModal({
       // hueco reservado mientras se leen las fichas de RT y Metacritic.
       rt={optionalScoreBadge(ratingScores.rt, ratingLinks.rt)}
       mc={optionalScoreBadge(ratingScores.mc, ratingLinks.mc)}
+      // Letterboxd solo tiene películas: en series ni reserva hueco.
+      lb={mediaType === "movie" ? optionalScoreBadge(ratingScores.lb, ratingScores.lb?.url || ratingLinks.lb, letterboxdScoreBadge) : null}
       mobileScoresOnly={phoneLayout}
       // En tablet la ventana supera `sm` aunque el drawer sea
       // estrecho: sin esto el marcador salía con la disposición

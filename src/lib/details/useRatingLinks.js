@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-const EMPTY = { rt: null, mc: null };
+const EMPTY = { rt: null, mc: null, lb: null };
 const cache = new Map();
 const pending = new Map();
 
 // `path`: /api/links/ratings (URL de las fichas) o
 // /api/links/ratings/scores (nota y votos del público leídos de esas fichas).
-// Misma forma { rt, mc }.
+// Misma forma { rt, mc, lb } (lb = Letterboxd, solo películas).
 function load(path, key) {
   const cacheKey = `${path}?${key}`;
   const hit = cache.get(cacheKey);
@@ -19,7 +19,7 @@ function load(path, key) {
       if (!response.ok) throw new Error("Rating links unavailable");
       const links = await response.json();
       if (cache.size >= 400) cache.delete(cache.keys().next().value);
-      cache.set(cacheKey, { links, expires: Date.now() + (links.rt || links.mc ? 3600000 : 300000) });
+      cache.set(cacheKey, { links, expires: Date.now() + (links.rt || links.mc || links.lb ? 3600000 : 300000) });
       return links;
     })
     .finally(() => pending.delete(cacheKey));
@@ -49,8 +49,10 @@ export default function useRatingLinks(options) {
   return useRatingSource("/api/links/ratings", options);
 }
 
-// { rt, mc, ready }: cada sitio { audienceScore, audienceCount,
-// audienceCountBanded } | null (ver lib/details/ratingScores.js). `ready` dice
+// { rt, mc, lb, ready }: rt y mc { audienceScore, audienceCount,
+// audienceCountBanded } | null (ver lib/details/ratingScores.js); lb
+// { audienceScore (0–5), audienceCount, url, source } | null (ver
+// lib/details/letterboxdScore.js). `ready` dice
 // si ya se sabe la respuesta, para reservar el hueco de la insignia mientras no.
 export function useRatingScores(options) {
   return useRatingSource("/api/links/ratings/scores", options);

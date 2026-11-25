@@ -238,11 +238,13 @@ test("la barra cede por partes al estrecharse, en un orden definido", async () =
 
   // 1º los botones pierden su etiqueta...
   assert.match(css, /@container detail-score-actions \(width < 22rem\)/);
-  // ...y 2º se retiran las dos puntuaciones sin recuento de votos.
+  // ...y 2º se retiran RT y Metacritic o Letterboxd (la que ocupe su hueco).
   assert.match(
     css,
     /@container detail-scoreboard \(width < 40rem\)[\s\S]*?\.optionalScore \{\s*\n\s*display: none;/,
   );
-  // Aplicado a Rotten Tomatoes y a Metacritic, y solo a ellas.
-  assert.equal((panel.match(/styles\.optionalScore/g) || []).length, 2);
+  // Aplicado a Rotten Tomatoes, Metacritic y Letterboxd, y solo a ellas.
+  assert.equal((panel.match(/styles\.optionalScore\b/g) || []).length, 3);
+  // Letterboxd sustituye a Metacritic: nunca salen las dos.
+  assert.match(panel, /scoreSlot\(\s*lb \? null : mc,/);
 });
