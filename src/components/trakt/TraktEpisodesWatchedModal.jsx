@@ -296,6 +296,7 @@ export default function TraktEpisodesWatchedModal({
   const [showError, setShowError] = useState("");
   const episodeListRef = useRef(null);
   const seasonSwipeStartRef = useRef(null);
+  const seasonSwipeClickGuardRef = useRef(0);
   // Relevo animado de temporada (ver `episodesSeasonTransition.js`). Mientras
   // salen los episodios de la temporada actual, `seasonExitPending` retiene el
   // cambio de `displaySeason`; `seasonSwapRef` guarda hacia dónde se va y un
@@ -761,10 +762,13 @@ export default function TraktEpisodesWatchedModal({
   const handleEpisodeListTouchStart = useCallback((event) => {
     if (window.matchMedia("(min-width: 768px)").matches) return;
 
+    // Los botones de puntuación y visionado también inician el gesto: el
+    // navegador no dispara su clic si el dedo se desplaza, y si alguno se
+    // colara tras cambiar de temporada lo anula handleEpisodeListClickCapture.
     const target = event.target;
     if (
       event.touches.length !== 1 ||
-      target.closest?.("button, a, input, select, textarea")
+      target.closest?.("input, select, textarea, [contenteditable='true']")
     ) {
       seasonSwipeStartRef.current = null;
       return;
@@ -795,10 +799,21 @@ export default function TraktEpisodesWatchedModal({
       const nextSeason = usableSeasons[
         currentIndex + (deltaX < 0 ? 1 : -1)
       ];
-      if (nextSeason) selectSeason(nextSeason.season_number);
+      if (!nextSeason) return;
+      seasonSwipeClickGuardRef.current = performance.now();
+      selectSeason(nextSeason.season_number);
     },
     [selectSeason, selectedSn, usableSeasons],
   );
+
+  const handleEpisodeListClickCapture = useCallback((event) => {
+    const swipedAt = seasonSwipeClickGuardRef.current;
+    if (!swipedAt) return;
+    seasonSwipeClickGuardRef.current = 0;
+    if (performance.now() - swipedAt > 400) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
 
   const displayCache = displaySn != null ? seasonCache?.[displaySn] : null;
   const episodes = Array.isArray(displayCache?.episodes)
@@ -2037,6 +2052,7 @@ export default function TraktEpisodesWatchedModal({
                 ref={episodeListRef}
                 onTouchStart={handleEpisodeListTouchStart}
                 onTouchEnd={handleEpisodeListTouchEnd}
+                onClickCapture={handleEpisodeListClickCapture}
                 onTouchCancel={() => {
                   seasonSwipeStartRef.current = null;
                 }}
