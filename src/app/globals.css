@@ -1781,6 +1781,37 @@ body {
   mask-size: 100% 100%;
 }
 
+/* Tráiler de las vistas previas (hover) de los dashboards: el mismo encaje
+   que el tráiler del FeaturedHero. «Cover» exacto sobre la imagen útil del
+   vídeo, sin ampliación extra: muchos tráileres son un 16:9 con bandas de
+   panorámico dentro (2:1, 2,39:1…) y --sv-trailer-aspect es la proporción
+   sin bandas, medida en sus fotogramas (lib/dashboard/trailerAspect.js, la
+   pasa usePreviewAutoTrailer). El iframe sigue siendo 16:9 pero se dimensiona
+   para que esa zona útil cubra la tarjeta: toca los cuatro bordes y solo se
+   recorta lo imprescindible. Antes era un 140 % × 180 % fijo: con un 16:9
+   ampliaba de más y con un panorámico dejaba ver las bandas. Sin medida,
+   16:9. Los 2 px extra evitan una línea de subpíxel.
+
+   --sv-trailer-chrome: el iframe crece eso por arriba y por abajo. YouTube
+   encaja el vídeo a lo ancho (sigue igual de grande) y su barra de título,
+   que va pegada al borde superior del REPRODUCTOR y no del vídeo, queda
+   fuera de la tarjeta. Con el encaje exacto asomaba entrecortada; con el
+   140 % fijo de antes quedaba fuera por casualidad. Mide ~48-60 px; 80 px
+   deja margen. */
+.sv-preview-trailer-viewport {
+  container-type: size;
+  --sv-trailer-aspect: 1.7778;
+  --sv-trailer-chrome: 80px;
+}
+
+.sv-preview-trailer-iframe {
+  --sv-trailer-w: max(100cqw, 100cqh * var(--sv-trailer-aspect));
+  width: calc(var(--sv-trailer-w) + 2px);
+  height: calc(var(--sv-trailer-w) * 9 / 16 + 2px + 2 * var(--sv-trailer-chrome));
+  max-width: none;
+  max-height: none;
+}
+
 /* =========================================================================
    FICHA DE TELÉFONO DEL DRAWER (DetailModal con `contentView === "mobile"`)
 

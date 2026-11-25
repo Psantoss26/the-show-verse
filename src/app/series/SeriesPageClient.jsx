@@ -84,6 +84,10 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
+import {
+  getCachedTrailerAspect,
+  getTrailerContentAspect,
+} from "@/lib/dashboard/trailerAspect";
 import useOwnCardPoster, { useCardArtworkState, useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 import {
   rowSwiperKeySuffix,
@@ -598,6 +602,8 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
+  // Proporción útil de la imagen del tráiler (sin bandas): encaje exacto.
+  const [trailerAspect, setTrailerAspect] = useState(null);
   const trailerIframeRef = useRef(null);
   const {
     muted: trailerMuted,
@@ -898,6 +904,10 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
         return;
       }
 
+      // Se mide antes de mostrarlo: el iframe no cambia de tamaño a la vista.
+      setTrailerAspect(
+        getCachedTrailerAspect(t.key) ?? (await getTrailerContentAspect(t.key)),
+      );
       setTrailer(t);
       setShowTrailer(true);
     } catch {
@@ -997,11 +1007,17 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
             )}
 
             {trailerSrc && (
-              <div className="absolute inset-0 overflow-hidden" style={isSpotlight ? undefined : dashboardPreviewBackdropFadeStyle}>
+              <div
+                className="sv-preview-trailer-viewport absolute inset-0 overflow-hidden"
+                style={{
+                  ...(isSpotlight ? null : dashboardPreviewBackdropFadeStyle),
+                  ...(trailerAspect ? { "--sv-trailer-aspect": trailerAspect } : null),
+                }}
+              >
                 <iframe
                   key={trailer.key}
                   ref={trailerIframeRef}
-                  className="absolute left-1/2 top-1/2 w-[140%] h-[180%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                  className="sv-preview-trailer-iframe pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
                   src={trailerSrc}
                   title={`Trailer - ${show.name || show.title}`}
                   allow="autoplay; encrypted-media; picture-in-picture"

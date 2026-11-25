@@ -11,6 +11,20 @@ import {
   prefetchPreviewTrailer,
   resolvePreviewTrailer,
 } from "@/lib/dashboard/previewTrailer";
+import {
+  getCachedTrailerAspect,
+  getTrailerContentAspect,
+} from "@/lib/dashboard/trailerAspect";
+
+// Proporción de la imagen útil del tráiler (sin bandas de panorámico) para
+// encajarlo con «cover» exacto. Al instante si ya se midió; si no, como mucho
+// lo que tarde getTrailerContentAspect (≤ 1,5 s, tapado por el backdrop).
+async function measureAspect(video) {
+  if (!video?.key) return null;
+  const value =
+    getCachedTrailerAspect(video.key) ?? (await getTrailerContentAspect(video.key));
+  return { key: video.key, value };
+}
 
 /**
  * Tráiler con autoplay de las vistas previas del dashboard. La tarjeta de la
@@ -38,6 +52,12 @@ import {
  *     Uno que ya se reproduce se deja: ya pasó por ahí y se ve. Si el puntero
  *     vuelve, el autoplay se arma de nuevo.
  *
+ *  6. Antes de montar el iframe se mide el formato real de la imagen del
+ *     tráiler (lib/dashboard/trailerAspect.js) y se devuelve en
+ *     `trailerAspect`: la tarjeta lo encaja con `.sv-preview-trailer-*`, que
+ *     llega a los bordes de arriba y abajo sin bandas ni zoom de más. Se mide
+ *     ANTES de mostrarlo para que el iframe no cambie de tamaño a la vista.
+ *
  * `onBeforeOpen`: lo que la tarjeta cierra al abrir el tráiler (el soundtrack).
  * `season`: el tráiler de esa temporada de la serie (Calendario: la del
  * episodio que se estrena), ver previewTrailer.js.
@@ -54,6 +74,7 @@ export default function usePreviewAutoTrailer({
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
   const [error, setError] = useState("");
+  const [aspect, setAspect] = useState(null);
   const titleRef = useRef({ id, mediaType, season });
   const onBeforeOpenRef = useRef(onBeforeOpen);
   // Fuera de un <AnimatePresence> siempre es true.
@@ -71,7 +92,12 @@ export default function usePreviewAutoTrailer({
     setTrailer(null);
     setTrailerLoading(false);
     setError("");
-    if (id) prefetchPreviewTrailer(mediaType, id, season);
+    if (!id) return;
+    prefetchPreviewTrailer(mediaType, id, season);
+    // El formato también se adelanta: al vencer la espera suele estar ya.
+    resolvePreviewTrailer(mediaType, id, season)
+      .then((video) => measureAspect(video))
+      .catch(() => {});
   }, [id, mediaType, season]);
 
   const openTrailer = useCallback(async () => {
@@ -82,20 +108,22 @@ export default function usePreviewAutoTrailer({
     setError("");
     // Ya resuelto (lo normal tras la espera): sin pasar por "cargando".
     const known = peekPreviewTrailer(currentType, currentId, currentSeason);
-    if (known) {
+    const knownAspect = known?.key ? getCachedTrailerAspect(known.key) : null;
+    if (known && knownAspect) {
+      setAspect({ key: known.key, value: knownAspect });
       setTrailer(known);
       setShowTrailer(true);
       return;
     }
     setTrailerLoading(true);
     try {
-      const resolved = await resolvePreviewTrailer(
-        currentType,
-        currentId,
-        currentSeason,
-      );
+      const resolved =
+        known ||
+        (await resolvePreviewTrailer(currentType, currentId, currentSeason));
+      const measured = await measureAspect(resolved);
       // La tarjeta cambió de título mientras tanto, o ya se está cerrando.
       if (titleRef.current.id !== currentId || !presentRef.current) return;
+      setAspect(measured);
       setTrailer(resolved || null);
       // Sin tráiler no hay aviso: en la preview no tenerlo no es un error.
       setShowTrailer(Boolean(resolved?.key));
@@ -145,10 +173,13 @@ export default function usePreviewAutoTrailer({
     const { id: currentId, mediaType: currentType, season: currentSeason } =
       titleRef.current;
     const failed = trailer;
-    markPreviewTrailerBroken(currentType, currentId, failed, currentSeason).then((next) => {
+    markPreviewTrailerBroken(currentType, currentId, failed, currentSeason).then(async (next) => {
       if (titleRef.current.id !== currentId) return;
       if (next?.key && next.key !== failed?.key) {
+        const measured = await measureAspect(next);
+        if (titleRef.current.id !== currentId) return;
         // El siguiente, oculto tras el backdrop hasta que se reproduzca.
+        setAspect(measured);
         setTrailer(next);
       } else {
         setShowTrailer(false);
@@ -219,6 +250,9 @@ export default function usePreviewAutoTrailer({
     trailerLoading,
     trailerPlaying,
     trailerError: error,
+    // Proporción útil de la imagen (ancho/alto) o null si aún no se sabe.
+    trailerAspect:
+      trailer?.key && aspect?.key === trailer.key ? aspect.value : null,
     toggleTrailer: toggleTrailerByUser,
   };
 }

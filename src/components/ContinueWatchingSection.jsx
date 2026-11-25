@@ -608,6 +608,7 @@ function ContinueWatchingPreviewCard({
     setShowTrailer,
     trailerLoading,
     trailerPlaying,
+    trailerAspect,
     trailerError,
     toggleTrailer: handleToggleTrailer,
   } = usePreviewAutoTrailer({
@@ -1294,11 +1295,14 @@ function ContinueWatchingPreviewCard({
               )}
               {trailerSrc && (
                 <>
-                  <div className="absolute inset-0 overflow-hidden sv-preview-fade">
+                  <div
+                    className="sv-preview-trailer-viewport absolute inset-0 overflow-hidden sv-preview-fade"
+                    style={trailerAspect ? { "--sv-trailer-aspect": trailerAspect } : undefined}
+                  >
                     <iframe
                       key={trailer.key}
                       ref={trailerIframeRef}
-                      className="pointer-events-none absolute left-1/2 top-1/2 h-[180%] w-[140%] -translate-x-1/2 -translate-y-1/2"
+                      className="sv-preview-trailer-iframe pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
                       src={trailerSrc}
                       title={`Trailer - ${show?.title || ""}`}
                       allow="autoplay; encrypted-media; picture-in-picture"

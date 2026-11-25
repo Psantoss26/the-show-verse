@@ -595,6 +595,7 @@ function InlinePreviewCard({
     setShowTrailer,
     trailerLoading,
     trailerPlaying,
+    trailerAspect,
     trailerError,
     toggleTrailer: handleToggleTrailer,
   } = usePreviewAutoTrailer({
@@ -1364,17 +1365,15 @@ function InlinePreviewCard({
               {trailerSrc && (
                 <>
                   <div
-                    className={`absolute inset-0 overflow-hidden ${
+                    className={`sv-preview-trailer-viewport absolute inset-0 overflow-hidden ${
                       isSpotlight ? "" : "sv-preview-fade"
                     }`}
+                    style={trailerAspect ? { "--sv-trailer-aspect": trailerAspect } : undefined}
                   >
                     <iframe
                       key={trailer.key}
                       ref={trailerIframeRef}
-                      className="absolute left-1/2 top-1/2
-                                        w-[140%] h-[180%]
-                                        -translate-x-1/2 -translate-y-1/2
-                                        pointer-events-none"
+                      className="sv-preview-trailer-iframe pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
                       src={trailerSrc}
                       title={`Trailer - ${movie.title || movie.name}`}
                       allow="autoplay; encrypted-media; picture-in-picture"
