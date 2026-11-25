@@ -377,12 +377,12 @@ export default function EpisodeRatingsGrid({
     compact: {
       cell: "w-[54px] h-[36px] sm:w-[60px] sm:h-[40px] lg:w-[66px] lg:h-[43px]",
       headerPad: "px-0 py-1.5 sm:px-1",
-      stickyCol: "w-5 sm:w-8 lg:w-9",
+      stickyCol: "w-7 min-w-7 sm:w-9 sm:min-w-9 lg:w-10 lg:min-w-10",
     },
     comfy: {
       cell: "w-[64px] h-[42px] sm:w-[70px] sm:h-[46px] lg:w-[78px] lg:h-[50px]",
       headerPad: "px-0 py-2 sm:px-1.5",
-      stickyCol: "w-6 sm:w-9 lg:w-10",
+      stickyCol: "w-8 min-w-8 sm:w-10 sm:min-w-10 lg:w-11 lg:min-w-11",
     },
   };
   const SZ = SIZES[density] ?? SIZES.compact;
@@ -944,15 +944,15 @@ export default function EpisodeRatingsGrid({
   // =======================
   const renderGrid = () => (
     <div
-      className="-ml-3 pr-3 overflow-x-auto overflow-y-visible mt-3 [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:ml-0 sm:pr-0"
+      className="sv-ergrid-scroller -ml-6 pl-3 pr-3 overflow-x-auto overflow-y-visible [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:-ml-3 sm:pr-0"
       style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
       <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed]">
         <thead>
           <tr>
-            <th
+            <th data-edge="top"
               className={`
-                sticky left-0 z-10
+                sv-ergrid-label sticky left-0 z-10
                 bg-transparent
                 ${SZ.headerPad}
                 text-left text-[12px] text-zinc-400 font-medium
@@ -975,14 +975,19 @@ export default function EpisodeRatingsGrid({
         </thead>
 
         <tbody>
-          {episodeNumbers.map((epNum) => (
+          {episodeNumbers.map((epNum, rowIndex) => (
             <tr key={`row-${epNum}`}>
               <td
+                data-edge={
+                  !showSeasonAvg && rowIndex === episodeNumbers.length - 1
+                    ? "bottom"
+                    : undefined
+                }
                 className={`
-                  sticky left-0 z-10
+                  sv-ergrid-label sticky left-0 z-10
                   bg-transparent
                   ${SZ.headerPad}
-                  text-right text-[13px] lg:text-[14px] text-zinc-100 font-medium
+                  text-center text-[13px] lg:text-[14px] text-zinc-100 font-medium
                   ${SZ.stickyCol}
                 `}
               >
@@ -1062,12 +1067,12 @@ export default function EpisodeRatingsGrid({
 
           {showSeasonAvg && (
             <tr>
-              <td
+              <td data-edge="bottom"
                 className={`
-                  sticky left-0 z-10
+                  sv-ergrid-label sticky left-0 z-10
                   bg-transparent
                   ${SZ.headerPad}
-                  text-right text-[13px] lg:text-[14px] text-zinc-300 font-semibold
+                  text-center text-[13px] lg:text-[14px] text-zinc-300 font-semibold
                   ${SZ.stickyCol}
                 `}
               >
@@ -1112,15 +1117,15 @@ export default function EpisodeRatingsGrid({
   // =======================
   const renderGridInverted = () => (
     <div
-      className="-ml-3 pr-3 overflow-x-auto overflow-y-visible mt-3 [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:ml-0 sm:pr-0"
+      className="sv-ergrid-scroller -ml-6 pl-3 pr-3 overflow-x-auto overflow-y-visible [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:-ml-3 sm:pr-0"
       style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
       <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed]">
         <thead>
           <tr>
-            <th
+            <th data-edge="top"
               className={`
-                sticky left-0 z-10
+                sv-ergrid-label sticky left-0 z-10
                 bg-transparent
                 ${SZ.headerPad}
                 text-left text-[12px] text-zinc-400 font-medium
@@ -1154,14 +1159,17 @@ export default function EpisodeRatingsGrid({
         </thead>
 
         <tbody>
-          {seasonsSorted.map((s) => (
+          {seasonsSorted.map((s, rowIndex) => (
             <tr key={`row-s${s.season_number}`}>
               <td
+                data-edge={
+                  rowIndex === seasonsSorted.length - 1 ? "bottom" : undefined
+                }
                 className={`
-                  sticky left-0 z-10
+                  sv-ergrid-label sticky left-0 z-10
                   bg-transparent
                   ${SZ.headerPad}
-                  text-right text-[13px] lg:text-[14px] text-zinc-100 font-medium
+                  text-center text-[13px] lg:text-[14px] text-zinc-100 font-medium
                   ${SZ.stickyCol}
                 `}
               >

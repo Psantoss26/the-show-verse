@@ -164,7 +164,7 @@ export default function EpisodeRatingsModal({
           aria-hidden="true"
         />
 
-        <header className={`flex shrink-0 items-center justify-between gap-4 ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6`}>
+        <header className={`flex shrink-0 items-center justify-between gap-4 ${LIQUID_GLASS_MODAL_HEADER} px-6 pt-5 pb-3 sm:px-8 sm:pt-7 sm:pb-3`}>
           <div className="flex min-w-0 items-center gap-3">
             <ModalTitleIcon icon={BarChart3} tone="neutral" />
             <div className="min-w-0">
@@ -198,7 +198,7 @@ export default function EpisodeRatingsModal({
         </header>
 
         <div
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:py-6"
+          className="sv-erm-scroll-fade min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-2 pb-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:pt-2 sm:pb-6"
           aria-busy={loading}
         >
           {loading && (

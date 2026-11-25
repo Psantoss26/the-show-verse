@@ -4847,3 +4847,138 @@ html[data-details-sequence-transition] .sv-topbar {
     rgb(0 0 0 / 0.07) 100%
   );
 }
+
+/* TABLA DE VALORACIONES DE EPISODIOS (EpisodeRatingsGrid): la columna fija de
+   la izquierda (E1, E2… o S1, S2… en la vista invertida) lleva un cristal que
+   aparece al desplazar la tabla en horizontal, cuando las casillas de nota
+   pasan por detrás. Cada celda pinta su trozo y cubre la mitad del hueco entre
+   filas (border-spacing-y 8px) y el hueco hasta la primera columna (5px), así
+   que los trozos encajan en una franja continua. Sin scroll-driven animations
+   el cristal queda siempre puesto. */
+.sv-ergrid-label {
+  isolation: isolate;
+}
+
+/* El scroll de la tabla tiene 12px de margen a la izquierda (pl-3, compensado
+   con un margen negativo) y los funde: lo que pasa por ahí al deslizar, el
+   cristal y las casillas de detrás, se desvanece hacia el fondo del modal en
+   vez de cortarse en una línea. En reposo ese margen está vacío. */
+.sv-ergrid-scroller {
+  mask-image: linear-gradient(to right, transparent 0, #000 12px);
+}
+
+.sv-ergrid-label::before {
+  content: "";
+  position: absolute;
+  /* La columna se fija al borde del contenido del scroll, 12px dentro de su
+     borde (sticky cuenta el pl-3), y el cristal se sale 16px a la izquierda: cubre ese margen, que .sv-ergrid-scroller funde
+     a transparente, así que su canto nunca se ve. */
+  inset: -4px -14px -4px -16px;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(9, 9, 11, 0.58),
+    rgba(9, 9, 11, 0.42)
+  );
+  backdrop-filter: blur(16px) saturate(1.6) brightness(0.75);
+  /* Sin canto: el borde derecho se funde hacia las casillas y la franja
+     nace y muere en degradado arriba (cabecera) y abajo (última fila). */
+  --sv-ergrid-fade-x: linear-gradient(
+    to right,
+    #000 calc(100% - 28px),
+    transparent
+  );
+  mask-image: var(--sv-ergrid-fade-x);
+}
+
+.sv-ergrid-label[data-edge="top"]::before {
+  mask-image:
+    var(--sv-ergrid-fade-x),
+    linear-gradient(to bottom, transparent, #000 85%);
+  mask-composite: intersect;
+}
+
+.sv-ergrid-label[data-edge="bottom"]::before {
+  mask-image:
+    var(--sv-ergrid-fade-x),
+    linear-gradient(to top, transparent, #000 75%);
+  mask-composite: intersect;
+}
+
+@supports ((animation-timeline: scroll()) and (animation-range: 0% 100%)) {
+  .sv-ergrid-label::before {
+    opacity: 0;
+    animation: sv-ergrid-glass-in linear both;
+    animation-timeline: scroll(nearest inline);
+    animation-range: 0px 24px;
+  }
+}
+
+@keyframes sv-ergrid-glass-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Cuerpo con scroll vertical del modal de valoración de episodios: al bajar,
+   el contenido se desvanece contra la cabecera en vez de cortarse en seco (se
+   notaba sobre todo en la franja de cristal de la columna de episodios), y lo
+   mismo abajo mientras quede tabla por ver. El fundido crece con el
+   desplazamiento: arriba del todo y al final no hay ninguno. La máscara hace
+   de este cuerpo la raíz del cristal de la columna, que solo necesita
+   difuminar las casillas, que están dentro. */
+@property --sv-erm-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --sv-erm-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.sv-erm-scroll-fade {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--sv-erm-fade-top),
+    #000 calc(100% - var(--sv-erm-fade-bottom)),
+    transparent 100%
+  );
+}
+
+@supports ((animation-timeline: scroll()) and (animation-range: 0% 100%)) {
+  .sv-erm-scroll-fade {
+    animation:
+      sv-erm-fade-top-in linear both,
+      sv-erm-fade-bottom-out linear both;
+    animation-timeline: scroll(self block), scroll(self block);
+    animation-range:
+      0px 32px,
+      calc(100% - 32px) 100%;
+  }
+}
+
+@keyframes sv-erm-fade-top-in {
+  from {
+    --sv-erm-fade-top: 0px;
+  }
+  to {
+    --sv-erm-fade-top: 28px;
+  }
+}
+
+@keyframes sv-erm-fade-bottom-out {
+  from {
+    --sv-erm-fade-bottom: 28px;
+  }
+  to {
+    --sv-erm-fade-bottom: 0px;
+  }
+}
