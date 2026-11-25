@@ -80,6 +80,8 @@ import {
   Trash2,
   SlidersHorizontal,
   Star,
+  Repeat,
+  Globe,
 } from "lucide-react";
 import ModalTitleIcon from "@/components/details/ModalTitleIcon";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
@@ -175,6 +177,19 @@ const formatDate = (iso) => {
       month: "short",
       day: "numeric",
     });
+  } catch {
+    return iso;
+  }
+};
+
+// Fecha corta para la etiqueta del rewatch en la cabecera («12 jun 25»): cabe
+// en la misma fila que la barra incluso en un móvil estrecho.
+const formatShortDate = (iso) => {
+  if (!iso) return "—";
+  try {
+    return new Date(iso)
+      .toLocaleDateString("es-ES", { year: "2-digit", month: "short", day: "numeric" })
+      .replace(".", "");
   } catch {
     return iso;
   }
@@ -1434,11 +1449,15 @@ export default function TraktEpisodesWatchedModal({
         <PanelGlass />
         {/* Header */}
         <div className={`z-30 flex shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6`}>
-          {/* Rejilla: el icono abarca solo las filas del título y la
-              descripción (`row-span-2`), así queda centrado respecto a ellas
-              y la barra de progreso va debajo, alineada con el texto. */}
-          <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 pr-4">
-            <ModalTitleIcon icon={Eye} tone="green" className="row-span-2" />
+          {/* Rejilla: el icono abarca todas las filas (título, serie y
+              progreso) y queda centrado en vertical con el bloque entero, a
+              la altura del botón de cerrar; la barra va alineada con el texto. */}
+          <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 pr-3 sm:gap-x-4 sm:pr-4">
+            <ModalTitleIcon
+              icon={Eye}
+              tone="green"
+              className={totals.totalEpisodes > 0 ? "row-span-3" : "row-span-2"}
+            />
             <div className="contents">
               <h2 className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl">
                 Episodios vistos
@@ -1446,17 +1465,16 @@ export default function TraktEpisodesWatchedModal({
               <p className="truncate text-xs text-white/55 sm:text-sm">{title}</p>
 
               {totals.totalEpisodes > 0 && (
-                // Barra, porcentaje y vista con la misma familia que la
-                // insignia «Vistas» de TraktWatchedModal: pista hundida sin
-                // halo (el brillo difuminaba el borde), relleno en degradado,
-                // cifra tabular y etiqueta en píldora de 20 px, todo a la
-                // misma altura. La barra es flexible (64–144 px) y cede sitio a la
-                // etiqueta del rewatch, que nunca se recorta: si no cabe (móvil
-                // estrecho) baja a la línea siguiente. PT Sans solo
+                // Barra, porcentaje y vista en UNA fila (nunca baja de línea):
+                // la barra (6 px, pista hundida, relleno en degradado) ocupa lo
+                // que dejan la cifra y la etiqueta, entre 40 y 224 px. La
+                // etiqueta es una píldora de 20 px con icono (Globe para la
+                // vista global, Repeat para un rewatch) y fecha corta; la
+                // palabra «Rewatch» solo se escribe desde `sm`. PT Sans solo
                 // trae 400 y 700 (`font-bold`).
-                <div className="col-start-2 mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+                <div className="col-start-2 mt-2 flex min-w-0 flex-nowrap items-center gap-2">
                   <div
-                    className="h-1.5 min-w-16 max-w-36 flex-1 overflow-hidden rounded-full bg-white/10 shadow-[inset_0_1px_1px_rgba(0,0,0,0.4)]"
+                    className="h-1.5 min-w-10 flex-1 overflow-hidden rounded-full bg-white/10 shadow-[inset_0_1px_1px_rgba(0,0,0,0.4)] sm:max-w-56"
                     role="progressbar"
                     aria-valuemin={0}
                     aria-valuemax={100}
@@ -1468,25 +1486,34 @@ export default function TraktEpisodesWatchedModal({
                       style={{ width: `${progressPct}%` }}
                     />
                   </div>
-                  <span className="shrink-0 text-[11px] font-bold leading-none tabular-nums text-white/80">
+                  <span className="w-[4ch] shrink-0 text-right text-xs font-bold leading-none tabular-nums text-white/80">
                     {progressPct}%
                   </span>
 
                   <span
-                    className={`ml-1 inline-flex h-5 shrink-0 items-center whitespace-nowrap rounded-full px-2 text-[10px] font-bold uppercase leading-none tracking-wide ${
+                    className={`inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-full pl-1.5 pr-2 text-[11px] font-bold leading-none ${
                       isRewatchView
                         ? "bg-purple-500/15 text-purple-200"
                         : "bg-emerald-500/15 text-emerald-200"
                     }`}
                     title={
                       isRewatchView
-                        ? "Vista rewatch (independiente)"
+                        ? `Rewatch · ${formatDate(effectiveViewId)} (vista independiente)`
                         : "Vista global"
                     }
                   >
-                    {isRewatchView
-                      ? `Rewatch · ${formatDate(effectiveViewId)}`
-                      : "Global"}
+                    {isRewatchView ? (
+                      <>
+                        <Repeat className="h-3 w-3" aria-hidden="true" />
+                        <span className="hidden sm:inline">Rewatch ·</span>
+                        <span className="tabular-nums">{formatShortDate(effectiveViewId)}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="h-3 w-3" aria-hidden="true" />
+                        Global
+                      </>
+                    )}
                   </span>
                 </div>
               )}
