@@ -50,6 +50,7 @@ class WebAppBridge(
     private val paginaPintada: () -> Unit = {},
     private val cambiarBarraEstado: (Boolean) -> Unit = {},
     private val cambiarModalAbierto: (Boolean) -> Unit = {},
+    private val pedirPermisoAvisos: () -> Unit = {},
 ) {
 
     /**
@@ -305,6 +306,9 @@ class WebAppBridge(
         prefs.token = limpio
         prefs.origin = destino
         prefs.addLog("Emparejado desde la app con $destino")
+        // Como en Sync, cuyo panel lo pide al abrirse: sin el permiso de
+        // notificaciones (Android 13+) el aviso de la ficha no se vería.
+        if (prefs.indicatorEnabled) activity.runOnUiThread { pedirPermisoAvisos() }
         return true
     }
 
@@ -328,6 +332,7 @@ class WebAppBridge(
     fun setIndicator(enabled: Boolean): Boolean {
         if (!propio()) return false
         prefs.indicatorEnabled = enabled
+        if (enabled) activity.runOnUiThread { pedirPermisoAvisos() }
         return true
     }
 

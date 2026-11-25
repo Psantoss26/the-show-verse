@@ -6,6 +6,7 @@ import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -114,6 +115,14 @@ class WebAppActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
             responderPermisoPush()
         }
+
+    /**
+     * Permiso de notificaciones para el aviso de acceso rápido a la ficha, al
+     * vincular o activarlo desde la web. Sin respuesta a la web: el aviso lo
+     * publica la sincronización nativa, que ya lo comprueba al mostrarse.
+     */
+    private val permisoAvisosLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     /** Los ajustes de servidor devuelven aquí para recargar con el origen nuevo. */
     private val serverSettingsLauncher =
@@ -267,6 +276,7 @@ class WebAppActivity : AppCompatActivity() {
                 { if (::atras.isInitialized) atras.paginaPintada() },
                 ::cambiarBarraEstado,
                 { abierto -> modalWebAbierto = abierto },
+                ::pedirPermisoAvisos,
             ),
             WebAppBridge.NAME,
         )
@@ -473,6 +483,16 @@ class WebAppActivity : AppCompatActivity() {
             permisoPushLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
             responderPermisoPush()
+        }
+    }
+
+    /** Lo mismo que hace el panel de Sync con su interruptor del aviso. */
+    private fun pedirPermisoAvisos() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            permisoAvisosLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 

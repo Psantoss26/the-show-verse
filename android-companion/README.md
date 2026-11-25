@@ -51,9 +51,17 @@ llaman a `BarrasDelSistema.ajustar` tras `setContentView`: con targetSdk 35,
 Android 15 dibuja de borde a borde, así que el contenido se aparta de las barras,
 la cámara y el teclado con sus huecos (sustituye a `adjustResize`).
 
-Al detectar una ficha navegando, el aviso de Sync lleva de título solo el de la
-película o serie (`notif_browsing` en `src/sync`); la completa lo precede de
-«En The Show Verse:».
+Al detectar una ficha navegando, el aviso lleva de título solo el de la película
+o serie (`notif_browsing` en `src/main`), igual en Sync y en la app completa.
+
+La sincronización es la misma en las dos apps: servicios, detección, avisos y
+cola de envíos viven en `src/main`. Solo cambia lo que rodea a cada una: dónde
+se abre la ficha al tocar el aviso (`AppVariante`: el WebView en la completa, la
+PWA en Sync), desde dónde se vincula (la web de la propia app o el enlace
+`theshowverse://pair`), los textos de «no vinculado» y el reparto con
+`Delegacion`. El permiso de notificaciones (Android 13+) se pide en las dos al
+vincular o al encender el aviso: en Sync desde su panel y en la completa desde
+el puente de la web (`pair`, `setIndicator`).
 
 El registro de detecciones del móvil es **nativo**. Va con el token de
 vinculación contra `/api/streaming/device/*`, porque Sync no tiene sesión web.
