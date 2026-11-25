@@ -67,6 +67,8 @@ Subcomponentes y modales usados por `DetailsClient`/`SeasonDetailsClient`/`Episo
 
 Logo de IMDb: todos los sitios (marcadores, tarjetas de temporada y episodio, filtros de las páginas, enlaces externos, importación y las imágenes para compartir de `ogKit.jsx`) usan el mismo `public/logo-IMDb.png`, el logo oficial horizontal a 960×484 px; no hay versión SVG.
 
+Punto de Plex: el logo de una plataforma disponible en tu servidor Plex lleva un punto verde (`PlexAvailabilityDot` de `details/StreamingProviderLogo.jsx`) centrado sobre la curva de su esquina superior derecha (10 px, mitad dentro y mitad fuera), con un halo suave y sin anillo. Lo usan la fila de plataformas de la ficha, la pestaña de información y el modal de plataformas.
+
 | Componente | Propósito |
 |---|---|
 | `DetailActionsRow.jsx` | Fila de botones de acción de la ficha (tráiler, soundtrack, vistos, nota, favorito, pendiente, listas, reseñas). En escritorio (`lg`) `DetailsClient` le pasa siempre `DETAIL_ACTION_DESKTOP_SIZE_CLASS` (52 px, iconos de 24 px, 8 px entre botones), con portada vertical y con backdrop: el modo de imagen no cambia los botones. `DetailModal` le pasa la misma clase en sus dos filas (título y episodio) salvo en la vista teléfono (`phoneLayout`), así que la vista rápida tiene los botones de la ficha; la vista previa de episodio ya la llevaba por `SubrouteDetailsActionRow`. |

@@ -2,6 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
+import { PlexAvailabilityDot } from "@/components/details/StreamingProviderLogo";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useLinksWithWikipedia } from "@/lib/details/useWikipediaLink";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
@@ -146,10 +147,7 @@ export default function ExternalLinksModal({
                                                                 draggable="false"
                                                             />
                                                             {isPlatformsMode && it.isPlexProvider && (
-                                                                <span
-                                                                    aria-label="Disponible en tu servidor Plex"
-                                                                    className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-black"
-                                                                />
+                                                                <PlexAvailabilityDot className="right-[1.5px] top-[1.5px]" />
                                                             )}
                                                         </>
                                                     ) : (

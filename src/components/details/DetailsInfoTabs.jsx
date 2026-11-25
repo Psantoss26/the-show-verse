@@ -38,6 +38,7 @@ import {
 import AwardsPanel from "@/components/details/AwardsPanel";
 import { translateGenre } from "@/lib/details/formatters";
 import OptimizedImage from "@/components/OptimizedImage";
+import { PlexAvailabilityDot } from "@/components/details/StreamingProviderLogo";
 import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
 import { getStatusLabel } from "@/components/details/DetailsMetaGenresRow";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
@@ -842,7 +843,7 @@ export default function DetailsInfoTabs({
                               className="h-10 w-10 rounded-xl bg-white/5 object-contain shadow-lg"
                             />
                             {platform.isPlexProvider && (
-                              <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-black" />
+                              <PlexAvailabilityDot />
                             )}
                           </span>
                         }
