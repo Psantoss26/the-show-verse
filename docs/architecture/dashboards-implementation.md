@@ -372,7 +372,9 @@ secundarias intercaladas, una cada 2 filas como mucho («Más de tus géneros
 favoritos» primero y luego los «Porque te gustó…»), nunca dos seguidas salvo que
 no queden filas genéricas. En Inicio el cliente coloca justo tras la fila de
 recomendaciones un bloque fijo: Tendencias, Más esperadas, Calendario y
-**«En cines»**. Esta última no sale del motor: la carga `src/app/page.jsx` en el servidor
+**«En cines»**. «Más esperadas» es una fila póster normal (mismas tarjetas y
+vista previa que el resto); Inicio no tiene fila destacada ×1,6, que solo queda
+en Películas y Series (Tendencias). Esta última no sale del motor: la carga `src/app/page.jsx` en el servidor
 con `fetchNowInCinemas` (`src/lib/streaming/cinemaListings.js`). Son las
 películas con sesiones en España según JustWatch (ofertas `CINEMA`, por
 popularidad), sin preventas: se quita cualquiera cuyo estreno en cines en España

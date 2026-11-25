@@ -7,8 +7,8 @@ import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 const LOGO_LANGS = ["en", "es", null];
 
 /**
- * Logo de la vista previa destacada (spotlight) del dashboard: Más esperadas en
- * Inicio y Tendencias en Películas y Series.
+ * Logo de la vista previa destacada (spotlight) de los dashboards de Películas y
+ * Series (Tendencias). Inicio ya no tiene fila destacada.
  *
  * Tres estados, para que el TÍTULO EN TEXTO no aparezca antes que el logo:
  *  - `undefined`: aún se está resolviendo → no se pinta ni logo ni título
