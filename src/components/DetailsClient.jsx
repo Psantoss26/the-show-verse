@@ -11715,8 +11715,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         </motion.div>
 
         {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
+        {/* Capa propia en Anterior/Siguiente («tabs»): fuera de «info», sin
+            marca no salía con el resto y se quedaba a la vista. */}
         {isBackdropPoster && (
-          <div className={`${detailsEntryReady && !posterModeToggled ? "sv-details-entry" : ""} sv-details-entry--tabs mt-8 hidden w-full sm:block lg:mt-6`}>
+          <div data-details-transition-part="tabs" className={`${detailsEntryReady && !posterModeToggled ? "sv-details-entry" : ""} sv-details-entry--tabs mt-8 hidden w-full sm:block lg:mt-6`}>
             {/* Sección de pestañas compartida con DetailModal (mismas tarjetas).
                 variant="backdrop": Presupuesto/Recaudación/Canal solo si hay valor
                 y tagline con comillas rectas. */}

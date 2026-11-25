@@ -57,6 +57,14 @@ function setNames(root, enabled) {
 
 const SKIP = "data-details-sequence-skip";
 
+// Bloques que salen y entran deslizándose. «tabs» es el menú Detalles /
+// Producción / Sinopsis de la portada en modo backdrop, que va FUERA de
+// «info»: sin marca no salía con el resto al pulsar y se quedaba a la vista
+// sobre el fondo mientras la ficha siguiente cargaba.
+const MOVING_PARTS = ["artwork", "info", "tabs", "content"]
+  .map((part) => `[${PART}="${part}"]`)
+  .join(", ");
+
 // Marca los bloques del menú y las secciones que quedan por DEBAJO de la
 // pantalla. La copia de la ficha entera son ~5.500 elementos con paneles de
 // cristal, y pintarla retrasaba ~200ms el primer fotograma tras el clic (y con
@@ -229,14 +237,14 @@ export async function navigateDetailsSequence({ href, direction, navigate, backd
   const hiddenParts = [];
   if (!reduced) {
     source
-      .querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)
+      .querySelectorAll(MOVING_PARTS)
       .forEach((node) => {
         hiddenParts.push([node, node.style.opacity]);
         node.style.opacity = "0";
       });
     const shift = direction === "previous" ? 24 : -24;
     snapshot
-      .querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)
+      .querySelectorAll(MOVING_PARTS)
       .forEach((node) => node.animate?.(
         [{ opacity: 1, transform: "translateX(0)" }, { opacity: 0, transform: `translateX(${shift}px)` }],
         // Curva que arranca rápido: con una de aceleración (ease-in) los primeros
@@ -313,7 +321,7 @@ export async function navigateDetailsSequence({ href, direction, navigate, backd
       // La entrada es SOLO transform: con opacity su cristal se vería plano
       // hasta el último fotograma (Backdrop Root) y saltaría al acabar.
       const x = direction === "previous" ? -24 : 24;
-      const animations = [...incoming.querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)]
+      const animations = [...incoming.querySelectorAll(MOVING_PARTS)]
         .map((node) => node.animate(
           [{ transform: `translateX(${x}px)` }, { transform: "translateX(0)" }],
           { duration: 320, easing: "cubic-bezier(.22,1,.36,1)" },

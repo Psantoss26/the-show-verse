@@ -9,6 +9,7 @@ const source = (await readFile(new URL('./detailsSequenceTransition.js', import.
 function setup({ native = true, reduced = false, stalledBackground = false, castReady = true, touch = false, width = 1280, timeout = false, routeError = false, stackedScreens = false } = {}) {
   const nodes = [];
   const clones = [];
+  const partSelectors = [];
   let clock = 0;
   // Póster, cabecera y secciones de una ficha: registran su estilo y las
   // animaciones que reciben.
@@ -30,6 +31,7 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
       cloneNode: () => { const clone = node(); clones.push(clone); return clone; },
       querySelectorAll(selector) {
         if (!selector.includes('="artwork"')) return [];
+        partSelectors.push(selector);
         if (!parts.length) parts.push(part(), part(), part());
         return parts;
       },
@@ -99,6 +101,7 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
     cancel: () => listeners.get('popstate')?.(),
     parts: () => ({ outgoing: outgoing.parts, snapshot: clones[0]?.parts || [], incoming: incoming.parts }),
     hiddenScreens,
+    partSelectors,
     outgoing,
     clones,
     state: () => ({ focused, transitions, active: html.hasAttribute('data-details-sequence-transition'),
@@ -123,6 +126,20 @@ test('mantiene la ficha antigua, espera la nueva y descarta clics repetidos', as
   assert.equal(await pending, true);
   assert.deepEqual(app.state(), { focused: true, transitions: 1, active: false,
     overlayRemoved: true, outgoingInert: false, incomingInert: false, listenerCount: 0 });
+});
+
+test('el menú Detalles/Producción/Sinopsis del modo backdrop sale y entra con el resto', async () => {
+  // Va fuera de «info» (DetailsClient, data-details-transition-part="tabs"):
+  // si no se anima con los demás bloques se queda a la vista sobre el fondo.
+  for (const options of [{}, { native: false }]) {
+    const app = setup(options);
+    const pending = app.run(() => {});
+    await tick();
+    app.ready();
+    assert.equal(await pending, true);
+    assert.ok(app.partSelectors.length >= 2);
+    for (const selector of app.partSelectors) assert.match(selector, /="tabs"/);
+  }
 });
 
 test('fallback y movimiento reducido esperan igualmente a la ficha lista', async () => {

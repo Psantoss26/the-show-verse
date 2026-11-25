@@ -3979,6 +3979,7 @@ html[data-details-sequence-transition] [data-details-root] {
 ::view-transition-group(details-sequence-background),
 ::view-transition-group(details-sequence-artwork),
 ::view-transition-group(details-sequence-info),
+::view-transition-group(details-sequence-tabs),
 ::view-transition-group(details-sequence-content) {
   animation-duration: 300ms;
   animation-timing-function: cubic-bezier(.22, 1, .36, 1);
@@ -3994,11 +3995,13 @@ html[data-details-sequence-transition] [data-details-root] {
 }
 ::view-transition-old(details-sequence-artwork),
 ::view-transition-old(details-sequence-info),
+::view-transition-old(details-sequence-tabs),
 ::view-transition-old(details-sequence-content) {
   animation: sv-sequence-leave 300ms cubic-bezier(.22, 1, .36, 1) both;
 }
 ::view-transition-new(details-sequence-artwork),
 ::view-transition-new(details-sequence-info),
+::view-transition-new(details-sequence-tabs),
 ::view-transition-new(details-sequence-content) {
   animation: sv-sequence-enter 300ms cubic-bezier(.22, 1, .36, 1) both;
 }
@@ -4009,7 +4012,9 @@ html[data-details-sequence-transition] [data-details-root] {
 ::view-transition-old(details-sequence-artwork),
 ::view-transition-new(details-sequence-artwork),
 ::view-transition-old(details-sequence-info),
+::view-transition-old(details-sequence-tabs),
 ::view-transition-new(details-sequence-info),
+::view-transition-new(details-sequence-tabs),
 ::view-transition-old(details-sequence-content),
 ::view-transition-new(details-sequence-content) {
   mix-blend-mode: normal;
@@ -4037,6 +4042,7 @@ html[data-details-sequence-transition] [data-details-root] {
   ::view-transition-group(details-sequence-background),
   ::view-transition-group(details-sequence-artwork),
   ::view-transition-group(details-sequence-info),
+  ::view-transition-group(details-sequence-tabs),
   ::view-transition-group(details-sequence-content) { animation: none; }
 }
 
