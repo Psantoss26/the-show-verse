@@ -601,6 +601,26 @@ html:not([data-avatar-boot]) .avatar-boot-chevron {
   display: none;
 }
 
+/* Medida de lo que hay detrás de un panel (`src/lib/ui/backdropLuminance.js`).
+ * `elementsFromPoint` se salta lo que tiene `pointer-events: none` (fondos y
+ * velos decorativos); durante la medida, que es síncrona, se fuerza en todo el
+ * documento y se quita en el mismo tick: no llega a pintarse. */
+html[data-sv-luminance-probe] * {
+  pointer-events: auto !important;
+}
+
+/* Menú de Perfil sobre un fondo CLARO (lo mide el Navbar al abrirlo): iconos y
+ * títulos con el estilo de los botones de la barra, texto blanco y sombra
+ * oscura. Solo entonces; sobre fondos oscuros el menú queda como siempre.
+ * `filter: drop-shadow` y no `text-shadow`: `truncate` recorta el text-shadow
+ * a su caja. */
+[data-light-backdrop] .sv-glass-menu-item {
+  color: #fff;
+}
+[data-light-backdrop] .sv-glass-menu-item > * {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9));
+}
+
 /* Igual con la campana de alertas: solo hay alertas con sesión. */
 html:not([data-avatar-boot]) .alerts-boot {
   display: none;

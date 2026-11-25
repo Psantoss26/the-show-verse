@@ -70,6 +70,10 @@ import OfflineBanner from "@/components/OfflineBanner";
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
 import useActionModalMotion from "@/hooks/useActionModalMotion";
 import useHeldWhileOpen from "@/hooks/useHeldWhileOpen";
+import {
+  LIGHT_BACKDROP_LUMINANCE,
+  measureBackdropLuminance,
+} from "@/lib/ui/backdropLuminance";
 import MobileOptionsSheet, {
   SheetOption,
   SheetOptionGroup,
@@ -2853,6 +2857,41 @@ function NavbarContent() {
     { position: profileMenuPosition },
     profileMenuOpen,
   ).position;
+  // ¿Fondo claro detrás del menú? Entonces iconos y títulos toman el estilo
+  // de los botones de la barra (`.sv-glass-menu-item` en globals.css). Se mide
+  // al pasar el ratón por el avatar, para tenerlo listo al abrir, y otra vez al
+  // abrir. Sin medida (o fondo oscuro) el menú queda como siempre.
+  const [profileMenuLight, setProfileMenuLight] = useState(false);
+  const profileMenuMeasureRef = useRef(0);
+  const measureProfileMenuBackdrop = useCallback(() => {
+    const anchor = profileMenuRef.current?.getBoundingClientRect();
+    if (!anchor) return;
+    // Mismo rectángulo que calcula `profileMenuPosition`.
+    const viewportPadding = 16;
+    const width = Math.min(256, window.innerWidth - viewportPadding * 2);
+    const left = Math.min(
+      window.innerWidth - width - viewportPadding,
+      Math.max(viewportPadding, anchor.right - width),
+    );
+    const top = anchor.bottom + 20;
+    const height = profileMenuPanelRef.current?.offsetHeight || 480;
+    const id = ++profileMenuMeasureRef.current;
+    measureBackdropLuminance(
+      { left, top, width, height },
+      {
+        exclude: [
+          profileMenuPanelRef.current,
+          profileMenuRef.current?.closest("nav") || profileMenuRef.current,
+        ],
+      },
+    ).then((luminance) => {
+      if (id !== profileMenuMeasureRef.current) return;
+      setProfileMenuLight(luminance != null && luminance >= LIGHT_BACKDROP_LUMINANCE);
+    });
+  }, [profileMenuPanelRef]);
+  useEffect(() => {
+    if (profileMenuOpen) measureProfileMenuBackdrop();
+  }, [profileMenuOpen, measureProfileMenuBackdrop]);
   const [profilePortalReady, setProfilePortalReady] = useState(false);
   useEffect(() => {
     setProfilePortalReady(true);
@@ -3269,6 +3308,7 @@ function NavbarContent() {
                 <button
                   type="button"
                   onClick={() => setProfileMenuOpen((v) => !v)}
+                  onPointerEnter={measureProfileMenuBackdrop}
                   aria-haspopup="menu"
                   aria-expanded={profileMenuOpen}
                   aria-label={t("nav_profile", "Perfil")}
@@ -3304,6 +3344,7 @@ function NavbarContent() {
                           ref={profileMenuPanelRef}
                           role="menu"
                           style={shownProfileMenuPosition}
+                          data-light-backdrop={profileMenuLight ? "" : undefined}
                           // MISMO CRISTAL Y MISMA FORMA que el desplegable de la barra de
                           // busqueda: identico `LIQUID_GLASS_PANEL`, mismo radio
                           // (rounded-2xl) y misma capa. Antes iba con rounded-3xl y un
@@ -3331,7 +3372,7 @@ function NavbarContent() {
                                     role="menuitem"
                                     onClick={() => setProfileMenuOpen(false)}
                                     aria-current={isActive(href) ? "page" : undefined}
-                                    className={`flex items-center gap-3 rounded-xl px-3 py-2 text-[15px]/5 transition-colors ${
+                                    className={`sv-glass-menu-item flex items-center gap-3 rounded-xl px-3 py-2 text-[15px]/5 transition-colors ${
                                       isActive(href)
                                         ? "bg-white/10 font-bold text-white"
                                         : "text-zinc-300 hover:bg-white/5 hover:text-white"
@@ -3351,7 +3392,7 @@ function NavbarContent() {
                               role="menuitem"
                               onClick={() => setProfileMenuOpen(false)}
                               aria-current={isActive("/recap") ? "page" : undefined}
-                              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-[15px]/5 transition-colors ${
+                              className={`sv-glass-menu-item flex items-center gap-3 rounded-xl px-3 py-2 text-[15px]/5 transition-colors ${
                                 isActive("/recap")
                                   ? "bg-white/10 font-bold text-white"
                                   : "text-zinc-300 hover:bg-white/5 hover:text-white"
@@ -3370,7 +3411,7 @@ function NavbarContent() {
                               role="menuitem"
                               onClick={() => setProfileMenuOpen(false)}
                               aria-current={isActive("/assistant") ? "page" : undefined}
-                              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-[15px]/5 transition-colors ${
+                              className={`sv-glass-menu-item flex items-center gap-3 rounded-xl px-3 py-2 text-[15px]/5 transition-colors ${
                                 isActive("/assistant")
                                   ? "bg-white/10 font-bold text-white"
                                   : "text-zinc-300 hover:bg-white/5 hover:text-white"
