@@ -325,6 +325,11 @@ export function DetailsRatingsBadges({
           <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
             <CompactBadge
               logo="/logo-Letterboxd.png"
+              // Es el icono de la app: un cuadrado oscuro que se funde con el
+              // marcador, y lo que se ve son los puntos (74 % del ancho del
+              // PNG). Se amplía para que los puntos midan lo que los demás
+              // logos; el hover mantiene su +10 %.
+              logoClassName="scale-[1.35] group-hover:!scale-[1.485]"
               value={score.value}
               suffix={score.suffix}
               sub={score.sub}
