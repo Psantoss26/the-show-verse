@@ -292,14 +292,56 @@ function alertsButtonClass({ variant }) {
     : "relative grid h-10 w-10 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
 }
 
+// CONTADOR DE ALERTAS SIN LEER, anclado a la esquina superior derecha de la
+// campana (no a la del botón): su borde izquierdo nace 1 px a la derecha del
+// centro del icono y crece hacia la derecha con más cifras, así que la campana
+// queda casi entera a la vista. Antes iba en la esquina del botón y tapaba
+// media campana; con dos cifras crecía hacia la izquierda, encima de ella.
+// - Cifra real hasta 99 y luego «99+» (antes «9+» desde 10: con 12 o 150 decía
+//   lo mismo).
+// - 11 px en negrita 700, el único peso grueso de PT Sans: el `font-black`
+//   (900) de antes no existe en la fuente y Chrome lo sintetizaba, más borroso.
+// - La campana lleva un hueco recortado con máscara alrededor del extremo
+//   izquierdo del contador (como las caras de Actividad): se despegan sin
+//   dibujar un aro de color, que sobre el cristal se ve como un círculo oscuro.
+const BELL_PX = 24;
+const BADGE_PX = 18;
+const BADGE_LEFT_PX = BELL_PX / 2 + 1;
+const BADGE_TOP_PX = -8;
+const BADGE_GAP_PX = 1.5;
+const BELL_CUTOUT_MASK = `radial-gradient(circle ${BADGE_PX / 2 + BADGE_GAP_PX}px at ${BADGE_LEFT_PX + BADGE_PX / 2}px ${BADGE_TOP_PX + BADGE_PX / 2}px, transparent 96%, #000 100%)`;
+
+export function formatUnreadCount(count) {
+  return count > 99 ? "99+" : String(count);
+}
+
+function UnreadBadge({ count }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute grid place-items-center rounded-full bg-red-500 px-[5px] text-[11px] font-bold leading-none tabular-nums tracking-[-0.01em] text-white shadow-[0_1px_4px_rgba(0,0,0,0.45)]"
+      style={{ left: BADGE_LEFT_PX, top: BADGE_TOP_PX, height: BADGE_PX, minWidth: BADGE_PX }}
+    >
+      {formatUnreadCount(count)}
+    </span>
+  );
+}
+
 // Campana del botón. En la barra móvil va dentro de `.sv-topbar-icon` (un
 // envoltorio HTML, no el <svg>: ver globals.css) para recuperar tamaño al
-// compactarse sincronizada con el grupo.
-function AlertsBellIcon({ variant }) {
-  if (variant !== "mobile") return <Bell className="h-6 w-6" strokeWidth={2} aria-hidden="true" />;
+// compactarse sincronizada con el grupo. El contador va en el mismo envoltorio
+// para que la contra-escala no descoloque el hueco recortado de la campana.
+function AlertsBellIcon({ variant, unread = 0 }) {
+  const mask = unread > 0 ? { WebkitMaskImage: BELL_CUTOUT_MASK, maskImage: BELL_CUTOUT_MASK } : undefined;
   return (
-    <span className="sv-topbar-icon" aria-hidden="true">
-      <Bell className="h-6 w-6" strokeWidth={2.2} />
+    <span className={`relative ${variant === "mobile" ? "sv-topbar-icon" : "grid"}`}>
+      <Bell
+        className="h-6 w-6"
+        strokeWidth={variant === "mobile" ? 2.2 : 2}
+        style={mask}
+        aria-hidden="true"
+      />
+      {unread > 0 ? <UnreadBadge count={unread} /> : null}
     </span>
   );
 }
@@ -641,15 +683,7 @@ export default function AlertsMenu({
         title={label}
         className={buttonClass}
       >
-        <AlertsBellIcon variant={variant} />
-        {unread > 0 ? (
-          <span
-            aria-hidden="true"
-            className="absolute right-0.5 top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white shadow-[0_2px_8px_rgba(0,0,0,0.45)]"
-          >
-            {unread > 9 ? "9+" : unread}
-          </span>
-        ) : null}
+        <AlertsBellIcon variant={variant} unread={unread} />
       </button>
 
       {portalReady &&
