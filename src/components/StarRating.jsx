@@ -9,6 +9,7 @@ import { useCenteredGlyphOffset } from "@/hooks/useCenteredGlyphOffset";
 import { createPortal } from "react-dom";
 import { Star, X, Minus, Plus, Loader2, Trash2 } from "lucide-react";
 import ModalTitleIcon from "@/components/details/ModalTitleIcon";
+import CommunityRatingsSummary from "@/components/details/CommunityRatingsSummary";
 import LiquidButton from "./LiquidButton";
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
@@ -50,6 +51,9 @@ export default function StarRating({
   renderTrigger,
   // Capa del diálogo: por encima de un modal padre con z-index mayor.
   layerClassName = "z-[10000]",
+  // { type: "movie" | "tv", tmdbId }: muestra en el diálogo la media y el
+  // reparto de notas de los usuarios de The Show Verse para ese título.
+  communityRatings = null,
 }) {
   const serverOnline = useServerOnline();
   const effectiveDisabled = disabled || loading || !serverOnline;
@@ -234,7 +238,7 @@ export default function StarRating({
 
             <div
               ref={modalPanelRef}
-              className={`relative w-full max-w-sm overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+              className={`relative w-full max-w-md overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
               role="dialog"
               aria-modal="true"
               aria-labelledby={titleId}
@@ -327,6 +331,14 @@ export default function StarRating({
                     </button>
                   </div>
                 </div>
+
+                {serverOnline && communityRatings?.type && communityRatings?.tmdbId ? (
+                  <CommunityRatingsSummary
+                    type={communityRatings.type}
+                    tmdbId={communityRatings.tmdbId}
+                    selectedValue={value}
+                  />
+                ) : null}
 
                 <div className="flex items-center gap-3 pt-2">
                   {hasRating && (

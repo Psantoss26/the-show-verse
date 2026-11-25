@@ -1456,6 +1456,7 @@ function ContinueWatchingPreviewCard({
               max: 10,
               loading: ratingLoading,
               onRate: handleRatePreview,
+              community: show ? { type: mediaType, tmdbId: show.id } : null,
               connected: traktInfo.connected,
               onConnect: () => requireLogin(),
             }}

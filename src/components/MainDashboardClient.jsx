@@ -1566,6 +1566,7 @@ function InlinePreviewCard({
                   max: 10,
                   loading: ratingLoading,
                   onRate: handleRatePreview,
+                  community: movie ? { type: mediaType, tmdbId: movie.id } : null,
                   connected: traktInfo.connected,
                   onConnect: () => requireLogin(),
                 }}

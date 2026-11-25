@@ -13,6 +13,7 @@ import {
 import {
   getActorLikes, likeActor, unlikeActor, parsePersonId, parsePersonIds,
 } from '../community/actorLikes.js';
+import { getTitleRatingStats } from '../community/ratingStats.js';
 import { db } from '../db/client.js';
 import { invalidateLevelState } from '../level/store.js';
 import { getFollowingTitleActivity } from '../lib/followingTitleActivity.js';
@@ -78,6 +79,17 @@ export default async function communityRoutes(fastify) {
     const data = await getSentiment({ tmdbId: t.tmdbId, mediaType: t.type });
     reply.header('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=86400');
     return { ...data, state: seed.status };
+  });
+
+  // GET /:type/:tmdbId/ratings — puntuaciones de los usuarios de The Show Verse
+  // para el título: { count, average, histogram: [{ score: 1..10, count }] }.
+  // Pública. Sin caché: el modal de puntuación la vuelve a pedir justo después
+  // de guardar y debe incluir ya la nota recién dada.
+  fastify.get('/:type/:tmdbId/ratings', async (req, reply) => {
+    const t = parseTarget(req, reply); if (!t) return;
+    const stats = await getTitleRatingStats(db, { mediaType: t.type, tmdbId: t.tmdbId });
+    reply.header('Cache-Control', 'no-store');
+    return stats;
   });
 
   // POST native comment — requires auth.

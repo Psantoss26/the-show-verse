@@ -1823,6 +1823,7 @@ function FeaturedSlide({
                     max: 10,
                     loading: ratingLoading,
                     onRate: handleRate,
+                    community: movie ? { type: mediaType, tmdbId: movie.id } : null,
                     connected: traktInfo.connected,
                     onConnect: () => requireLogin(),
                   }}

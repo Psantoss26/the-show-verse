@@ -18,6 +18,10 @@ Comentarios y reseñas en las fichas, resumen de sentimiento, listas de la comun
 
 `GET /v1/community/{type}/{tmdbId}/sentiment` devuelve temas a favor y en contra. Se calcula en el sembrado: si Trakt tiene temas oficiales para el título, se traducen al español (`translate.js`); si no, se usa una heurística sobre los comentarios guardados (`buildHeuristicSentiment` en `sentiment.js`). En `sentiment.js` hay también un generador con la API de modelos de NVIDIA (`generateSentiment`, `provider: 'nvidia'`; necesita `NVIDIA_API_KEY` en el backend), pero hoy no se llama desde ningún sitio.
 
+## Puntuaciones de los usuarios
+
+El modal de puntuación (`StarRating`, prop `communityRatings`; en `DetailActionsRow` llega como `rate.community` desde la ficha, el DetailModal y las vistas previas del dashboard; no en temporadas ni episodios) muestra la media y el reparto de las notas que los miembros han dado al título (`CommunityRatingsSummary`). `GET /v1/community/{type}/{tmdbId}/ratings` agrupa `user_ratings` del título completo (sin temporadas ni episodios) en `community/ratingStats.js`: `{ count, average, histogram: [{ score: 1..10, count }] }`. La escala va de 1 a 10 en medias notas; cada media nota cuenta en la barra de su entero inferior (9,5 → «9»), y la media usa la nota exacta. La respuesta no se cachea: el modal la pide cada vez que se abre (pintando antes la copia en memoria de `src/lib/details/communityRatings.js`), así incluye la nota recién guardada. La barra de la nota que se está eligiendo en el deslizador se ilumina.
+
 ## Listas de la comunidad
 
 - Listas importadas de Trakt y **listas de usuario publicadas** (`userLists.js`): una lista propia y pública se copia a `community_lists` y se resincroniza al editarla. Si pasa a privada se retira; si se borra, se va con sus «me gusta».

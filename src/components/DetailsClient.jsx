@@ -11388,6 +11388,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   max: 10,
                   loading: actionStateLoading || ratingLoading || !!traktBusy,
                   onRate: handleUnifiedRate,
+                  // Media y reparto de notas de los usuarios de la app en el modal.
+                  community: { type: endpointType, tmdbId: id },
                   connected:
                     authHydrated &&
                     (!!session || trakt.connected || hasBackendSession),

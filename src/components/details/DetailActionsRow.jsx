@@ -396,6 +396,7 @@ export default function DetailActionsRow({
       onRate={rate.onRate}
       connected={rate.connected}
       onConnect={rate.onConnect}
+      communityRatings={rate.community}
     />
   ) : null;
 
@@ -873,6 +874,7 @@ export default function DetailActionsRow({
             onRate={rate.onRate}
             connected={rate.connected}
             onConnect={rate.onConnect}
+            communityRatings={rate.community}
           />
         )}
 

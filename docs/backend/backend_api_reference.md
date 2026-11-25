@@ -266,6 +266,7 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 | `DELETE` | `/v1/community/{type}/{tmdbId}/comments/{id}` | Si | Borra un comentario propio |
 | `POST`/`DELETE` | `/v1/community/{type}/{tmdbId}/comments/{id}/like` | Si | Me gusta en un comentario (idempotente) |
 | `GET` | `/v1/community/{type}/{tmdbId}/sentiment` | No | Resumen de sentimiento (temas a favor/en contra) |
+| `GET` | `/v1/community/{type}/{tmdbId}/ratings` | No | Puntuaciones de los miembros para el titulo: `{ count, average, histogram: [{ score, count }] }` con 10 barras (1–10; las medias notas van a su entero inferior). Sin cache (`no-store`). Ver [comunidad](../features/comunidad.md) |
 | `GET` | `/v1/community/{type}/{tmdbId}/summary` | Opcional | Resumen de comunidad del titulo (incluye `artwork`, las imagenes mas votadas) |
 | `GET` | `/v1/community/{type}/{tmdbId}/artwork` | No | `type`: `movie`, `tv` o `collection` (solo en esta ruta). Imagen mas votada de cada tipo (`poster`, `mobilePoster`, `backdrop`, `cardBackdrop`, `background`, `logo`); solo los tipos con algun voto. Cada usuario vale un voto: su seleccion actual en «Portadas y fondos» (tabla `artwork_votes`). Empate: la elegida mas recientemente |
 | `GET` | `/v1/community/{type}/{tmdbId}/artwork/votes` | No | `type`: `movie`, `tv`, `collection` o `season` (id de TMDb de la temporada). Cuántas veces está elegida cada imagen del título, por tipo de imagen: `{ votes: { poster: { "/x.jpg": 3 } } }`, solo las que tienen algún voto. Sin caché (`no-store`). Lo enseñan las tarjetas de «Portadas y fondos» |

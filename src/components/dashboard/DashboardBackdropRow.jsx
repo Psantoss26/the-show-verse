@@ -1142,6 +1142,7 @@ export function BackdropPreviewCard({
               max: 10,
               loading: ratingLoading,
               onRate: handleRatePreview,
+              community: item ? { type: mediaType, tmdbId: item.id } : null,
               connected: traktInfo.connected,
               onConnect: () => requireLogin(),
             }}

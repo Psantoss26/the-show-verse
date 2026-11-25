@@ -3183,6 +3183,7 @@ export default function DetailModal({
             max: 10,
             loading: ratingActionLoading,
             onRate: handleRate,
+            community: isEpisode ? null : { type: mediaType, tmdbId: item?.id },
             connected: ratingActionConnected,
             onConnect: () => requireLogin(),
           }}
