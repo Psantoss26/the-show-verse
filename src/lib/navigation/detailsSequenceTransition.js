@@ -30,6 +30,22 @@ export function isDetailsSequenceTransitionActive() {
   return typeof document !== "undefined" && document.documentElement.hasAttribute(FLAG);
 }
 
+const ARRIVAL = "arrival";
+
+// Llegada a la ficha tapada por otra capa (el velo del panel lateral de las
+// páginas de usuario, DetailModal). Igual que con Anterior/Siguiente, la ficha
+// que monta mientras dura entra YA lista —sin su cortina #101010 ni las
+// entradas que la capa taparía— y con el fondo precalentado
+// (`getWarmedSequenceBackdrop`). Devuelve la función que la retira.
+export function markDetailsArrival() {
+  if (typeof document === "undefined") return () => {};
+  const html = document.documentElement;
+  if (!html.hasAttribute(FLAG)) html.setAttribute(FLAG, ARRIVAL);
+  return () => {
+    if (html.getAttribute(FLAG) === ARRIVAL) html.removeAttribute(FLAG);
+  };
+}
+
 function setNames(root, enabled) {
   root.style.viewTransitionName = enabled ? "details-sequence-page" : "";
   root.querySelectorAll(`[${PART}]`).forEach((element) => {

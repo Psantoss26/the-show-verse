@@ -106,12 +106,22 @@ import {
   wait,
   nextAnimationFrame,
   waitForDetailsRoot,
+  waitForDetailsContent,
+  markDetailsEntered,
+  DRAWER_TO_DETAILS_REVEAL_MIN_MS,
+  DRAWER_TO_DETAILS_FADE_MS,
+  DRAWER_TO_DETAILS_ART_WAIT_MS,
   cleanupFullDetailsTransitionLayers,
   startFullDetailsTransition,
   backdropVariants,
   createPanelVariants,
   createPanelVariantsRight,
 } from "@/components/dashboard/detailPanelMotion";
+import {
+  getWarmedSequenceBackdrop,
+  warmDetailsSequenceTarget,
+} from "@/lib/navigation/detailsSequenceWarmup";
+import { markDetailsArrival } from "@/lib/navigation/detailsSequenceTransition";
 import {
   mergeOwnedComments,
 } from "@/lib/details/detailActionState";
@@ -2416,6 +2426,9 @@ export default function DetailModal({
     if (!item?.id) return;
     try {
       router.prefetch(dashboardDetailHref(item, mediaType));
+      // Drawer de las páginas de usuario: elegir y decodificar ya el fondo y
+      // el póster que pintará la ficha (ver `goToDetailsRoute`).
+      if (isRightPlacement) warmDetailsSequenceTarget(dashboardDetailHref(item, mediaType));
       // La temporada se precarga igual: es el otro destino del mismo grupo de
       // botones y comparte su transición, así que debe llegar igual de listo.
       const showId = data.episodeMeta?.showId;
@@ -2430,6 +2443,7 @@ export default function DetailModal({
     item?.id,
     mediaType,
     router,
+    isRightPlacement,
     data.episodeMeta?.showId,
     data.episodeMeta?.seasonNumber,
   ]);
@@ -2463,19 +2477,53 @@ export default function DetailModal({
       return;
     }
 
+    // Drawer de las páginas de usuario (vistas normal y teléfono) hacia la
+    // ficha de una película o serie: el mismo relevo que Anterior/Siguiente.
+    // El precalentamiento (al abrir el panel) eligió el fondo que pintará la
+    // ficha —selección propia o el mejor de la galería COMPLETA— y dejó
+    // decodificados ese fondo y el póster. El velo es ese fondo (no el del
+    // panel, que puede ser otro y se cambiaba al llegar), y la ficha monta con
+    // `markDetailsArrival`: ya lista, sin su cortina negra y con ese mismo
+    // fondo, así que la capa funde en cuanto la ficha tiene su póster.
+    const warmTask = isRightPlacement ? warmDetailsSequenceTarget(href) : undefined;
+    const drawerArrival = Boolean(warmTask);
     const routeTransition = startFullDetailsTransition(
       panelRef.current,
       isRightPlacement ? "right" : "center",
+      { art: drawerArrival },
     );
+    const releaseArrival = drawerArrival ? markDetailsArrival() : null;
     setNavigatingToFullDetails(true);
 
     if (routeTransition) {
       await nextAnimationFrame();
     }
 
+    if (drawerArrival) {
+      if (!getWarmedSequenceBackdrop(href)) {
+        await Promise.race([warmTask, wait(DRAWER_TO_DETAILS_ART_WAIT_MS)]);
+      }
+      const warmedPath = getWarmedSequenceBackdrop(href);
+      routeTransition?.showArt(
+        warmedPath
+          ? `https://image.tmdb.org/t/p/w1280${warmedPath}`
+          : heroBackdropSrc || heroPosterSrc || null,
+      );
+    }
+
     router.push(href);
 
-    if (routeTransition) {
+    if (drawerArrival) {
+      Promise.all([waitForDetailsContent(href), wait(DRAWER_TO_DETAILS_REVEAL_MIN_MS)])
+        .catch(() => {})
+        .finally(() => {
+          markDetailsEntered(document, href);
+          routeTransition?.reveal();
+          // La marca se retira con la capa ya fundida: mientras está, la
+          // ficha no arranca sus entradas ni recibe clics a medio fundido.
+          window.setTimeout(releaseArrival, routeTransition ? DRAWER_TO_DETAILS_FADE_MS + 40 : 0);
+        });
+    } else if (routeTransition) {
       Promise.all([waitForDetailsRoot(), wait(DETAILS_ROUTE_REVEAL_MIN_MS)])
         .catch(() => {})
         .finally(routeTransition.reveal);

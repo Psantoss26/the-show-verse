@@ -186,6 +186,102 @@ export function waitForDetailsRoot(maxMs = 1800) {
   });
 }
 
+// Relevo drawer de páginas de usuario → ficha completa (DetailModal, vistas
+// normal y teléfono). El velo es el arte del título, no una superficie negra,
+// y se mantiene hasta que la ficha REAL tiene su imagen (no hasta
+// `details/loading.jsx`, que es otra superficie oscura vacía): entonces funde
+// sobre ella. Suelo corto, solo para que el arte termine de entrar.
+export const DRAWER_TO_DETAILS_REVEAL_MIN_MS = 220;
+export const DRAWER_TO_DETAILS_FADE_MS = 260;
+// Si el fondo del destino aún no está elegido al pulsar (panel abierto hace un
+// instante), se le espera como mucho esto antes de navegar.
+export const DRAWER_TO_DETAILS_ART_WAIT_MS = 400;
+const DRAWER_TO_DETAILS_MAX_WAIT_MS = 2200;
+
+function sameDetailsPath(doc, href) {
+  try {
+    const target = new URL(href, doc.location.origin).pathname;
+    return doc.location.pathname === target;
+  } catch {
+    return false;
+  }
+}
+
+// ¿Está ya a la vista la ficha de `href` con su imagen principal? Las
+// pantallas ocultas de la pila (OverlayRouteHost, `display:none`) no tienen
+// cajas y no cuentan. Una ficha que no marca `data-details-sequence-ready`
+// (temporada/episodio) cuenta como lista en cuanto se ve.
+export function detailsContentReady(doc, href) {
+  if (!doc || !sameDetailsPath(doc, href)) return false;
+  for (const loading of doc.querySelectorAll('[data-details-root][aria-busy="true"]')) {
+    if (loading.getClientRects().length > 0) return false;
+  }
+  let shown = false;
+  for (const root of doc.querySelectorAll("[data-details-root], [data-subroute-root]")) {
+    if (root.getClientRects().length === 0) continue;
+    if (root.getAttribute("aria-busy") === "true") continue;
+    const ready = root.getAttribute("data-details-sequence-ready");
+    if (ready !== null && ready !== "true") return false;
+    shown = true;
+  }
+  return shown;
+}
+
+// Un MutationObserver responde en la microtarea que sigue al commit de React
+// que marca la imagen lista; un sondeo por setTimeout llegaba hasta ~300 ms
+// tarde porque tras ese commit React sigue montando las secciones de debajo en
+// tareas largas. El sondeo queda de respaldo (no rAF: con la pestaña en segundo
+// plano no hay fotogramas y la capa se quedaría encima), con tope por tiempo.
+export function waitForDetailsContent(href, maxMs = DRAWER_TO_DETAILS_MAX_WAIT_MS) {
+  if (typeof document === "undefined") return Promise.resolve();
+  return new Promise((resolve) => {
+    const start = Date.now();
+    let done = false;
+    let timer = null;
+    let observer = null;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      observer?.disconnect();
+      if (timer) clearTimeout(timer);
+      resolve();
+    };
+    const check = () => {
+      if (done) return;
+      if (detailsContentReady(document, href) || Date.now() - start > maxMs) {
+        finish();
+        return;
+      }
+      timer = setTimeout(check, 50);
+    };
+    if (typeof MutationObserver === "function" && document.body) {
+      observer = new MutationObserver(() => {
+        if (detailsContentReady(document, href)) finish();
+      });
+      observer.observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["data-details-sequence-ready", "aria-busy"],
+      });
+    }
+    check();
+  });
+}
+
+// La ficha que entra bajo el velo del drawer lo hace sin sus entradas CSS
+// (`html[data-details-sequence-transition]`). Marcada como ya entrada, no las
+// arranca al retirar esa marca, con la ficha ya a la vista (mismo atributo que
+// usa Anterior/Siguiente).
+export function markDetailsEntered(doc, href) {
+  if (!doc) return;
+  for (const root of doc.querySelectorAll("[data-details-root]")) {
+    if (root.getClientRects().length === 0) continue;
+    if (href && root.getAttribute("data-details-href") !== href) continue;
+    root.setAttribute("data-details-sequence-entered", "");
+  }
+}
+
 export function cleanupFullDetailsTransitionLayers() {
   if (typeof document === "undefined") return;
   document
@@ -196,7 +292,13 @@ export function cleanupFullDetailsTransitionLayers() {
 // `decorateClone(clone)`: deja retocar el clon antes de animarlo. El panel de
 // temporada/episodio pinta su ficha en un iframe, que no se puede clonar (y se
 // retira del clon): ahí repone lo que se ve de él.
-export function startFullDetailsTransition(panelElement, variant = "center", { decorateClone } = {}) {
+//
+// `art`: el velo es el FONDO QUE PINTARÁ LA FICHA (variante `--art`), no una
+// superficie negra: entra a pantalla completa mientras el panel se amplía y se
+// difumina, y la capa entera funde sobre la ficha. `artSrc` es ese fondo si ya
+// se conoce; si no, el velo espera transparente (se ve la página de debajo) a
+// que lo ponga `showArt(src)`.
+export function startFullDetailsTransition(panelElement, variant = "center", { decorateClone, art = false, artSrc = null } = {}) {
   if (typeof document === "undefined" || !panelElement) return null;
 
   cleanupFullDetailsTransitionLayers();
@@ -214,6 +316,25 @@ export function startFullDetailsTransition(panelElement, variant = "center", { d
 
   const scrim = document.createElement("div");
   scrim.className = "sv-detail-route-transition__scrim";
+  const artVariant = Boolean(art || artSrc);
+  let artShown = false;
+  const showArt = (src) => {
+    if (!artVariant || artShown) return;
+    artShown = true;
+    if (src) {
+      const image = document.createElement("img");
+      image.className = "sv-detail-route-transition__art";
+      image.alt = "";
+      image.decoding = "async";
+      image.src = src;
+      scrim.append(image);
+    }
+    layer.classList.remove("is-art-pending");
+  };
+  if (artVariant) {
+    layer.classList.add("sv-detail-route-transition--art", "is-art-pending");
+    if (artSrc) showArt(artSrc);
+  }
 
   const panelClone = panelElement.cloneNode(true);
   panelClone.classList.add("sv-detail-route-transition__panel");
@@ -252,8 +373,11 @@ export function startFullDetailsTransition(panelElement, variant = "center", { d
   const reveal = () => {
     if (cleaned) return;
     layer.classList.add("is-revealing");
-    cleanupTimer = window.setTimeout(cleanup, DETAILS_ROUTE_CLEANUP_MS);
+    cleanupTimer = window.setTimeout(
+      cleanup,
+      artVariant ? DRAWER_TO_DETAILS_FADE_MS + 40 : DETAILS_ROUTE_CLEANUP_MS,
+    );
   };
 
-  return { reveal, cleanup };
+  return { reveal, cleanup, showArt };
 }

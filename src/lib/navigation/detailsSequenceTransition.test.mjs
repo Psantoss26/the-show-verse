@@ -236,3 +236,26 @@ test('copia y espera la ficha VISIBLE aunque haya fichas ocultas de la pila ante
   assert.equal(await pending, true);
   assert.equal(app.state().focused, true, 'Entra la ficha visible, no la copia oculta');
 });
+
+test('markDetailsArrival marca la llegada desde el drawer y solo retira su propia marca', () => {
+  const attrs = new Map();
+  const html = {
+    setAttribute: (k, v) => attrs.set(k, v),
+    getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
+    hasAttribute: (k) => attrs.has(k),
+    removeAttribute: (k) => attrs.delete(k),
+  };
+  const context = vm.createContext({ document: { documentElement: html }, setTimeout, Promise });
+  vm.runInContext(`${source}\nglobalThis.api = { markDetailsArrival, isDetailsSequenceTransitionActive };`, context);
+  const { markDetailsArrival, isDetailsSequenceTransitionActive } = context.api;
+
+  const release = markDetailsArrival();
+  assert.equal(isDetailsSequenceTransitionActive(), true);
+  release();
+  assert.equal(isDetailsSequenceTransitionActive(), false);
+
+  // Con Anterior/Siguiente en curso no la pisa ni la quita.
+  html.setAttribute('data-details-sequence-transition', 'next');
+  markDetailsArrival()();
+  assert.equal(html.getAttribute('data-details-sequence-transition'), 'next');
+});

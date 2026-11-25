@@ -1325,6 +1325,82 @@ html {
   opacity: 0;
 }
 
+/* Drawer de páginas de usuario → ficha completa con el ARTE del título como velo
+   (startFullDetailsTransition con `artSrc`). Nada de superficie negra: el arte,
+   desenfocado, entra sobre la página mientras el panel se amplía y difumina (más
+   corto), y al tener la ficha su imagen la capa ENTERA funde sobre ella (260 ms, constante
+   DRAWER_TO_DETAILS_FADE_MS de detailPanelMotion.js). */
+.sv-detail-route-transition--art .sv-detail-route-transition__scrim {
+  opacity: 0;
+  overflow: hidden;
+  transition: none;
+  animation: sv-detail-route-art-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sv-detail-route-transition--art .sv-detail-route-transition__scrim::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top,
+      #101010 0%,
+      rgb(16 16 16 / 0.6) 32%,
+      rgb(16 16 16 / 0.2) 68%,
+      rgb(16 16 16 / 0.45) 100%);
+}
+
+/* Fondo de la ficha aún sin elegir (precalentamiento en curso): el velo se
+   queda transparente sobre la página de debajo, que todavía no ha cambiado. */
+.sv-detail-route-transition--art.is-art-pending .sv-detail-route-transition__scrim {
+  animation: none;
+  opacity: 0;
+}
+
+/* El arte del velo es solo un BAÑO de color (desenfocado y oscurecido), no el
+   fondo nítido: el fondo de la ficha y su contenido aparecen JUNTOS en el
+   fundido final. Con el fondo nítido en el velo se veía la imagen sola durante
+   lo que tardaba la ficha (~250 ms en producción, ~1 s en desarrollo). Sin
+   animación propia: un filtro sobre una capa que se transforma se recalcula
+   en cada fotograma; quieto se pinta una vez. El escalado tapa el halo
+   transparente que deja el desenfoque en los bordes. */
+.sv-detail-route-transition__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transform: scale(1.15);
+  filter: blur(32px) brightness(0.5) saturate(1.15);
+}
+
+.sv-detail-route-transition.is-running.sv-detail-route-transition--art .sv-detail-route-transition__panel {
+  animation-duration: 300ms;
+}
+
+.sv-detail-route-transition--art {
+  transition: opacity 260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sv-detail-route-transition--art.is-revealing {
+  opacity: 0;
+}
+
+/* El velo base pone el scrim a 0 al revelar con su propia transición: en esta
+   variante funde la capa entera, así que el scrim se queda opaco. */
+.sv-detail-route-transition--art.is-revealing .sv-detail-route-transition__scrim {
+  opacity: 1;
+}
+
+@keyframes sv-detail-route-art-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes sv-detail-route-panel-out {
   0% {
     opacity: 1;
