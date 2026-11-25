@@ -84,6 +84,7 @@ import {
   Globe,
 } from "lucide-react";
 import ModalTitleIcon from "@/components/details/ModalTitleIcon";
+import usePixelSnappedTop from "@/hooks/usePixelSnappedTop";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -537,6 +538,15 @@ export default function TraktEpisodesWatchedModal({
       ),
     );
   }, [totals]);
+
+  // Etiqueta de vista de la cabecera (Global / Rewatch) al píxel entero: la
+  // cabecera cae en media fracción de píxel y Chrome pinta el texto en píxel
+  // entero pero el icono no, así que se descuadraban medio píxel.
+  const viewPillRef = usePixelSnappedTop({
+    enabled: actionMotion.present && !isMovie && totals.totalEpisodes > 0,
+    observe: "[data-episodes-header]",
+    viewport: true,
+  });
 
   const showCompleted = useMemo(() => {
     return (
@@ -1448,7 +1458,7 @@ export default function TraktEpisodesWatchedModal({
       >
         <PanelGlass />
         {/* Header */}
-        <div className={`z-30 flex shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6`}>
+        <div data-episodes-header="" className={`z-30 flex shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6`}>
           {/* Rejilla: el icono abarca todas las filas (título, serie y
               progreso) y queda centrado en vertical con el bloque entero, a
               la altura del botón de cerrar; la barra va alineada con el texto. */}
@@ -1467,14 +1477,16 @@ export default function TraktEpisodesWatchedModal({
               {totals.totalEpisodes > 0 && (
                 // Barra, porcentaje y vista en UNA fila (nunca baja de línea):
                 // la barra (6 px, pista hundida, relleno en degradado) ocupa lo
-                // que dejan la cifra y la etiqueta, entre 40 y 224 px. La
-                // etiqueta es una píldora de 20 px con icono (Globe para la
+                // que dejan la cifra y la etiqueta, entre 40 y 128 px (160 desde `sm`). La
+                // etiqueta es una píldora de 20 px (6 px de relleno a cada lado: con el
+                // aire propio del icono y del texto, la tinta queda a 7 px; «Global» lleva
+                // 7 px a la derecha porque la «l» final no tiene aire) con icono (Globe para la
                 // vista global, Repeat para un rewatch) y fecha corta; la
                 // palabra «Rewatch» solo se escribe desde `sm`. PT Sans solo
                 // trae 400 y 700 (`font-bold`).
                 <div className="col-start-2 mt-2 flex min-w-0 flex-nowrap items-center gap-2">
                   <div
-                    className="h-1.5 min-w-10 flex-1 overflow-hidden rounded-full bg-white/10 shadow-[inset_0_1px_1px_rgba(0,0,0,0.4)] sm:max-w-56"
+                    className="h-1.5 min-w-10 flex-1 overflow-hidden rounded-full bg-white/10 shadow-[inset_0_1px_1px_rgba(0,0,0,0.4)] max-w-32 sm:max-w-40"
                     role="progressbar"
                     aria-valuemin={0}
                     aria-valuemax={100}
@@ -1491,10 +1503,11 @@ export default function TraktEpisodesWatchedModal({
                   </span>
 
                   <span
-                    className={`inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-full pl-1.5 pr-2 text-[11px] font-bold leading-none ${
+                    ref={viewPillRef}
+                    className={`inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-full pl-1.5 text-[11px] font-bold leading-none ${
                       isRewatchView
-                        ? "bg-purple-500/15 text-purple-200"
-                        : "bg-emerald-500/15 text-emerald-200"
+                        ? "pr-1.5 bg-purple-500/15 text-purple-200"
+                        : "pr-[7px] bg-emerald-500/15 text-emerald-200"
                     }`}
                     title={
                       isRewatchView

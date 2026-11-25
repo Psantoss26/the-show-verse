@@ -17,8 +17,12 @@ import { useLayoutEffect, useRef } from "react";
  * animando (la entrada de la cabecera), espera a que termine. Mientras el
  * elemento está `inert` (capa oculta de la cabecera del perfil) no se mide: su
  * posición la mueve una transformación.
+ *
+ * `viewport`: para elementos dentro de una capa `fixed` (modales), que no se
+ * mueven con el scroll de la página: se ajusta su posición en la ventana, no
+ * en el documento (con un scroll fraccionario saldría al revés).
  */
-export default function usePixelSnappedTop({ enabled = true, observe = null } = {}) {
+export default function usePixelSnappedTop({ enabled = true, observe = null, viewport = false } = {}) {
   const ref = useRef(null);
 
   useLayoutEffect(() => {
@@ -55,7 +59,7 @@ export default function usePixelSnappedTop({ enabled = true, observe = null } = 
         return;
       }
       const current = Number.parseFloat(el.style.top) || 0;
-      const top = el.getBoundingClientRect().top + window.scrollY - current;
+      const top = el.getBoundingClientRect().top + (viewport ? 0 : window.scrollY) - current;
       // En sesenta y cuatroavos de píxel, la unidad de maqueta de Chrome: un
       // desplazamiento redondeado a decimales (0,156 en vez de 0,15625) se
       // queda corto, deja la insignia en 190,984 y el texto cae al píxel de
@@ -91,7 +95,7 @@ export default function usePixelSnappedTop({ enabled = true, observe = null } = 
       el.style.top = "";
       el.style.position = "";
     };
-  }, [enabled, observe]);
+  }, [enabled, observe, viewport]);
 
   return ref;
 }
