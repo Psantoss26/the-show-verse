@@ -19,7 +19,7 @@
 //   rt:          { value, sub, href } | null          (badge Rotten Tomatoes, solo >= sm)
 //   mc:          { value, sub, href } | null          (badge Metacritic, solo >= sm;
 //                                                     no se pinta si hay `lb`)
-//   lb:          { value, suffix, sub, href } | null  (badge Letterboxd 0–5, solo >= sm)
+//   lb:          { value, sub, href } | null  (badge Letterboxd sobre 10, solo >= sm)
 //   stats:       { watchers, plays, lists, favorited } | null  (fila de stats)
 //   showFavoritedStat: boolean                  (oculta Favoritos cuando no aplica)
 //   toolbarActions: ReactNode | null            (acciones inline al final)
@@ -318,7 +318,8 @@ export function DetailsRatingsBadges({
       )}
 
       {/* Badge de Letterboxd - en el hueco de Metacritic, con su propia
-          escala (media 0–5, `suffix` "/5"). Solo películas. */}
+          Solo películas; su media 0–5 llega ya sobre 10
+          (`letterboxdScoreBadge`), como las demás. */}
       {scoreSlot(
         lb,
         (score) => (
@@ -331,7 +332,6 @@ export function DetailsRatingsBadges({
               // logos; el hover mantiene su +10 %.
               logoClassName="scale-[1.35] group-hover:!scale-[1.485]"
               value={score.value}
-              suffix={score.suffix}
               sub={score.sub}
               href={score.href}
               disableHoverLift
@@ -340,7 +340,7 @@ export function DetailsRatingsBadges({
             />
           </div>
         ),
-        { value: "0.0", suffix: "/5", sub: "00 k" },
+        { value: "0.0", sub: "00 k" },
       )}
     </div>
   );

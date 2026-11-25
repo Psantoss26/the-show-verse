@@ -11557,7 +11557,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     : null)
                 }
                 mc={audienceScoreBadge(ratingScores.mc, ratingLinks.mc)}
-                // Letterboxd: media 0–5 de sus miembros (solo películas).
+                // Letterboxd: media de sus miembros sobre 10 (solo películas).
                 lb={letterboxdScoreBadge(ratingScores.lb, ratingScores.lb?.url || ratingLinks.lb)}
                 externalLinks={isBackdropPoster ? scoreboardExternalLinks : null}
                 externalLinksWikipedia={wikipediaQuery}

@@ -92,12 +92,12 @@ export function parseLetterboxdApiScore(film, statistics) {
   };
 }
 
-// Insignia del marcador: { value: "4.2", suffix: "/5", sub: "4,6M", href }.
+// Insignia del marcador: { value: "8.5", sub: "4,6M", href }. La media 0–5 se
+// muestra sobre 10 (×2), como las demás puntuaciones del marcador.
 export function letterboxdScoreBadge(score, href = score?.url) {
   if (score?.audienceScore == null) return null;
   return {
-    value: score.audienceScore.toFixed(1),
-    suffix: "/5",
+    value: (score.audienceScore * 2).toFixed(1),
     sub: formatCountShort(score.audienceCount) || undefined,
     href: href || undefined,
   };

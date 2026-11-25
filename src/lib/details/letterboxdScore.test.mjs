@@ -160,12 +160,12 @@ test("con credenciales: si la API falla (token rechazado, 5xx) se cae a la web",
   );
 });
 
-test("insignia: un decimal sobre 5, votos abreviados y enlace a la ficha", () => {
+test("insignia: un decimal sobre 10 (media ×2), votos abreviados y enlace a la ficha", () => {
   assert.deepEqual(letterboxdScoreBadge({ audienceScore: 4.24, audienceCount: 4638530, url: "https://letterboxd.com/film/inception/" }), {
-    value: "4.2", suffix: "/5", sub: "4,6M", href: "https://letterboxd.com/film/inception/",
+    value: "8.5", sub: "4,6M", href: "https://letterboxd.com/film/inception/",
   });
   assert.deepEqual(letterboxdScoreBadge({ audienceScore: 3, audienceCount: null, url: null }), {
-    value: "3.0", suffix: "/5", sub: undefined, href: undefined,
+    value: "6.0", sub: undefined, href: undefined,
   });
   assert.equal(letterboxdScoreBadge(null), null);
 });
