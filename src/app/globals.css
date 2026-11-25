@@ -2501,13 +2501,22 @@ html[data-android-app] {
    Dejan arriba y abajo un margen que crece con el alto disponible (7 % del
    alto, entre 2,5 y 5,5 rem) más las zonas seguras (cámara, barra de gestos,
    barras de la app de Android). Clase `.sv-modal-max-h`; si el contenido no
-   cabe, el modal desplaza por dentro. */
+   cabe, el modal desplaza por dentro. En móvil (por debajo de `sm`) el margen
+   baja a 1 rem —el mismo que dejan a los lados— para que los modales largos
+   (valoración y vistos de episodios, añadir a una lista…) aprovechen la
+   pantalla; los cortos siguen midiendo lo que su contenido. */
 :root {
   --sv-modal-gap: clamp(2.5rem, 7dvh, 5.5rem);
   --sv-modal-max-h: calc(
     100dvh - var(--sv-safe-top, 0px) - var(--sv-safe-bottom, 0px) - 2 *
       var(--sv-modal-gap)
   );
+}
+
+@media (max-width: 39.99rem) {
+  :root {
+    --sv-modal-gap: 1rem;
+  }
 }
 
 .sv-modal-max-h {
