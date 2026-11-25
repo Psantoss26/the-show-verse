@@ -69,6 +69,18 @@ export const buildImg = (path, size = "original") =>
 
 export const PREVIEW_BACKDROP_SIZE = "w780";
 
+// Tamaño de la vista previa al pasar el ratón en las filas de backdrops
+// (DashboardBackdropRow, Continuar viendo, Calendario): el mismo que la de las
+// filas de pósters (MainDashboardClient → `normalPreviewWidthClass`), cuya
+// imagen 16:9 mide el alto de una tarjeta póster (220/260/300/340 px). El
+// margen superior negativo es medio alto de imagen: con la carcasa en
+// `top-1/2`, la IMAGEN queda centrada sobre la tarjeta y la info cuelga
+// debajo, bien desde el primer render (ahí mide `usePreviewMorph`).
+export const BACKDROP_PREVIEW_SIZE_CLASS =
+  "w-[391px] -mt-[110px] sm:w-[462px] sm:-mt-[130px] md:w-[533px] md:-mt-[150px] xl:w-[604px] xl:-mt-[170px]";
+export const BACKDROP_PREVIEW_IMAGE_SIZES =
+  "(min-width:1280px) 604px, (min-width:768px) 533px, (min-width:640px) 462px, 391px";
+
 // Vive en su propio módulo, sin dependencias, para poder probarlo con node --test
 // (este fichero importa por alias `@/`, que el runner no resuelve). Se reexporta
 // para no tocar a los ~15 consumidores que ya lo importan desde aquí.

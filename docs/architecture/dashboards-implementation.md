@@ -499,6 +499,16 @@ En `MainDashboardClient.jsx`, las filas del motor se pintan con el componente
 - **Vista previa al hover** (`InlinePreviewCard`): al pasar el ratón sobre una
   tarjeta se expande con backdrop, info y acciones ("Ver trailer", "Añadir a
   favoritos", "Añadir a pendientes" — estado leído de nuestro backend/BBDD).
+  Mide 391/462/533/604 px de ancho (base/`sm`/`md`/`xl`), para que su imagen
+  16:9 tenga el alto de la tarjeta póster (220/260/300/340 px). La vista previa
+  de las tarjetas horizontales usa las mismas medidas
+  (`BACKDROP_PREVIEW_SIZE_CLASS` y `BACKDROP_PREVIEW_IMAGE_SIZES` en
+  `lib/dashboard/media.js`), con la imagen centrada en vertical sobre la
+  tarjeta: `BackdropPreviewCard` (`dashboard/DashboardBackdropRow.jsx`) y
+  `ContinueWatchingPreviewCard` (`ContinueWatchingSection.jsx`, también en
+  Calendario). Estas vistas previas no llevan sombra
+  (`<DashboardPreviewGlass surface shadow={false} />`): con tarjetas tan bajas,
+  la sombra caía ~40 px sobre la fila de abajo como una franja borrosa.
 - **Flechas de desplazamiento** (`showPrev`/`showNext`): aparecen al hacer hover
   sobre la fila cuando hay más contenido (`canPrev`/`canNext`).
 - Swiper con 20 tarjetas por fila, lazy de imágenes y overrides de póster/backdrop.

@@ -91,6 +91,8 @@ import {
   fetchBestBackdrop,
   GENRES,
   PREVIEW_BACKDROP_SIZE,
+  BACKDROP_PREVIEW_IMAGE_SIZES,
+  BACKDROP_PREVIEW_SIZE_CLASS,
   getBackdropCacheKey,
   movieBackdropCache,
   getPreviewBackdropFallback,
@@ -967,31 +969,9 @@ export function BackdropPreviewCard({
     alignment = "right";
   }
 
-  const previewWidthPercent =
-    visibleCount <= 3
-      ? 160
-      : visibleCount === 4
-        ? 158
-        : visibleCount === 5
-          ? 156
-          : 154;
-  const previewMaxWidth =
-    visibleCount >= 6 ? "min(156%, 560px)" : `${previewWidthPercent}%`;
-  // Centrado por-imagen: la IMAGEN 16:9 de la vista previa queda centrada sobre
-  // la tarjeta y la info cuelga debajo. Sin medir nada: un margen en % se
-  // resuelve contra el ANCHO del contenedor (la tarjeta), igual que el ancho de
-  // la vista previa, así que medio alto de imagen = ancho · 9/32. Tiene que
-  // estar bien desde el primer render, porque ahí mide `usePreviewMorph`.
-  const previewMarginTop = `calc(${previewMaxWidth} * -9 / 32)`;
-
   const previewRef = useRef(null);
   usePreviewMorph(previewRef, { alignment, tileRadius: 8, reduceMotion });
-  const previewImageSizes =
-    visibleCount <= 3
-      ? "(min-width:1280px) 620px, (min-width:768px) 540px, 440px"
-      : visibleCount === 4
-        ? "(min-width:1280px) 560px, (min-width:768px) 500px, 420px"
-        : "(min-width:1536px) 560px, (min-width:1280px) 500px, 420px";
+  const previewImageSizes = BACKDROP_PREVIEW_IMAGE_SIZES;
 
   const previewBtnClass = "!h-9 !w-9 sm:!h-10 sm:!w-10 [&_svg]:!h-5 [&_svg]:!w-5";
 
@@ -1002,18 +982,14 @@ export function BackdropPreviewCard({
         su hermana, que un recorte de la carcasa cortaría. */}
     <div
       ref={previewRef}
-      className={`absolute top-1/2 ${alignmentClass} z-50 flex cursor-pointer flex-col rounded-xl text-white`}
+      className={`absolute top-1/2 ${alignmentClass} ${BACKDROP_PREVIEW_SIZE_CLASS} z-50 flex cursor-pointer flex-col rounded-xl text-white`}
       onClick={() => openDetailModal?.(item)}
       onMouseEnter={(event) => {
         onPreviewMouseEnter?.(event);
       }}
       onMouseLeave={onPreviewMouseLeave}
-      style={{
-        width: previewMaxWidth,
-        marginTop: previewMarginTop,
-      }}
     >
-      <DashboardPreviewGlass surface />
+      <DashboardPreviewGlass surface shadow={false} />
       {/* Backdrop ampliado 16:9 (+ trailer al pulsar ▶) */}
       <div
         data-preview-media=""

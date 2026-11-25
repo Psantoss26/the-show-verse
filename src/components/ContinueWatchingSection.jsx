@@ -69,6 +69,8 @@ import {
   getPreviewBackdropFallback,
   preloadImage,
   GENRES,
+  BACKDROP_PREVIEW_IMAGE_SIZES,
+  BACKDROP_PREVIEW_SIZE_CLASS,
 } from "@/lib/dashboard/media";
 import {
   DASHBOARD_PREVIEW_CLOSE_DELAY_MS,
@@ -1186,46 +1188,20 @@ function ContinueWatchingPreviewCard({
     alignment = "right";
   }
 
-  // Vista previa ~1,6× la tarjeta base (como el spotlight): más ancha que antes
-  // para que el backdrop se vea más grande y quepa el panel de info ampliado.
-  const previewWidthPercent =
-    visibleCount <= 3
-      ? 160
-      : visibleCount === 4
-        ? 158
-        : visibleCount === 5
-          ? 156
-          : 154;
-  const previewMaxWidth =
-    visibleCount >= 6 ? "min(156%, 560px)" : `${previewWidthPercent}%`;
-  // Preview anclada por la IMAGEN (igual que las filas backdrop): el panel va
-  // con top:50% y el CENTRO de su imagen 16:9 cae sobre el centro de la tarjeta
-  // base. Un margen en % se resuelve contra el ANCHO del contenedor (la
-  // tarjeta), igual que el ancho de la preview: medio alto de imagen = ancho ·
-  // 9/32, correcto desde el primer render, que es cuando mide `usePreviewMorph`.
-  const previewMarginTop = `calc(${previewMaxWidth} * -9 / 32)`;
-
   const previewRef = useRef(null);
   usePreviewMorph(previewRef, { alignment, tileRadius: 8, reduceMotion });
-  const previewImageSizes =
-    visibleCount <= 3
-      ? "(min-width:1280px) 620px, (min-width:768px) 540px, 440px"
-      : visibleCount === 4
-        ? "(min-width:1280px) 560px, (min-width:768px) 500px, 420px"
-        : visibleCount === 5
-          ? "(min-width:1536px) 540px, (min-width:1280px) 500px, 420px"
-          : "(min-width:1536px) 560px, (min-width:1280px) 500px, 420px";
+  const previewImageSizes = BACKDROP_PREVIEW_IMAGE_SIZES;
 
   return (
     <>
     <div
       ref={previewRef}
-      // El ancho se calcula según las tarjetas visibles del breakpoint activo:
-      // menos tarjetas permiten una preview mayor; con 6 se contiene mejor.
+      // Mismo tamaño que la vista previa de las filas de pósters
+      // (`BACKDROP_PREVIEW_SIZE_CLASS`), con la imagen centrada sobre la tarjeta.
       // Sin `overflow-hidden` ni fondo en la carcasa: el tinte y el desenfoque
       // van en la capa de cristal (que `usePreviewMorph` recorta) y la sombra en
       // su hermana, que un recorte de la carcasa cortaría.
-      className={`absolute top-1/2 ${alignmentClass} rounded-xl text-white cursor-pointer z-50 flex flex-col`}
+      className={`absolute top-1/2 ${alignmentClass} ${BACKDROP_PREVIEW_SIZE_CLASS} rounded-xl text-white cursor-pointer z-50 flex flex-col`}
       onClick={() => openDetailModal?.(previewItemFor(show, mode))}
       onMouseEnter={(event) => {
         onPreviewMouseEnter?.(event);
@@ -1233,12 +1209,8 @@ function ContinueWatchingPreviewCard({
       }}
       onMouseLeave={onPreviewMouseLeave}
       onFocus={prefetchHref}
-      style={{
-        width: previewMaxWidth,
-        marginTop: previewMarginTop,
-      }}
     >
-      <DashboardPreviewGlass surface />
+      <DashboardPreviewGlass surface shadow={false} />
       {/* Backdrop de 16:9 (+ tráiler al reproducir) */}
       <div
         data-preview-media=""
