@@ -51,6 +51,7 @@ import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
 import useActionModalMotion from "@/hooks/useActionModalMotion";
 import HistorySectionNav from "@/components/HistorySectionNav";
+import { useSiblingToolbarShift } from "@/lib/hooks/useSiblingToolbarShift";
 import { useSiblingArrival } from "@/lib/hooks/useSiblingArrival";
 import { useStatCardsHandoff } from "@/lib/hooks/useStatCardsHandoff";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
@@ -3134,9 +3135,10 @@ function MobileCalendarOverlay({
 // ----------------------------
 // MAIN PAGE
 // ----------------------------
-// Hueco del botón del calendario de la barra móvil al llegar desde Continuar
-// viendo: mismo ritmo que la pastilla de la sección.
-const CALENDAR_SLOT_TRANSITION = { type: "spring", stiffness: 420, damping: 38, mass: 0.9 };
+// Llegando desde Continuar viendo la fila móvil gana el botón del calendario
+// (w-11 + gap-2): el selector viene de 52 px a la derecha y el buscador encoge
+// (useSiblingToolbarShift, todo en el compositor).
+const CALENDAR_SLOT_SHIFT_PX = 52;
 
 export default function HistoryClient() {
   // Buscador de la barra: con texto si cabe, o solo icono (ver el hook).
@@ -3158,6 +3160,8 @@ export default function HistoryClient() {
   // que no empujen la barra al aparecer.
   const fromSibling = useSiblingArrival("history-sections", "history");
   const staticChrome = isBackNav || fromSibling;
+  const mobileToolbarRowRef = useRef(null);
+  useSiblingToolbarShift(mobileToolbarRowRef, { active: fromSibling, delta: CALENDAR_SLOT_SHIFT_PX });
   // Durante la vuelta bloqueamos el cargador infinito solo hasta que el
   // restaurador global ha fijado el scroll. Después se reactiva para que el
   // usuario pueda seguir recorriendo el historial desde ese mismo punto.
@@ -4415,14 +4419,22 @@ export default function HistoryClient() {
                 {/* Mobile: búsqueda + botón de la hoja de filtros
                     (MobileOptionsSheet). */}
                 <div data-history-mobile-toolbar="" className="relative z-10 lg:hidden">
-                  <div className="relative flex gap-2">
+                  <div ref={mobileToolbarRowRef} className="relative flex gap-2">
                   <div className="relative min-w-0 flex-1">
+                    {/* Cristal del buscador en capa aparte: en el relevo desde
+                        Continuar viendo se recorta (clip-path) en vez de
+                        animar el ancho. */}
+                    <span
+                      aria-hidden="true"
+                      data-sibling-shift="glass"
+                      className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg"
+                    />
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
                     <input
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
                       placeholder="Buscar..."
-                      className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                      className="relative w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-transparent text-white"
                     />
                     {q && (
                       <button
@@ -4434,15 +4446,10 @@ export default function HistoryClient() {
                     )}
                   </div>
                   <div className="flex shrink-0 gap-2">
-                  <HistorySectionNav className="h-11 shrink-0" />
+                  <HistorySectionNav className="h-11 shrink-0" data-sibling-shift="follow" />
                   {/* Llegando desde Continuar viendo (que no lo tiene) el botón
-                      se abre desde ancho 0 y el buscador cede su sitio. */}
-                  <motion.div
-                    className="h-11 shrink-0 overflow-hidden"
-                    initial={fromSibling ? { width: 0, marginLeft: -8, opacity: 0 } : false}
-                    animate={{ width: 44, marginLeft: 0, opacity: 1 }}
-                    transition={CALENDAR_SLOT_TRANSITION}
-                  >
+                      ya ocupa su sitio y aparece mientras el selector se aparta. */}
+                  <div className="h-11 shrink-0" data-sibling-shift="fade-in">
                   <button
                     type="button"
                     onClick={() => setMobileCalendarOpen(true)}
@@ -4451,7 +4458,7 @@ export default function HistoryClient() {
                   >
                     <CalendarDays className="w-4 h-4" />
                   </button>
-                  </motion.div>
+                  </div>
                   <OptionsSheetTrigger
                     controller={filtersSheet}
                     aria-label="Filtros y vista"

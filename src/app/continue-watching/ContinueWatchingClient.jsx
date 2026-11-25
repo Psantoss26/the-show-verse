@@ -50,6 +50,7 @@ import {
 } from "@/lib/userLists/optimisticListCache";
 import LiquidButton from "@/components/LiquidButton";
 import HistorySectionNav from "@/components/HistorySectionNav";
+import { useSiblingToolbarShift } from "@/lib/hooks/useSiblingToolbarShift";
 import { useSiblingArrival } from "@/lib/hooks/useSiblingArrival";
 import { useStatCardsHandoff } from "@/lib/hooks/useStatCardsHandoff";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
@@ -1036,16 +1037,23 @@ function writeCache(items) {
 // ----------------------------
 const VIEW_MODES = new Set(["cards", "poster", "compact"]);
 
-// Hueco del botón del calendario de Historial que se cierra al llegar desde
-// allí: mismo ritmo que la pastilla de la sección.
-const CALENDAR_SLOT_TRANSITION = { type: "spring", stiffness: 420, damping: 38, mass: 0.9 };
+// Llegando desde Historial la fila móvil pierde su botón del calendario
+// (w-11 + gap-2): el selector se desplaza eso a la derecha y el buscador crece
+// (useSiblingToolbarShift, todo en el compositor).
+const CALENDAR_SLOT_SHIFT_PX = -52;
 
 export default function ContinueWatchingClient() {
   // Llegando desde Historial la barra no repite su entrada: solo se desliza
   // la pastilla de la sección (HistorySectionNav) y se cierra el hueco del
   // botón del calendario, que aquí no hay.
   const fromSibling = useSiblingArrival("history-sections", "continue-watching");
-  const [calendarSlotClosing, setCalendarSlotClosing] = useState(fromSibling);
+  const [calendarGhost, setCalendarGhost] = useState(fromSibling);
+  const mobileToolbarRowRef = useRef(null);
+  useSiblingToolbarShift(mobileToolbarRowRef, {
+    active: fromSibling,
+    delta: CALENDAR_SLOT_SHIFT_PX,
+    onDone: () => setCalendarGhost(false),
+  });
   // Buscador de la barra: con texto si cabe, o solo icono (ver el hook).
   const toolbarSearchFitRef = usePageToolbarSearchFit();
   const { authenticated, hydrated } = useAuth();
@@ -1342,14 +1350,21 @@ export default function ContinueWatchingClient() {
               flujo (y sigue en él al fijarse); abierto ya fijado va como overlay,
               igual que en Historial (ver useStickyToolbarState). */}
           <div className="relative z-10 lg:hidden">
-            <div className="relative flex gap-2">
+            <div ref={mobileToolbarRowRef} className="relative flex gap-2">
               <div className="relative min-w-0 flex-1">
+                {/* Cristal del buscador en capa aparte: en el relevo desde
+                    Historial se recorta (clip-path) en vez de animar el ancho. */}
+                <span
+                  aria-hidden="true"
+                  data-sibling-shift="glass"
+                  className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg"
+                />
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="Buscar..."
-                  className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                  className="relative w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-transparent text-white"
                 />
                 {q && (
                   <button
@@ -1360,21 +1375,20 @@ export default function ContinueWatchingClient() {
                   </button>
                 )}
               </div>
-              <HistorySectionNav className="h-11 shrink-0" />
-              {calendarSlotClosing && (
-                <motion.div
+              {/* Copia del botón del calendario de Historial, fuera del flujo
+                  (la fila ya está en su sitio final), que se apaga mientras el
+                  selector pasa por encima. Antes que el selector en el DOM para
+                  quedar debajo. */}
+              {calendarGhost && (
+                <div
                   aria-hidden="true"
-                  className="h-11 shrink-0 overflow-hidden"
-                  initial={{ width: 44, marginLeft: 0, opacity: 1 }}
-                  animate={{ width: 0, marginLeft: -8, opacity: 0 }}
-                  transition={CALENDAR_SLOT_TRANSITION}
-                  onAnimationComplete={() => setCalendarSlotClosing(false)}
+                  data-sibling-shift="fade-out"
+                  className="pointer-events-none absolute right-[52px] top-0 h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200"
                 >
-                  <div className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200">
-                    <CalendarDays className="w-4 h-4" />
-                  </div>
-                </motion.div>
+                  <CalendarDays className="w-4 h-4" />
+                </div>
               )}
+              <HistorySectionNav className="h-11 shrink-0" data-sibling-shift="follow" />
               <button
                 type="button"
                 onClick={() => setMobileFiltersOpen((v) => !v)}

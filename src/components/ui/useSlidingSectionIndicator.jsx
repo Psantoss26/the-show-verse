@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { recordSlide, resumableSlide } from "@/lib/ui/slidingIndicatorFlight";
+import { SLIDE_EASING, SLIDE_MS } from "@/lib/ui/siblingToolbarShift";
 
 // Pastilla de la sección activa de un selector de secciones (Listas, En
 // progreso · Completadas) que SE DESLIZA de un botón a otro en vez de saltar.
@@ -39,8 +40,8 @@ const slideFlights = new Map();
 // 0.22, 1, 0.36, 1 (pendiente ~4,5: casi todo el recorrido en 100 ms, brusca)
 // ni una de entrada y salida (0.45, 0, 0.2, 1: arranca parada y acelera a
 // mitad, se veía rara y acelerada).
-const SLIDE_MS = 460;
-const SLIDE_EASING = "cubic-bezier(0.25, 0.6, 0.3, 1)";
+// (Compartidas con el relevo de la barra entre páginas hermanas,
+// siblingToolbarShift.js, para que selector y pastilla vayan a la par.)
 
 function measure(nav, activeKey) {
   const button = nav?.querySelector(`[data-section-key="${activeKey}"]`);

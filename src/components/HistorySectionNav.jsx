@@ -16,7 +16,7 @@ const SECTIONS = [
 // (useSlidingSectionIndicator).
 const ACTIVE_PILL = "bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/20";
 
-export default function HistorySectionNav({ className = "" }) {
+export default function HistorySectionNav({ className = "", ...rest }) {
   const pathname = usePathname();
   const navRef = useRef(null);
   const { ready, indicator } = useSlidingSectionIndicator({
@@ -28,6 +28,7 @@ export default function HistorySectionNav({ className = "" }) {
 
   return (
     <nav
+      {...rest}
       ref={navRef}
       aria-label="Historial y continuar viendo"
       className={`relative inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
