@@ -241,6 +241,12 @@ const MOBILE_SEARCH_EXIT = { duration: 0.22, ease: [0.4, 0, 1, 1] };
 const PROFILE_TRIGGER_SHELL =
   "-mr-1.5 flex items-center gap-2 rounded-full py-1 pl-1 pr-2";
 
+// La flecha del menú de perfil lleva el MISMO trazo que los iconos de Buscar y
+// Alertas (blanco + sombra oscura). En gris claro y sin sombra desaparecía
+// sobre fondos claros (backdrops luminosos de las fichas).
+const PROFILE_TRIGGER_CHEVRON =
+  "h-[18px] w-[18px] shrink-0 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]";
+
 function isActorOrDirector(item) {
   return ["Acting", "Directing"].includes(item?.known_for_department);
 }
@@ -3248,7 +3254,7 @@ function NavbarContent() {
               <div className="relative ml-1">
                 <div aria-hidden="true" className={PROFILE_TRIGGER_SHELL}>
                   <UserAvatarBoot />
-                  <ChevronDown className="avatar-boot-chevron h-[18px] w-[18px] shrink-0 text-zinc-300" />
+                  <ChevronDown className={`avatar-boot-chevron ${PROFILE_TRIGGER_CHEVRON}`} />
                 </div>
               </div>
             ) : !account ? (
@@ -3275,7 +3281,7 @@ function NavbarContent() {
                     }
                   />
                   <ChevronDown
-                    className={`h-[18px] w-[18px] shrink-0 text-zinc-300 transition-transform duration-200 ${
+                    className={`${PROFILE_TRIGGER_CHEVRON} transition-transform duration-200 ${
                       profileMenuOpen ? "rotate-180" : ""
                     }`}
                   />
