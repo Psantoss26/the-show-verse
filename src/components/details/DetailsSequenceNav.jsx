@@ -77,13 +77,23 @@ function SequenceBubble({ href, title, direction, onNavigate, onIntent }) {
       //
       // Sin `opacity` ni `filter` en la carcasa: los dos la convierten en
       // Backdrop Root y apagan la refracción de sus capas ópticas.
-      className={`sv-seq-bubble group items-center rounded-2xl text-white outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${LIQUID_GLASS_SURFACE} ${
+      //
+      // El cristal va en una capa HERMANA detrás del contenido (`.sv-seq-shell`),
+      // no en el enlace: el cristal es una capa de GPU y su origen se redondea al
+      // píxel. "Anterior" crece hacia la izquierda, así que su borde izquierdo
+      // cae en una fracción distinta en cada fotograma; con la flecha y el texto
+      // dentro de esa capa saltaban 1px arriba y abajo (vibraban). Fuera de ella
+      // se pintan en su posición, que no cambia. Por lo mismo, sin `contain` en
+      // el enlace: le da un origen de pintado propio que también se redondea
+      // (medido: con `contain: layout style` la flecha seguía saltando).
+      className={`sv-seq-bubble group items-center rounded-2xl text-white outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
         // La flecha queda siempre junto al menú; el texto se abre al otro lado.
         isNext ? "text-left" : "flex-row-reverse text-right"
       }`}
-      style={{ contain: "layout style" }}
     >
-      <LiquidGlassOpticalLayers />
+      <span aria-hidden="true" className={`sv-seq-shell ${LIQUID_GLASS_SURFACE}`}>
+        <LiquidGlassOpticalLayers />
+      </span>
       <span
         aria-hidden="true"
         className="sv-seq-icon relative flex shrink-0 items-center justify-center rounded-full bg-transparent transition-colors duration-300 group-hover:bg-white/10 group-focus-visible:bg-white/10"

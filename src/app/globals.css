@@ -3765,6 +3765,17 @@ html:has([data-embedded-details])::-webkit-scrollbar {
   right: calc(100% + 1.5rem);
 }
 
+/* Cristal de la píldora: capa hermana DETRÁS de la flecha y el texto (ver
+   DetailsSequenceNav). Se estira con la píldora; el contenido no va dentro de
+   su capa de GPU, así que no hereda el redondeo de su borde al píxel. Sin
+   @layer: gana a la `relative` de LIQUID_GLASS_SURFACE. */
+.sv-seq-shell {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
 .sv-seq-bubble[data-direction="next"] {
   left: calc(100% + 1.5rem);
 }
