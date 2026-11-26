@@ -4,6 +4,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import styles from "./HoverExpandCard.module.css";
 import { applyTmdbResponsiveImage } from "@/lib/ui/tmdbResponsiveImage";
 import {
+  HOVER_INTENT_END_EVENT,
+  HOVER_INTENT_EVENT,
+  useHoverIntent,
+} from "@/lib/ui/hoverIntent";
+import {
   isDrawerResizeActive,
   onDrawerResize,
 } from "@/lib/ui/drawerResizeEvents";
@@ -146,6 +151,9 @@ export default function HoverExpandCard({
   cellClassName = "",
   className = "",
   enabled = true,
+  // Ampliar solo cuando el cursor se PARA sobre la tarjeta (ver
+  // src/lib/ui/hoverIntent.js), no al rozarla. Páginas de usuario.
+  hoverIntent = false,
   zIndex,
   style,
   onPointerEnter,
@@ -266,15 +274,31 @@ export default function HoverExpandCard({
 
   const handlePointerEnter = (event) => {
     onPointerEnter?.(event);
-    if (!enabled || event.pointerType !== "mouse" || !canHover()) return;
+    if (!enabled || hoverIntent || event.pointerType !== "mouse" || !canHover()) return;
     expand();
   };
 
   const handlePointerLeave = (event) => {
     onPointerLeave?.(event);
-    if (!enabled) return;
+    if (!enabled || hoverIntent) return;
     collapse();
   };
+
+  // Con intención, la ampliación sigue al atributo `data-sv-hover`.
+  useHoverIntent(enabled && hoverIntent);
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || !enabled || !hoverIntent) return undefined;
+    const onIntent = () => {
+      if (canHover()) expand();
+    };
+    el.addEventListener(HOVER_INTENT_EVENT, onIntent);
+    el.addEventListener(HOVER_INTENT_END_EVENT, collapse);
+    return () => {
+      el.removeEventListener(HOVER_INTENT_EVENT, onIntent);
+      el.removeEventListener(HOVER_INTENT_END_EVENT, collapse);
+    };
+  }, [enabled, hoverIntent, expand, collapse]);
 
   // Pósteres al tamaño justo (ver la nota de arriba). Se aplica cuando aparece
   // una imagen, cuando cambia de `src` y cuando cambia el ancho de la celda.
@@ -376,6 +400,7 @@ export default function HoverExpandCard({
       <Tag
         ref={cardRef}
         className={`absolute inset-0 ${enabled ? styles.expand : ""} ${className}`}
+        {...(enabled && hoverIntent ? { "data-sv-hover-card": "" } : null)}
         style={
           zIndex != null
             ? { ...style, "--sv-hover-expand-z": zIndex }

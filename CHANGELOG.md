@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Favoritos, Pendientes, Historial y En progreso: al cruzar las tarjetas con el ratón camino de otra parte ya no reaccionan (ni se amplían, ni se encienden el anillo de color, el zoom o los indicadores); el hover llega cuando el cursor se para sobre una tarjeta (~0,1 s) o se queda encima moviéndose muy despacio, en la cuadrícula, la cuadrícula compacta, la lista y las tarjetas de En progreso, y se quita en cuanto sale. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Historial: las tarjetas tampoco muestran ya el filo gris claro alrededor del póster o del backdrop, en la cuadrícula, la cuadrícula compacta, la lista, los grupos de episodios y sus modales. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Favoritos, Pendientes y En progreso: las tarjetas ya no muestran un filo gris claro alrededor del póster o del backdrop (se notaba sobre todo en pósters oscuros, en el borde inferior y en las esquinas), en la cuadrícula, la cuadrícula compacta y la lista. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Cuadrícula compacta: al quitar el cursor, la tarjeta y el póster vuelven a su sitio en un solo movimiento suave, sin el pequeño salto a mitad ni la imagen que seguía moviéndose despacio después. → [páginas de usuario](docs/features/paginas-de-usuario.md)

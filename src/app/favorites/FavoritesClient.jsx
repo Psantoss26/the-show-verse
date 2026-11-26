@@ -91,6 +91,7 @@ import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { compareImdbRatings } from "@/lib/userLists/imdbRatingSort";
 import HoverExpandCard, { HoverExpandZoom } from "@/components/ui/HoverExpandCard";
+import { useHoverIntent } from "@/lib/ui/hoverIntent";
 import FlipReorder from "@/components/ui/FlipReorder";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
 import useCardEntrance from "@/hooks/useCardEntrance";
@@ -1875,7 +1876,7 @@ function FavoriteHoverIndicator({
 
   return (
     <div
-      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-1" : "bottom-2 px-1.5"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 will-change-transform transform-gpu`}
+      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-1" : "bottom-2 px-1.5"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-intent:translate-y-0 lg:group-intent:scale-100 lg:group-intent:opacity-100 will-change-transform transform-gpu`}
       aria-hidden="true"
     >
       <span
@@ -2002,12 +2003,13 @@ const FavoriteCard = memo(function FavoriteCard({
           showImdb
           imdbRating={imdbScore}
           showTitleMeta
+          hoverIntent
           media={
             <SmartPoster item={item} title={title} mode={effectiveImageMode} />
           }
           // El tamaño de backdrop de siempre de estas páginas.
           mediaClassName="aspect-video w-[180px] sm:w-[280px] rounded-lg shadow-md"
-          className="relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]"
+          className="relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 intent:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]"
         />
       </div>
     );
@@ -2028,6 +2030,7 @@ const FavoriteCard = memo(function FavoriteCard({
           className="block"
         >
           <HoverExpandCard
+            hoverIntent
             cellClassName={aspectRatio}
             className="group overflow-hidden rounded-lg shadow-md"
           >
@@ -2062,10 +2065,11 @@ const FavoriteCard = memo(function FavoriteCard({
         className="block"
       >
         <div
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:intent:shadow-red-900/20 transition-shadow duration-300`}
+          data-sv-hover-card=""
         >
           {/* Overlay de borde para que los indicadores queden por debajo */}
-          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />
+          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-intent:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
           <FavoriteHoverIndicator
             type={type}
@@ -2096,6 +2100,8 @@ function areFavoriteCardPropsEqual(prev, next) {
 
 // ================== MAIN COMPONENT ==================
 export default function FavoritesClient() {
+  // Hover de las tarjetas solo al pararse el cursor (src/lib/ui/hoverIntent.js).
+  useHoverIntent();
   // Buscador de la barra: con texto si cabe, o solo icono (ver el hook).
   const toolbarSearchFitRef = usePageToolbarSearchFit();
   const {

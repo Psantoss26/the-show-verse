@@ -62,6 +62,12 @@
   }
 }
 
+/* HOVER CON INTENCIÓN (src/lib/ui/hoverIntent.js): en las tarjetas de las
+ * páginas de usuario el estado de hover lo pone el atributo `data-sv-hover`,
+ * que llega solo cuando el cursor se PARA sobre la tarjeta. `intent:` es el
+ * `hover:` de la tarjeta y `group-intent:` el `group-hover:` de sus hijos. */
+@custom-variant intent (&[data-sv-hover]);
+
 /* La app es SIEMPRE oscura: no existe tema claro. Estos dos tokens venían del
    boilerplate de create-next-app con su par claro/oscuro (#ffffff / #0a0a0a) y
    el único sitio que los consume es la regla `body` de más abajo.

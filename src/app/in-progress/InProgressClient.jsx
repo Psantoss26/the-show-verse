@@ -2,6 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
+import { useHoverIntent } from "@/lib/ui/hoverIntent";
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from "react";
 import Link from "next/link";
@@ -860,7 +861,7 @@ function InProgressPosterHoverIndicator({
 }) {
   return (
     <div
-      className={`pointer-events-none absolute bottom-2 inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full px-1 ${LIQUID_GLASS_PANEL} text-white shadow-xl opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-hover:opacity-100`}
+      className={`pointer-events-none absolute bottom-2 inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full px-1 ${LIQUID_GLASS_PANEL} text-white shadow-xl opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-intent:opacity-100`}
       aria-hidden="true"
     >
       <span className="mr-1 flex h-9 max-w-[7rem] shrink-0 items-center gap-1.5 px-2 text-emerald-400">
@@ -884,7 +885,7 @@ function CompletedHoverIndicator({ lastWatchedAt, rating }) {
 
   return (
     <div
-      className={`pointer-events-none absolute bottom-2 inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full px-1 ${LIQUID_GLASS_PANEL} text-white shadow-xl opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-hover:opacity-100`}
+      className={`pointer-events-none absolute bottom-2 inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full px-1 ${LIQUID_GLASS_PANEL} text-white shadow-xl opacity-0 transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-intent:opacity-100`}
       aria-hidden="true"
     >
       <span className="flex h-9 w-10 shrink-0 items-center justify-center text-emerald-400">
@@ -953,7 +954,8 @@ const InProgressCard = memo(function InProgressCard({
           href={href}
           prefetch={false}
           onClick={onPreviewClick}
-          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]"
+          className="relative block bg-zinc-900/30 rounded-xl intent:bg-zinc-900/60 transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 intent:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]"
+          data-sv-hover-card=""
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
             {/* Backdrop image - same size as History list view */}
@@ -965,7 +967,7 @@ const InProgressCard = memo(function InProgressCard({
             {/* En el móvil la columna deja 10 px a la derecha para que la barra
                 y los textos no lleguen pegados al borde de la tarjeta. */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5 pr-2.5 sm:pr-0">
-              <h4 className="text-white font-bold text-base leading-tight truncate group-hover:text-emerald-300 transition-colors">
+              <h4 className="text-white font-bold text-base leading-tight truncate group-intent:text-emerald-300 transition-colors">
                 {title}
               </h4>
 
@@ -1043,7 +1045,7 @@ const InProgressCard = memo(function InProgressCard({
         transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
-          <div className={`relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]`}>
+          <div className={`relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group rounded-xl overflow-hidden shadow-md lg:intent:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 intent:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]`} data-sv-hover-card="">
             {imageMode === "backdrop" ? (
               <SmartBackdrop item={item} title={title} />
             ) : (
@@ -1099,22 +1101,25 @@ const InProgressCard = memo(function InProgressCard({
         ease: [0.25, 0.46, 0.45, 0.94],
       }}
     >
-      <Link href={href} prefetch={false} onClick={onPreviewClick} className="block group">
+      <Link
+        href={href}
+        prefetch={false}
+        onClick={onPreviewClick}
+        className="block group"
+        data-sv-hover-card=""
+      >
+        {/* Sombra del color de la sección al pararse el cursor (hover con
+            intención: src/lib/ui/hoverIntent.js). */}
         <div
-          className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg transition-all duration-300 hover:shadow-xl"
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = `0 20px 25px -5px rgba(${colors.accent}, 0.15), 0 8px 10px -6px rgba(${colors.accent}, 0.1)`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = "";
-          }}
+          className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg transition-all duration-300 group-intent:shadow-[0_20px_25px_-5px_rgba(var(--sv-card-accent),0.15),0_8px_10px_-6px_rgba(var(--sv-card-accent),0.1)]"
+          style={{ "--sv-card-accent": colors.accent }}
         >
           {/* Backdrop hero */}
           <div className="relative aspect-video overflow-hidden">
             <SmartBackdrop
               item={item}
               title={title}
-              imgClassName="transition-transform duration-500 sv-crisp-zoom group-hover:scale-100"
+              imgClassName="transition-transform duration-500 sv-crisp-zoom group-intent:scale-100"
             />
 
             {/* Gradient overlay softened to reduce cover darkening */}
@@ -1296,6 +1301,8 @@ export default function InProgressClient({
   // y la navegación entre ellas la hace <WatchingSectionNav />.
   mode = "inprogress",
 }) {
+  // Hover de las tarjetas solo al pararse el cursor (src/lib/ui/hoverIntent.js).
+  useHoverIntent();
   // Buscador de la barra: con texto si cabe, o solo icono (ver el hook).
   const toolbarSearchFitRef = usePageToolbarSearchFit();
   const { session, account, hydrated } = useAuth();
