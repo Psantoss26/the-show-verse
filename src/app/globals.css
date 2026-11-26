@@ -2714,6 +2714,17 @@ html[data-android-app] .sv-glass-rim {
   backdrop-filter: none;
 }
 
+/* MODALES DE ACCIÓN EN MOVIMIENTO (app de Android): mientras el panel nace del
+   botón o vuelve a él (useActionModalMotion marca `data-sv-modal-moving`), sus
+   piezas de dentro van sin `backdrop-filter`. Dentro del cristal del panel no se
+   ven (≤ 16/255 medido), pero cada una es una pasada más en cada fotograma: en
+   episodios vistos, con ~20 (filas, píldoras de temporada, botones), 24-37 % de
+   fotogramas tarde al abrir a 120 Hz; sin ellas, 5-7 %. Al terminar de entrar
+   vuelven. El cristal del propio panel no se toca. */
+html[data-android-app] [data-sv-modal-moving] * {
+  backdrop-filter: none;
+}
+
 .sv-topbar {
   transition:
     background-color 300ms,

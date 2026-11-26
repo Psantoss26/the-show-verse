@@ -2112,7 +2112,11 @@ export default function TraktEpisodesWatchedModal({
                               : "focus-visible:outline-emerald-300/60"
                           }`}
                         >
-                          <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border-0 bg-black/30 shadow-none sm:w-32">
+                          {/* Velo de visto / en curso: desenfoca la IMAGEN con `filter` (se
+                              rasteriza una vez) en vez de un `backdrop-filter` encima,
+                              que costaba una pasada por fotograma y por fila al
+                              abrir y cerrar el modal. */}
+                          <div className={`relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border-0 bg-black/30 shadow-none sm:w-32${inProgress || watched ? " [&_img]:blur-[1px]" : ""}`}>
                             {img ? (
                               <OptimizedImage
                                 src={img}
@@ -2127,12 +2131,12 @@ export default function TraktEpisodesWatchedModal({
                             )}
 
                             {inProgress ? (
-                              <div className="absolute inset-0 flex items-center justify-center bg-amber-500/20 backdrop-blur-[1px]">
+                              <div className="absolute inset-0 flex items-center justify-center bg-amber-500/20">
                                 <Hourglass className="w-7 h-7 text-amber-300 drop-shadow-md" />
                               </div>
                             ) : watched && (
                               <div
-                                className={`absolute inset-0 flex items-center justify-center backdrop-blur-[1px] ${
+                                className={`absolute inset-0 flex items-center justify-center ${
                                   isRewatchView
                                     ? "bg-purple-500/20"
                                     : "bg-emerald-500/20"

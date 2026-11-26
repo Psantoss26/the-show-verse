@@ -81,3 +81,25 @@ test("anchor below: el panel encogido conserva su borde superior bajo el botón"
   const centerX = panelRect.left + panelRect.width / 2 + t.dx;
   assert.equal(centerX, originRect.left + originRect.width / 2);
 });
+
+test("en la app de Android, el panel que se mueve apaga los desenfoques anidados", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { MOVING_PANEL_ATTR } = await import("./actionModalMotion.js");
+  assert.equal(MOVING_PANEL_ATTR, "data-sv-modal-moving");
+  const css = await readFile(new URL("../../app/globals.css", import.meta.url), "utf8");
+  // Solo los descendientes (el cristal del propio panel se queda) y solo en la app.
+  assert.match(css, /html\[data-android-app\] \[data-sv-modal-moving\] \*\s*\{\s*backdrop-filter:\s*none/);
+  // El hook marca el panel antes de animar.
+  const hook = await readFile(new URL("../../hooks/useActionModalMotion.js", import.meta.url), "utf8");
+  assert.match(hook, /setAttribute\(MOVING_PANEL_ATTR/);
+});
+
+test("el velo de los episodios vistos desenfoca la imagen con filter, no con backdrop-filter", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(
+    new URL("../../components/trakt/TraktEpisodesWatchedModal.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(src, /backdrop-blur-\[1px\]/);
+  assert.match(src, /\[&_img\]:blur-\[1px\]/);
+});
