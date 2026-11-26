@@ -16,6 +16,7 @@ import {
   buildAndroidHandoffPage,
   buildAndroidOauthHandoffUrl,
   clearGoogleOauthCookies,
+  exchangeGoogleCode,
   getGoogleRedirectUri,
   getRequestOrigin,
   GOOGLE_OAUTH_NEXT_COOKIE,
@@ -41,37 +42,8 @@ function redirectToLogin(request, next, reason) {
   return response;
 }
 
-async function exchangeCodeForTokens(request, code) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) {
-    return { ok: false, error: "missing_config" };
-  }
-
-  const body = new URLSearchParams({
-    code,
-    client_id: clientId,
-    client_secret: clientSecret,
-    redirect_uri: getGoogleRedirectUri(request),
-    grant_type: "authorization_code",
-  });
-
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    cache: "no-store",
-    body,
-  });
-  const json = await res.json().catch(() => ({}));
-  return {
-    ok: res.ok,
-    status: res.status,
-    json,
-    error: json?.error || `Google token exchange failed (${res.status})`,
-  };
+function exchangeCodeForTokens(request, code) {
+  return exchangeGoogleCode(code, getGoogleRedirectUri(request));
 }
 
 export async function GET(request) {

@@ -4,18 +4,28 @@ Esta guia cubre el login/registro con Google usando la cuenta propia de The Show
 
 ## Flujo
 
-**Web (ordenador, móvil y PWA): botón oficial de Google.** `/login` pinta el
-botón de Google Identity Services (`src/components/auth/GoogleSignInButton.jsx`):
-el diseño y el texto son los de Google («Continuar con Google» o
-«Registrarse con Google»), y al pulsarlo se abre la ventana de Google para elegir
-cuenta sin salir de la página (una ventana emergente de Google en todos los
-navegadores). No se usa FedCM (`use_fedcm_for_button`): si Google rechaza el
-token —por ejemplo, porque el origen no está autorizado—, Chrome solo registra
-`FedCM get() rejects with NetworkError: Error retrieving a token` y el botón no
-hace nada; con la ventana emergente se ve el error de Google.
+**Web (ordenador, móvil y PWA): botón propio + ventana oficial de Google.**
+`/login` pinta su propio botón (`src/components/auth/GoogleSignInButton.jsx`)
+con el vidrio de los botones de los modales de la ficha
+(`LIQUID_GLASS_MODAL_BUTTON`), 44 px de alto y la «G» de Google a color («Continuar con Google» o «Registrarse con Google»). El
+mismo aspecto se usa en la app de Android, en el respaldo y en «Entrando con
+Google…». Al pulsarlo se abre la ventana emergente oficial de Google para elegir
+cuenta sin salir de la página (Google Identity Services,
+`google.accounts.oauth2.initCodeClient` con `ux_mode: "popup"`). El cliente se
+prepara al cargar la página: la ventana tiene que abrirse en el mismo clic o el
+navegador la bloquea.
 
-1. Google devuelve un `idToken` al botón.
-2. `loginWithGoogle` (`AuthContext`) lo envía a `/api/auth/google/native`.
+No se usa el botón de Google en iframe (`renderButton`): su diseño no se puede
+adaptar. Tampoco FedCM: si Google rechaza el token —por ejemplo, porque el
+origen no está autorizado—, Chrome solo registra
+`FedCM get() rejects with NetworkError: Error retrieving a token` y el botón no
+hace nada.
+
+1. Google devuelve un `code` de un solo uso al botón.
+2. `loginWithGoogle` (`AuthContext`) lo envía a `/api/auth/google/native` como
+   `{ code }`, y Next.js lo canjea con el secreto del cliente y
+   `redirect_uri = "postmessage"` (`exchangeGoogleCode` en
+   `src/app/api/auth/google/_utils.js`) por un `id_token`.
 3. Next.js lo reenvía al backend en `/v1/auth/google`, que lo valida contra
    Google (incluido el `aud`), crea o recupera el usuario y devuelve tokens propios.
 4. Next.js guarda `showverse_access_token` y `showverse_refresh_token` como
@@ -24,10 +34,10 @@ hace nada; con la ventana emergente se ve el error de Google.
    de destino se pinta ya con la sesión, sin parpadeo. Mientras, el formulario
    enseña «Entrando con Google…».
 
-**Respaldo por redirección.** Si el script de Google no carga (sin red,
-bloqueador, origen no autorizado), el botón se sustituye por un enlace a
-`/api/auth/google/start`. También queda bajo el botón oficial el enlace
-«¿No se abre la ventana? Usa la página de Google».
+**Respaldo por redirección.** El botón es un enlace a `/api/auth/google/start`:
+si el script de Google no carga (sin red, bloqueador) o el navegador no deja
+abrir la ventana (`popup_failed_to_open`), se entra por la página de Google.
+Cerrar la ventana no hace nada; otros errores se explican en el formulario.
 
 1. `/api/auth/google/start` redirige a Google OAuth.
 2. Google vuelve a `/api/auth/google/callback`, que canjea el `code` por un
@@ -43,7 +53,7 @@ usa el selector nativo de cuentas y, si falla, el login en el navegador. Ver
 
 Crea un OAuth Client de tipo `Web application`.
 
-Authorized JavaScript origins (el botón oficial solo funciona en estos orígenes;
+Authorized JavaScript origins (la ventana de Google solo funciona en estos orígenes;
 para `localhost` Google pide también la entrada sin puerto):
 
 ```text

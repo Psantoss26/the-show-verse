@@ -7,6 +7,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Loader2, LogIn, UserPlus, Mail, Lock, User, UserCheck, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
+  LIQUID_GLASS_MODAL_BUTTON,
+  LIQUID_GLASS_MODAL_FIELD,
+  LIQUID_GLASS_MODAL_HEADER,
+  LIQUID_GLASS_PANEL,
+} from "@/lib/ui/liquidGlass";
+import {
   abrirLoginEnNavegadorNativo,
   empezarLoginPorNavegador,
   logToApp,
@@ -52,6 +58,12 @@ function getGoogleErrorMessage(value) {
   if (value === "missing_config") {
     return "Google Login no está configurado todavía.";
   }
+  if (value === "google_popup_failed" || value === "invalid_grant") {
+    return "La ventana de Google no devolvió la cuenta. Inténtalo de nuevo.";
+  }
+  if (value === "redirect_uri_mismatch" || value === "origin_mismatch") {
+    return "Google no tiene autorizado este dominio. Añádelo en los orígenes de JavaScript del cliente OAuth.";
+  }
   if (value === "invalid_state") {
     return "No se pudo verificar la sesión de Google. Inténtalo de nuevo.";
   }
@@ -90,6 +102,9 @@ function getGoogleErrorMessage(value) {
   }
   return "No se pudo completar el inicio de sesión con Google.";
 }
+
+// Campos con el cristal de los modales de la ficha; el anillo de foco, azul.
+const fieldClass = `${LIQUID_GLASS_MODAL_FIELD} focus:ring-sky-500/40`;
 
 export default function LoginForm({ next: nextProp, googleClientId = "" }) {
   const router = useRouter();
@@ -134,14 +149,15 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
     window.location.href = url;
   }, [next]);
 
-  // idToken de Google (botón oficial o selector nativo) → sesión en el
-  // contexto → destino. La página de destino ya se pinta con la sesión.
+  // Credencial de Google —`{ code }` de la ventana de la web o idToken del
+  // selector nativo— → sesión en el contexto → destino. La página de destino
+  // ya se pinta con la sesión.
   const entrarConIdToken = useCallback(
-    async (idToken) => {
+    async (credential) => {
       setGoogleBusy(true);
       setErr("");
       try {
-        await loginWithGoogle(idToken);
+        await loginWithGoogle(credential);
         router.replace(next);
         // Sin desbloquear: el formulario se va con la navegación.
       } catch (e) {
@@ -155,6 +171,10 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
     },
     [loginWithGoogle, next, router],
   );
+
+  const mostrarErrorDeGoogle = useCallback((code) => {
+    setErr(getGoogleErrorMessage(code) || getGoogleErrorMessage("google_popup_failed"));
+  }, []);
 
   // APP DE ANDROID. Primero el selector de cuentas del sistema (Credential
   // Manager). Si el usuario lo cierra, no se hace nada; si falla de verdad
@@ -220,9 +240,9 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-      className="w-full max-w-[380px] rounded-[2.5rem] border border-white/12 bg-zinc-900/40 px-6 py-10 shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
+      className={`w-full max-w-[380px] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
     >
-      <div className="mb-6 flex flex-col items-center">
+      <div className={`flex flex-col items-center px-6 pb-6 pt-10 ${LIQUID_GLASS_MODAL_HEADER}`}>
         <div className="relative mb-4 flex h-24 w-48 items-center justify-center">
           <img
             src="/logo-TSV-sinFondo.png"
@@ -235,210 +255,206 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
         </h1>
       </div>
 
-      <div className="mb-5">
-        {googleBusy ? (
-          <div
-            role="status"
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-[4px] border border-[#8E918F]/60 bg-[#131314] text-sm text-[#E3E3E3]"
-          >
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Entrando con Google…
-          </div>
-        ) : inAndroidApp ? (
-          <GoogleBrandButton onClick={handleAppGoogleLogin}>
-            {isRegister ? "Registrarse con Google" : "Continuar con Google"}
-          </GoogleBrandButton>
-        ) : (
-          <GoogleSignInButton
-            clientId={googleClientId}
-            mode={mode}
-            onCredential={entrarConIdToken}
-            fallbackHref={googleAuthHref}
-            label={isRegister ? "Registrarse con Google" : "Continuar con Google"}
-          />
-        )}
-      </div>
-
-      <div className="mb-5 flex items-center gap-3" aria-hidden="true">
-        <div className="h-px flex-1 bg-white/5" />
-        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">
-          o
-        </span>
-        <div className="h-px flex-1 bg-white/5" />
-      </div>
-
-      <div className="relative mb-6 grid grid-cols-2 rounded-xl border border-white/10 bg-black/40 p-1">
-        <button
-          type="button"
-          onClick={() => {
-            setMode("login");
-            setErr("");
-          }}
-          className={`relative z-10 rounded-lg py-2.5 text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${
-            !isRegister ? "text-black font-black" : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          {!isRegister && (
-            <motion.div
-              layoutId="activeTabIndicator"
-              className="absolute inset-0 rounded-lg bg-white"
-              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+      <div className="px-6 pb-10">
+        <div className="mb-5">
+          {inAndroidApp ? (
+            <GoogleBrandButton onClick={handleAppGoogleLogin} busy={googleBusy}>
+              {isRegister ? "Registrarse con Google" : "Continuar con Google"}
+            </GoogleBrandButton>
+          ) : (
+            <GoogleSignInButton
+              clientId={googleClientId}
+              mode={mode}
+              busy={googleBusy}
+              onCredential={entrarConIdToken}
+              onError={mostrarErrorDeGoogle}
+              fallbackHref={googleAuthHref}
+              label={isRegister ? "Registrarse con Google" : "Continuar con Google"}
             />
           )}
-          <span className="relative z-20">Entrar</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("register");
-            setErr("");
-          }}
-          className={`relative z-10 rounded-lg py-2.5 text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${
-            isRegister ? "text-black font-black" : "text-zinc-400 hover:text-white"
-          }`}
-        >
+        </div>
+
+        <div className="mb-5 flex items-center gap-3" aria-hidden="true">
+          <div className="h-px flex-1 bg-white/[0.06]" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+            o
+          </span>
+          <div className="h-px flex-1 bg-white/[0.06]" />
+        </div>
+
+        <div className="relative mb-6 grid grid-cols-2 rounded-2xl bg-white/[0.03] p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("login");
+              setErr("");
+            }}
+            className={`relative z-10 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${
+              !isRegister ? "text-white" : "text-zinc-500 hover:text-white"
+            }`}
+          >
+            {!isRegister && (
+              <motion.div
+                layoutId="activeTabIndicator"
+                className={`absolute inset-0 ${LIQUID_GLASS_MODAL_BUTTON}`}
+                transition={{ type: "spring", stiffness: 350, damping: 28 }}
+              />
+            )}
+            <span className="relative z-20">Entrar</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("register");
+              setErr("");
+            }}
+            className={`relative z-10 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${
+              isRegister ? "text-white" : "text-zinc-500 hover:text-white"
+            }`}
+          >
+            {isRegister && (
+              <motion.div
+                layoutId="activeTabIndicator"
+                className={`absolute inset-0 ${LIQUID_GLASS_MODAL_BUTTON}`}
+                transition={{ type: "spring", stiffness: 350, damping: 28 }}
+              />
+            )}
+            <span className="relative z-20">Crear</span>
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="block text-left group">
+            <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
+              {isRegister ? "Email" : "Email o usuario"}
+            </span>
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-500 transition-colors group-focus-within:text-sky-300 pointer-events-none" />
+              {/* Al iniciar sesión vale el email o el nombre de usuario: un
+                  `type="email"` rechazaría el usuario antes de enviarlo. */}
+              <input
+                type={isRegister ? "email" : "text"}
+                autoComplete={isRegister ? "email" : "username"}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={form.email}
+                onChange={updateField("email")}
+                required
+                className={`h-11 w-full pl-11 pr-3.5 ${fieldClass}`}
+                placeholder={isRegister ? "tu@email.com" : "tu@email.com o usuario"}
+              />
+            </div>
+          </div>
+
           {isRegister && (
-            <motion.div
-              layoutId="activeTabIndicator"
-              className="absolute inset-0 rounded-lg bg-white"
-              transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            />
+            <>
+              <div className="block text-left group">
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
+                  Usuario
+                </span>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-500 transition-colors group-focus-within:text-sky-300 pointer-events-none" />
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    value={form.username}
+                    onChange={updateField("username")}
+                    required
+                    minLength={3}
+                    maxLength={30}
+                    pattern="[A-Za-z0-9_-]+"
+                    className={`h-11 w-full pl-11 pr-3.5 ${fieldClass}`}
+                    placeholder="usuario"
+                  />
+                </div>
+              </div>
+
+              <div className="block text-left group">
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
+                  Nombre visible
+                </span>
+                <div className="relative">
+                  <UserCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-500 transition-colors group-focus-within:text-sky-300 pointer-events-none" />
+                  <input
+                    type="text"
+                    autoComplete="name"
+                    value={form.displayName}
+                    onChange={updateField("displayName")}
+                    maxLength={50}
+                    className={`h-11 w-full pl-11 pr-3.5 ${fieldClass}`}
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+            </>
           )}
-          <span className="relative z-20">Crear</span>
+
+          <div className="block text-left group">
+            <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
+              Contraseña
+            </span>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-500 transition-colors group-focus-within:text-sky-300 pointer-events-none" />
+              <input
+                type={showPassword ? "text" : "password"}
+                autoComplete={isRegister ? "new-password" : "current-password"}
+                value={form.password}
+                onChange={updateField("password")}
+                required
+                minLength={isRegister ? 8 : 1}
+                className={`h-11 w-full pl-11 pr-11 ${fieldClass}`}
+                placeholder={isRegister ? "Mínimo 8 caracteres" : "Tu contraseña"}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-white transition-colors focus:outline-none"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {!!visibleError && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="mt-5 flex items-start gap-2.5 rounded-2xl bg-red-500/10 px-4 py-3 text-left text-xs text-red-200 animate-in fade-in duration-200"
+            >
+              <AlertCircle className="mt-0.5 h-4.5 w-4.5 shrink-0 text-red-400" />
+              <span className="leading-relaxed">{visibleError}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="mt-6 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-sky-500/85 bg-gradient-to-b from-sky-400/90 to-indigo-600/90 text-xs font-bold uppercase tracking-widest text-white shadow-[0_0_18px_rgba(14,165,233,0.35),inset_0_1px_1px_rgba(255,255,255,0.25)] transition hover:from-sky-400 hover:to-indigo-500 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? (
+            <Loader2 className="h-4.5 w-4.5 animate-spin" />
+          ) : isRegister ? (
+            <UserPlus className="h-4.5 w-4.5" />
+          ) : (
+            <LogIn className="h-4.5 w-4.5" />
+          )}
+          <span>
+            {loading
+              ? isRegister
+                ? "Creando cuenta..."
+                : "Entrando..."
+              : isRegister
+                ? "Crear"
+                : "Entrar"}
+          </span>
         </button>
       </div>
-
-      <div className="space-y-4">
-        <div className="block text-left group">
-          <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
-            {isRegister ? "Email" : "Email o usuario"}
-          </span>
-          <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-500 transition-colors group-focus-within:text-sky-300 pointer-events-none" />
-            {/* Al iniciar sesión vale el email o el nombre de usuario: un
-                `type="email"` rechazaría el usuario antes de enviarlo. */}
-            <input
-              type={isRegister ? "email" : "text"}
-              autoComplete={isRegister ? "email" : "username"}
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              value={form.email}
-              onChange={updateField("email")}
-              required
-              className="h-11 w-full rounded-xl border border-white/10 bg-black/45 pl-11 pr-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-sky-500/40 focus:bg-black/60 focus:shadow-[0_0_15px_rgba(14,165,233,0.1)]"
-              placeholder={isRegister ? "tu@email.com" : "tu@email.com o usuario"}
-            />
-          </div>
-        </div>
-
-        {isRegister && (
-          <>
-            <div className="block text-left group">
-              <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
-                Usuario
-              </span>
-              <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-500 transition-colors group-focus-within:text-sky-300 pointer-events-none" />
-                <input
-                  type="text"
-                  autoComplete="username"
-                  value={form.username}
-                  onChange={updateField("username")}
-                  required
-                  minLength={3}
-                  maxLength={30}
-                  pattern="[A-Za-z0-9_-]+"
-                  className="h-11 w-full rounded-xl border border-white/10 bg-black/45 pl-11 pr-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-sky-500/40 focus:bg-black/60 focus:shadow-[0_0_15px_rgba(14,165,233,0.1)]"
-                  placeholder="usuario"
-                />
-              </div>
-            </div>
-
-            <div className="block text-left group">
-              <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
-                Nombre visible
-              </span>
-              <div className="relative">
-                <UserCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-500 transition-colors group-focus-within:text-sky-300 pointer-events-none" />
-                <input
-                  type="text"
-                  autoComplete="name"
-                  value={form.displayName}
-                  onChange={updateField("displayName")}
-                  maxLength={50}
-                  className="h-11 w-full rounded-xl border border-white/10 bg-black/45 pl-11 pr-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-sky-500/40 focus:bg-black/60 focus:shadow-[0_0_15px_rgba(14,165,233,0.1)]"
-                  placeholder="Opcional"
-                />
-              </div>
-            </div>
-          </>
-        )}
-
-        <div className="block text-left group">
-          <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
-            Contraseña
-          </span>
-          <div className="relative">
-            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-500 transition-colors group-focus-within:text-sky-300 pointer-events-none" />
-            <input
-              type={showPassword ? "text" : "password"}
-              autoComplete={isRegister ? "new-password" : "current-password"}
-              value={form.password}
-              onChange={updateField("password")}
-              required
-              minLength={isRegister ? 8 : 1}
-              className="h-11 w-full rounded-xl border border-white/10 bg-black/45 pl-11 pr-11 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-sky-500/40 focus:bg-black/60 focus:shadow-[0_0_15px_rgba(14,165,233,0.1)]"
-              placeholder={isRegister ? "Mínimo 8 caracteres" : "Tu contraseña"}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-white transition-colors focus:outline-none"
-              tabIndex={-1}
-            >
-              {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {!!visibleError && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            className="mt-5 flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-left text-xs text-red-200 animate-in fade-in duration-200"
-          >
-            <AlertCircle className="mt-0.5 h-4.5 w-4.5 shrink-0 text-red-400" />
-            <span className="leading-relaxed">{visibleError}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 hover:from-sky-400 hover:via-indigo-400 hover:to-emerald-400 text-white font-extrabold uppercase tracking-widest text-xs transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.45)] cursor-pointer"
-      >
-        {loading ? (
-          <Loader2 className="h-4.5 w-4.5 animate-spin" />
-        ) : isRegister ? (
-          <UserPlus className="h-4.5 w-4.5" />
-        ) : (
-          <LogIn className="h-4.5 w-4.5" />
-        )}
-        <span>
-          {loading
-            ? isRegister
-              ? "Creando cuenta..."
-              : "Entrando..."
-            : isRegister
-              ? "Crear"
-              : "Entrar"}
-        </span>
-      </button>
     </motion.form>
   );
 }

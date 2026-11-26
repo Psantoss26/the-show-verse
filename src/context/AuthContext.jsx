@@ -518,15 +518,18 @@ export const AuthProvider = ({ children }) => {
   // selector nativo de la app de Android. Mismo canje que el login por
   // redirección, pero el usuario entra en el contexto ANTES de navegar, así que
   // la página de destino ya se pinta con la sesión.
+  // `credential`: idToken (app de Android) o `{ code }` (botón de la web).
   const loginWithGoogle = useCallback(
-    async (idToken) => {
+    async (credential) => {
       cleanLegacyStorage();
+      const body =
+        typeof credential === "string" ? { idToken: credential } : { code: credential?.code };
       const res = await fetch("/api/auth/google/native", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         cache: "no-store",
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify(body),
       });
       const json = await readJsonResponse(res);
       const loggedUser = applyUser(json.user || null);

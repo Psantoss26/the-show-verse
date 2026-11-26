@@ -1,29 +1,28 @@
 "use client";
 
-// Botón OFICIAL de «Continuar con Google» (Google Identity Services).
+// Botón «Continuar con Google» del formulario de acceso.
 //
-// Lo pinta Google dentro de su propio iframe: diseño, texto y logotipo son los
-// suyos, y al pulsarlo se abre la ventana de Google para elegir cuenta sin salir
-// de la página. Devuelve un idToken por `onCredential`.
+// El diseño es PROPIO —el vidrio de los botones de los modales de la ficha, 44 px
+// de alto— y al pulsarlo se abre la ventana emergente oficial
+// de Google para elegir cuenta sin salir de la página (Google Identity
+// Services, flujo de código OAuth). El código llega por `onCredential` como
+// `{ code }` y lo canjea el servidor.
 //
-// Mientras carga el script se reserva su hueco (sin salto). Si no carga —sin
-// red, bloqueador, origen no autorizado en Google Cloud— se enseña un enlace
-// equivalente que hace el login por redirección.
+// Es un enlace a la redirección clásica: sin JavaScript, si el script de Google
+// no carga o si el navegador bloquea la ventana, se entra por la página de
+// Google y nada se queda a medias.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { Loader2 } from "lucide-react";
 
 import {
-  googleButtonOptions,
+  googleCodeClientOptions,
+  googlePopupNextStep,
   loadGoogleIdentityScript,
 } from "@/lib/auth/googleSignIn";
+import { LIQUID_GLASS_MODAL_BUTTON } from "@/lib/ui/liquidGlass";
 
-// GIS admite UNA configuración por página: se inicializa una vez por client
-// ID y la respuesta se reparte al botón montado en ese momento. Inicializarlo
-// en cada render (al cambiar Entrar/Crear) hacía que Google avisara.
-let initializedClientId = null;
-let activeCredentialHandler = null;
-
-export function GoogleLogo({ className = "h-5 w-5" }) {
+export function GoogleLogo({ className = "h-[18px] w-[18px]" }) {
   return (
     <svg className={className} viewBox="0 0 48 48" aria-hidden="true">
       <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
@@ -34,29 +33,45 @@ export function GoogleLogo({ className = "h-5 w-5" }) {
   );
 }
 
+// Mismo vidrio que los botones de los modales de la ficha.
+const brandButtonClass =
+  "relative flex h-11 w-full cursor-pointer select-none items-center justify-center gap-3 px-4 text-sm font-bold " +
+  `${LIQUID_GLASS_MODAL_BUTTON} active:scale-[0.985] ` +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 " +
+  "aria-busy:cursor-default aria-busy:active:scale-100 disabled:cursor-default disabled:opacity-60";
+
 /**
- * Botón de Google con el aspecto de la marca (fondo oscuro, «G» a color) para
- * donde no se puede usar el oficial: la app de Android —Google no permite su
- * ventana dentro de un WebView— y el respaldo por redirección.
+ * Aspecto común del botón de Google: la web, la app de Android (Google no
+ * permite su ventana dentro de un WebView), el respaldo por redirección y el
+ * estado «Entrando con Google…» (`busy`) se ven igual.
  */
-export function GoogleBrandButton({ href, onClick, disabled = false, children }) {
-  const className =
-    "flex h-10 w-full items-center justify-center gap-3 rounded-[4px] border border-[#8E918F] bg-[#131314] px-3 text-sm font-medium text-[#E3E3E3] transition-colors hover:bg-[#1f1f20] active:bg-[#2a2a2b] disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer";
+export function GoogleBrandButton({ href, onClick, disabled = false, busy = false, children }) {
   const content = (
     <>
-      <GoogleLogo />
-      <span>{children}</span>
+      {busy ? (
+        <Loader2 className="h-[18px] w-[18px] animate-spin text-zinc-300" aria-hidden="true" />
+      ) : (
+        <GoogleLogo />
+      )}
+      <span>{busy ? "Entrando con Google…" : children}</span>
     </>
   );
+  if (busy) {
+    return (
+      <div role="status" aria-busy="true" className={brandButtonClass}>
+        {content}
+      </div>
+    );
+  }
   if (href) {
     return (
-      <a href={href} onClick={onClick} aria-disabled={disabled || undefined} className={className}>
+      <a href={href} onClick={onClick} aria-disabled={disabled || undefined} className={brandButtonClass}>
         {content}
       </a>
     );
   }
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={className}>
+    <button type="button" onClick={onClick} disabled={disabled} className={brandButtonClass}>
       {content}
     </button>
   );
@@ -66,106 +81,68 @@ export default function GoogleSignInButton({
   clientId,
   mode = "login",
   onCredential,
+  onError,
   fallbackHref,
+  busy = false,
   label = "Continuar con Google",
 }) {
-  const hostRef = useRef(null);
-  const callbackRef = useRef(onCredential);
-  const [status, setStatus] = useState(clientId ? "loading" : "failed");
+  const clientRef = useRef(null);
+  const handlersRef = useRef({ onCredential, onError, fallbackHref });
 
   useEffect(() => {
-    callbackRef.current = onCredential;
-  }, [onCredential]);
+    handlersRef.current = { onCredential, onError, fallbackHref };
+  }, [onCredential, onError, fallbackHref]);
 
+  // El cliente se prepara al montar: la ventana tiene que abrirse en el mismo
+  // clic (sin esperas) o el navegador la bloquea.
   useEffect(() => {
-    if (!clientId) {
-      setStatus("failed");
-      return undefined;
-    }
+    if (!clientId) return undefined;
     let alive = true;
-    let observer = null;
-    let lastWidth = 0;
-    const handler = (credential) => callbackRef.current?.(credential);
 
-    const render = (gis) => {
-      const host = hostRef.current;
-      if (!alive || !host) return;
-      const width = Math.round(host.getBoundingClientRect().width);
-      if (!width || width === lastWidth) return;
-      lastWidth = width;
-      host.innerHTML = "";
-      gis.renderButton(host, googleButtonOptions({ width, mode }));
+    const fail = (failure) => {
+      const step = googlePopupNextStep(failure);
+      if (step === "stay") return;
+      const { fallbackHref: href, onError: reportError } = handlersRef.current;
+      if (step === "redirect" && href) {
+        window.location.assign(href);
+        return;
+      }
+      reportError?.(failure?.error || failure?.type || "google_popup_failed");
     };
 
     loadGoogleIdentityScript()
-      .then((gis) => {
+      .then((oauth2) => {
         if (!alive) return;
-        if (initializedClientId !== clientId) {
-          gis.initialize({
-            client_id: clientId,
-            callback: (response) => {
-              if (response?.credential) activeCredentialHandler?.(response.credential);
-            },
-            // Ventana emergente de Google, también en Chrome. NO se usa FedCM
-            // (`use_fedcm_for_button`): si Google rechaza el token —p. ej.
-            // origen sin autorizar—, `get()` falla con «NetworkError: Error
-            // retrieving a token», GIS no avisa ni prueba otra vía y el clic
-            // se pierde. La ventana emergente enseña el error de Google.
-            ux_mode: "popup",
-            auto_select: false,
-            cancel_on_tap_outside: true,
-            itp_support: true,
-          });
-          initializedClientId = clientId;
-        }
-        activeCredentialHandler = handler;
-        render(gis);
-        setStatus("ready");
-        // El ancho del botón lo fija Google al pintarlo: si cambia el hueco
-        // (girar el móvil, redimensionar), se vuelve a pintar a la medida.
-        if (typeof ResizeObserver !== "undefined" && hostRef.current) {
-          observer = new ResizeObserver(() => render(gis));
-          observer.observe(hostRef.current);
-        }
+        clientRef.current = oauth2.initCodeClient({
+          ...googleCodeClientOptions({ clientId, mode }),
+          callback: (response) => {
+            if (response?.code) handlersRef.current.onCredential?.({ code: response.code });
+            else fail({ error: response?.error });
+          },
+          error_callback: fail,
+        });
       })
       .catch(() => {
-        if (alive) setStatus("failed");
+        // Sin script: el enlace lleva a la página de Google.
+        clientRef.current = null;
       });
 
     return () => {
       alive = false;
-      observer?.disconnect();
-      if (activeCredentialHandler === handler) activeCredentialHandler = null;
+      clientRef.current = null;
     };
   }, [clientId, mode]);
 
-  if (status === "failed") {
-    return <GoogleBrandButton href={fallbackHref}>{label}</GoogleBrandButton>;
-  }
+  const handleClick = (event) => {
+    const client = clientRef.current;
+    if (!client) return; // el enlace hace la redirección
+    event.preventDefault();
+    client.requestCode();
+  };
 
   return (
-    <div className="flex w-full flex-col items-center gap-2">
-      {/* Hueco del botón oficial: 40 px, el alto del tamaño `large`. */}
-      <div className="relative h-10 w-full">
-        <div
-          ref={hostRef}
-          className="flex h-10 w-full justify-center overflow-hidden rounded-[4px] [color-scheme:normal]"
-        />
-        {status === "loading" && (
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 rounded-[4px] border border-[#8E918F]/50 bg-[#131314]"
-          />
-        )}
-      </div>
-      {status === "ready" && fallbackHref && (
-        <a
-          href={fallbackHref}
-          className="text-[11px] text-zinc-500 underline-offset-2 transition-colors hover:text-zinc-300 hover:underline"
-        >
-          ¿No se abre la ventana? Usa la página de Google
-        </a>
-      )}
-    </div>
+    <GoogleBrandButton href={fallbackHref} onClick={handleClick} busy={busy}>
+      {label}
+    </GoogleBrandButton>
   );
 }

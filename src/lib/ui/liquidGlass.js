@@ -177,3 +177,19 @@ export const LIQUID_GLASS_DETAIL_SHADOW =
 
 // Controles flotantes compartidos por las fichas rápidas.
 export const DETAIL_MODAL_GLASS_CONTROL = `${LIQUID_GLASS_PANEL} border-0 text-white/80 hover:bg-black/[0.34] hover:text-white active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:pointer-events-none disabled:opacity-60`;
+
+// PIEZAS DE DENTRO de los modales sobre LIQUID_GLASS_PANEL, sacadas de los de
+// la ficha (AddToListModal, ListToggleConfirmModal) para que el formulario de
+// acceso las use igual. Sin borde: la pieza se separa del panel por un velo
+// blanco tenue, no por una línea.
+//
+// Ninguna lleva `backdrop-filter`: el panel ya desenfoca y es backdrop root, así
+// que un desenfoque en un hijo solo vería el propio panel y no haría nada.
+//
+// CAMPO de texto: velo casi invisible que se enciende un punto al pasar y al
+// enfocar, con anillo interior (el color del anillo lo pone cada formulario).
+export const LIQUID_GLASS_MODAL_FIELD =
+  "rounded-2xl bg-white/[0.03] text-sm text-white outline-none ring-inset placeholder:text-zinc-500 transition hover:bg-white/[0.05] focus:bg-white/[0.06] focus:ring-2";
+// BOTÓN secundario (o pieza seleccionada): vidrio con luz arriba.
+export const LIQUID_GLASS_MODAL_BUTTON =
+  "rounded-2xl bg-white/[0.08] bg-gradient-to-b from-white/[0.16] to-white/[0.04] text-white/90 shadow-sm transition hover:bg-white/[0.14] hover:text-white";

@@ -41,7 +41,7 @@ Layout global, dashboards y páginas de detalle "grandes".
 
 | Componente | Propósito |
 |---|---|
-| `LoginForm.jsx` | Formulario de login/registro (usa `useAuth()`), sanitiza `?next=`. |
+| `LoginForm.jsx` | Formulario de login/registro (usa `useAuth()`), sanitiza `?next=`. Lleva el cristal de los modales de la ficha: tarjeta `LIQUID_GLASS_PANEL` (radio 2rem, sin borde) con cabecera `LIQUID_GLASS_MODAL_HEADER`; campos `LIQUID_GLASS_MODAL_FIELD` (velo sin borde, anillo azul al enfocar); selector Entrar/Crear con la pieza activa en `LIQUID_GLASS_MODAL_BUTTON`, igual que el botón de Google, y «Entrar» como los botones de confirmar de los modales (relleno de color con luz arriba). Ningún hijo lleva `backdrop-filter`: el panel ya es backdrop root. La tarjeta «Entrando…» de `/login` usa el mismo panel. |
 | `LoginButton.jsx` | Botón de acceso rápido que redirige a `/login?next=...`. |
 | `UserAvatar.jsx` | Avatar del usuario (iniciales si no hay imagen) enlazado a `/profile`. |
 | `LoginRequiredScreen.jsx` | Pantalla «Inicia sesión» sin sesión en Favoritos, Pendientes y Social: cabecera de la sección, manchas de su color (`theme`: red, blue, purple, pink) y tarjeta de cristal con logo y botón a `/login?next=`. Exporta también esa tarjeta sola, `LoginRequiredCard`, para las páginas que bloquean una única sección y conservan su cabecera y pestañas (Mis listas en `/lists`). |

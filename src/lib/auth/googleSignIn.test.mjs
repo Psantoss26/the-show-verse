@@ -3,29 +3,30 @@ import test from "node:test";
 
 import {
   appGoogleNextStep,
-  googleButtonOptions,
+  googleCodeClientOptions,
+  googlePopupNextStep,
   googleRedirectHref,
   GOOGLE_SESSION_PARAM,
 } from "./googleSignIn.js";
 
-test("the official button uses Google's own text, dark theme and Spanish locale", () => {
-  const options = googleButtonOptions({ width: 332, mode: "login" });
-  assert.equal(options.type, "standard");
-  assert.equal(options.theme, "filled_black");
-  assert.equal(options.size, "large");
-  assert.equal(options.text, "continue_with");
-  assert.equal(options.locale, "es");
-  assert.equal(options.width, 332);
+test("the button opens Google's own popup with the OAuth code flow", () => {
+  const options = googleCodeClientOptions({ clientId: "abc.apps.googleusercontent.com" });
+  assert.equal(options.client_id, "abc.apps.googleusercontent.com");
+  assert.equal(options.ux_mode, "popup");
+  assert.equal(options.scope, "openid email profile");
+  assert.equal(options.prompt, undefined);
 });
 
-test("registering asks Google for its sign-up wording", () => {
-  assert.equal(googleButtonOptions({ width: 300, mode: "register" }).text, "signup_with");
+test("registering always asks which Google account to use", () => {
+  assert.equal(googleCodeClientOptions({ clientId: "x", mode: "register" }).prompt, "select_account");
 });
 
-test("the button width stays inside the range Google renders (200-400 px)", () => {
-  assert.equal(googleButtonOptions({ width: 120 }).width, 200);
-  assert.equal(googleButtonOptions({ width: 900 }).width, 400);
-  assert.equal(googleButtonOptions({ width: Number.NaN }).width, 320);
+test("closing Google's popup does nothing; a blocked popup falls back to the redirect", () => {
+  assert.equal(googlePopupNextStep({ type: "popup_closed" }), "stay");
+  assert.equal(googlePopupNextStep({ error: "access_denied" }), "stay");
+  assert.equal(googlePopupNextStep({ type: "popup_failed_to_open" }), "redirect");
+  assert.equal(googlePopupNextStep({ error: "invalid_request" }), "error");
+  assert.equal(googlePopupNextStep(null), "error");
 });
 
 test("the redirect fallback keeps a sanitized destination", () => {

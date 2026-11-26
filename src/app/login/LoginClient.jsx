@@ -7,6 +7,7 @@ import { useRouter } from "@/lib/offline/useOfflineRouter";
 import LoginForm from "@/components/auth/LoginForm";
 import { useAuth } from "@/context/AuthContext";
 import { GOOGLE_SESSION_PARAM } from "@/lib/auth/googleSignIn";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 export default function LoginClient({ next, googleClientId }) {
   const router = useRouter();
@@ -62,7 +63,7 @@ export default function LoginClient({ next, googleClientId }) {
           {enteringSession ? (
             <div
               role="status"
-              className="flex w-full max-w-[380px] flex-col items-center gap-4 rounded-[2.5rem] border border-white/12 bg-zinc-900/40 px-6 py-12 shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
+              className={`flex w-full max-w-[380px] flex-col items-center gap-4 rounded-[2rem] px-6 py-12 ${LIQUID_GLASS_PANEL}`}
             >
               <img
                 src="/logo-TSV-sinFondo.png"

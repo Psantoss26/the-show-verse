@@ -149,6 +149,45 @@ export function getGoogleRedirectUri(request) {
   );
 }
 
+/**
+ * Canjea un código de autorización de Google por sus tokens (incluido el
+ * `id_token`). `redirectUri` debe ser el mismo con el que se pidió el código:
+ * la URL del callback en la redirección, y "postmessage" en la ventana
+ * emergente del botón de la web.
+ */
+export async function exchangeGoogleCode(code, redirectUri) {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    return { ok: false, error: "missing_config" };
+  }
+
+  const body = new URLSearchParams({
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code",
+  });
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    cache: "no-store",
+    body,
+  });
+  const json = await res.json().catch(() => ({}));
+  return {
+    ok: res.ok,
+    status: res.status,
+    json,
+    error: json?.error || `Google token exchange failed (${res.status})`,
+  };
+}
+
 export function clearGoogleOauthCookies(response, request) {
   const secure = request?.nextUrl?.protocol === "https:";
   for (const name of [GOOGLE_OAUTH_STATE_COOKIE, GOOGLE_OAUTH_NEXT_COOKIE]) {

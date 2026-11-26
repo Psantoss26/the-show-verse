@@ -5,6 +5,7 @@ import {
   buildAndroidHandoffPage,
   buildAndroidOauthHandoffUrl,
   createOauthState,
+  exchangeGoogleCode,
   isAndroidAppUserAgent,
   isAndroidOauthState,
 } from "./_utils.js";
@@ -60,4 +61,35 @@ test("the return page carries the deep link and cannot break out of the markup",
 
   // Y el salto automático viaja como literal JS válido.
   assert.match(html, /location\.replace\("theshowverse:/);
+});
+
+test("the popup code is exchanged with redirect_uri=postmessage and the client secret", async () => {
+  const previous = {
+    id: process.env.GOOGLE_CLIENT_ID,
+    secret: process.env.GOOGLE_CLIENT_SECRET,
+    fetch: globalThis.fetch,
+  };
+  process.env.GOOGLE_CLIENT_ID = "client-id";
+  process.env.GOOGLE_CLIENT_SECRET = "client-secret";
+  let sent = null;
+  globalThis.fetch = async (url, init) => {
+    sent = { url, body: new URLSearchParams(init.body) };
+    return new Response(JSON.stringify({ id_token: "token" }), { status: 200 });
+  };
+  try {
+    const result = await exchangeGoogleCode("the-code", "postmessage");
+    assert.equal(result.ok, true);
+    assert.equal(result.json.id_token, "token");
+    assert.equal(sent.url, "https://oauth2.googleapis.com/token");
+    assert.equal(sent.body.get("code"), "the-code");
+    assert.equal(sent.body.get("redirect_uri"), "postmessage");
+    assert.equal(sent.body.get("client_secret"), "client-secret");
+    assert.equal(sent.body.get("grant_type"), "authorization_code");
+  } finally {
+    process.env.GOOGLE_CLIENT_ID = previous.id;
+    process.env.GOOGLE_CLIENT_SECRET = previous.secret;
+    if (previous.id === undefined) delete process.env.GOOGLE_CLIENT_ID;
+    if (previous.secret === undefined) delete process.env.GOOGLE_CLIENT_SECRET;
+    globalThis.fetch = previous.fetch;
+  }
 });
