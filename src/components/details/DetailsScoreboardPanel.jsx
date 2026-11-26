@@ -213,10 +213,17 @@ export function DetailsRatingsBadges({
   // Metacritic enseñan la nota del público en escala 10 con sus votos). Así el
   // hueco reservado mide prácticamente lo que va a medir el real. Sin `href` la
   // insignia no es un enlace, así que tampoco entra en el orden de tabulación.
+  //
+  // Una pendiente NO elegida para el teléfono se retira entera (`.phoneOff` en
+  // el envoltorio invisible). Su `.phoneOff` de dentro ya la escondía, pero el
+  // envoltorio seguía siendo un ítem flex vacío que `justify-evenly` contaba
+  // como uno más: en el drawer, TMDb sin elegir y aún sin nota abría un hueco
+  // a la izquierda y la primera puntuación (Letterboxd) nacía desplazada hasta
+  // que llegaba TMDb.
   const scoreSlot = (name, score, render, placeholder = { value: "0.0", sub: "00 k" }) => {
     if (!score) return null;
     const node = !isPendingScore(score) ? render(score) : (
-      <div className="invisible" aria-hidden="true">
+      <div className={`invisible ${spread && !onPhone(name) ? styles.phoneOff : ""}`} aria-hidden="true">
         {render({ ...score, ...placeholder, href: undefined })}
       </div>
     );
@@ -346,6 +353,10 @@ export function DetailsRatingsBadges({
             />
           </div>
         ),
+        // RT da sus votos por tramos («250K+»): con el relleno de siempre
+        // («00 k») el hueco reservado medía unos 7 px menos y, al llegar la
+        // nota, el marcador de teléfono se recolocaba 2–4 px.
+        { value: "0.0", sub: "250K+" },
       )}
 
       {/* Badge de Metacritic - mismo criterio que Rotten Tomatoes, con la
