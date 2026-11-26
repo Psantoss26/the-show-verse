@@ -4862,6 +4862,54 @@ html[data-details-sequence-transition] .sv-topbar {
   }
 }
 
+/* REPARTO MARCADOR / BLOQUES en DetailModal (`useScoreRowFit`). El marcador
+   toma de base su ancho natural (`--sv-score-panel-w`, medido) y los bloques se
+   quedan con TODO lo que sobra, en vez de dejar un hueco vacío a la derecha de
+   las puntuaciones. Si no cabe, cede antes el marcador (y `useFitScoresZoom`
+   escala las puntuaciones, como antes) mientras los bloques guardan su mínimo. */
+/* Holgura tras la última puntuación (Letterboxd) antes del borde del panel:
+   el reparto cambia con margen y la nota no queda pegada al canto. */
+.sv-score-row[data-score-fit] > .sv-score-panel {
+  flex: 0 1 calc(var(--sv-score-panel-w) + 2rem);
+}
+.sv-score-row[data-score-fit] > .sv-score-tiles {
+  flex: 1 1 auto;
+}
+/* En fila (ancha, o sin stats): cada bloque crece por igual desde su ancho. */
+.sv-score-row[data-score-fit] .sv-score-tile {
+  flex: 1 1 6.5rem;
+  width: auto;
+}
+
+/* Fila estrecha (`@container/sbrow` < 56rem): bloques apilados que llenan el
+   ancho libre. Con CUATRO (Plataformas, Actividad, Enlaces, Compartir), rejilla
+   2×2 solo con el icono (el nombre queda en `aria-label`). No depende de la
+   fila de stats: así la rejilla sale igual durante la carga. */
+@container sbrow (width < 56rem) {
+  .sv-score-row:has([data-scoreboard-stats]) .sv-score-tiles {
+    min-width: 9rem;
+  }
+  .sv-score-row:has([data-scoreboard-stats]) .sv-score-tile {
+    flex: 1 1 0;
+    width: auto;
+  }
+  .sv-score-row .sv-score-tiles[data-tile-count="4"] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(4rem, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    min-width: 8.5rem;
+  }
+  .sv-score-row .sv-score-tiles[data-tile-count="4"] .sv-score-tile {
+    width: auto;
+    min-width: 0;
+    flex-direction: column;
+  }
+  .sv-score-row .sv-score-tiles[data-tile-count="4"] .sv-score-tile-label {
+    display: none;
+  }
+}
+
 /* FILA DE STATS DEL MARCADOR (DetailsScoreboardPanel): sin filete entre
    puntuaciones y estadísticas. El velo oscuro de la fila entra en degradado
    desde transparente, así que el paso de una zona a otra no dibuja ninguna

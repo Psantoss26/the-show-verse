@@ -53,9 +53,27 @@ export const SCOREBOARD_FIVE_SCORES_PX = 640;
 // al alza porque el ancho de cada etiqueta depende de la cifra que muestre.
 export const SCOREBOARD_STATS_ONE_ROW_PX = 500;
 
-// Mínimo de ESCRITORIO: se para antes de que se oculten las dos puntuaciones.
-export const DRAWER_MIN_PX =
-  SCOREBOARD_FIVE_SCORES_PX + MODAL_CONTENT_PADDING_PX;
+// FILA MARCADOR + BLOQUES del modal (`.sv-score-row`, `useScoreRowFit`).
+//
+// MEDIDO en el navegador (Breaking Bad, cinco puntuaciones, ventana de 1600px):
+// la fila de puntuaciones mide 495px a escala 1 con su relleno, el CSS le suma
+// 2rem de holgura tras la última nota (Letterboxd), hay 12px de hueco hasta los
+// bloques, y los bloques (Plataformas, Enlaces, Compartir apilados, o la
+// rejilla 2×2 con Actividad) se leen holgados desde 176px. Por debajo de esa
+// suma las puntuaciones se encogen (`useFitScoresZoom`) y los bloques se
+// quedan en su mínimo: se ve apretado aunque no se rompa.
+export const SCORE_RATINGS_NATURAL_PX = 495;
+export const SCORE_PANEL_SLACK_PX = 32;
+export const SCORE_ROW_GAP_PX = 12;
+export const SCORE_TILES_COMFORT_PX = 176;
+export const SCORE_ROW_COMFORT_PX =
+  SCORE_RATINGS_NATURAL_PX + SCORE_PANEL_SLACK_PX + SCORE_ROW_GAP_PX + SCORE_TILES_COMFORT_PX;
+
+// Mínimo de ESCRITORIO: se para cuando la fila del marcador deja de caber
+// holgada (antes, en 696px, se paraba solo antes de perder dos puntuaciones, y
+// para entonces las notas ya se encogían). Queda por encima del umbral de las
+// cinco puntuaciones, así que esas tampoco se pierden.
+export const DRAWER_MIN_PX = SCORE_ROW_COMFORT_PX + MODAL_CONTENT_PADDING_PX;
 
 // Mínimo de TABLET: llega más abajo —ahí la pantalla no da para tanto— y se
 // para cuando las estadísticas están a punto de partirse en dos filas. Las

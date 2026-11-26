@@ -1,4 +1,5 @@
 "use client";
+import { useScoreRowFit } from "@/components/details/useScoreRowFit";
 import { useOfflineTitle } from "@/lib/offline/useOfflineTitle";
 import { isServerReachable } from "@/lib/offline/client";
 import { openSavedRoute } from "@/lib/offline/navigation";
@@ -529,7 +530,7 @@ export default function DetailModal({
     () => createPanelVariants(prefersReducedMotion),
     [prefersReducedMotion],
   );
-  const { session, account, preferences } = useAuth();
+  const { session, account, preferences, hydrated: authHydrated = true } = useAuth();
   const { openDetailModal } = useDetailModal();
   const { loading, data, applyArtworkSelection } = useDetailModalData(item, {
     phoneView: phoneLayout,
@@ -619,8 +620,12 @@ export default function DetailModal({
   // La misma actividad de seguidos que muestra DetailsClient. En el modal es
   // un acceso a la sección completa: el drawer no duplica el feed entero.
   const canAccessFollowingActivity = !!session && !!account?.id && !isEpisode;
+  // `pending`: mientras AuthContext no hidrata vale la copia guardada, así el
+  // bloque Actividad (y con él la rejilla 2×2 de los bloques) sale desde el
+  // primer pintado y no entra después recolocando los demás.
   const followingActivity = useFollowingActivity(mediaType, item?.id, {
     enabled: canAccessFollowingActivity,
+    pending: !authHydrated && !isEpisode,
   });
   const showFollowingActivity = hasFollowingActivity(followingActivity);
   const detailKey = `${mediaType}:${item?.id ?? ""}`;
@@ -3329,7 +3334,10 @@ export default function DetailModal({
   // Compartir salen del marcador y van a su derecha como tres bloques de
   // cristal con su mismo alto (como en la ficha normal). Deciden por el ancho
   // de la fila (`@container/sbrow`), no por el de la ventana: el drawer se
-  // estrecha arrastrando. Estrecha = apilados; ancha = uno al lado del otro.
+  // estrecha arrastrando. Estrecha = apilados (con cuatro, rejilla 2×2 de
+  // cuadrados: `data-tile-count` en globals.css); ancha = uno al lado del otro.
+  // Reparto marcador / bloques por el ancho natural del marcador (ver hook).
+  const scoreRowFitRef = useScoreRowFit();
   const renderScoreboardPanel = (className, { separateTiles = false } = {}) => {
     const panel = (
     <DetailsScoreboardPanel
@@ -3383,9 +3391,12 @@ export default function DetailModal({
     if (!separateTiles) return panel;
     return (
       <div className={`@container/sbrow ${className}`}>
-        <div className="sv-score-row flex items-stretch gap-3">
+        <div ref={scoreRowFitRef} className="sv-score-row flex items-stretch gap-3">
           {panel}
-          <div className="sv-score-tiles flex shrink-0 flex-col gap-2 @4xl/sbrow:flex-row @4xl/sbrow:gap-2">
+          <div
+            data-tile-count={showFollowingActivity ? 4 : 3}
+            className="sv-score-tiles flex shrink-0 flex-col gap-2 @4xl/sbrow:flex-row @4xl/sbrow:gap-2"
+          >
             <ScoreboardTile
               wideBy="container"
               icon={MonitorPlay}

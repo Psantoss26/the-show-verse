@@ -11,6 +11,7 @@ import {
   SCOREBOARD_FIVE_SCORES_PX,
   SCOREBOARD_MIN_CONTENT_PX,
   SCOREBOARD_STATS_ONE_ROW_PX,
+  SCORE_ROW_COMFORT_PX,
   clampDrawerWidth,
 } from "./detailModalSizing.js";
 
@@ -21,15 +22,17 @@ const contenido = (w) => w - MODAL_CONTENT_PADDING_PX;
 // pantalla y no hay nada que garantizar (ver el test correspondiente).
 const VENTANAS = [1280, 1366, 1440, 1600, 1792, 1920, 2200, 2541];
 
-test("en escritorio el arrastre se para ANTES de perder puntuaciones", () => {
-  // Por debajo de 40rem de barra, el container query retira Rotten Tomatoes y
-  // Metacritic. En escritorio hay sitio de sobra, así que esa degradación ni se
-  // llega a ofrecer: el tope inferior queda justo encima del umbral.
-  assert.equal(contenido(DRAWER_MIN_PX), SCOREBOARD_FIVE_SCORES_PX);
-  assert.equal(DRAWER_MIN_PX, 696);
+test("en escritorio el arrastre se para con el marcador aún holgado", () => {
+  // El suelo es la fila marcador + bloques a tamaño natural: puntuaciones sin
+  // encoger, su holgura tras Letterboxd y los bloques legibles.
+  assert.equal(contenido(DRAWER_MIN_PX), SCORE_ROW_COMFORT_PX);
+  assert.equal(DRAWER_MIN_PX, 771);
 
-  // Sigue MUY por debajo de los dos umbrales que fijaban el mínimo antiguo: ese
-  // es el margen de estrechamiento ganado.
+  // Por encima del umbral de las cinco puntuaciones: ninguna se pierde.
+  assert.ok(contenido(DRAWER_MIN_PX) > SCOREBOARD_FIVE_SCORES_PX);
+
+  // Y por debajo de los dos umbrales que fijaban el mínimo antiguo (896), que
+  // dejaban el tirador sin recorrido.
   assert.ok(contenido(DRAWER_MIN_PX) < SCOREBOARD_MIN_CONTENT_PX);
   assert.ok(contenido(DRAWER_MIN_PX) < CAST_ROW_SIX_CARDS_PX);
 });
@@ -68,7 +71,7 @@ test("en tablet se para donde las estadísticas se partirían en dos filas", () 
 test("los mínimos se derivan, no se escriben a mano", () => {
   assert.equal(
     DRAWER_MIN_PX,
-    SCOREBOARD_FIVE_SCORES_PX + MODAL_CONTENT_PADDING_PX,
+    SCORE_ROW_COMFORT_PX + MODAL_CONTENT_PADDING_PX,
   );
   assert.equal(
     DRAWER_TABLET_MIN_PX,
@@ -117,11 +120,11 @@ test("el rescate no se come la pantalla en ventanas pequeñas", () => {
 });
 
 test("se respeta el ancho pedido cuando está dentro del rango", () => {
-  // A 2541px el rango es 696 .. 1271.
+  // A 2541px el rango es 771 .. 1271.
   assert.equal(clampDrawerWidth(1000, 2541), 1000);
   assert.equal(clampDrawerWidth(1271, 2541), 1271);
-  // 700px estaba FUERA de rango con el mínimo antiguo (896) y ahora es válido.
-  assert.equal(clampDrawerWidth(700, 2541), 700);
+  // 800px estaba FUERA de rango con el mínimo antiguo (896) y ahora es válido.
+  assert.equal(clampDrawerWidth(800, 2541), 800);
   // Fuera de rango, se sigue acotando por ambos lados.
   assert.equal(clampDrawerWidth(300, 2541), DRAWER_MIN_PX);
   assert.equal(clampDrawerWidth(9999, 2541), 1271);
