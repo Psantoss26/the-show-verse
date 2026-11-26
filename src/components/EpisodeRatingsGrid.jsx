@@ -944,7 +944,7 @@ export default function EpisodeRatingsGrid({
   // =======================
   const renderGrid = () => (
     <div
-      className="sv-ergrid-scroller -ml-6 pl-3 pr-3 overflow-x-auto overflow-y-visible [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:-ml-3 sm:pr-0"
+      className="sv-ergrid-scroller -ml-6 -mb-2 pl-3 pr-3 pb-2 overflow-x-auto overflow-y-visible [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:-ml-3 sm:pr-0"
       style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
       <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed]">
@@ -1117,7 +1117,7 @@ export default function EpisodeRatingsGrid({
   // =======================
   const renderGridInverted = () => (
     <div
-      className="sv-ergrid-scroller -ml-6 pl-3 pr-3 overflow-x-auto overflow-y-visible [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:-ml-3 sm:pr-0"
+      className="sv-ergrid-scroller -ml-6 -mb-2 pl-3 pr-3 pb-2 overflow-x-auto overflow-y-visible [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:-ml-3 sm:pr-0"
       style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
       <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed]">

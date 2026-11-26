@@ -4873,7 +4873,7 @@ html[data-details-sequence-transition] .sv-topbar {
   /* La columna se fija al borde del contenido del scroll, 12px dentro de su
      borde (sticky cuenta el pl-3), y el cristal se sale 16px a la izquierda: cubre ese margen, que .sv-ergrid-scroller funde
      a transparente, así que su canto nunca se ve. */
-  inset: -4px -14px -4px -16px;
+  inset: -4px -24px -4px -16px;
   z-index: -1;
   pointer-events: none;
   background: linear-gradient(
@@ -4883,10 +4883,13 @@ html[data-details-sequence-transition] .sv-topbar {
   );
   backdrop-filter: blur(16px) saturate(1.6) brightness(0.75);
   /* Sin canto: el borde derecho se funde hacia las casillas y la franja
-     nace y muere en degradado arriba (cabecera) y abajo (última fila). */
+     nace y muere en degradado arriba (cabecera) y abajo (última fila). El
+     fundido derecho empieza justo en el borde de la columna (24px de fuera):
+     dentro de ella el cristal es opaco, para que una cifra que pasa por detrás
+     de la etiqueta (la media blanca de AVG.) no se transparente nítida. */
   --sv-ergrid-fade-x: linear-gradient(
     to right,
-    #000 calc(100% - 28px),
+    #000 calc(100% - 24px),
     transparent
   );
   mask-image: var(--sv-ergrid-fade-x);
@@ -4899,10 +4902,15 @@ html[data-details-sequence-transition] .sv-topbar {
   mask-composite: intersect;
 }
 
+/* Abajo la franja se alarga 16px por debajo de la última fila (el scroll deja
+   ese hueco: border-spacing 8px + pb-2) y se desvanece solo ahí: la fila
+   entera queda cubierta, también la de AVG., cuya media va pegada al fondo de
+   la celda y antes se transparentaba por el fundido. */
 .sv-ergrid-label[data-edge="bottom"]::before {
+  bottom: -16px;
   mask-image:
     var(--sv-ergrid-fade-x),
-    linear-gradient(to top, transparent, #000 75%);
+    linear-gradient(to top, transparent, #000 16px);
   mask-composite: intersect;
 }
 
