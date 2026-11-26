@@ -78,7 +78,7 @@ import { titleMatchesQuery } from "@/lib/search/titleMatching";
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { compareImdbRatings } from "@/lib/userLists/imdbRatingSort";
-import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import HoverExpandCard, { HoverExpandZoom } from "@/components/ui/HoverExpandCard";
 import FlipReorder from "@/components/ui/FlipReorder";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
 import useCardEntrance from "@/hooks/useCardEntrance";
@@ -1769,7 +1769,9 @@ const WatchlistCard = memo(function WatchlistCard({
             className="group overflow-hidden rounded-lg bg-zinc-900 shadow-md"
             onMouseEnter={handleHover}
           >
-            <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+            <HoverExpandZoom>
+              <SmartPoster item={item} title={title} mode={effectiveImageMode} />
+            </HoverExpandZoom>
             <WatchlistHoverIndicator
               type={type}
               tmdbScore={item.vote_average}

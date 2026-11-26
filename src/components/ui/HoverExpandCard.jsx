@@ -361,3 +361,11 @@ export default function HoverExpandCard({
     </div>
   );
 }
+
+// Envoltorio de la IMAGEN de una tarjeta `HoverExpandCard`: al pasar el ratón,
+// la imagen se acerca un poco dentro de la tarjeta (zoom lento y suave, como en
+// las páginas de las secciones de los dashboards). Los indicadores van fuera
+// de él para no ampliarse. Ver `.zoom` en el CSS module.
+export function HoverExpandZoom({ className = "", children }) {
+  return <div className={`${styles.zoom} ${className}`}>{children}</div>;
+}

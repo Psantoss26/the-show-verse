@@ -8,7 +8,7 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { resolvePosterViewerState } from "./posterViewerState.mjs";
 import Stars from "./Stars";
-import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import HoverExpandCard, { HoverExpandZoom } from "@/components/ui/HoverExpandCard";
 import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 function tmdbPoster(path, size = "w342") {
@@ -124,20 +124,22 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
       >
 
         {/* Imagen del póster */}
-        {src && !failed ? (
-          <OptimizedImage
-            src={src}
-            alt={title}
-            className="h-full w-full object-cover"
-            loading="lazy"
-            draggable={false}
-            onError={() => setFailed(true)}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-zinc-700">
-            <ImageOff className="h-7 w-7 opacity-50" />
-          </div>
-        )}
+        <HoverExpandZoom>
+          {src && !failed ? (
+            <OptimizedImage
+              src={src}
+              alt={title}
+              className="h-full w-full object-cover"
+              loading="lazy"
+              draggable={false}
+              onError={() => setFailed(true)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-zinc-700">
+              <ImageOff className="h-7 w-7 opacity-50" />
+            </div>
+          )}
+        </HoverExpandZoom>
 
         {cornerOverlay}
 

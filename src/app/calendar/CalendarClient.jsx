@@ -69,7 +69,7 @@ import { usePageTitle } from "@/lib/hooks/usePageTitle";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useAuth } from "@/context/AuthContext";
-import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import HoverExpandCard, { HoverExpandZoom } from "@/components/ui/HoverExpandCard";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
@@ -529,12 +529,14 @@ const CalendarCompactCard = memo(function CalendarCompactCard({
           className="compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md"
         >
           <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
-            <TmdbPoster
-              path={item.posterPath}
-              artwork={{ type: item.artworkType, id: item.artworkId }}
-              alt={item.title}
-              className="w-full h-full object-cover"
-            />
+            <HoverExpandZoom>
+              <TmdbPoster
+                path={item.posterPath}
+                artwork={{ type: item.artworkType, id: item.artworkId }}
+                alt={item.title}
+                className="w-full h-full object-cover"
+              />
+            </HoverExpandZoom>
             <CalendarHoverIndicator
               kind={item.kind}
               dateParts={dateParts}

@@ -47,7 +47,7 @@ import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { pickLadderBackdrop, pickLadderPoster } from "@/lib/details/tmdbImages";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
-import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import HoverExpandCard, { HoverExpandZoom } from "@/components/ui/HoverExpandCard";
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
 import FlipReorder from "@/components/ui/FlipReorder";
@@ -886,7 +886,7 @@ function LibraryMediaCard({
             enabled={canOpen && enableHoverLift}
             onClick={openItem}
           >
-            {renderMedia()}
+            <HoverExpandZoom>{renderMedia()}</HoverExpandZoom>
             <LibraryHoverIndicator
               isMovie={isMovie}
               resolution={primaryRes}

@@ -54,3 +54,29 @@
     will-change: translate;
   }
 }
+
+/* ZOOM DE LA IMAGEN (`HoverExpandZoom`): además de ampliarse la tarjeta, la
+   imagen se acerca un 5% dentro de ella, lento y suave, como en las páginas
+   de las secciones de los dashboards (`group-hover:scale-105 duration-700`).
+   Va en un envoltorio y no en el <img>: las imágenes ya llevan su propia
+   transición (fundido al cargar, y en Historial también escala) y una
+   `transition` aquí la pisaría. Solo dentro de una tarjeta que se amplía, así
+   que las vistas de cuadrícula y lista que reutilizan el mismo póster no
+   cambian. */
+.zoom {
+  position: absolute;
+  inset: 0;
+  transition: transform 700ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .expand:hover .zoom {
+    transform: scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zoom {
+    transition: none;
+  }
+}

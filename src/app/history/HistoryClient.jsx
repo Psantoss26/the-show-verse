@@ -78,7 +78,7 @@ import {
   historyEpisodeStillSrcSet,
   readResolvedSeasonMetadata,
 } from "@/lib/history/episodeSeasonMetadata";
-import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import HoverExpandCard, { HoverExpandZoom } from "@/components/ui/HoverExpandCard";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { ControlledOptionsSheet, OptionsSheetTrigger, SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
@@ -2387,11 +2387,13 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
     >
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         {/* Póster o backdrop, según el modo de imagen (como en Favoritos). */}
-        {imageMode === "backdrop" ? (
-          <Backdrop entry={entry} className="w-full h-full" />
-        ) : (
-          <Poster entry={entry} className="w-full h-full" />
-        )}
+        <HoverExpandZoom>
+          {imageMode === "backdrop" ? (
+            <Backdrop entry={entry} className="w-full h-full" />
+          ) : (
+            <Poster entry={entry} className="w-full h-full" />
+          )}
+        </HoverExpandZoom>
 
         {isGroup && (
           <div className="absolute inset-x-0 top-0 z-10 h-20 pointer-events-none bg-gradient-to-b from-black/50 via-black/10 to-transparent" />

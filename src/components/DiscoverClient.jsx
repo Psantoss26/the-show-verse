@@ -17,7 +17,7 @@ import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { useAuth } from "@/context/AuthContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import PageStatCard from "@/components/ui/PageStatCard";
-import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import HoverExpandCard, { HoverExpandZoom } from "@/components/ui/HoverExpandCard";
 import MobileOptionsSheet, {
   SheetOption,
   SheetOptionGroup,
@@ -966,7 +966,7 @@ function DiscoverCard({
             cellClassName={aspectRatio}
             className="group overflow-hidden rounded-lg bg-zinc-900 shadow-md"
           >
-            {image}
+            <HoverExpandZoom>{image}</HoverExpandZoom>
             <DiscoverHoverIndicator
               type={type}
               tmdbScore={item.vote_average}
