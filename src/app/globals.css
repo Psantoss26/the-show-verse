@@ -4873,10 +4873,12 @@ html[data-details-sequence-transition] .sv-topbar {
   isolation: isolate;
 }
 
-/* El scroll de la tabla tiene 12px de margen a la izquierda (pl-3, compensado
-   con un margen negativo) y los funde: lo que pasa por ahí al deslizar, el
-   cristal y las casillas de detrás, se desvanece hacia el fondo del modal en
-   vez de cortarse en una línea. En reposo ese margen está vacío.
+/* El scroll de la tabla empieza en el borde izquierdo del modal (margen
+   negativo del relleno del cuerpo) y funde sus primeros 12px: lo que pasa por
+   ahí al deslizar, el cristal y las casillas de detrás, se desvanece hacia el
+   fondo del modal en vez de cortarse en una línea. La columna de etiquetas
+   ocupa todo el hueco desde ese borde hasta la primera casilla, así que E1,
+   E2… quedan centradas en él.
    A la derecha el scroll llega hasta el borde del modal (margen negativo del
    relleno del cuerpo, compensado con el mismo pr) y, mientras quede tabla por
    ver, las casillas se desvanecen en 28px contra ese borde; el fundido se
@@ -4918,9 +4920,9 @@ html[data-details-sequence-transition] .sv-topbar {
 .sv-ergrid-label::before {
   content: "";
   position: absolute;
-  /* La columna se fija al borde del contenido del scroll, 12px dentro de su
-     borde (sticky cuenta el pl-3), y el cristal se sale 16px a la izquierda: cubre ese margen, que .sv-ergrid-scroller funde
-     a transparente, así que su canto nunca se ve. */
+  /* La columna se fija al borde izquierdo del scroll, que .sv-ergrid-scroller
+     funde a transparente en 12px, así que el canto izquierdo del cristal
+     nunca se ve (sobra lo que se sale por la izquierda). */
   inset: -4px -24px -4px -16px;
   z-index: -1;
   pointer-events: none;

@@ -377,12 +377,12 @@ export default function EpisodeRatingsGrid({
     compact: {
       cell: "w-[54px] h-[36px] sm:w-[60px] sm:h-[40px] lg:w-[66px] lg:h-[43px]",
       headerPad: "px-0 py-1.5 sm:px-1",
-      stickyCol: "w-7 min-w-7 sm:w-9 sm:min-w-9 lg:w-10 lg:min-w-10",
+      stickyCol: "w-10 min-w-10 sm:w-[68px] sm:min-w-[68px] lg:w-[72px] lg:min-w-[72px]",
     },
     comfy: {
       cell: "w-[64px] h-[42px] sm:w-[70px] sm:h-[46px] lg:w-[78px] lg:h-[50px]",
       headerPad: "px-0 py-2 sm:px-1.5",
-      stickyCol: "w-8 min-w-8 sm:w-10 sm:min-w-10 lg:w-11 lg:min-w-11",
+      stickyCol: "w-11 min-w-11 sm:w-[72px] sm:min-w-[72px] lg:w-[76px] lg:min-w-[76px]",
     },
   };
   const SZ = SIZES[density] ?? SIZES.compact;
@@ -944,7 +944,7 @@ export default function EpisodeRatingsGrid({
   // =======================
   const renderGrid = () => (
     <div
-      className="sv-ergrid-scroller -ml-6 -mr-6 -mb-2 pl-3 pr-9 pb-2 overflow-x-auto overflow-y-visible [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:-ml-3 sm:-mr-8 sm:pr-8"
+      className="sv-ergrid-scroller -ml-6 -mr-6 -mb-2 pl-0 pr-9 pb-2 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:-ml-8 sm:-mr-8 sm:pr-8"
       style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
       <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed]">
@@ -1117,7 +1117,7 @@ export default function EpisodeRatingsGrid({
   // =======================
   const renderGridInverted = () => (
     <div
-      className="sv-ergrid-scroller -ml-6 -mr-6 -mb-2 pl-3 pr-9 pb-2 overflow-x-auto overflow-y-visible [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:-ml-3 sm:-mr-8 sm:pr-8"
+      className="sv-ergrid-scroller -ml-6 -mr-6 -mb-2 pl-0 pr-9 pb-2 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:-ml-8 sm:-mr-8 sm:pr-8"
       style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
       <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed]">
