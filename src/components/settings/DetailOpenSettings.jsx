@@ -156,7 +156,7 @@ export default function DetailOpenSettings({ uiSettings, disabled: disabledProp,
     <>
       <div className={`${panelClassName} group flex items-center justify-between gap-4 rounded-2xl p-4 sm:p-5`}>
         <div className="flex min-w-0 items-center gap-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-emerald-400">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-emerald-400 transition-all duration-300 group-hover:scale-105 group-hover:bg-white/10">
             <PanelsTopLeft className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0">
@@ -165,8 +165,9 @@ export default function DetailOpenSettings({ uiSettings, disabled: disabledProp,
           </div>
         </div>
         <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog"
-          className="min-h-9 shrink-0 rounded-full bg-white/[0.07] px-5 text-xs font-semibold text-emerald-200 transition-colors hover:bg-white/[0.12] focus-visible:outline-2 focus-visible:outline-emerald-400 sm:text-sm">
-          {t("settings_customize", "Personalizar")}
+          className="min-h-9 px-4 shrink-0 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition-all duration-200 flex items-center justify-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 active:scale-[0.98]">
+          {/* Mismo botón que las filas de Ajustes (SettingActionRow). */}
+          <span>{t("settings_customize", "Personalizar")}</span>
         </button>
       </div>
       <dialog ref={dialogRef} aria-labelledby={headingId} onClose={() => setOpen(false)}

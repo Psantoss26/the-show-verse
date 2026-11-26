@@ -286,7 +286,9 @@ function ToggleRow({ icon: Icon, title, description, checked, disabled: disabled
   );
 }
 
-function SettingActionRow({ icon: Icon, avatarSrc, avatarName, title, description, buttonLabel = "Cambiar", disabled: disabledProp, onClick }) {
+// `wrapDescription`: la descripción baja a varias líneas en vez de cortarse
+// con «…» cuando no cabe junto al botón (filas con texto explicativo).
+function SettingActionRow({ icon: Icon, avatarSrc, avatarName, title, description, buttonLabel = "Cambiar", disabled: disabledProp, onClick, wrapDescription = false }) {
   const online = useServerOnline();
   const disabled = disabledProp || !online;
   return (
@@ -310,7 +312,7 @@ function SettingActionRow({ icon: Icon, avatarSrc, avatarName, title, descriptio
         </div>
         <div className="min-w-0">
           <h3 className="text-sm font-bold text-white tracking-wide">{title}</h3>
-          <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed truncate max-w-md sm:max-w-xl">{description}</p>
+          <p className={`mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed ${wrapDescription ? "text-pretty" : "truncate max-w-md sm:max-w-xl"}`}>{description}</p>
         </div>
       </div>
       <button
@@ -2503,6 +2505,7 @@ function ProfileSettingsClient() {
                       buttonLabel={t("settings_customize", "Personalizar")}
                       disabled={saving}
                       onClick={() => setShowMobileBottomNavEditor(true)}
+                      wrapDescription
                     />
                     {/* Solo en la app de Android: se guarda en el dispositivo
                         (no en la cuenta) y se aplica al momento. */}

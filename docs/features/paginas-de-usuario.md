@@ -132,7 +132,7 @@ Los detalles de lista (listas propias, de la comunidad y colecciones) hacen lo m
 
 ### Cómo se abre una ficha (ajustes)
 
-En *Ajustes* (`DetailOpenSettings`) se elige:
+En *Ajustes* (`DetailOpenSettings`, una fila con el mismo aspecto que las demás de Preferencias: icono y botón «Personalizar» como `SettingActionRow`) se elige:
 
 - **Al seleccionar un título:** ficha rápida (panel) o ficha completa.
 - **Posición:** centrada o lateral; en lateral, superpuesta o acoplada.
