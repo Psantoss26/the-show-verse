@@ -13,8 +13,15 @@ test("Android tries the native account picker first and falls back to the browse
   assert.match(source, /await requestNativeGoogleIdToken\(\)/);
   assert.match(source, /appGoogleNextStep\(resultado\)/);
   // Cerrar el selector no abre el navegador; un fallo real, sí.
-  assert.match(source, /if \(paso === "stay"\) return;/);
+  assert.match(source, /if \(paso === "stay"\) \{/);
   assert.match(source, /abrirLoginEnNavegador\(\);/);
+});
+
+test("a second tap after a 'cancelled' picker skips it and opens the browser", async () => {
+  const source = await readFile(loginForm, "utf8");
+
+  assert.match(source, /nativoCanceladoRef\.current = true;/);
+  assert.match(source, /appGoogleShouldTryNative\(\{ cancelledBefore: nativoCanceladoRef\.current \}\)/);
 });
 
 test("the web uses Google's official button with the redirect as a fallback", async () => {

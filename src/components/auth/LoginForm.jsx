@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,7 +20,11 @@ import {
   useAndroidApp,
 } from "@/lib/android/appBridge";
 import GoogleSignInButton, { GoogleBrandButton } from "@/components/auth/GoogleSignInButton";
-import { appGoogleNextStep, googleRedirectHref } from "@/lib/auth/googleSignIn";
+import {
+  appGoogleNextStep,
+  appGoogleShouldTryNative,
+  googleRedirectHref,
+} from "@/lib/auth/googleSignIn";
 
 function sanitizeNextPath(value) {
   const next = value || "/";
@@ -117,6 +121,8 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
   // Canje del idToken de Google en curso: tapa el formulario con «Entrando con
   // Google…» hasta que la sesión está en el contexto y se navega.
   const [googleBusy, setGoogleBusy] = useState(false);
+  // El selector nativo ya volvió «cancelado» en este formulario.
+  const nativoCanceladoRef = useRef(false);
   const [err, setErr] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
@@ -183,6 +189,13 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
   const handleAppGoogleLogin = useCallback(async () => {
     if (googleBusy) return;
     setErr("");
+    // Tras un «cancelado», directo al navegador: en las APK antiguas eso es
+    // también el fallo tras elegir cuenta (ver appGoogleShouldTryNative).
+    if (!appGoogleShouldTryNative({ cancelledBefore: nativoCanceladoRef.current })) {
+      logToApp("Google: el selector nativo volvió cancelado, uso el navegador");
+      abrirLoginEnNavegador();
+      return;
+    }
     setGoogleBusy(true);
     const resultado = await requestNativeGoogleIdToken();
     const paso = appGoogleNextStep(resultado);
@@ -192,7 +205,10 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
       return;
     }
     setGoogleBusy(false);
-    if (paso === "stay") return;
+    if (paso === "stay") {
+      nativoCanceladoRef.current = true;
+      return;
+    }
     logToApp(`Google: selector nativo no disponible (${resultado?.error || "?"}), uso el navegador`);
     abrirLoginEnNavegador();
   }, [abrirLoginEnNavegador, entrarConIdToken, googleBusy]);

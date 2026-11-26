@@ -144,6 +144,16 @@ Android exista, el sistema da un error de configuración y la app recuerda
 falta borrar los datos de la app. «Sin cuentas en el teléfono»
 (`NoCredentialException`) no cuenta como fallo de configuración.
 
+**Ojo: «cancelado» no siempre lo es.** Sin el cliente Android, el selector se
+abre, eliges cuenta y Credential Manager responde con la misma excepción que
+al cerrarlo (`GetCredentialCancellationException`: «[16] Account reauth
+failed»). `GoogleCancelacion.esDelUsuario` mira el mensaje y lo trata como
+fallo de configuración (`account_reauth_failed` → camino 2). Para las APK
+instaladas antes de ese arreglo, la web hace de red: tras un «cancelado», el
+siguiente toque del botón va directo al camino 2
+(`appGoogleShouldTryNative`). Antes, el formulario se quedaba igual tras elegir
+cuenta en cada intento.
+
 **2) Navegador + vuelta a la app (respaldo).** El botón navega a
 `/api/auth/google/start`, que detecta la app por el User-Agent
 (`TheShowVerseApp/`) y marca el `state` con el prefijo `android.`. Al volver de

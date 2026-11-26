@@ -92,6 +92,17 @@ export function appGoogleNextStep(result) {
   return "browser";
 }
 
+/**
+ * ¿Abrir el selector nativo al pulsar el botón de la app? No si ya volvió
+ * «cancelado» en este formulario. Las APK anteriores a este arreglo dan por
+ * cancelación el fallo que llega tras ELEGIR cuenta sin cliente OAuth de
+ * Android («[16] Account reauth failed»), y el formulario se quedaba igual en
+ * cada intento. Desde el segundo intento se va directo al login en el navegador.
+ */
+export function appGoogleShouldTryNative({ cancelledBefore = false } = {}) {
+  return !cancelledBefore;
+}
+
 let gisPromise = null;
 
 /**

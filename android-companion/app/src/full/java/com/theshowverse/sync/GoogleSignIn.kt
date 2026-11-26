@@ -121,9 +121,16 @@ object GoogleSignIn {
                 override fun onError(e: GetCredentialException) {
                     val resultado = when (e) {
                         // El usuario cerró el selector: NO es un error que deba
-                        // provocar el salto al navegador.
+                        // provocar el salto al navegador. Pero la misma excepción
+                        // llega tras ELEGIR cuenta cuando Google no puede emitir
+                        // el token («[16] Account reauth failed»): eso es un
+                        // fallo de configuración y va al navegador.
                         is GetCredentialCancellationException ->
-                            Result(ok = false, cancelled = true)
+                            if (GoogleCancelacion.esDelUsuario(e.message)) {
+                                Result(ok = false, cancelled = true)
+                            } else {
+                                Result(ok = false, error = "account_reauth_failed")
+                            }
                         // Sin cuentas o sin servicios de Google: la web ofrece el
                         // flujo por navegador.
                         is NoCredentialException ->
@@ -139,7 +146,7 @@ object GoogleSignIn {
                     // Sin cuentas en el teléfono NO es configuración: al añadir
                     // una, el selector debe volver a aparecer.
                     if (resultado.cancelled) {
-                        prefs.addLog("Google: cancelado por el usuario")
+                        prefs.addLog("Google: cancelado por el usuario (${e.message ?: "sin detalle"})")
                     } else {
                         prefs.addLog("Google: ✗ ${e.type.ifBlank { e.javaClass.simpleName }} — ${e.message ?: "sin detalle"}")
                         if (e !is NoCredentialException) prefs.nativeGoogleUnavailable = true
