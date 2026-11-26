@@ -4862,9 +4862,43 @@ html[data-details-sequence-transition] .sv-topbar {
 /* El scroll de la tabla tiene 12px de margen a la izquierda (pl-3, compensado
    con un margen negativo) y los funde: lo que pasa por ahí al deslizar, el
    cristal y las casillas de detrás, se desvanece hacia el fondo del modal en
-   vez de cortarse en una línea. En reposo ese margen está vacío. */
+   vez de cortarse en una línea. En reposo ese margen está vacío.
+   A la derecha el scroll llega hasta el borde del modal (margen negativo del
+   relleno del cuerpo, compensado con el mismo pr) y, mientras quede tabla por
+   ver, las casillas se desvanecen en 28px contra ese borde; el fundido se
+   retira en los últimos 32px de desplazamiento, así que al final la última
+   columna queda nítida donde acababa antes. */
+@property --sv-ergrid-fade-right {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
 .sv-ergrid-scroller {
-  mask-image: linear-gradient(to right, transparent 0, #000 12px);
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - var(--sv-ergrid-fade-right)),
+    transparent 100%
+  );
+}
+
+@supports ((animation-timeline: scroll()) and (animation-range: 0% 100%)) {
+  .sv-ergrid-scroller {
+    animation: sv-ergrid-fade-right-out linear both;
+    animation-timeline: scroll(self inline);
+    animation-range: calc(100% - 32px) 100%;
+  }
+}
+
+@keyframes sv-ergrid-fade-right-out {
+  from {
+    --sv-ergrid-fade-right: 28px;
+  }
+  to {
+    --sv-ergrid-fade-right: 0px;
+  }
 }
 
 .sv-ergrid-label::before {
@@ -4932,40 +4966,45 @@ html[data-details-sequence-transition] .sv-topbar {
   }
 }
 
-/* Cuerpo con scroll vertical del modal de valoración de episodios: al bajar,
+/* Cuerpo con scroll vertical de los modales (compartido: valoración de
+   episodios, listas, enlaces, compartir, vistas laterales, historial…). Nació
+   en el modal de valoración de episodios: al bajar,
    el contenido se desvanece contra la cabecera en vez de cortarse en seco (se
    notaba sobre todo en la franja de cristal de la columna de episodios), y lo
    mismo abajo mientras quede tabla por ver. El fundido crece con el
    desplazamiento: arriba del todo y al final no hay ninguno. La máscara hace
    de este cuerpo la raíz del cristal de la columna, que solo necesita
    difuminar las casillas, que están dentro. */
-@property --sv-erm-fade-top {
+@property --sv-modal-fade-top {
   syntax: "<length>";
   inherits: false;
   initial-value: 0px;
 }
 
-@property --sv-erm-fade-bottom {
+@property --sv-modal-fade-bottom {
   syntax: "<length>";
   inherits: false;
   initial-value: 0px;
 }
 
-.sv-erm-scroll-fade {
+.sv-modal-scroll-fade {
   mask-image: linear-gradient(
     to bottom,
     transparent 0,
-    #000 var(--sv-erm-fade-top),
-    #000 calc(100% - var(--sv-erm-fade-bottom)),
+    #000 max(var(--sv-modal-fade-floor, 0px), var(--sv-modal-fade-top)),
+    #000 calc(100% - var(--sv-modal-fade-bottom)),
     transparent 100%
   );
 }
 
+/* `--sv-modal-fade-floor`: fundido superior mínimo aunque no haya scroll, para
+   cuerpos que suben por debajo de la cabecera (TraktWatchedModal). */
+
 @supports ((animation-timeline: scroll()) and (animation-range: 0% 100%)) {
-  .sv-erm-scroll-fade {
+  .sv-modal-scroll-fade {
     animation:
-      sv-erm-fade-top-in linear both,
-      sv-erm-fade-bottom-out linear both;
+      sv-modal-fade-top-in linear both,
+      sv-modal-fade-bottom-out linear both;
     animation-timeline: scroll(self block), scroll(self block);
     animation-range:
       0px 32px,
@@ -4973,20 +5012,20 @@ html[data-details-sequence-transition] .sv-topbar {
   }
 }
 
-@keyframes sv-erm-fade-top-in {
+@keyframes sv-modal-fade-top-in {
   from {
-    --sv-erm-fade-top: 0px;
+    --sv-modal-fade-top: 0px;
   }
   to {
-    --sv-erm-fade-top: 28px;
+    --sv-modal-fade-top: 28px;
   }
 }
 
-@keyframes sv-erm-fade-bottom-out {
+@keyframes sv-modal-fade-bottom-out {
   from {
-    --sv-erm-fade-bottom: 28px;
+    --sv-modal-fade-bottom: 28px;
   }
   to {
-    --sv-erm-fade-bottom: 0px;
+    --sv-modal-fade-bottom: 0px;
   }
 }

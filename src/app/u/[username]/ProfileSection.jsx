@@ -1459,7 +1459,7 @@ function DiaryGroupedEpisodesModal({ entry, onClose }) {
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:py-6">
+        <div className="sv-modal-scroll-fade min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:py-6">
           {episodes.map((episode, index) => {
             const episodeMeta = getDiaryEpisode(episode);
             const stillPath = episodeMeta

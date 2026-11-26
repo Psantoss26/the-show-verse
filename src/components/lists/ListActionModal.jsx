@@ -81,7 +81,7 @@ export default function ListActionModal({ open, onClose, title, subtitle, footer
                     </button>
                 </div>
 
-                <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 sm:px-8 ${THIN_SCROLLBAR}`}>
+                <div className={`sv-modal-scroll-fade min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 sm:px-8 ${THIN_SCROLLBAR}`}>
                     {children}
                 </div>
 

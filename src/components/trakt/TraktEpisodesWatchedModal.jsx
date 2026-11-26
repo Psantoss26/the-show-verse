@@ -2020,10 +2020,16 @@ export default function TraktEpisodesWatchedModal({
                   así que pintaba una franja más oscura detrás de los botones.
                   La fila no se superpone a nada (la lista se desplaza debajo),
                   así que solo quedan los botones sobre el fondo del modal. */}
-              <div className="w-full shrink-0 overflow-x-auto no-scrollbar md:hidden">
+              {/* El scroll horizontal recorta también en vertical: el halo
+                  (`shadow-lg`) de la temporada elegida baja ~22px y con `pb-3`
+                  se cortaba en una línea. La fila deja 24px abajo y 4px arriba
+                  y los devuelve con márgenes negativos: la lista de episodios
+                  arranca donde antes y su relleno superior (vacío) queda bajo
+                  el halo. `relative z-10` lo pinta encima de la lista. */}
+              <div className="relative z-10 -mt-1 -mb-3 w-full shrink-0 overflow-x-auto no-scrollbar md:hidden">
                 {/* Mismo margen lateral (16px) que la barra de herramientas y la
                     lista de episodios: las tres zonas arrancan alineadas. */}
-                <div className="flex min-w-max gap-2 px-4 pb-3 pt-0">
+                <div className="flex min-w-max gap-2 px-4 pb-6 pt-1">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
                     const active = sn === selectedSn;
@@ -2056,7 +2062,7 @@ export default function TraktEpisodesWatchedModal({
                 onTouchCancel={() => {
                   seasonSwipeStartRef.current = null;
                 }}
-                className="relative flex-1 overflow-y-auto scroll-smooth p-4 pb-6 touch-pan-y no-scrollbar sm:pb-4 md:touch-auto"
+                className="sv-modal-scroll-fade relative flex-1 overflow-y-auto scroll-smooth p-4 pb-6 touch-pan-y no-scrollbar sm:pb-4 md:touch-auto"
               >
                 {/* Temporada elegida aún cargando con la anterior ya fuera. */}
                 {!seasonExitPending &&

@@ -746,7 +746,7 @@ export default function DetailsShareSheet({
           </button>
         </div>
 
-        <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto px-6 pt-2 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div ref={bodyRef} className="sv-modal-scroll-fade min-h-0 flex-1 overflow-y-auto px-6 pt-2 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {showModeSwitch && <ModeSwitch mode={mode} onChange={changeMode} />}
 
           {/* Vista previa: lo que se va a compartir, sin marco. */}

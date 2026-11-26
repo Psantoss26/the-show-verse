@@ -366,7 +366,7 @@ export default function SectionSheet({
             No aplana el cristal: eso lo hace `opacity`, no `transform`. */}
         {/* Anclado bajo el menú, la barra inferior flota encima del panel: el
             final de la lista deja su hueco para no quedar debajo. */}
-        <div className={`details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,var(--sv-safe-bottom,0px))] pt-1 will-change-transform sm:px-6`}>
+        <div className={`details-sheet-scroll sv-modal-scroll-fade min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,var(--sv-safe-bottom,0px))] pt-1 will-change-transform sm:px-6`}>
           {children}
         </div>
 

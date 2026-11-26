@@ -374,7 +374,7 @@ export function FollowingActivityModal({ open, onClose, data, mediaType }) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 pb-8 sm:px-8">
+        <div className="sv-modal-scroll-fade flex-1 overflow-y-auto p-6 pb-8 sm:px-8">
           <ul className="space-y-2">
             {data.items.map((item) => (
               <PersonRow key={item.user.username} item={item} mediaType={mediaType} onNavigate={onClose} />

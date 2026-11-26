@@ -1839,7 +1839,7 @@ function AddProgressModal({ existingKeys, onAdded, onClose }) {
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-8 sm:pb-8 sm:pt-6">
+        <div className="sv-modal-scroll-fade min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-8 sm:pb-8 sm:pt-6">
           {selected ? (
             <AddProgressConfig
               item={selected}

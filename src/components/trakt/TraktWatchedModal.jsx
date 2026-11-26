@@ -413,7 +413,7 @@ export default function TraktWatchedModal({
             cabe dentro del área con scroll en vez de cortarse en una línea
             recta. La máscara funde esa franja de 32 px: el halo se apaga sin
             borde y el contenido desplazado se desvanece bajo el título. */}
-        <div className="-mt-8 flex-1 overflow-y-auto custom-scrollbar p-6 pt-9 space-y-8 [mask-image:linear-gradient(to_bottom,transparent,black_2rem)]">
+        <div className="sv-modal-scroll-fade [--sv-modal-fade-floor:2rem] -mt-8 flex-1 overflow-y-auto custom-scrollbar p-6 pt-9 space-y-8">
           {/* SECCIÓN 1: AÑADIR NUEVO (Hero Section) */}
           <div className="relative group">
             <div className="absolute -inset-2 rounded-3xl bg-gradient-to-b from-emerald-400/15 to-transparent opacity-0 blur-lg transition duration-500 group-hover:opacity-100" />

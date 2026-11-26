@@ -384,7 +384,7 @@ export default function MobileOptionsSheet({
         </header>
 
         <div
-          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+          className={`sv-modal-scroll-fade min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
             footer ? "pb-5" : "pb-[max(1.5rem,calc(var(--sv-safe-bottom,0px)+1rem))]"
           }`}
         >

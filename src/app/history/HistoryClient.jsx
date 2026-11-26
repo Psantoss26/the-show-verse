@@ -2934,7 +2934,7 @@ function ExpandedGroupPanel({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:py-6">
+        <div className="sv-modal-scroll-fade min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:py-6">
           {episodes.map((ep, idx) => {
             const episodeMeta = getEpisodeMeta(ep);
             const localizedMetadata = episodeMeta
@@ -3035,7 +3035,7 @@ function MobileDayTitlesModal({ dayKey, items, onClose }) {
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-4 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-6 sm:py-5">
+        <div className="sv-modal-scroll-fade min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain p-4 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-6 sm:py-5">
           <DayItemsList items={items} />
         </div>
       </motion.section>

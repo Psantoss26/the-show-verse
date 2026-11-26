@@ -109,7 +109,7 @@ export default function ExternalLinksModal({
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 pb-8 sm:px-8">
+                        <div className="sv-modal-scroll-fade flex-1 overflow-y-auto p-6 pb-8 sm:px-8">
                             {loading && (
                                 <p role="status" className="mb-4 text-center text-sm font-medium text-zinc-400">
                                     {isPlatformsMode ? 'Cargando plataformas disponibles…' : 'Cargando enlaces…'}

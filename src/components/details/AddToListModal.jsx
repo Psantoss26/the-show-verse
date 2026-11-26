@@ -131,7 +131,7 @@ export default function AddToListModal(props) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 sm:px-8 pb-8 space-y-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="sv-modal-scroll-fade flex-1 overflow-y-auto p-6 sm:px-8 pb-8 space-y-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {/* Resumen: ya está en... */}
           {addedLists.length > 0 && (
             <div className="rounded-2xl bg-emerald-500/[0.04] p-4">
