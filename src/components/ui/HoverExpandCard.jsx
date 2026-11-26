@@ -71,12 +71,18 @@ import {
 // misma celda (la escala no le llega), y se desplaza con `translate` a la
 // esquina de la tarjeta ampliada con la MISMA duración y curva: la esquina de
 // una caja escalada desde su centro avanza en línea recta con la escala, así
-// que las dos transiciones coinciden en cada fotograma, también en el rebote.
+// que las dos transiciones coinciden en cada fotograma.
 
 const EXPAND = 1.15;
+// Acercamiento de la imagen dentro de la tarjeta (`HoverExpandZoom`), el mismo
+// que `--sv-zoom` en `.zoom` del CSS module.
+const ZOOM = 1.05;
 const DURATION_MS = 360;
-// Leve rebote, como el muelle que tenía la versión con Framer Motion.
-const EASING = "cubic-bezier(0.34, 1.25, 0.64, 1)";
+// SIN REBOTE. Con un muelle que pasaba de 1 la tarjeta se ampliaba MÁS que su
+// tamaño pintado: la capa se estiraba (borrosa) y volvía a 1 (nítida) dos veces
+// en el último tramo, y el texto de los pósteres parecía vibrar. Medido
+// fotograma a fotograma: con esta curva la nitidez solo sube.
+const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 // Crecimiento en píxeles ENTEROS por lado, a partir del tamaño real de la celda,
 // y la escala que devuelve la tarjeta ampliada al tamaño exacto de la celda.
@@ -274,7 +280,9 @@ export default function HoverExpandCard({
       deferred = false;
       const width = (cellWidth || cell.offsetWidth) * (enabled ? EXPAND : 1);
       card.querySelectorAll("img").forEach((img) => {
-        applyTmdbResponsiveImage(img, width);
+        // Dentro del zoom la imagen se maqueta un 5% más grande (ver `.zoom`).
+        const zoomed = enabled && img.closest(`.${styles.zoom}`);
+        applyTmdbResponsiveImage(img, zoomed ? width * ZOOM : width);
       });
     };
     const schedule = () => {

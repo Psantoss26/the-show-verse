@@ -43,12 +43,12 @@ function FilmographyRow({ item, department, watched, onNavigate }) {
       className="group/row flex items-center gap-3 rounded-2xl p-2 transition-colors hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
     >
       {/* 56px de ancho y esquinas apenas redondeadas: el póster se ve entero. */}
-      <span className="flex aspect-[2/3] w-14 shrink-0 items-center justify-center overflow-hidden rounded-[5px] bg-zinc-900 shadow-md">
+      <span className="relative flex aspect-[2/3] w-14 shrink-0 items-center justify-center overflow-hidden rounded-[5px] bg-zinc-900 shadow-md">
         {poster ? (
           <OptimizedImage
             src={poster}
             alt=""
-            className="h-full w-full object-cover transition-transform duration-500 group-hover/row:scale-105"
+            className="h-full w-full object-cover transition-transform duration-500 sv-crisp-zoom group-hover/row:scale-100"
             loading="lazy"
             decoding="async"
           />

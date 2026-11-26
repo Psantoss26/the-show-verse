@@ -921,7 +921,7 @@ const ProgressCard = memo(function ProgressCard({
           }}
         >
           <div className="relative aspect-video overflow-hidden">
-            <SmartImage item={item} kind="backdrop" alt={title} imgClassName="transition-transform duration-500 group-hover:scale-105" />
+            <SmartImage item={item} kind="backdrop" alt={title} imgClassName="transition-transform duration-500 sv-crisp-zoom group-hover:scale-100" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/15 to-transparent" />
             <div className="absolute top-3 right-3">
               {canDelete ? (

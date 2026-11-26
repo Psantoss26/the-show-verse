@@ -11884,7 +11884,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                                     alt={actor.name}
                                     {...detailsRowImageLoading(actorIndex)}
-                                    className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
+                                    className="w-full h-full object-cover transition-transform duration-500 ease-out sv-crisp-zoom [--sv-zoom:1.1] group-hover:scale-100 grayscale-[15%] group-hover:grayscale-0"
                                   />
                                 ) : (
                                   <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
@@ -11984,7 +11984,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             ? "block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"
                             : "block relative bg-zinc-900 rounded-xl overflow-hidden shadow-md";
                           const recImageClass = enableHover
-                            ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+                            ? "w-full h-full object-cover transition-transform duration-500 ease-out sv-crisp-zoom [--sv-zoom:1.1] group-hover:scale-100"
                             : "w-full h-full object-cover";
 
                           return (
@@ -12113,7 +12113,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             ? "block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"
                             : "block relative bg-zinc-900 rounded-xl overflow-hidden shadow-md";
                           const colImageClass = enableHover
-                            ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+                            ? "w-full h-full object-cover transition-transform duration-500 ease-out sv-crisp-zoom [--sv-zoom:1.1] group-hover:scale-100"
                             : "w-full h-full object-cover";
 
                           return (
@@ -12672,8 +12672,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           }}
                                         >
                                           <div
-                                            className={`relative w-full overflow-hidden ${aspect} ${isLogoTab ? "bg-gradient-to-br from-white/10 via-black/50 to-black/70 p-4" : "bg-black/40"}`}
+                                            className={`relative w-full overflow-hidden ${aspect} ${isLogoTab ? "bg-gradient-to-br from-white/10 via-black/50 to-black/70" : "bg-black/40"}`}
                                           >
+                                            {/* Relleno de los logos en el
+                                                envoltorio: `sv-crisp-zoom`
+                                                ignora el `p-4` del padre. */}
+                                            <div
+                                              className={`absolute ${isLogoTab ? "inset-4" : "inset-0"}`}
+                                            >
                                             <OptimizedImage
                                               src={imgSrc}
                                               srcSet={imgSrcSet}
@@ -12686,9 +12692,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 isPriority ? "high" : undefined
                                               }
                                               decoding="async"
-                                              className={`w-full h-full ${isLogoTab ? "object-contain" : "object-cover"} transition-transform duration-500 ease-out transform-gpu
-                            group-hover:scale-[1.08]`}
+                                              className={`w-full h-full ${isLogoTab ? "object-contain" : "object-cover"} transition-transform duration-500 ease-out
+                            sv-crisp-zoom [--sv-zoom:1.08] group-hover:scale-100`}
                                             />
+                                            </div>
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                                           </div>
 
@@ -12820,7 +12827,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         <OptimizedImage
                                           src={thumb || fallback}
                                           alt={v.name || "Video"}
-                                          className="w-full h-full object-cover transform-gpu scale-100 transition-transform duration-500 group-hover:scale-[1.05] motion-reduce:transition-none"
+                                          className="w-full h-full object-cover transition-transform duration-500 sv-crisp-zoom group-hover:scale-100 motion-reduce:transition-none"
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                                         <div className="absolute inset-0 flex items-center justify-center">
@@ -13017,7 +13024,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           loading="lazy"
                                           decoding="async"
                                           fetchPriority="low"
-                                          className="absolute inset-0 w-full h-full object-contain transform-gpu scale-100 transition-transform duration-500 group-hover:scale-[1.05] drop-shadow-2xl motion-reduce:transition-none"
+                                          className="absolute inset-0 w-full h-full object-contain transition-transform duration-500 sv-crisp-zoom group-hover:scale-100 drop-shadow-2xl motion-reduce:transition-none"
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent pointer-events-none" />
                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

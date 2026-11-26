@@ -1114,7 +1114,7 @@ const InProgressCard = memo(function InProgressCard({
             <SmartBackdrop
               item={item}
               title={title}
-              imgClassName="transition-transform duration-500 group-hover:scale-105"
+              imgClassName="transition-transform duration-500 sv-crisp-zoom group-hover:scale-100"
             />
 
             {/* Gradient overlay softened to reduce cover darkening */}

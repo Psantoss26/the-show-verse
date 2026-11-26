@@ -83,7 +83,7 @@ export default function EpisodeCard({
               // Se pide ~1,5× para que se vea nítida.
               sizes="(min-width: 640px) 480px, 240px"
               alt=""
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+              className="h-full w-full object-cover transition-transform duration-500 sv-crisp-zoom [--sv-zoom:1.04] group-hover:scale-100"
               loading="lazy"
               decoding="async"
             />

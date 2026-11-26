@@ -5059,3 +5059,35 @@ html[data-details-sequence-transition] .sv-topbar {
     --sv-modal-fade-bottom: 0px;
   }
 }
+
+/* ZOOM NÍTIDO AL PASAR EL RATÓN (`sv-crisp-zoom`).
+   Con `group-hover:scale-105` la imagen se pintaba a su tamaño y se ESTIRABA
+   durante la transición: el texto de los pósteres se veía blando, parecía
+   vibrar y al terminar se volvía a pintar nítido de golpe (medido fotograma a
+   fotograma). Aquí es al revés: la imagen se maqueta YA ampliada (`--sv-zoom`,
+   por defecto 1.05), en reposo se reduce al tamaño de su caja y al pasar el
+   ratón vuelve a 1: solo se reduce una imagen pintada en grande, nunca se
+   amplía. Uso: `sv-crisp-zoom group-hover:scale-100` (y `[--sv-zoom:1.1]`
+   para otro acercamiento) dentro de una caja con `relative overflow-hidden`.
+   Sin `transform-gpu` ni `will-change`: fijarían la capa a la escala de reposo
+   y al ampliar se estiraría otra vez.
+   Dos reglas: el tamaño y la posición SIN capa, para ganar a `h-full w-full`
+   o `absolute inset-0` que ya lleve la imagen; el acercamiento y la escala de
+   reposo en `@layer base`, para que `[--sv-zoom:…]` y la `scale-100` del
+   hover (utilidades) les ganen. */
+.sv-crisp-zoom {
+  position: absolute;
+  inset: auto;
+  left: calc((1 - var(--sv-zoom)) * 50%);
+  top: calc((1 - var(--sv-zoom)) * 50%);
+  width: calc(var(--sv-zoom) * 100%);
+  height: calc(var(--sv-zoom) * 100%);
+  max-width: none;
+}
+
+@layer base {
+  .sv-crisp-zoom {
+    --sv-zoom: 1.05;
+    scale: calc(1 / var(--sv-zoom));
+  }
+}

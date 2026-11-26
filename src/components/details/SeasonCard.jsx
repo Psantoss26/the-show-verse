@@ -37,10 +37,17 @@ const LAZY_IMAGE = { loading: "lazy" };
 // `scale`, no `transform`. Con `transition-[opacity,transform]` el zoom del
 // hover saltaba de golpe en los pósters recién cargados, y solo iba suave en
 // los que salían de caché (`transition-transform` sí incluye `scale`).
-function posterRevealClass({ ready, instant }, hoverScale) {
+// `hoverZoom`: acercamiento al pasar el ratón (`sv-crisp-zoom`, globals.css),
+// o nada. Con zoom, la escala de reposo es la de la utilidad (1/zoom) y la
+// entrada parte de un 3% más que ella.
+function posterRevealClass({ ready, instant }, hoverZoom) {
   const motion = instant ? "transition-transform duration-500" : "transition-[opacity,transform,scale] duration-500";
-  const state = ready ? `opacity-100 scale-100 ${hoverScale}` : "opacity-0 scale-[1.03]";
-  return `${motion} ease-out ${state}`;
+  if (!hoverZoom) {
+    const state = ready ? "opacity-100 scale-100" : "opacity-0 scale-[1.03]";
+    return `${motion} ease-out ${state}`;
+  }
+  const state = ready ? "opacity-100 group-hover:scale-100" : "opacity-0 scale-[calc(1.03/var(--sv-zoom))]";
+  return `${motion} ease-out sv-crisp-zoom ${hoverZoom} ${state}`;
 }
 
 /**
@@ -126,7 +133,7 @@ export default function SeasonCard({
   const posterSrc = poster ? `https://image.tmdb.org/t/p/w342${poster}` : null;
   const posterLoad = useImageLoadReady(posterSrc);
   const { imgRef: posterRef, onLoad: onPosterLoad } = posterLoad;
-  const posterClass = posterRevealClass(posterLoad, enableHover ? "group-hover:scale-[1.04]" : "");
+  const posterClass = posterRevealClass(posterLoad, enableHover ? "[--sv-zoom:1.04]" : "");
   const isSpecials = Number(seasonNumber) === 0;
   const title = isSpecials ? "Especiales" : `Temporada ${seasonNumber}`;
   const subtitle = seasonSubtitle(name, title);
@@ -297,7 +304,7 @@ export function SeasonPosterCard({
   const posterSrc = poster ? `https://image.tmdb.org/t/p/w342${poster}` : null;
   const posterLoad = useImageLoadReady(posterSrc);
   const { imgRef: posterRef, onLoad: onPosterLoad } = posterLoad;
-  const posterClass = posterRevealClass(posterLoad, enableHover ? "group-hover:scale-110" : "");
+  const posterClass = posterRevealClass(posterLoad, enableHover ? "[--sv-zoom:1.1]" : "");
 
   // Solo el póster; el progreso va DEBAJO, fuera de la imagen, como en
   // «Continuar viendo» del dashboard.

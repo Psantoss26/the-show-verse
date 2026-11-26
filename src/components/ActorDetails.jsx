@@ -1403,7 +1403,7 @@ function PosterCard({
           <OptimizedImage
             src={poster}
             alt={title}
-            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+            className="w-full h-full object-cover transition-transform duration-500 ease-out sv-crisp-zoom [--sv-zoom:1.1] group-hover:scale-100"
             loading="lazy"
             decoding="async"
             onError={() => setErr(true)}
@@ -1573,7 +1573,7 @@ function PhotoCard({ image }) {
       <OptimizedImage
         src={tmdbImg(image.file_path, "w500")}
         alt=""
-        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+        className="h-full w-full object-cover transition-transform duration-500 sv-crisp-zoom [--sv-zoom:1.06] group-hover:scale-100"
         loading="lazy"
         decoding="async"
       />
@@ -1765,7 +1765,7 @@ function TaggedMediaCard({ image, width, height }) {
       <OptimizedImage
         src={tmdbImg(image.file_path, "w780")}
         alt=""
-        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+        className="h-full w-full object-cover transition-transform duration-500 sv-crisp-zoom [--sv-zoom:1.06] group-hover:scale-100"
         loading="lazy"
         decoding="async"
       />

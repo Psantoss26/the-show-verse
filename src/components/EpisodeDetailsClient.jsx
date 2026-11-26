@@ -2219,7 +2219,7 @@ export default function EpisodeDetailsClient({
                           <OptimizedImage
                             src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                             alt={actor.name}
-                            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
+                            className="w-full h-full object-cover transition-transform duration-500 ease-out sv-crisp-zoom [--sv-zoom:1.1] group-hover:scale-100 grayscale-[15%] group-hover:grayscale-0"
                           />
                         ) : (
                           <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
@@ -2273,7 +2273,7 @@ export default function EpisodeDetailsClient({
                           <OptimizedImage
                             src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                             alt={actor.name}
-                            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
+                            className="w-full h-full object-cover transition-transform duration-500 ease-out sv-crisp-zoom [--sv-zoom:1.1] group-hover:scale-100 grayscale-[15%] group-hover:grayscale-0"
                           />
                         ) : (
                           <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">

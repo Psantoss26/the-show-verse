@@ -128,6 +128,7 @@ import {
   preparePreviewBackdrop,
 } from "@/lib/dashboard/media";
 import { fadeInUp, staggerContainer, scaleIn } from "@/lib/motion/revealVariants";
+import { CRISP_ZOOM_FILL_STYLE } from "@/lib/ui/crispZoom";
 import {
   rowSwiperKeySuffix,
   rowSwiperScrollProps,
@@ -3369,11 +3370,12 @@ function TopRatedHero({
                           fill
                           className={`rounded-xl ${
                             isMobile ? "object-contain" : "object-cover"
-                          } transition-[opacity,transform,scale] duration-700 ease-out group-hover/hero:scale-105 ${
+                          } sv-crisp-zoom transition-[opacity,transform,scale] duration-700 ease-out group-hover/hero:scale-100 ${
                             heroExtraBackdrop
                               ? "group-hover/hero:opacity-0"
                               : ""
                           } motion-reduce:transition-none`}
+                          style={CRISP_ZOOM_FILL_STYLE}
                           {...(index === 0
                             ? { priority: true, fetchPriority: "high" }
                             : {
@@ -3390,7 +3392,8 @@ function TopRatedHero({
                             fill
                             className={`rounded-xl ${
                               isMobile ? "object-contain" : "object-cover"
-                            } opacity-0 transition-[opacity,transform,scale] duration-700 ease-out group-hover/hero:scale-105 group-hover/hero:opacity-100 motion-reduce:transition-none`}
+                            } sv-crisp-zoom opacity-0 transition-[opacity,transform,scale] duration-700 ease-out group-hover/hero:scale-100 group-hover/hero:opacity-100 motion-reduce:transition-none`}
+                            style={CRISP_ZOOM_FILL_STYLE}
                             loading={
                               index < (isMobile ? 1 : 3) ? "eager" : "lazy"
                             }

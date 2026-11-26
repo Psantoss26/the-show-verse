@@ -700,19 +700,24 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                     }`}
                   >
                     <span
-                      className={`block ${gridIsPoster ? "aspect-[2/3]" : "aspect-video"} ${
-                        gridIsLogo ? "bg-[repeating-conic-gradient(#27272a_0%_25%,#18181b_0%_50%)] bg-[length:16px_16px] p-4" : ""
+                      className={`relative block overflow-hidden ${gridIsPoster ? "aspect-[2/3]" : "aspect-video"} ${
+                        gridIsLogo ? "bg-[repeating-conic-gradient(#27272a_0%_25%,#18181b_0%_50%)] bg-[length:16px_16px]" : ""
                       }`}
                     >
+                      {/* El relleno de los logos va en este envoltorio: la
+                          imagen de `sv-crisp-zoom` se coloca en % de la caja
+                          de relleno de su padre e ignoraría un `p-4`. */}
+                      <span className={`absolute block ${gridIsLogo ? "inset-4" : "inset-0"}`}>
                       <OptimizedImage
                         src={card.src}
                         srcSet={card.srcSet}
                         sizes={card.sizes}
                         alt=""
-                        className={`h-full w-full ${gridIsLogo ? "object-contain" : "object-cover"} transition-transform duration-500 group-hover/img:scale-[1.03]`}
+                        className={`h-full w-full ${gridIsLogo ? "object-contain" : "object-cover"} transition-transform duration-500 sv-crisp-zoom [--sv-zoom:1.03] group-hover/img:scale-100`}
                         loading="lazy"
                         decoding="async"
                       />
+                      </span>
                     </span>
                     {active || isDefault ? (
                       <span aria-hidden="true" className="absolute left-2 top-2 flex max-w-[calc(100%-2.5rem)] items-center gap-1">

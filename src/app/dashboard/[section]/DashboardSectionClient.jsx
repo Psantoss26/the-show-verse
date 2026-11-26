@@ -374,7 +374,7 @@ function PosterImage({
     <OptimizedImage
       src={imgUrl(path, mode === "backdrop" ? "w780" : "w500")}
       alt={title}
-      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+      className="h-full w-full object-cover transition-transform duration-700 sv-crisp-zoom group-hover:scale-100"
       loading={eager ? "eager" : "lazy"}
       decoding="async"
       onError={() => setFailed(true)}

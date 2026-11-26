@@ -1166,7 +1166,7 @@ const ListItemCard = memo(function ListItemCard({
             loading="lazy"
             decoding="async"
             draggable={false}
-            className="h-full w-full object-cover grayscale-[18%] transition-transform duration-500 transform-gpu group-hover:scale-[1.08] group-hover:-translate-y-1 group-hover:grayscale-0"
+            className="h-full w-full object-cover grayscale-[18%] transition-transform duration-500 sv-crisp-zoom [--sv-zoom:1.08] group-hover:scale-100 group-hover:-translate-y-1 group-hover:grayscale-0"
             onError={() => setImgFailed(true)}
           />
         ) : (

@@ -405,7 +405,7 @@ function PendingPreview({ username, items, onOpen }) {
                   <OptimizedImage
                     src={source}
                     alt={titleText}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover/poster:scale-105"
+                    className="h-full w-full object-cover transition-transform duration-300 sv-crisp-zoom group-hover/poster:scale-100"
                     loading="lazy"
                   />
                 ) : (

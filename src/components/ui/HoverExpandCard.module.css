@@ -57,21 +57,29 @@
 
 /* ZOOM DE LA IMAGEN (`HoverExpandZoom`): además de ampliarse la tarjeta, la
    imagen se acerca un 5% dentro de ella, lento y suave, como en las páginas
-   de las secciones de los dashboards (`group-hover:scale-105 duration-700`).
-   Va en un envoltorio y no en el <img>: las imágenes ya llevan su propia
-   transición (fundido al cargar, y en Historial también escala) y una
-   `transition` aquí la pisaría. Solo dentro de una tarjeta que se amplía, así
-   que las vistas de cuadrícula y lista que reutilizan el mismo póster no
-   cambian. */
+   de las secciones de los dashboards. Va en un envoltorio y no en el <img>:
+   las imágenes ya llevan su propia transición (fundido al cargar, y en
+   Historial también escala) y una `transition` aquí la pisaría. Solo dentro de
+   una tarjeta que se amplía, así que las vistas de cuadrícula y lista que
+   reutilizan el mismo póster no cambian.
+
+   ACERCAR SIN ESTIRAR. Con `scale(1.05)` al pasar el ratón la imagen se
+   pintaba a su tamaño y se ESTIRABA durante los 700 ms (el texto del póster
+   blando), y al acabar se volvía a pintar nítida de golpe. Ahora es al revés,
+   como `.sv-crisp-zoom` (globals.css): el envoltorio mide SIEMPRE un 5% más,
+   en reposo se reduce a la tarjeta y al pasar el ratón vuelve a 1. Solo se
+   reduce una imagen pintada en grande, nunca se amplía. */
 .zoom {
+  --sv-zoom: 1.05;
   position: absolute;
-  inset: 0;
-  transition: transform 700ms cubic-bezier(0.4, 0, 0.2, 1);
+  inset: calc((1 - var(--sv-zoom)) * 50%);
+  scale: calc(1 / var(--sv-zoom));
+  transition: scale 700ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .expand:hover .zoom {
-    transform: scale(1.05);
+    scale: 1;
   }
 }
 

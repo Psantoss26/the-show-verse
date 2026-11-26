@@ -437,11 +437,11 @@ function PhotosSheet({ meta, data, onClose }) {
                 aria-label={`Abrir imagen original${imageResolution(image) ? ` (${imageResolution(image)})` : ""}`}
                 className={IMAGE_LINK}
               >
-                <span className="block aspect-[2/3]">
+                <span className="relative block aspect-[2/3] overflow-hidden">
                   <OptimizedImage
                     src={`https://image.tmdb.org/t/p/w342${image.file_path}`}
                     alt=""
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover/img:scale-[1.03]"
+                    className="h-full w-full object-cover transition-transform duration-500 sv-crisp-zoom [--sv-zoom:1.03] group-hover/img:scale-100"
                     loading="lazy"
                     decoding="async"
                   />
@@ -501,11 +501,11 @@ function TaggedSheet({ meta, data, onClose }) {
                   aria-label={title ? `Abrir imagen de ${title}` : "Abrir imagen original"}
                   className={IMAGE_LINK}
                 >
-                  <span className="block" style={{ aspectRatio: imageAspect(image) }}>
+                  <span className="relative block overflow-hidden" style={{ aspectRatio: imageAspect(image) }}>
                     <OptimizedImage
                       src={`https://image.tmdb.org/t/p/w500${image.file_path}`}
                       alt=""
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover/img:scale-[1.03]"
+                      className="h-full w-full object-cover transition-transform duration-500 sv-crisp-zoom [--sv-zoom:1.03] group-hover/img:scale-100"
                       loading="lazy"
                       decoding="async"
                     />

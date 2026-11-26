@@ -236,6 +236,7 @@ import { statusRetryDelay } from "@/lib/trakt/statusRetry";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 import { PEEK_OVER_PAGE_Z } from "@/lib/ui/pageModal";
+import { CRISP_ZOOM_FILL_STYLE } from "@/lib/ui/crispZoom";
 
 function normalizeUrl(url) {
   if (!url) return null;
@@ -442,7 +443,8 @@ function SimilarBackdrop({ rec, onOpen }) {
           alt={recTitle}
           fill
           sizes="(min-width:1024px) 260px, (min-width:640px) 320px, 72vw"
-          className="object-cover transition duration-500 group-hover:scale-105"
+          className="object-cover transition duration-500 sv-crisp-zoom group-hover:scale-100"
+          style={CRISP_ZOOM_FILL_STYLE}
           loading="lazy"
         />
       ) : path === null ? (
@@ -4842,7 +4844,7 @@ export default function DetailModal({
                                 src={photo}
                                 alt={person?.name || ""}
                                 {...detailsRowImageLoading(personIndex)}
-                                className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
+                                className="w-full h-full object-cover transition-transform duration-500 ease-out sv-crisp-zoom [--sv-zoom:1.1] group-hover:scale-100 grayscale-[15%] group-hover:grayscale-0"
                               />
                             ) : (
                               <div className="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 transition-colors duration-500 group-hover:bg-neutral-700">
