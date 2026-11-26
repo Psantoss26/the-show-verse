@@ -45,30 +45,36 @@ export function pickRatingLinks(entities, { type, tmdbId }) {
   };
 }
 
+// UN solo viaje a Wikidata: la búsqueda por propiedad TMDb (generator=search)
+// devuelve ya el contenido JSON de cada elemento (prop=revisions), con los
+// claims en la misma forma que wbgetentities. Antes eran dos peticiones en
+// serie (search → wbgetentities), ~150–300 ms más en frío.
 export async function resolveRatingLinks({ type, tmdbId }, fetchImpl = fetch) {
   if (!isRatingLinksIdentity(type, tmdbId)) throw new Error("Invalid media identity");
-  const signal = AbortSignal.timeout(10_000);
-  const get = async (params) => {
-    const url = new URL("https://www.wikidata.org/w/api.php");
-    url.search = new URLSearchParams({ format: "json", ...params }).toString();
-    const response = await fetchImpl(url, {
-      headers: { "User-Agent": "TheShowVerse/1.0 (https://theshowverse.com)", Accept: "application/json" },
-      signal,
-      next: { revalidate: 86400 },
-    });
-    if (!response.ok) throw new Error("Rating links source unavailable");
-    const data = await response.json();
-    if (data.error) throw new Error("Rating links source rejected the request");
-    return data;
-  };
-  const search = await get({
-    action: "query", list: "search", srnamespace: "0", srlimit: "5", srprop: "",
-    srsearch: `haswbstatement:${TMDB_PROPERTIES[type]}=${tmdbId}`,
+  const url = new URL("https://www.wikidata.org/w/api.php");
+  url.search = new URLSearchParams({
+    format: "json", formatversion: "2", action: "query",
+    generator: "search", gsrnamespace: "0", gsrlimit: "5",
+    gsrsearch: `haswbstatement:${TMDB_PROPERTIES[type]}=${tmdbId}`,
+    prop: "revisions", rvprop: "content", rvslots: "main",
+  }).toString();
+  const response = await fetchImpl(url, {
+    headers: { "User-Agent": "TheShowVerse/1.0 (https://theshowverse.com)", Accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
+    next: { revalidate: 86400 },
   });
-  if (!Array.isArray(search.query?.search)) throw new Error("Invalid rating links response");
-  const ids = search.query.search.map((item) => item.title).filter((id) => /^Q\d+$/.test(id));
-  if (!ids.length) return { rt: null, mc: null, lb: null };
-  const data = await get({ action: "wbgetentities", ids: ids.join("|"), props: "claims" });
-  if (!data.entities) throw new Error("Invalid rating links entities");
-  return pickRatingLinks(data.entities, { type, tmdbId });
+  if (!response.ok) throw new Error("Rating links source unavailable");
+  const data = await response.json();
+  if (data.error) throw new Error("Rating links source rejected the request");
+  // Sin resultados la API no trae `query`.
+  if (data.query == null) return { rt: null, mc: null, lb: null };
+  if (!Array.isArray(data.query.pages)) throw new Error("Invalid rating links response");
+  const entities = {};
+  for (const page of data.query.pages) {
+    if (!/^Q\d+$/.test(page?.title || "")) continue;
+    try {
+      entities[page.title] = JSON.parse(page.revisions?.[0]?.slots?.main?.content);
+    } catch { /* contenido ilegible: se ignora ese elemento */ }
+  }
+  return pickRatingLinks(entities, { type, tmdbId });
 }

@@ -52,22 +52,34 @@ test("validates identifiers before any upstream request", async () => {
   }
 });
 
-test("looks up by TMDb property and verifies the returned entity claims", async () => {
+test("looks up by TMDb property in ONE request and verifies the returned entity claims", async () => {
   const urls = [];
   const links = await resolveRatingLinks({ type: "movie", tmdbId: 27205 }, async (url) => {
     urls.push(url);
-    return { ok: true, json: async () => urls.length === 1
-      ? { query: { search: [{ title: "Q25188" }] } }
-      : { entities: { Q25188: movie } } };
+    return { ok: true, json: async () => ({ query: { pages: [
+      { title: "Q25188", revisions: [{ slots: { main: { content: JSON.stringify(movie) } } }] },
+    ] } }) };
   });
-  assert.equal(urls[0].searchParams.get("srsearch"), "haswbstatement:P4947=27205");
-  assert.equal(urls[1].searchParams.get("ids"), "Q25188");
+  assert.equal(urls.length, 1);
+  assert.equal(urls[0].searchParams.get("generator"), "search");
+  assert.equal(urls[0].searchParams.get("gsrsearch"), "haswbstatement:P4947=27205");
   assert.equal(links.mc, "https://www.metacritic.com/movie/inception/");
+});
+
+test("ignores pages that are not items or whose content is not valid JSON", async () => {
+  const links = await resolveRatingLinks({ type: "movie", tmdbId: 27205 }, async () => ({
+    ok: true, json: async () => ({ query: { pages: [
+      { title: "Q1", revisions: [{ slots: { main: { content: "{not json" } } }] },
+      { title: "Property:P1", revisions: [{ slots: { main: { content: JSON.stringify(movie) } } }] },
+      { title: "Q25188", revisions: [{ slots: { main: { content: JSON.stringify(movie) } } }] },
+    ] } }),
+  }));
+  assert.equal(links.rt, "https://www.rottentomatoes.com/m/inception");
 });
 
 test("missing entries return no links; upstream failures remain retryable errors", async () => {
   assert.deepEqual(await resolveRatingLinks({ type: "movie", tmdbId: 1 }, async () => ({
-    ok: true, json: async () => ({ query: { search: [] } }),
+    ok: true, json: async () => ({ batchcomplete: true }),
   })), { rt: null, mc: null, lb: null });
   await assert.rejects(resolveRatingLinks({ type: "movie", tmdbId: 1 }, async () => ({ ok: false })));
   await assert.rejects(resolveRatingLinks({ type: "movie", tmdbId: 1 }, async () => ({

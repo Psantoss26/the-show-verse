@@ -11566,18 +11566,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         value: (Math.round(tScoreboard.external.rtAudience) / 10).toFixed(1),
                         href: ratingLinks.rt,
                       }
-                    : phoneScores.includes("rt") && !ratingScores.ready
+                    : phoneScores.includes("rt") && !ratingScores.settled.rt
                       ? { pending: true }
                       : null)
                 }
                 mc={
                   audienceScoreBadge(ratingScores.mc, ratingLinks.mc) ??
-                  (phoneScores.includes("mc") && !ratingScores.ready ? { pending: true } : null)
+                  (phoneScores.includes("mc") && !ratingScores.settled.mc ? { pending: true } : null)
                 }
                 // Letterboxd: media de sus miembros sobre 10 (solo películas).
                 lb={
                   letterboxdScoreBadge(ratingScores.lb, ratingScores.lb?.url || ratingLinks.lb) ??
-                  (endpointType === "movie" && phoneScores.includes("lb") && !ratingScores.ready
+                  (endpointType === "movie" && phoneScores.includes("lb") && !ratingScores.settled.lb
                     ? { pending: true }
                     : null)
                 }

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import MobilePosterPreload from "@/components/details/MobilePosterPreload";
+import RatingScoresPreload from "@/components/details/RatingScoresPreload";
 import { getDetails } from "@/lib/api/tmdb";
 import { fetchTitleRecommendations } from "@/lib/details/titleRecommendations.server";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
@@ -107,6 +108,8 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
       {/* Va antes que la ficha: el navegador empieza a bajar la portada móvil
           mientras todavía está leyendo el HTML, sin esperar a hidratar. */}
       <MobilePosterPreload data={data} communityArtwork={community?.artwork} />
+      {/* Igual con las notas de Rotten Tomatoes, Metacritic y Letterboxd. */}
+      <RatingScoresPreload type={type} id={id} />
       <DetailsPageLoader
         type={type}
         id={id}

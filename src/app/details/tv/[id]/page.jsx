@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import MobilePosterPreload from "@/components/details/MobilePosterPreload";
+import RatingScoresPreload from "@/components/details/RatingScoresPreload";
 import { getDetails } from "@/lib/api/tmdb";
 import { fetchTitleRecommendations } from "@/lib/details/titleRecommendations.server";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
@@ -69,6 +70,8 @@ export default async function TvDetailsPage({ params }) {
       {/* Va antes que la ficha: el navegador empieza a bajar la portada móvil
           mientras todavía está leyendo el HTML, sin esperar a hidratar. */}
       <MobilePosterPreload data={data} communityArtwork={communityArtwork} />
+      {/* Igual con las notas de Rotten Tomatoes, Metacritic y Letterboxd. */}
+      <RatingScoresPreload type="tv" id={id} />
       <DetailsPageLoader
         type="tv"
         id={id}

@@ -18,6 +18,7 @@ import OutsideEmbed from "@/components/navigation/OutsideEmbed";
 import DesktopSideNavInset from "@/components/navigation/DesktopSideNavInset";
 import MobileUserPageSwipeNavigation from "@/components/MobileUserPageSwipeNavigation";
 import MobileTitlePeek from "@/components/preview/MobileTitlePeek";
+import RatingScoresPrefetch from "@/components/details/RatingScoresPrefetch";
 import { AVATAR_BOOT_SCRIPT } from "@/components/auth/AvatarBootScript";
 import { anton, ptSans } from "./fonts";
 
@@ -162,6 +163,8 @@ export default function RootLayout({ children, overlay }) {
               <PwaManager />
               {/* Vista previa al mantener pulsada una tarjeta (móvil). */}
               <MobileTitlePeek />
+              {/* Notas de RT y Letterboxd pedidas al tocar el enlace de una ficha. */}
+              <RatingScoresPrefetch />
               <InAppNotifications />
               <OfflineManager />
               <LetterboxdAutoSync />

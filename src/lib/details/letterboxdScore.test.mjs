@@ -169,3 +169,18 @@ test("insignia: un decimal sobre 10 (media ×2), votos abreviados y enlace a la 
   });
   assert.equal(letterboxdScoreBadge(null), null);
 });
+
+test("el enlace web puede llegar como promesa: la API no lo espera y la web sí", async () => {
+  let resolveUrl;
+  const webUrl = new Promise((resolve) => { resolveUrl = resolve; });
+  const html = `<script type="application/ld+json">{"@type":"Movie","url":"https://letterboxd.com/film/inception/","aggregateRating":{"ratingValue":4.2,"ratingCount":10}}</script>`;
+  const pending = fetchLetterboxdScore({ webUrl }, {
+    env: {},
+    fetchImpl: async (url) => ({ ok: true, url, text: async () => html }),
+  });
+  resolveUrl("https://letterboxd.com/film/inception/");
+  const score = await pending;
+  assert.equal(score.audienceScore, 4.2);
+  assert.equal(score.source, "web");
+  assert.equal(await fetchLetterboxdScore({ webUrl: Promise.reject(new Error("wikidata")) }, { env: {}, fetchImpl: () => assert.fail() }), null);
+});

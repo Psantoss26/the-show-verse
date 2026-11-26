@@ -199,7 +199,7 @@ Estas funcionalidades siguen en Next.js y no tienen reemplazo en `backend/`:
 | IA Watch Next | `/api/ai/watch-next`, `/api/ai/health` |
 | OMDb/IMDb/Filmaffinity/SeriesGraph | `/api/omdb`, `/api/imdb/*`, `/api/filmaffinity/rating`, `/api/seriesgraph/episode-ratings` |
 | Artwork overrides | `/api/artwork` |
-| Enlaces externos | `/api/links/justwatch`, `/api/links/letterboxd`, `/api/links/ratings` (URL de RT/Metacritic/Letterboxd), `/api/links/ratings/scores` (nota y votos del público de RT/Metacritic, y media 0–5 de Letterboxd en películas) |
+| Enlaces externos | `/api/links/justwatch`, `/api/links/letterboxd`, `/api/links/ratings` (URL de RT/Metacritic/Letterboxd), `/api/links/ratings/scores` (nota y votos del público de RT/Metacritic, y media 0–5 de Letterboxd en películas; con `source=rt|mc|lb` devuelve una sola fuente para que cada nota llegue en cuanto responde, `lib/details/ratingScoresLoader.js`; los enlaces de Wikidata se comparten entre ambas rutas con caché de 7 días, `lib/details/ratingLinksCache.js`) |
 | TMDb auxiliares | awards, collections, localized-images, episode details, credits |
 | Scoreboard publico | `/api/scoreboard/public`, `/api/trakt/scoreboard` |
 

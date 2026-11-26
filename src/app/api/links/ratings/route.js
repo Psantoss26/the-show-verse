@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isRatingLinksIdentity, resolveRatingLinks } from "@/lib/details/resolveRatingLinks";
+import { isRatingLinksIdentity } from "@/lib/details/resolveRatingLinks";
+import { getRatingLinks } from "@/lib/details/ratingLinksCache";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,7 @@ export async function GET(request) {
     return NextResponse.json({ error: "Invalid type or TMDb id" }, { status: 400 });
   }
   try {
-    const links = await resolveRatingLinks({ type, tmdbId });
+    const links = await getRatingLinks({ type, tmdbId });
     return NextResponse.json(links, {
       headers: { "Cache-Control": "public, max-age=300, s-maxage=3600" },
     });

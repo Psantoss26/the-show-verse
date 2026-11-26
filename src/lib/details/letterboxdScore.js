@@ -159,7 +159,8 @@ async function fromApi(tmdbId, env, fetchImpl) {
   return parseLetterboxdApiScore(film, statistics);
 }
 
-async function fromWeb(webUrl, fetchImpl) {
+async function fromWeb(webUrlOrPromise, fetchImpl) {
+  const webUrl = await Promise.resolve(webUrlOrPromise).catch(() => null);
   if (typeof webUrl !== "string" || !WEB_URL.test(webUrl)) return null;
   try {
     const response = await fetchImpl(webUrl, {
@@ -179,7 +180,9 @@ async function fromWeb(webUrl, fetchImpl) {
 }
 
 // { tmdbId, webUrl } → { audienceScore, audienceCount, url, source } | null.
-// `webUrl` es el enlace de Wikidata (resolveRatingLinks().lb).
+// `webUrl` es el enlace de Wikidata (resolveRatingLinks().lb), o una PROMESA
+// de él: con credenciales la API arranca sin esperar a Wikidata (solo la
+// necesita la vía web, de reserva).
 export async function fetchLetterboxdScore(
   { tmdbId, webUrl } = {},
   { env = process.env, fetchImpl = fetch } = {},
@@ -187,7 +190,9 @@ export async function fetchLetterboxdScore(
   if (hasLetterboxdApiCredentials(env) && /^[1-9]\d{0,9}$/.test(String(tmdbId ?? ""))) {
     try {
       const score = await fromApi(String(tmdbId), env, fetchImpl);
-      return score ? { ...score, url: score.url || filmUrl(webUrl), source: "api" } : null;
+      if (!score) return null;
+      const fallbackUrl = score.url ? null : await Promise.resolve(webUrl).catch(() => null);
+      return { ...score, url: score.url || filmUrl(fallbackUrl), source: "api" };
     } catch (error) {
       if (error instanceof NotFound) return null;
       // API caída o credenciales rechazadas: se intenta la web.

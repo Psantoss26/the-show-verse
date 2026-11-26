@@ -673,7 +673,8 @@ export default function DetailModal({
   const optionalScoreBadge = (scores, href, toBadge, name) => {
     if (isEpisode) return null;
     if (phoneLayout && !phoneScores.includes(name)) return null;
-    if (!ratingScores.ready) return { pending: true };
+    // Cada insignia reserva su hueco solo hasta que llega SU nota.
+    if (!ratingScores.settled[name]) return { pending: true };
     return toBadge(scores, href);
   };
 
