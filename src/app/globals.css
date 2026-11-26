@@ -239,6 +239,19 @@ body {
     /* Firefox */
   }
 
+  /* Sin barras de scroll en el contenedor ni en ningún descendiente
+     (modal de valoración de episodios: cuerpo vertical + rejilla horizontal). */
+  .sv-no-scrollbar-deep,
+  .sv-no-scrollbar-deep * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .sv-no-scrollbar-deep::-webkit-scrollbar,
+  .sv-no-scrollbar-deep *::-webkit-scrollbar {
+    display: none;
+  }
+
   .soundtrack-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;

@@ -198,7 +198,7 @@ export default function EpisodeRatingsModal({
         </header>
 
         <div
-          className="sv-modal-scroll-fade sv-modal-flat-glass min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-2 pb-5 [scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin] sm:px-8 sm:pt-2 sm:pb-6"
+          className="sv-modal-scroll-fade sv-modal-flat-glass min-h-0 flex-1 sv-no-scrollbar-deep overflow-y-auto overscroll-contain px-6 pt-2 pb-5 sm:px-8 sm:pt-2 sm:pb-6"
           aria-busy={loading}
         >
           {loading && (
