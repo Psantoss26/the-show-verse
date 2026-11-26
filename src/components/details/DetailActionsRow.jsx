@@ -217,8 +217,6 @@ export default function DetailActionsRow({
   commentsActive = false,
   onComments,
 
-  // Nombre del título para el modal de confirmación de favorito/pendiente.
-  itemTitle = "",
 }) {
   const serverOnline = useServerOnline();
 
@@ -258,7 +256,6 @@ export default function DetailActionsRow({
       open={Boolean(confirmKind)}
       kind={confirmKind || "favorite"}
       active={confirmKind === "watchlist" ? watchlist : favorite}
-      itemTitle={itemTitle}
       onConfirm={confirmToggle}
       onClose={closeConfirm}
     />
