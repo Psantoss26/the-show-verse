@@ -70,6 +70,8 @@ Las tarjetas con póster de Favoritos, Pendientes, En progreso, Historial, Perfi
 
 **Sin filo en el canto:** la caja redondeada que recorta el póster o el backdrop (cuadrícula, cuadrícula compacta y lista de Favoritos, Pendientes y En progreso; la caja `media` de `TitleRow`) no lleva fondo propio. Con `bg-zinc-900` debajo de la imagen, el recorte con antialias de las esquinas y de los cantos en fracción de píxel dejaba asomar ese gris como un filo claro alrededor de los pósters oscuros. El gris de carga lo pone el marcador de cada imagen (`SmartPoster`, `SmartBackdrop`), que se desvanece cuando la imagen está lista.
 
+En Historial (`HistoryClient`) igual: las cajas de las tarjetas y de las miniaturas de los modales no llevan fondo, y `Poster`/`Backdrop` pintan la imagen con `HistoryArtImage`, que pone un marcador gris aparte y lo quita al cargar (o al montar si ya venía de caché). Las miniaturas de episodio (`EpisodeStillThumb`) llevan ese gris en su propio marcador, que se funde al cargar.
+
 En el detalle de listas y colecciones (`FilterableListItems` de `ListDetailsTools`), cada tarjeta va en `ListCardEntrance`: la misma entrada que Favoritos (`useCardEntrance`, fundido y escala en cascada, una vez al montar), solo para las que caben en pantalla (`estimateVisibleCards` con las columnas de cada vista) y nunca al volver atrás.
 
 ## Entrada del Perfil

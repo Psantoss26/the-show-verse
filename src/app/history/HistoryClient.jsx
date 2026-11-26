@@ -598,7 +598,7 @@ function EpisodeStillThumb({ stillPath, pending = false, eager = false, iconClas
     <>
       <span
         aria-hidden="true"
-        className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-white/[0.08] via-white/[0.04] to-white/[0.015] text-zinc-700 transition-opacity duration-500 ease-out motion-reduce:transition-none ${
+        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 bg-gradient-to-br from-white/[0.08] via-white/[0.04] to-white/[0.015] text-zinc-700 transition-opacity duration-500 ease-out motion-reduce:transition-none ${
           shown ? "opacity-0" : "opacity-100"
         }`}
       >
@@ -1508,7 +1508,7 @@ function CalendarWithPosters({
                             transition: "all 0.25s ease-out",
                           }}
                         >
-                          <div className="w-full h-full rounded-md lg:rounded-lg overflow-hidden bg-zinc-900 shadow-xl shadow-black/50">
+                          <div className="w-full h-full rounded-md lg:rounded-lg overflow-hidden shadow-xl shadow-black/50">
                             <Poster entry={item} className="w-full h-full" />
                           </div>
                         </div>
@@ -1604,7 +1604,7 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
         className="w-full flex items-center gap-3.5 p-2.5 hover:bg-white/5 transition-colors"
       >
         <div className="w-[56px] h-[84px] shrink-0 relative">
-          <div className="absolute inset-0 rounded-lg overflow-hidden bg-zinc-900 shadow-md">
+          <div className="absolute inset-0 rounded-lg overflow-hidden shadow-md">
             <Poster entry={entry} className="w-full h-full" />
           </div>
           <div className="absolute top-1 right-1 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600 text-white shadow-lg">
@@ -1670,7 +1670,7 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
                     href={subHref || "#"} prefetch
                     className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors group/sub"
                   >
-                    <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-lg bg-zinc-900 shadow-sm">
+                    <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-lg shadow-sm">
                       <EpisodeStillThumb
                         stillPath={finalStill}
                         pending={!finalStill && !episodeMetadataReady}
@@ -1736,7 +1736,7 @@ function DayItemsList({ items }) {
         href={href || "#"} prefetch
         className="flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/5 transition-colors group/row"
       >
-        <div className="w-[56px] h-[84px] shrink-0 rounded-lg overflow-hidden bg-zinc-900 shadow-md">
+        <div className="w-[56px] h-[84px] shrink-0 rounded-lg overflow-hidden shadow-md">
           <Poster entry={entry} className="w-full h-full" />
         </div>
         <div className="flex-1 min-w-0">
@@ -1941,21 +1941,50 @@ function Poster({ entry, className = "" }) {
   return (
     <div
       ref={ref}
-      className={`overflow-hidden bg-neutral-900 shrink-0 relative ${className}`}
+      className={`overflow-hidden shrink-0 relative ${className}`}
     >
-      {src ? (
-        <OptimizedImage
-          src={src}
-          alt="poster"
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-zinc-600">
-          <Film className="w-6 h-6" />
-        </div>
-      )}
+      <HistoryArtImage src={src} alt="poster" />
     </div>
+  );
+}
+
+// Imagen de Poster/Backdrop con su marcador de carga.
+//
+// SIN FONDO EN LA CAJA. El fondo gris iba antes en la propia caja que recorta
+// con esquinas redondeadas: el antialias del recorte lo dejaba asomar bajo la
+// imagen y se veía un filo gris claro en los cantos de cada tarjeta. Ahora el
+// gris es un marcador aparte que se apaga en cuanto la imagen carga (también
+// si ya venía de caché: `complete` al montar), así que no queda nada debajo.
+function HistoryArtImage({ src, alt }) {
+  const imgRef = useRef(null);
+  const [loadedSrc, setLoadedSrc] = useState(null);
+  const loaded = loadedSrc === src;
+
+  useLayoutEffect(() => {
+    const img = imgRef.current;
+    if (src && img?.complete && img.naturalWidth > 0) setLoadedSrc(src);
+  }, [src]);
+
+  if (!src) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-neutral-900 text-zinc-600">
+        <Film className="w-6 h-6" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {!loaded && <span aria-hidden="true" className="absolute inset-0 bg-neutral-900" />}
+      <OptimizedImage
+        ref={imgRef}
+        src={src}
+        alt={alt}
+        className="relative w-full h-full object-cover"
+        loading="lazy"
+        onLoad={() => setLoadedSrc(src)}
+      />
+    </>
   );
 }
 
@@ -1997,19 +2026,8 @@ function Backdrop({ entry, className = "" }) {
     : null;
 
   return (
-    <div ref={ref} className={`overflow-hidden bg-neutral-900 relative ${className}`}>
-      {src ? (
-        <OptimizedImage
-          src={src}
-          alt="backdrop"
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-zinc-600">
-          <Film className="w-6 h-6" />
-        </div>
-      )}
+    <div ref={ref} className={`overflow-hidden relative ${className}`}>
+      <HistoryArtImage src={src} alt="backdrop" />
     </div>
   );
 }
@@ -2173,7 +2191,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
     <div
       className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 pr-12 transition-all ${busy ? "opacity-50 pointer-events-none grayscale" : ""}`}
     >
-      <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg relative shadow-md bg-zinc-900 shrink-0">
+      <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg relative shadow-md shrink-0">
         <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
           <div className="absolute inset-0 w-full h-full">
             <div
@@ -2371,7 +2389,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   const CardInner = (
     <HoverExpandCard
       cellClassName={imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"}
-      className={`compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md ${disabledCls}`}
+      className={`compact-card group overflow-hidden rounded-lg shadow-md ${disabledCls}`}
       // El contador de episodios agrupados NO crece con la tarjeta: va fuera de
       // ella y solo acompaña a su esquina (ver HoverExpandCard). Fuera, ya no lo
       // recortan las esquinas redondeadas ni lo tapa la confirmación de borrar.
@@ -2582,7 +2600,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
     <div
       className={[
         // IMPORTANTE: hover SOLO en desktop para evitar "hover pegajoso" en móvil
-        `relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group overflow-hidden rounded-xl bg-zinc-900 shadow-md`,
+        `relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group overflow-hidden rounded-xl shadow-md`,
         "lg:hover:shadow-emerald-900/20 transition-all",
         disabledCls,
       ].join(" ")}
@@ -2746,7 +2764,7 @@ function EpisodeSubItem({
         onClick={onPreviewClick}
         className={`flex items-center gap-3 p-3 ${isBusy ? "opacity-50 pointer-events-none" : ""}`}
       >
-        <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-md sm:w-28">
+        <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-md sm:w-28">
           <EpisodeStillThumb
             stillPath={stillPath || entry?.still_path || entry?.stillPath || null}
             pending={metadataPending}
@@ -2898,7 +2916,7 @@ function ExpandedGroupPanel({
 
         <header className="flex w-full shrink-0 items-center justify-between gap-4 bg-white/[0.025] px-5 py-4 sm:px-8 sm:pb-6 sm:pt-8">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <div className="aspect-[2/3] w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-inner sm:w-12">
+            <div className="aspect-[2/3] w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 shadow-inner sm:w-12">
               <Poster entry={entry} className="w-full h-full" />
             </div>
             <div className="min-w-0">
