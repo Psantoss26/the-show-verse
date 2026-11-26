@@ -49,7 +49,7 @@ The interface is in Spanish today; the code, the architecture and these contribu
 
 <table>
 <tr>
-<td width="50%"><img src="docs/assets/readme/movie.jpg" alt="Movie page"><p align="center"><sub><b>Movie page</b> with ratings from 8+ sources</sub></p></td>
+<td width="50%"><img src="docs/assets/readme/details-movie.jpg" alt="Movie page"><p align="center"><sub><b>Movie page</b> with ratings from 8+ sources</sub></p></td>
 <td width="50%"><img src="docs/assets/readme/profile.jpg" alt="Public profile"><p align="center"><sub><b>Public profile</b> with levels and activity</sub></p></td>
 </tr>
 </table>

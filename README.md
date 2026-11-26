@@ -67,7 +67,7 @@ En plena era del streaming lo que ves está repartido entre Netflix, Max, Disney
 
 ## 🎬 Tour visual
 
-> Capturas reales de la app con una cuenta con sesión iniciada.
+> Capturas reales de la app con mi cuenta y la sesión iniciada: mis notas, favoritos, listas y la vista que tengo elegida en cada página. Se regeneran con [`scripts/capture-readme-screenshots.mjs`](scripts/capture-readme-screenshots.mjs).
 
 ### 🏠 Inicio
 
@@ -80,27 +80,27 @@ Un hero a pantalla completa con tráiler, logo del título y acciones rápidas, 
 
 ### 🎞️ Fichas de películas y series
 
-Todo sobre un título en una sola página: marcador de puntuaciones (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic…), tu estado (visto, nota, favorito, pendiente), reparto, temporadas, recomendaciones, premios, galería de arte, opiniones de la comunidad y listas que lo incluyen.
+Todo sobre un título en una sola página: portada y fondo elegidos por ti, premios, plataformas donde verlo (con Plex), la fila de **botones de acción**, el **marcador** de puntuaciones (TMDb, Trakt, IMDb, Rotten Tomatoes, Letterboxd…) con las estadísticas de la comunidad, y debajo un menú de secciones fijo: reparto, temporadas, recomendaciones, premios, media, sentimientos, comentarios y listas que lo incluyen.
 
 <table>
 <tr>
 <td width="50%">
-<img src="docs/assets/readme/movie.jpg" alt="Ficha de película">
-<p align="center"><sub><b>Ficha de película</b> con marcador y acciones</sub></p>
+<img src="docs/assets/readme/details-movie.jpg" alt="Ficha de la película Origen en escritorio">
+<p align="center"><sub><b>Película</b>: tu nota, visto y favorito ya marcados en los botones</sub></p>
 </td>
 <td width="50%">
-<img src="docs/assets/readme/tv.jpg" alt="Ficha de serie">
-<p align="center"><sub><b>Ficha de serie</b> con tu nota, visto y favorito</sub></p>
+<img src="docs/assets/readme/details-tv.jpg" alt="Ficha de la serie Breaking Bad en escritorio">
+<p align="center"><sub><b>Serie</b>: progreso de episodios vistos en el botón de Trakt</sub></p>
 </td>
 </tr>
 <tr>
 <td width="50%">
-<img src="docs/assets/readme/movie-scroll.jpg" alt="Reparto y recomendaciones">
-<p align="center"><sub><b>Reparto y recomendaciones</b> con menú de secciones fijo</sub></p>
+<img src="docs/assets/readme/details-movie-scroll.jpg" alt="Ficha de película al desplazar, con el menú de secciones">
+<p align="center"><sub><b>Al desplazar</b>: menú de secciones fijo y flechas al título anterior y siguiente</sub></p>
 </td>
 <td width="50%">
-<img src="docs/assets/readme/tv-scroll.jpg" alt="Temporadas y reparto principal">
-<p align="center"><sub><b>Temporadas y reparto principal</b></sub></p>
+<img src="docs/assets/readme/details-tv-scroll.jpg" alt="Ficha de serie al desplazar, con temporadas">
+<p align="center"><sub><b>Temporadas y reparto</b> de la serie</sub></p>
 </td>
 </tr>
 </table>
@@ -108,9 +108,107 @@ Todo sobre un título en una sola página: marcador de puntuaciones (TMDb, Trakt
 <img src="docs/assets/readme/movie-scroll2.jpg" alt="Colección, premios y galería de portadas" width="100%">
 <p align="center"><sub><b>Colección, premios y galería de arte</b>: elige portada, fondo y logo por idioma</sub></p>
 
+#### En el móvil
+
+La ficha móvil no es la de escritorio encogida: cabecera inmersiva con el póster a pantalla completa y el logo del título, botones de acción en una fila, marcador compacto con las notas que elijas en Ajustes y barra inferior con tus páginas.
+
+<img src="docs/assets/readme/mobile-details.jpg" alt="Fichas de Origen, Breaking Bad e Interstellar en el móvil, y la ficha desplazada" width="100%">
+<p align="center"><sub><b>Origen</b>, <b>Breaking Bad</b>, <b>Interstellar</b> y la ficha de Origen al desplazar</sub></p>
+
+### 🎛️ Botones de acción y sus modales
+
+Cada botón de la ficha abre su propio modal de cristal, que nace del botón y vuelve a él al cerrarse. Favorito y pendiente se marcan con un toque, sin modal.
+
+| Botón | Qué hace |
+| --- | --- |
+| ▶️ **Tráiler** | Reproduce el tráiler oficial (o eliges otro vídeo del título) |
+| 🎵 **Banda sonora** | Escucha la banda sonora, con reproducción automática opcional y 👍 / 👎 por canción |
+| 👁️ **Vistos (Trakt)** | Historial de visionados; en series, el progreso por temporada y episodio |
+| ⭐ **Puntuación** | Tu nota de 1 a 10 y el reparto de votos de la comunidad |
+| ❤️ / 🔖 **Favorito y pendiente** | Añadir o quitar con un toque |
+| 📃 **Listas** | Añade el título a tus listas o crea una nueva |
+| 💬 **Reseñas** | Reseñas de la comunidad y la tuya |
+| 👥 **Actividad** | Qué han hecho con el título las personas que sigues |
+| 🔗 **Enlaces** | TMDb, Trakt, IMDb, Rotten Tomatoes, Letterboxd, JustWatch, Wikipedia… |
+| 📤 **Compartir** | Tarjeta del título lista para compartir, como imagen o vídeo |
+
+<table>
+<tr>
+<td width="33%">
+<img src="docs/assets/readme/action-trailer.jpg" alt="Modal del tráiler">
+<p align="center"><sub><b>Tráiler</b></sub></p>
+</td>
+<td width="33%">
+<img src="docs/assets/readme/action-soundtrack.jpg" alt="Modal de la banda sonora">
+<p align="center"><sub><b>Banda sonora</b></sub></p>
+</td>
+<td width="33%">
+<img src="docs/assets/readme/action-rating.jpg" alt="Modal de puntuación">
+<p align="center"><sub><b>Puntuación</b></sub></p>
+</td>
+</tr>
+<tr>
+<td width="33%">
+<img src="docs/assets/readme/action-trakt.jpg" alt="Modal de visionados de Trakt en una película">
+<p align="center"><sub><b>Vistos</b> en una película</sub></p>
+</td>
+<td width="33%">
+<img src="docs/assets/readme/action-trakt-tv.jpg" alt="Modal de episodios vistos de una serie">
+<p align="center"><sub><b>Vistos</b> en una serie, por episodio</sub></p>
+</td>
+<td width="33%">
+<img src="docs/assets/readme/action-lists.jpg" alt="Modal de listas">
+<p align="center"><sub><b>Listas</b></sub></p>
+</td>
+</tr>
+<tr>
+<td width="33%">
+<img src="docs/assets/readme/action-reviews.jpg" alt="Modal de reseñas">
+<p align="center"><sub><b>Reseñas</b></sub></p>
+</td>
+<td width="33%">
+<img src="docs/assets/readme/action-activity.jpg" alt="Modal de actividad de quienes sigues">
+<p align="center"><sub><b>Actividad</b> de quienes sigues</sub></p>
+</td>
+<td width="33%">
+<img src="docs/assets/readme/action-links.jpg" alt="Modal de enlaces externos">
+<p align="center"><sub><b>Enlaces</b> externos</sub></p>
+</td>
+</tr>
+<tr>
+<td width="33%" colspan="3" align="center">
+<img src="docs/assets/readme/action-share.jpg" alt="Modal de compartir" width="66%">
+<p align="center"><sub><b>Compartir</b></sub></p>
+</td>
+</tr>
+</table>
+
+### 📺 Temporadas y episodios
+
+Cada temporada y cada episodio tiene su propia ficha, con el mismo diseño que la de la serie: nota y visto por episodio, reparto e invitados, imágenes y paso al anterior o siguiente con flechas (o deslizando en el móvil).
+
+<table>
+<tr>
+<td width="50%">
+<img src="docs/assets/readme/season.jpg" alt="Ficha de la temporada 5 de Breaking Bad">
+<p align="center"><sub><b>Temporada</b>: episodios con nota y visto</sub></p>
+</td>
+<td width="50%">
+<img src="docs/assets/readme/episode.jpg" alt="Ficha del episodio Ozymandias de Breaking Bad">
+<p align="center"><sub><b>Episodio</b>: puntuaciones, reparto invitado y fotogramas</sub></p>
+</td>
+</tr>
+</table>
+
+<p align="center">
+<img src="docs/assets/readme/mobile-season-episode.jpg" alt="Temporada y episodio en el móvil" width="60%">
+<br>
+<sub><b>En el móvil</b>: la temporada con su póster y el episodio con dos fotogramas apilados</sub>
+</p>
+
 ### 📚 Tu biblioteca
 
-Cada página personal con su vista predeterminada, buscador, filtros, orden, agrupación y contadores.
+Cada página personal con la vista que tengas elegida, buscador, filtros, orden, agrupación y contadores.
 
 <table>
 <tr>
@@ -153,17 +251,20 @@ Cada página personal con su vista predeterminada, buscador, filtros, orden, agr
 
 ### 📲 Ficha rápida lateral en vista teléfono
 
-Desde cualquier página personal, pulsar un título abre su ficha en un **panel lateral acoplado** sin salir de la página. En **vista teléfono** el panel reproduce la ficha móvil: portada con logo, botones, marcador y todas las secciones al desplazar. Se puede pasar de un título a otro sin cerrarlo.
+Desde cualquier página personal, pulsar un título abre su ficha en un **panel lateral acoplado** sin salir de la página: la cuadrícula se recoloca a su lado. En **vista teléfono** el panel reproduce la ficha móvil (portada con logo, botones, marcador y todas las secciones al desplazar) y se puede pasar de un título a otro sin cerrarlo. Cómo se abren las fichas (panel centrado o lateral, superpuesto o acoplado, vista de escritorio o de teléfono, o página completa) se elige en Ajustes.
+
+<img src="docs/assets/readme/drawer-favorites.jpg" alt="Favoritos con la ficha de Origen abierta en el panel lateral" width="100%">
+<p align="center"><sub><b>Abierto desde Favoritos</b></sub></p>
 
 <table>
 <tr>
 <td width="50%">
-<img src="docs/assets/readme/drawer-watch.jpg" alt="Panel lateral en vista teléfono desde Pendientes">
+<img src="docs/assets/readme/drawer-watchlist.jpg" alt="Pendientes con la ficha de Breaking Bad en el panel lateral">
 <p align="center"><sub><b>Abierto desde Pendientes</b></sub></p>
 </td>
 <td width="50%">
-<img src="docs/assets/readme/drawer-fav-scroll.jpg" alt="Panel lateral desplazado con marcador y detalles">
-<p align="center"><sub><b>Al desplazar</b>: marcador, estadísticas y detalles</sub></p>
+<img src="docs/assets/readme/drawer-watchlist-scroll.jpg" alt="Panel lateral desplazado con marcador y detalles">
+<p align="center"><sub><b>Al desplazar</b>: marcador, estadísticas y secciones</sub></p>
 </td>
 </tr>
 </table>
@@ -498,6 +599,20 @@ El backend levanta los contenedores, espera a que estén sanos y aplica las migr
 3. Abre `/api/spotify/login`, autoriza y guarda el `SPOTIFY_REFRESH_TOKEN` que se muestra.
 
 **Google**: autoriza `http://localhost:3000/api/auth/google/callback` ([guía](docs/backend/google_auth_setup.md)).
+
+</details>
+
+<details>
+<summary><b>📸 Regenerar las capturas del README</b></summary>
+<br>
+
+Con la web y la API en marcha y la base local, el script entra con un usuario real de esa base (por defecto `pablosantos`, cámbialo con `README_USERNAME`) mediante un token firmado en un navegador aislado: no toca la sesión de tu navegador ni escribe nada en la cuenta. Falla si la sesión no está iniciada.
+
+```bash
+PLAYWRIGHT_MODULE=/ruta/a/playwright-core/index.mjs CHROME_PATH=/usr/bin/google-chrome node scripts/capture-readme-screenshots.mjs
+```
+
+Pasa nombres de captura (`details-movie action-share …`) para rehacer solo esas, y `README_STORAGE=vistas.json` para fijar la vista de cada página (las claves `showverse:*` de `localStorage`).
 
 </details>
 
