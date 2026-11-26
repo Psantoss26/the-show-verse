@@ -9,8 +9,12 @@ import { useAuth } from "@/context/AuthContext";
 import {
   abrirLoginEnNavegadorNativo,
   empezarLoginPorNavegador,
+  logToApp,
+  requestNativeGoogleIdToken,
   useAndroidApp,
 } from "@/lib/android/appBridge";
+import GoogleSignInButton, { GoogleBrandButton } from "@/components/auth/GoogleSignInButton";
+import { appGoogleNextStep, googleRedirectHref } from "@/lib/auth/googleSignIn";
 
 function sanitizeNextPath(value) {
   const next = value || "/";
@@ -42,6 +46,9 @@ function getAuthErrorMessage(error, mode) {
 
 function getGoogleErrorMessage(value) {
   if (!value) return "";
+  if (value === "missing_id_token" || value === "invalid_body") {
+    return "Google no devolvió la cuenta elegida. Inténtalo de nuevo.";
+  }
   if (value === "missing_config") {
     return "Google Login no está configurado todavía.";
   }
@@ -84,14 +91,17 @@ function getGoogleErrorMessage(value) {
   return "No se pudo completar el inicio de sesión con Google.";
 }
 
-export default function LoginForm({ next: nextProp }) {
+export default function LoginForm({ next: nextProp, googleClientId = "" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, register } = useAuth();
+  const { login, loginWithGoogle, register } = useAuth();
   const inAndroidApp = useAndroidApp();
 
   const [mode, setMode] = useState("login");
   const [loading, setLoading] = useState(false);
+  // Canje del idToken de Google en curso: tapa el formulario con «Entrando con
+  // Google…» hasta que la sesión está en el contexto y se navega.
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [err, setErr] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
@@ -106,27 +116,14 @@ export default function LoginForm({ next: nextProp }) {
   }, [nextProp, searchParams]);
   const googleError = getGoogleErrorMessage(searchParams?.get("google_error"));
   const visibleError = err || googleError;
-  const googleAuthHref = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
-
-  // Google no garantiza que Credential Manager pueda emitir un token para una
-  // APK cuyo certificado no esté registrado en Google Cloud. La PWA sí funciona
-  // con el OAuth web, así que la APK usa el mismo camino en una Custom Tab y
-  // recoge la sesión al volver mediante su entrega `app`.
-  const handleGoogleLogin = (event) => {
-    if (!inAndroidApp) return; // navegador y PWA: sigue el enlace normal
-    event.preventDefault();
-    setErr("");
-    abrirLoginEnNavegador();
-  };
+  const googleAuthHref = googleRedirectHref(next);
 
   // Abre el login en el navegador dejando abierta una ENTREGA en el servidor:
   // al volver a la app, la sesión se recoge de ahí. No depende de que el
   // navegador consiga devolver el control.
   const abrirLoginEnNavegador = useCallback(() => {
     const id = empezarLoginPorNavegador();
-    const url = `/api/auth/google/start?next=${encodeURIComponent(next)}${
-      id ? `&app=${encodeURIComponent(id)}` : ""
-    }`;
+    const url = googleRedirectHref(next, { app: id || undefined });
 
     // Lo abre el NATIVO, que se queda vigilando y devuelve la app al frente en
     // cuanto la sesión está lista: así no hay que pulsar nada para volver. Si la
@@ -136,6 +133,49 @@ export default function LoginForm({ next: nextProp }) {
     }
     window.location.href = url;
   }, [next]);
+
+  // idToken de Google (botón oficial o selector nativo) → sesión en el
+  // contexto → destino. La página de destino ya se pinta con la sesión.
+  const entrarConIdToken = useCallback(
+    async (idToken) => {
+      setGoogleBusy(true);
+      setErr("");
+      try {
+        await loginWithGoogle(idToken);
+        router.replace(next);
+        // Sin desbloquear: el formulario se va con la navegación.
+      } catch (e) {
+        setGoogleBusy(false);
+        setErr(
+          e?.status === 503 && !e?.payload?.error
+            ? getGoogleErrorMessage("backend_unavailable")
+            : getGoogleErrorMessage(e?.payload?.error || "backend_auth_failed"),
+        );
+      }
+    },
+    [loginWithGoogle, next, router],
+  );
+
+  // APP DE ANDROID. Primero el selector de cuentas del sistema (Credential
+  // Manager). Si el usuario lo cierra, no se hace nada; si falla de verdad
+  // —sin cuentas, sin Play Services, certificado no registrado—, se abre el
+  // login en el navegador con la recogida de sesión de siempre.
+  const handleAppGoogleLogin = useCallback(async () => {
+    if (googleBusy) return;
+    setErr("");
+    setGoogleBusy(true);
+    const resultado = await requestNativeGoogleIdToken();
+    const paso = appGoogleNextStep(resultado);
+    if (paso === "exchange") {
+      logToApp("Google: selector nativo ✓, canjeando el token");
+      await entrarConIdToken(resultado.idToken);
+      return;
+    }
+    setGoogleBusy(false);
+    if (paso === "stay") return;
+    logToApp(`Google: selector nativo no disponible (${resultado?.error || "?"}), uso el navegador`);
+    abrirLoginEnNavegador();
+  }, [abrirLoginEnNavegador, entrarConIdToken, googleBusy]);
 
   const updateField = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -195,31 +235,29 @@ export default function LoginForm({ next: nextProp }) {
         </h1>
       </div>
 
-      <a
-        href={googleAuthHref}
-        onClick={handleGoogleLogin}
-        className="mb-5 flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-sm font-semibold text-white transition-all active:scale-[0.99] shadow-sm cursor-pointer"
-      >
-        <svg className="h-5 w-5" viewBox="0 0 24 24">
-          <path
-            fill="#EA4335"
-            d="M5.266 9.765A7.077 7.077 0 0 1 12 4.909c1.69 0 3.218.6 4.418 1.582L19.91 3C17.782 1.145 15.055 0 12 0 7.336 0 3.332 2.691 1.39 6.618l3.876 3.147z"
+      <div className="mb-5">
+        {googleBusy ? (
+          <div
+            role="status"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-[4px] border border-[#8E918F]/60 bg-[#131314] text-sm text-[#E3E3E3]"
+          >
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Entrando con Google…
+          </div>
+        ) : inAndroidApp ? (
+          <GoogleBrandButton onClick={handleAppGoogleLogin}>
+            {isRegister ? "Registrarse con Google" : "Continuar con Google"}
+          </GoogleBrandButton>
+        ) : (
+          <GoogleSignInButton
+            clientId={googleClientId}
+            mode={mode}
+            onCredential={entrarConIdToken}
+            fallbackHref={googleAuthHref}
+            label={isRegister ? "Registrarse con Google" : "Continuar con Google"}
           />
-          <path
-            fill="#FBBC05"
-            d="M16.04 15.342c-1.043.682-2.38 1.09-4.04 1.09A7.078 7.078 0 0 1 5.266 11.6l-3.876 3.147C3.332 18.682 7.336 21.373 12 21.373c3.082 0 5.864-1.018 7.89-2.763l-3.85-3.268z"
-          />
-          <path
-            fill="#4285F4"
-            d="M23.49 12.273c0-.818-.082-1.609-.236-2.363H12v4.51h6.46A5.53 5.53 0 0 1 16.04 15.34l3.85 3.27C22.136 16.59 23.49 14.627 23.49 12.273z"
-          />
-          <path
-            fill="#34A853"
-            d="M5.266 11.6a6.973 6.973 0 0 1 0-1.835L1.39 6.618A11.968 11.968 0 0 0 0 12c0 1.91.445 3.718 1.236 5.33l4.03-3.147A6.976 6.976 0 0 1 5.266 11.6z"
-          />
-        </svg>
-        Continuar con Google
-      </a>
+        )}
+      </div>
 
       <div className="mb-5 flex items-center gap-3" aria-hidden="true">
         <div className="h-px flex-1 bg-white/5" />

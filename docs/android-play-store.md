@@ -129,8 +129,20 @@ flujo web y las cookies quedan en el WebView. Requiere registrar un cliente
    porque es el `aud` que valida el backend. El cliente Android solo autoriza al
    paquete a pedir tokens.
 
-Hasta que ese cliente exista, el sistema responde `no_credentials` y la app cae
-sola al camino 2.
+El APK que se instala hoy (el de `assembleFullDebug`) lo firma la clave de
+depuración: su SHA-256 es el de `public/.well-known/assetlinks.json`, así que la
+huella que hay que dar de alta es la de depuración de arriba.
+
+El botón «Continuar con Google» de la app prueba SIEMPRE primero este camino
+(`requestNativeGoogleIdToken` → `appGoogleNextStep` en
+`src/lib/auth/googleSignIn.js`): con un token, lo canjea `loginWithGoogle` y la
+sesión entra en el contexto antes de navegar; si el usuario cierra el selector,
+no pasa nada; cualquier otro fallo abre el camino 2. Hasta que el cliente
+Android exista, el sistema da un error de configuración y la app recuerda
+(`Prefs.nativeGoogleUnavailable`) que no debe ofrecer el selector, pero **solo
+24 horas**: después vuelve a intentarlo, así que al registrar el cliente no hace
+falta borrar los datos de la app. «Sin cuentas en el teléfono»
+(`NoCredentialException`) no cuenta como fallo de configuración.
 
 **2) Navegador + vuelta a la app (respaldo).** El botón navega a
 `/api/auth/google/start`, que detecta la app por el User-Agent

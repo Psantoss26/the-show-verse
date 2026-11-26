@@ -20,5 +20,12 @@ function sanitizeNextPath(nextPath) {
 export default async function LoginPage({ searchParams }) {
   const sp = await Promise.resolve(searchParams);
   const rawNext = typeof sp?.next === "string" ? sp.next : "/";
-  return <LoginClient next={sanitizeNextPath(rawNext)} />;
+  // El client ID web de Google es público (va en el botón oficial): se lee en
+  // el servidor para no duplicarlo en una variable NEXT_PUBLIC_.
+  return (
+    <LoginClient
+      next={sanitizeNextPath(rawNext)}
+      googleClientId={process.env.GOOGLE_CLIENT_ID || ""}
+    />
+  );
 }

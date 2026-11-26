@@ -88,11 +88,25 @@ class Prefs(context: Context) {
     /**
      * El login nativo de Google falló por configuración (no por cancelación).
      * Se recuerda para no volver a enseñar un selector de cuentas que acaba en
-     * nada: a partir de entonces se va directo al flujo por navegador.
+     * nada: durante un día se va directo al flujo por navegador. CADUCA para
+     * que, en cuanto el cliente OAuth de Android esté registrado en Google
+     * Cloud (o vuelvan los servicios de Google), el selector nativo regrese sin
+     * tener que borrar los datos de la app.
      */
     var nativeGoogleUnavailable: Boolean
-        get() = prefs.getBoolean(KEY_NO_NATIVE_GOOGLE, false)
-        set(value) = prefs.edit().putBoolean(KEY_NO_NATIVE_GOOGLE, value).apply()
+        get() {
+            val desde = prefs.getLong(KEY_NO_NATIVE_GOOGLE_AT, 0L)
+            return desde > 0L && System.currentTimeMillis() - desde < NO_NATIVE_GOOGLE_TTL_MS
+        }
+        set(value) {
+            val editor = prefs.edit().remove(KEY_NO_NATIVE_GOOGLE) // marca antigua, sin caducidad
+            if (value) {
+                editor.putLong(KEY_NO_NATIVE_GOOGLE_AT, System.currentTimeMillis())
+            } else {
+                editor.remove(KEY_NO_NATIVE_GOOGLE_AT)
+            }
+            editor.apply()
+        }
 
     /**
      * Resultado del último login con Google, en JSON, a la espera de que la web
@@ -221,6 +235,8 @@ class Prefs(context: Context) {
         private const val KEY_ACCESS_KEY = "private_access_key"
         private const val KEY_LAST_URL = "last_url"
         private const val KEY_NO_NATIVE_GOOGLE = "no_native_google"
+        private const val KEY_NO_NATIVE_GOOGLE_AT = "no_native_google_at"
+        private const val NO_NATIVE_GOOGLE_TTL_MS = 24L * 60 * 60 * 1000
         private const val KEY_GOOGLE_RESULT = "google_result"
         private const val KEY_PUSH_TOKEN = "push_token"
         private const val KEY_PERF_METER = "perf_frame_meter"

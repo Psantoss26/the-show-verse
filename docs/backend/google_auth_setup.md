@@ -4,22 +4,49 @@ Esta guia cubre el login/registro con Google usando la cuenta propia de The Show
 
 ## Flujo
 
-1. El usuario pulsa `Continuar con Google` en `/login`.
-2. Next.js redirige desde `/api/auth/google/start` a Google OAuth.
-3. Google vuelve a `/api/auth/google/callback`.
-4. Next.js intercambia el `code` por un `id_token`.
-5. Next.js envia el `id_token` al backend en `/v1/auth/google`.
-6. El backend valida Google, crea o recupera el usuario en PostgreSQL y devuelve tokens propios.
-7. Next.js guarda `showverse_access_token` y `showverse_refresh_token` como cookies httpOnly.
+**Web (ordenador, móvil y PWA): botón oficial de Google.** `/login` pinta el
+botón de Google Identity Services (`src/components/auth/GoogleSignInButton.jsx`):
+el diseño y el texto son los de Google («Continuar con Google» o
+«Registrarse con Google»), y al pulsarlo se abre la ventana de Google para elegir
+cuenta sin salir de la página (el diálogo del navegador, FedCM, en Chrome; una
+ventana emergente en el resto).
+
+1. Google devuelve un `idToken` al botón.
+2. `loginWithGoogle` (`AuthContext`) lo envía a `/api/auth/google/native`.
+3. Next.js lo reenvía al backend en `/v1/auth/google`, que lo valida contra
+   Google (incluido el `aud`), crea o recupera el usuario y devuelve tokens propios.
+4. Next.js guarda `showverse_access_token` y `showverse_refresh_token` como
+   cookies httpOnly y devuelve el usuario.
+5. El usuario entra en el contexto y solo entonces se navega a `next`: la página
+   de destino se pinta ya con la sesión, sin parpadeo. Mientras, el formulario
+   enseña «Entrando con Google…».
+
+**Respaldo por redirección.** Si el script de Google no carga (sin red,
+bloqueador, origen no autorizado), el botón se sustituye por un enlace a
+`/api/auth/google/start`. También queda bajo el botón oficial el enlace
+«¿No se abre la ventana? Usa la página de Google».
+
+1. `/api/auth/google/start` redirige a Google OAuth.
+2. Google vuelve a `/api/auth/google/callback`, que canjea el `code` por un
+   `id_token` y sigue como en los pasos 3-4.
+3. El callback vuelve a `/login?next=…&google_session=1`, que enseña «Entrando…»
+   hasta que `/api/auth/me` carga el usuario y entonces navega a `next`.
+
+**App de Android.** Google no permite su ventana dentro de un WebView: la app
+usa el selector nativo de cuentas y, si falla, el login en el navegador. Ver
+[Login con Google dentro de la app](../android-play-store.md#3bis-login-con-google-dentro-de-la-app).
 
 ## Google Cloud Console
 
 Crea un OAuth Client de tipo `Web application`.
 
-Authorized JavaScript origins:
+Authorized JavaScript origins (el botón oficial solo funciona en estos orígenes;
+para `localhost` Google pide también la entrada sin puerto):
 
 ```text
+http://localhost
 http://localhost:3000
+https://theshowverse.com
 https://TU-DOMINIO-DE-VERCEL
 https://theshowverse.netlify.app
 ```

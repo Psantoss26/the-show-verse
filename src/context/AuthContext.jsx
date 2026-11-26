@@ -514,6 +514,31 @@ export const AuthProvider = ({ children }) => {
     [applyUser, loadPreferences],
   );
 
+  // Login con un idToken de Google: el botón oficial de la web (GIS) y el
+  // selector nativo de la app de Android. Mismo canje que el login por
+  // redirección, pero el usuario entra en el contexto ANTES de navegar, así que
+  // la página de destino ya se pinta con la sesión.
+  const loginWithGoogle = useCallback(
+    async (idToken) => {
+      cleanLegacyStorage();
+      const res = await fetch("/api/auth/google/native", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+        body: JSON.stringify({ idToken }),
+      });
+      const json = await readJsonResponse(res);
+      const loggedUser = applyUser(json.user || null);
+      // Un backend que no devuelva el usuario: la cookie ya está, se pregunta.
+      if (!loggedUser) return refreshMe();
+      await loadPreferences();
+      setHydrated(true);
+      return loggedUser;
+    },
+    [applyUser, loadPreferences, refreshMe],
+  );
+
   const register = useCallback(
     async (payload) => {
       cleanLegacyStorage();
@@ -594,6 +619,7 @@ export const AuthProvider = ({ children }) => {
       authenticated,
       hydrated,
       login,
+      loginWithGoogle,
       register,
       updateProfile,
       logout,
@@ -611,6 +637,7 @@ export const AuthProvider = ({ children }) => {
       authenticated,
       hydrated,
       login,
+      loginWithGoogle,
       logout,
       refreshMe,
       register,
@@ -641,6 +668,7 @@ export const useAuth = () => {
       authenticated: false,
       hydrated: true,
       login: async () => null,
+      loginWithGoogle: async () => null,
       register: async () => null,
       updateProfile: async () => null,
       logout: async () => {},

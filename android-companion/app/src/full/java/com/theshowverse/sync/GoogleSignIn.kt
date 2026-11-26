@@ -136,11 +136,13 @@ object GoogleSignIn {
                     // existe el cliente OAuth de Android para este paquete y esta
                     // huella de firma. Se anota para que el flujo por navegador
                     // no tenga que adivinarlo.
+                    // Sin cuentas en el teléfono NO es configuración: al añadir
+                    // una, el selector debe volver a aparecer.
                     if (resultado.cancelled) {
                         prefs.addLog("Google: cancelado por el usuario")
                     } else {
                         prefs.addLog("Google: ✗ ${e.type.ifBlank { e.javaClass.simpleName }} — ${e.message ?: "sin detalle"}")
-                        prefs.nativeGoogleUnavailable = true
+                        if (e !is NoCredentialException) prefs.nativeGoogleUnavailable = true
                     }
                     principal.post { entregar(resultado) }
                 }

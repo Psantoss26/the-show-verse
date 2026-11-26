@@ -7,14 +7,20 @@ import { fileURLToPath } from "node:url";
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const loginForm = path.join(directory, "LoginForm.jsx");
 
-test("Android starts Google OAuth through the browser handoff instead of the native token flow", async () => {
+test("Android tries the native account picker first and falls back to the browser", async () => {
   const source = await readFile(loginForm, "utf8");
 
-  assert.doesNotMatch(
-    source,
-    /const resultado = await signInWithGoogleNative\(\)/,
-    "the APK must not depend on a Credential Manager token that requires a separately configured Android OAuth certificate",
-  );
-  assert.match(source, /if \(!inAndroidApp\) return;/);
+  assert.match(source, /await requestNativeGoogleIdToken\(\)/);
+  assert.match(source, /appGoogleNextStep\(resultado\)/);
+  // Cerrar el selector no abre el navegador; un fallo real, sí.
+  assert.match(source, /if \(paso === "stay"\) return;/);
   assert.match(source, /abrirLoginEnNavegador\(\);/);
+});
+
+test("the web uses Google's official button with the redirect as a fallback", async () => {
+  const source = await readFile(loginForm, "utf8");
+
+  assert.match(source, /<GoogleSignInButton/);
+  assert.match(source, /onCredential=\{entrarConIdToken\}/);
+  assert.match(source, /fallbackHref=\{googleAuthHref\}/);
 });

@@ -9,6 +9,10 @@ import {
 } from "@/lib/backend/server";
 import { buscarPorEstado, completarEntrega } from "../handoffStore";
 import {
+  GOOGLE_SESSION_PARAM,
+  normalizeBackendGoogleError,
+} from "@/lib/auth/googleSignIn";
+import {
   buildAndroidHandoffPage,
   buildAndroidOauthHandoffUrl,
   clearGoogleOauthCookies,
@@ -35,23 +39,6 @@ function redirectToLogin(request, next, reason) {
   const response = NextResponse.redirect(url);
   clearGoogleOauthCookies(response, request);
   return response;
-}
-
-function normalizeBackendGoogleError(error, status = 0) {
-  const message = String(error || "").toLowerCase();
-  if (status === 404 || message.includes("backend http 404")) {
-    return "backend_route_not_found";
-  }
-  if (message.includes("cors origin not allowed")) return "backend_cors_origin";
-  if (message.includes("google_client_id")) return "backend_google_config";
-  if (message.includes("audience")) return "google_audience_mismatch";
-  if (message.includes("invalid value") || message.includes("invalid google token")) {
-    return "google_token_rejected";
-  }
-  if (message.includes("email is not verified")) return "google_email_not_verified";
-  if (status >= 500) return "backend_server_error";
-  if (message.includes("backend api is not configured")) return "backend_missing_config";
-  return "backend_auth_failed";
 }
 
 async function exchangeCodeForTokens(request, code) {
@@ -224,7 +211,14 @@ export async function GET(request) {
     );
   }
 
-  const response = NextResponse.redirect(new URL(next, getRequestOrigin(request)));
+  // Se vuelve por /login y no directamente a `next`: el navegador todavía no
+  // tiene el usuario en caché, y la página de destino se pintaría un instante
+  // sin sesión. /login enseña «Entrando…» hasta que /api/auth/me responde y
+  // entonces navega a `next` con la sesión ya en el contexto.
+  const destino = new URL("/login", getRequestOrigin(request));
+  destino.searchParams.set("next", next);
+  destino.searchParams.set(GOOGLE_SESSION_PARAM, "1");
+  const response = NextResponse.redirect(destino);
   clearGoogleOauthCookies(response, request);
   clearBackendAuthCookies(response, { secure: getCookieSecure(request) });
   setBackendTokenCookies(response, backend.json, {

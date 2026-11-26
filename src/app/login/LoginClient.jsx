@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import LoginForm from "@/components/auth/LoginForm";
 import { useAuth } from "@/context/AuthContext";
+import { GOOGLE_SESSION_PARAM } from "@/lib/auth/googleSignIn";
 
-export default function LoginClient({ next }) {
+export default function LoginClient({ next, googleClientId }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { authenticated, hydrated } = useAuth();
+  // Vuelta del login de Google por redirección: las cookies ya están puestas y
+  // solo falta que /api/auth/me cargue el usuario. Mientras, «Entrando…» en vez
+  // del formulario (que parecía que el login no había funcionado).
+  const arrivingFromGoogle = searchParams?.get(GOOGLE_SESSION_PARAM) === "1";
+  const enteringSession = authenticated || (arrivingFromGoogle && !hydrated);
 
   useEffect(() => {
     if (!hydrated || !authenticated) return;
@@ -38,10 +47,6 @@ export default function LoginClient({ next }) {
     };
   }, []);
 
-  if (hydrated && authenticated) {
-    return null;
-  }
-
   return (
     <>
       {/* Fondo fijo: los blobs nunca se mueven al hacer scroll */}
@@ -54,7 +59,24 @@ export default function LoginClient({ next }) {
       {/* Contenedor fijo centrado — navbar top (4rem + recorte de la cámara) + bottom nav móvil (calc(4.5rem + safe-area)) */}
       <main className="fixed top-[calc(4rem+var(--sv-safe-top,0px))] bottom-[calc(4.5rem+var(--sv-safe-bottom,0px))] left-0 right-0 z-10 overflow-hidden overscroll-none text-white flex items-center justify-center lg:inset-0 lg:overflow-y-auto">
         <div className="w-full flex items-center justify-center px-4 py-0 lg:min-h-full lg:pt-8 lg:pb-8">
-          <LoginForm next={next} />
+          {enteringSession ? (
+            <div
+              role="status"
+              className="flex w-full max-w-[380px] flex-col items-center gap-4 rounded-[2.5rem] border border-white/12 bg-zinc-900/40 px-6 py-12 shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
+            >
+              <img
+                src="/logo-TSV-sinFondo.png"
+                alt="The Show Verse"
+                className="h-24 w-auto object-contain scale-[1.6]"
+              />
+              <div className="flex items-center gap-2 text-sm font-bold text-zinc-300">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Entrando…
+              </div>
+            </div>
+          ) : (
+            <LoginForm next={next} googleClientId={googleClientId} />
+          )}
         </div>
       </main>
     </>
