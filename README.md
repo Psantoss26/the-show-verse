@@ -321,7 +321,7 @@ Lo más destacado de lo que han visto, puntuado y reseñado la gente que sigues 
 <tr>
 <td width="50%">
 <img src="docs/assets/readme/discover.jpg" alt="Descubrir">
-<p align="center"><sub><b>Descubrir</b>: filtros por tipo, género, año, puntuación y plataforma</sub></p>
+<p align="center"><sub><b>Descubrir</b>: buscador, tipo, orden, filtros avanzados y varias vistas</sub></p>
 </td>
 <td width="50%">
 <img src="docs/assets/readme/calendar.jpg" alt="Calendario">

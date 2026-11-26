@@ -75,6 +75,8 @@ const SHOTS = [
   { name: 'continue', device: DESKTOP, path: '/continue-watching' },
   { name: 'completed', device: DESKTOP, path: '/completed' },
   { name: 'biblio', device: DESKTOP, path: '/biblioteca' },
+  // Explore.
+  { name: 'discover', device: DESKTOP, path: '/discover' },
   { name: 'drawer-favorites', device: DESKTOP, path: `/favorites?preview=movie-${MOVIE}`, drawer: true },
   { name: 'drawer-watchlist', device: DESKTOP, path: `/watchlist?preview=tv-${TV}`, drawer: true },
   { name: 'drawer-watchlist-scroll', device: DESKTOP, path: `/watchlist?preview=tv-${TV}`, drawer: true, scroll: 900 },

@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- README: captura de Descubrir actualizada a la versión actual de la página (buscador, tipo, orden, filtros avanzados y vistas); ya la regenera `scripts/capture-readme-screenshots.mjs`. → [README](README.md)
 - Cuadrícula compacta de Favoritos, Pendientes, Historial, Biblioteca, Calendario, Descubrir y las secciones de pósters del Perfil: al pasar el ratón, además de ampliarse la tarjeta, el póster se acerca dentro de ella con el mismo zoom lento y suave que en las secciones del dashboard (Más esperadas, Tendencias, Recomendaciones…). Los indicadores no se amplían. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - README: tour visual rehecho con capturas nuevas tomadas con la cuenta de Pablo y la sesión iniciada: fichas de película y serie en ordenador y en móvil, cada botón de acción con su modal (tráiler, banda sonora, vistos, puntuación, listas, reseñas, actividad, enlaces y compartir), fichas de temporada y de episodio, las páginas personales con su vista actual y el panel lateral abierto desde Favoritos y Pendientes. Las capturas se regeneran con `scripts/capture-readme-screenshots.mjs`. → [README](README.md)
 - Modal «Valoración de episodios»: sin barras de desplazamiento, ni la vertical del modal ni la horizontal de la tabla, en ordenador y en móvil; se sigue pudiendo desplazar igual. → [componentes](docs/frontend/components.md)
