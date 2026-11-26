@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Cuadrícula compacta: al quitar el cursor, la tarjeta y el póster vuelven a su sitio en un solo movimiento suave, sin el pequeño salto a mitad ni la imagen que seguía moviéndose despacio después. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Pósters más nítidos al pasar el ratón: el título impreso en el póster ya no se ve blando ni parece vibrar mientras la imagen se acerca, en la cuadrícula compacta y en el resto de tarjetas con zoom (dashboard, fichas, temporadas y episodios, Perfil, listas, estadísticas, En progreso, Continuar viendo). La tarjeta que se amplía ya no rebota al final. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - README: capturas rehechas con la foto de perfil en la barra superior en lugar de la inicial; el script de capturas sirve las fotos de Google desde Node porque Chrome sin ventana las bloqueaba. → [README](README.md)
 - README: captura de Descubrir actualizada a la versión actual de la página (buscador, tipo, orden, filtros avanzados y vistas); ya la regenera `scripts/capture-readme-screenshots.mjs`. → [README](README.md)

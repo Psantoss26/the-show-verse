@@ -83,6 +83,20 @@ const DURATION_MS = 360;
 // en el último tramo, y el texto de los pósteres parecía vibrar. Medido
 // fotograma a fotograma: con esta curva la nitidez solo sube.
 const EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+// Vuelta al quitar el cursor. La imagen (`.zoom`) vuelve con esta MISMA
+// duración y curva (variables `--sv-collapse-*` que lee el CSS module): antes
+// volvía en 700 ms con otra curva, la tarjeta recuperaba su tamaño a mitad
+// (repintado en pleno movimiento) y la imagen seguía 400 ms arrastrándose
+// borrosa hasta enfocarse de golpe. Ahora todo acaba a la vez.
+// Curva suave al principio y al final, sin concentrar el movimiento en los
+// primeros fotogramas como `EASING` (al encoger, ese arranque brusco se veía
+// como un tirón).
+const COLLAPSE_MS = DURATION_MS;
+const COLLAPSE_EASING = "cubic-bezier(0.4, 0, 0.2, 1)";
+const COLLAPSE_VARS = {
+  "--sv-collapse-ms": `${COLLAPSE_MS}ms`,
+  "--sv-collapse-ease": COLLAPSE_EASING,
+};
 
 // Crecimiento en píxeles ENTEROS por lado, a partir del tamaño real de la celda,
 // y la escala que devuelve la tarjeta ampliada al tamaño exacto de la celda.
@@ -230,14 +244,24 @@ export default function HoverExpandCard({
       return;
     }
 
-    const collapseTransition = `${Math.round(DURATION_MS * 0.8)}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+    const collapseTransition = `${COLLAPSE_MS}ms ${COLLAPSE_EASING}`;
     el.style.transition = `transform ${collapseTransition}`;
     el.style.transform = shrunkRef.current;
     moveOverlay(overlayRef.current, "0px 0px", `translate ${collapseTransition}`);
-    // Al terminar la animación la tarjeta recupera su tamaño normal. Con un
-    // temporizador y no con `transitionend`, que no llega si la transición se
-    // interrumpe o no llega a arrancar.
-    leaveTimerRef.current = window.setTimeout(finish, Math.round(DURATION_MS * 0.8) + 40);
+    // Al terminar la animación la tarjeta recupera su tamaño normal, en el
+    // mismo fotograma en que se para (con un margen de 40 ms se repintaba
+    // suelta con la imagen ya quieta). `transitionend` no llega si la
+    // transición se interrumpe o no arranca: el temporizador lo cubre.
+    const onEnd = (event) => {
+      if (event.target !== el || event.propertyName !== "transform") return;
+      el.removeEventListener("transitionend", onEnd);
+      finish();
+    };
+    el.addEventListener("transitionend", onEnd);
+    leaveTimerRef.current = window.setTimeout(() => {
+      el.removeEventListener("transitionend", onEnd);
+      finish();
+    }, COLLAPSE_MS + 120);
   }, []);
 
   const handlePointerEnter = (event) => {
@@ -343,7 +367,9 @@ export default function HoverExpandCard({
   }, [enabled]);
 
   const layerStyle =
-    zIndex != null ? { "--sv-hover-expand-z": zIndex } : undefined;
+    zIndex != null
+      ? { ...COLLAPSE_VARS, "--sv-hover-expand-z": zIndex }
+      : COLLAPSE_VARS;
 
   return (
     <div className={`relative ${cellClassName}`} style={layerStyle}>
