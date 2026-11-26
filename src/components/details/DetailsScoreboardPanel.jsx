@@ -20,9 +20,11 @@
 //   mc:          { value, sub, href } | null          (badge Metacritic, solo >= sm;
 //                                                     no se pinta si hay `lb`)
 //   lb:          { value, sub, href } | null  (badge Letterboxd sobre 10, solo >= sm)
-//   phoneExtraScore: "lb" | "rt" | null  (cuarta puntuación del marcador de
-//                                         teléfono: Letterboxd en películas,
-//                                         Rotten Tomatoes en series)
+//   phoneScores: string[] | null  (puntuaciones del marcador de teléfono,
+//                                  ajuste «Puntuaciones en el móvil», ya
+//                                  filtradas para el tipo del título con
+//                                  `phoneScoresFor` de lib/ui/phoneScoreboardScores.js;
+//                                  null = TMDb, Trakt e IMDb)
 //   stats:       { watchers, plays, lists, favorited } | null  (fila de stats)
 //   showFavoritedStat: boolean                  (oculta Favoritos cuando no aplica)
 //   toolbarActions: ReactNode | null            (acciones inline al final)
@@ -35,7 +37,7 @@ import { Fragment, useLayoutEffect, useRef } from "react";
 import styles from "./DetailsScoreboardPanel.module.css";
 import { motion, useReducedMotion } from "framer-motion";
 import NextImage from "next/image";
-import { Eye, Play, List, Heart, MoreHorizontal, MonitorPlay, UsersRound, Link2 } from "lucide-react";
+import { Eye, Play, List, Heart, MoreHorizontal, MonitorPlay, UsersRound, Link2, Plus } from "lucide-react";
 
 import {
   CompactBadge,
@@ -48,6 +50,7 @@ import {
 import { formatShortNumber } from "@/lib/details/formatters";
 import { useLinksWithWikipedia } from "@/lib/details/useWikipediaLink";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
+import { DEFAULT_PHONE_SCORES } from "@/lib/ui/phoneScoreboardScores";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
 // Badge de estadística de Trakt (Watchers, Plays, Lists, Favorited).
@@ -142,18 +145,50 @@ export function DetailsRatingsBadges({
   // Marcador: puntuaciones y logos un punto mayores desde
   // `xl` (ver `roomy` en CompactBadge).
   roomy = false,
-  // Marcador de teléfono (`spread`): la cuarta puntuación, junto a TMDb, Trakt
-  // e IMDb. "lb" (Letterboxd, películas) o "rt" (Rotten Tomatoes, series). La
-  // otra, y Metacritic, siguen solo desde `sm`.
-  phoneExtraScore = null,
+  // Marcador de teléfono (`spread`): qué puntuaciones enseña (ajuste
+  // «Puntuaciones en el móvil», hasta cuatro). Desde `sm` no cuenta.
+  phoneScores = null,
+  // Editor de Ajustes: hueco «+» en esa posición del marcador de teléfono
+  // (vista previa de dónde caerá la puntuación que se arrastra).
+  phoneAddSlotAt = null,
 }) {
-  // Envoltorio de RT / Metacritic / Letterboxd: solo desde `sm`, salvo la
-  // cuarta puntuación del marcador de teléfono (`.phoneExtraScore`, que la
-  // muestra en `phone-sb` aunque `.optionalScore` la retire por ancho).
-  const isPhoneExtra = (name) => spread && phoneExtraScore === name;
-  const optionalWrapClass = (name) =>
-    `${phone && !isPhoneExtra(name) ? "hidden" : "hidden sm:block"} ${styles.optionalScore} ${isPhoneExtra(name) ? styles.phoneExtraScore : ""}`;
-  const extraOnPhone = isPhoneExtra("lb") ? lb : isPhoneExtra("rt") ? rt : null;
+  // Ya filtradas por tipo (`phoneScoresFor`): aquí solo se consultan.
+  const phonePicked = phoneScores ?? DEFAULT_PHONE_SCORES.movie;
+  const onPhone = (name) => spread && phonePicked.includes(name);
+  // TMDb / Trakt / IMDb no elegidas: en el teléfono se retiran (`.phoneOff`);
+  // en la ficha, desde `sm`, siguen. Las elegidas no llevan envoltorio.
+  const phoneOffWrap = (name, node) =>
+    spread && !onPhone(name) ? <div className={styles.phoneOff}>{node}</div> : node;
+  // Envoltorio de RT / Metacritic / Letterboxd: solo desde `sm`, salvo las
+  // elegidas para el marcador de teléfono (`.phoneOn`, que las muestra en
+  // `phone-sb` aunque `.optionalScore` las retire por ancho). `deskOff`:
+  // Metacritic con Letterboxd presente solo se ve en el teléfono.
+  const optionalWrapClass = (name, deskOff = false) =>
+    `${(phone && !onPhone(name)) || deskOff ? "hidden" : "hidden sm:block"} ${styles.optionalScore} ${onPhone(name) ? styles.phoneOn : ""}`;
+  // ORDEN ELEGIDO en el teléfono (el del editor de Ajustes): las insignias van
+  // en el DOM en orden fijo; las elegidas se envuelven en `.phoneSlot`, que
+  // fuera del teléfono es `display: contents` (no existe para el flex) y en el
+  // teléfono es el ítem flex con `order` = su posición en la lista.
+  const addSlotAt = spread && Number.isInteger(phoneAddSlotAt) ? phoneAddSlotAt : null;
+  const slotOrder = (name) => {
+    const index = phonePicked.indexOf(name);
+    return addSlotAt != null && index >= addSlotAt ? index + 1 : index;
+  };
+  const phoneSlot = (name, node) =>
+    spread && onPhone(name) ? (
+      <div className={styles.phoneSlot} data-phone-score={name} style={{ "--sb-order": slotOrder(name) }}>
+        {node}
+      </div>
+    ) : node;
+  // Cuántas se ven en el teléfono: con cuatro la escala se recalcula.
+  const phoneCount = [
+    ["tmdb", tmdb],
+    ["trakt", trakt || traktPublic],
+    ["imdb", imdb],
+    ["rt", rt],
+    ["mc", mc],
+    ["lb", lb],
+  ].filter(([name, score]) => score && onPhone(name)).length + (addSlotAt != null ? 1 : 0);
   const isPendingScore = (score) =>
     !!score && score.pending === true && score.value == null;
   const resolvedValue = (score) =>
@@ -178,14 +213,14 @@ export function DetailsRatingsBadges({
   // Metacritic enseñan la nota del público en escala 10 con sus votos). Así el
   // hueco reservado mide prácticamente lo que va a medir el real. Sin `href` la
   // insignia no es un enlace, así que tampoco entra en el orden de tabulación.
-  const scoreSlot = (score, render, placeholder = { value: "0.0", sub: "00 k" }) => {
+  const scoreSlot = (name, score, render, placeholder = { value: "0.0", sub: "00 k" }) => {
     if (!score) return null;
-    if (!isPendingScore(score)) return render(score);
-    return (
+    const node = !isPendingScore(score) ? render(score) : (
       <div className="invisible" aria-hidden="true">
         {render({ ...score, ...placeholder, href: undefined })}
       </div>
     );
+    return phoneSlot(name, node);
   };
 
   return (
@@ -206,7 +241,7 @@ export function DetailsRatingsBadges({
           : phone
             ? ""
             : "sm:gap-5"
-      } ${spread ? `phone-sb:w-full phone-sb:justify-evenly ${styles.spreadScores} ${extraOnPhone ? styles.spreadScores4 : ""}` : ""}`}
+      } ${spread ? `phone-sb:w-full phone-sb:justify-evenly ${styles.spreadScores} ${phoneCount >= 4 ? styles.spreadScores4 : ""}` : ""}`}
     >
       {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
       <div className="absolute opacity-0 pointer-events-none w-4 h-4">
@@ -216,7 +251,7 @@ export function DetailsRatingsBadges({
       </div>
 
       {/* Badge de TMDb - Muestra la puntuación promedio y número de votos */}
-      {scoreSlot(tmdb, (score) => (
+      {scoreSlot("tmdb", tmdb, (score) => phoneOffWrap("tmdb",
         <CompactBadge
           key={scoreStateKey("tmdb", score)}
           logo="/logo-TMDb.png"
@@ -234,7 +269,7 @@ export function DetailsRatingsBadges({
       ))}
 
       {/* Badge de Trakt - Muestra puntuación en formato decimal cuando el usuario está conectado */}
-      {scoreSlot(trakt, (score) => (
+      {scoreSlot("trakt", trakt, (score) => phoneOffWrap("trakt",
         <CompactBadge
           key={scoreStateKey("trakt", score)}
           logo="/logo-Trakt.png"
@@ -251,7 +286,7 @@ export function DetailsRatingsBadges({
       ))}
 
       {/* Badge de Trakt alternativo cuando no hay conexión pero existe score público */}
-      {scoreSlot(traktPublic, (score) => (
+      {scoreSlot("trakt", traktPublic, (score) => phoneOffWrap("trakt",
         <CompactBadge
           key={scoreStateKey("trakt-public", score)}
           logo="/logo-Trakt.png"
@@ -267,7 +302,7 @@ export function DetailsRatingsBadges({
       ))}
 
       {/* Badge de IMDb - Muestra rating y votos, enlaza al título en IMDb */}
-      {scoreSlot(imdb, (score) => (
+      {scoreSlot("imdb", imdb, (score) => phoneOffWrap("imdb",
         <CompactBadge
           key={scoreStateKey("imdb", score)}
           logo="/logo-IMDb.png"
@@ -294,13 +329,14 @@ export function DetailsRatingsBadges({
           en el módulo CSS). Nota del público (Popcornmeter) en escala 10, con
           sus votos como `sub`, leída de la ficha de RT. */}
       {scoreSlot(
+        "rt",
         rt,
         (score) => (
           <div className={optionalWrapClass("rt")}>
             <CompactBadge
               logo="/logo-RottenTomatoes.png"
               phone={phone}
-              large={isPhoneExtra("rt")}
+              large={onPhone("rt")}
               value={score.value}
               sub={score.sub}
               href={score.href}
@@ -317,11 +353,14 @@ export function DetailsRatingsBadges({
           esperando), Letterboxd ocupa su sitio: en películas manda Letterboxd
           y Metacritic queda para series y películas sin nota allí. */}
       {scoreSlot(
-        lb ? null : mc,
+        "mc",
+        lb && !onPhone("mc") ? null : mc,
         (score) => (
-          <div className={optionalWrapClass("mc")}>
+          <div className={optionalWrapClass("mc", !!lb)}>
             <CompactBadge
               logo="/logo-Metacritic.png"
+              phone={phone}
+              large={onPhone("mc")}
               value={score.value}
               sub={score.sub}
               href={score.href}
@@ -337,13 +376,14 @@ export function DetailsRatingsBadges({
           Solo películas; su media 0–5 llega ya sobre 10
           (`letterboxdScoreBadge`), como las demás. */}
       {scoreSlot(
+        "lb",
         lb,
         (score) => (
           <div className={optionalWrapClass("lb")}>
             <CompactBadge
               logo="/logo-Letterboxd.png"
               phone={phone}
-              large={isPhoneExtra("lb")}
+              large={onPhone("lb")}
               // Es el icono de la app: un cuadrado oscuro que se funde con el
               // marcador, y lo que se ve son los puntos (74 % del ancho del
               // PNG). Se amplía para que los puntos midan lo que los demás
@@ -360,6 +400,14 @@ export function DetailsRatingsBadges({
         ),
         { value: "0.0", sub: "00 k" },
       )}
+
+      {addSlotAt != null ? (
+        <div className={styles.phoneSlot} data-phone-add-slot="" style={{ "--sb-order": addSlotAt }} aria-hidden="true">
+          <div className={styles.phoneAddSlot}>
+            <Plus />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1012,8 +1060,9 @@ export default function DetailsScoreboardPanel({
   // ventana: el panel marca `data-phone-scoreboard` y la variante `phone-sb:`
   // (globals.css) activa ahí lo mismo que `max-sm:` en un teléfono.
   mobileScoresOnly = false,
-  // Cuarta puntuación del marcador de teléfono (ver DetailsRatingsBadges).
-  phoneExtraScore = null,
+  // Puntuaciones del marcador de teléfono (ver DetailsRatingsBadges).
+  phoneScores = null,
+  phoneAddSlotAt = null,
   toolbarActions = null,
   className = "",
   children = null,
@@ -1140,7 +1189,8 @@ export default function DetailsScoreboardPanel({
               phone={phoneLayout}
               spread={mobileScoresOnly}
               roomy={roomyScores}
-              phoneExtraScore={phoneExtraScore}
+              phoneScores={phoneScores}
+              phoneAddSlotAt={phoneAddSlotAt}
             />
           </div>
 

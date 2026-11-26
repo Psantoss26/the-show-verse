@@ -100,6 +100,7 @@ import {
   isDrawerResizeActive,
 } from "@/lib/ui/drawerResizeEvents";
 import { useDrawerWidthVar } from "@/lib/ui/drawerWidthVar";
+import { getPhoneScores, phoneScoresFor } from "@/lib/ui/phoneScoreboardScores";
 import {
   DETAILS_ROUTE_TRANSITION_KEY,
   DETAILS_ROUTE_REVEAL_MIN_MS,
@@ -664,14 +665,14 @@ export default function DetailModal({
   // notas y se compactaban de golpe. Ya resuelto y sin dato vuelve a ser `null`:
   // la insignia no se pinta, que es lo correcto para un título sin nota allí.
   //
-  // Ficha de teléfono: solo la cuarta puntuación del marcador móvil
-  // (`phoneExtraScore`: Letterboxd en películas, Rotten Tomatoes en series);
-  // cinco insignias no caben en ese ancho. Tampoco en episodios: esas fichas
-  // son de la serie, no del episodio.
-  const phoneExtraScore = isEpisode ? null : mediaType === "movie" ? "lb" : "rt";
-  const optionalScoreBadge = (scores, href, toBadge = audienceScoreBadge, name = null) => {
+  // Ficha de teléfono: solo las que el usuario eligió para el marcador móvil
+  // (ajuste «Puntuaciones en el móvil», `phoneScores`; cinco insignias no
+  // caben en ese ancho). Tampoco en episodios: esas fichas son de la serie,
+  // no del episodio.
+  const phoneScores = phoneScoresFor(getPhoneScores(preferences), mediaType);
+  const optionalScoreBadge = (scores, href, toBadge, name) => {
     if (isEpisode) return null;
-    if (phoneLayout && name !== phoneExtraScore) return null;
+    if (phoneLayout && !phoneScores.includes(name)) return null;
     if (!ratingScores.ready) return { pending: true };
     return toBadge(scores, href);
   };
@@ -2496,12 +2497,16 @@ export default function DetailModal({
       isRightPlacement ? "right" : "center",
       { art: drawerArrival },
     );
-    const releaseArrival = drawerArrival ? markDetailsArrival() : null;
     setNavigatingToFullDetails(true);
 
     if (routeTransition) {
       await nextAnimationFrame();
     }
+
+    // La marca de llegada recalcula los estilos del documento entero (es un
+    // atributo en <html>): en el clic retrasaba el primer fotograma del
+    // relevo. Basta con que esté antes de `router.push`.
+    const releaseArrival = drawerArrival ? markDetailsArrival() : null;
 
     if (drawerArrival) {
       if (!getWarmedSequenceBackdrop(href)) {
@@ -3337,14 +3342,14 @@ export default function DetailModal({
       trakt={scoreboardTrakt}
       traktPublic={null}
       imdb={scoreboardImdb}
-      // Ver `optionalScoreBadge`: en la ficha de teléfono solo la cuarta
-      // puntuación, y con hueco reservado mientras se leen las fichas.
+      // Ver `optionalScoreBadge`: en la ficha de teléfono solo las elegidas,
+      // y con hueco reservado mientras se leen las fichas.
       rt={optionalScoreBadge(ratingScores.rt, ratingLinks.rt, audienceScoreBadge, "rt")}
-      mc={optionalScoreBadge(ratingScores.mc, ratingLinks.mc)}
+      mc={optionalScoreBadge(ratingScores.mc, ratingLinks.mc, audienceScoreBadge, "mc")}
       // Letterboxd solo tiene películas: en series ni reserva hueco.
       lb={mediaType === "movie" ? optionalScoreBadge(ratingScores.lb, ratingScores.lb?.url || ratingLinks.lb, letterboxdScoreBadge, "lb") : null}
       mobileScoresOnly={phoneLayout}
-      phoneExtraScore={phoneExtraScore}
+      phoneScores={isEpisode ? null : phoneScores}
       // En tablet la ventana supera `sm` aunque el drawer sea
       // estrecho: sin esto el marcador salía con la disposición
       // ancha y puntuaciones y stats se partían en dos filas.

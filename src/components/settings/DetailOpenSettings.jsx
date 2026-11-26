@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, PanelsTopLeft, X } from "lucide-react";
+import { ChevronDown, PanelsTopLeft } from "lucide-react";
 import { useServerOnline } from "@/context/ServerStatusContext";
-import useBodyScrollLock from "@/hooks/useBodyScrollLock";
+import SettingsGlassModal from "@/components/settings/SettingsGlassModal";
 import { resolveDetailOpen, withDetailOpen } from "@/lib/ui/detailOpenPreferences";
 import { detailOpenPreview } from "@/lib/ui/detailOpenPreview";
 import styles from "./DetailOpenSettings.module.css";
@@ -142,15 +142,8 @@ export default function DetailOpenSettings({ uiSettings, disabled: disabledProp,
   const disabled = disabledProp || !online;
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState("dashboard");
-  const dialogRef = useRef(null);
   const headingId = useId();
   const scopeName = useId();
-  useBodyScrollLock(open);
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
   const title = t("settings_detail_open_title", "Al abrir un título");
   return (
     <>
@@ -170,18 +163,19 @@ export default function DetailOpenSettings({ uiSettings, disabled: disabledProp,
           <span>{t("settings_customize", "Personalizar")}</span>
         </button>
       </div>
-      <dialog ref={dialogRef} aria-labelledby={headingId} onClose={() => setOpen(false)}
-        onClick={(event) => { if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setOpen(false); } }}
-        className={`${styles.dialog} m-auto max-h-[94dvh] w-[calc(100%-2rem)] max-w-[90rem] overflow-y-auto overscroll-contain rounded-[1.75rem] p-0 text-white backdrop:bg-black/75 backdrop:backdrop-blur-sm`}>
-        {open && <div className="space-y-4 p-4 sm:p-6">
-          <header className="flex items-start justify-between gap-4">
-            <div>
-              <h2 id={headingId} className="text-xl font-bold tracking-tight">{title}</h2>
-              <p className="mt-1 max-w-2xl text-sm text-zinc-400">{t("settings_detail_open_intro", "Elige dónde quieres aplicarlo y compara cómo se abre la ficha. En móvil siempre se abre la ficha completa.")}</p>
-            </div>
-            <button type="button" onClick={() => setOpen(false)} aria-label={t("close", "Cerrar")}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-emerald-400"><X size={20} /></button>
-          </header>
+      {/* Mismo diseño que los modales de acción de la ficha (SettingsGlassModal). */}
+      <SettingsGlassModal
+        open={open}
+        onClose={() => setOpen(false)}
+        titleId={headingId}
+        title={title}
+        subtitle={t("settings_detail_open_subtitle", "Escritorio")}
+        icon={PanelsTopLeft}
+        closeLabel={t("close", "Cerrar")}
+        panelClassName="max-w-[90rem]"
+        bodyClassName="sv-modal-scroll-fade flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 sm:p-6"
+      >
+          <p className="max-w-2xl text-sm text-zinc-400">{t("settings_detail_open_intro", "Elige dónde quieres aplicarlo y compara cómo se abre la ficha. En móvil siempre se abre la ficha completa.")}</p>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <fieldset className={styles.scope}>
             <legend className="sr-only">{t("settings_detail_open_scope", "Aplicar en")}</legend>
@@ -201,8 +195,7 @@ export default function DetailOpenSettings({ uiSettings, disabled: disabledProp,
             ? t("settings_detail_open_offline", "Sin conexión: puedes ver las muestras, pero no cambiar los ajustes.")
             : disabledProp ? t("settings_detail_open_saving", "Guardando cambios…")
             : t("settings_detail_open_autosave", "Los cambios se guardan automáticamente para el ámbito seleccionado.")}</p>
-        </div>}
-      </dialog>
+      </SettingsGlassModal>
     </>
   );
 }

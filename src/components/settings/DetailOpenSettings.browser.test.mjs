@@ -41,7 +41,7 @@ try {
  await dialog.locator('label').filter({has:page.getByRole('radio',{name:'Dashboards',exact:true})}).click();
  assert.equal(await dialog.locator('video').getAttribute('src'),'/previews/detail-open/docked-mobile.webm');
  await page.keyboard.press('Escape');
- assert.equal(await dialog.isVisible(),false);
+ await dialog.waitFor({state:'hidden'});
  assert.equal(await row.getByRole('button',{name:'Personalizar'}).evaluate(el=>el===document.activeElement),true);
  await page.setViewportSize({width:390,height:844});
  await row.getByRole('button',{name:'Personalizar'}).click();

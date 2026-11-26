@@ -111,15 +111,31 @@
   --sb-su: clamp(0.7px, calc((100cqi - 46px) / 272), 1px);
 }
 
-/* CUARTA PUNTUACIÓN del marcador de teléfono (`phoneExtraScore`): Letterboxd
-   en películas, Rotten Tomatoes en series. Se ve aunque `.optionalScore` la
-   retire por ancho (esa regla es para la barra de escritorio con botones).
+/* PUNTUACIONES ELEGIDAS para el marcador de teléfono (`phoneScores`, ajuste
+   «Puntuaciones en el móvil»). `.phoneOn`: RT / Metacritic / Letterboxd
+   elegidas, que se ven aunque `.optionalScore` las retire por ancho (esa regla
+   es para la barra de escritorio con botones). `.phoneOff`: TMDb / Trakt /
+   IMDb no elegidas, que se retiran solo en el teléfono. `.phoneSlot`: envoltorio
+   de cada elegida que, solo en el teléfono, la coloca en el orden del editor.
    Con cuatro insignias la escala se recalcula: 2×12px de relleno + 3 huecos
    de 12px = 60px fijos; la cuarta pide ~77px más a escala 1 (logo 32 + 12 +
    cifra "8.5" / votos "250K+"), 320px en total. */
+.phoneSlot {
+  display: contents;
+}
+
 @media (width < 40rem) {
-  .spreadScores .phoneExtraScore {
+  .spreadScores .phoneSlot {
+    display: block;
+    order: var(--sb-order, 0);
+  }
+
+  .spreadScores .phoneOn {
     display: block !important;
+  }
+
+  .spreadScores .phoneOff {
+    display: none;
   }
 
   .spreadScores4 {
@@ -127,12 +143,38 @@
   }
 }
 
-[data-phone-scoreboard] .spreadScores .phoneExtraScore {
+[data-phone-scoreboard] .spreadScores .phoneSlot {
+  display: block;
+  order: var(--sb-order, 0);
+}
+
+[data-phone-scoreboard] .spreadScores .phoneOn {
   display: block !important;
+}
+
+[data-phone-scoreboard] .spreadScores .phoneOff {
+  display: none;
 }
 
 [data-phone-scoreboard] .spreadScores4 {
   --sb-u: clamp(0.6px, calc((100cqi - 60px) / 320), 1px);
+}
+
+/* Hueco «+» del editor de Ajustes (`phoneAddSlotAt`): donde caerá la
+   puntuación que se arrastra, con el ancho y alto de una insignia. */
+.phoneAddSlot {
+  display: grid;
+  place-items: center;
+  inline-size: calc(72 * var(--sb-u, 1px));
+  block-size: calc(44 * var(--sb-u, 1px));
+  border-radius: calc(12 * var(--sb-u, 1px));
+  background: rgb(255 255 255 / 0.1);
+  color: rgb(255 255 255 / 0.8);
+}
+
+.phoneAddSlot svg {
+  inline-size: calc(22 * var(--sb-u, 1px));
+  block-size: calc(22 * var(--sb-u, 1px));
 }
 
 /* Ficha normal con Enlaces y Compartir fuera del panel (`narrowStatLabels`):

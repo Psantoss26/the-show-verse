@@ -343,6 +343,7 @@ import VideoModal from "@/components/details/VideoModal";
 import SoundtrackModal from "@/components/details/SoundtrackModal";
 import useAmbientSoundtrack from "@/lib/details/useAmbientSoundtrack";
 import { isSoundtrackAutoplayOn, withSoundtrackAutoplay } from "@/lib/soundtrack/autoplayPreference";
+import { getPhoneScores, phoneScoresFor } from "@/lib/ui/phoneScoreboardScores";
 import {
   getSoundtrackFeedback,
   SOUNDTRACK_EXCLUDE_PARAM,
@@ -1308,6 +1309,12 @@ export default function DetailsClient({
   } = useAuth();
   const isAdmin =
     account?.username === "psantos26" || account?.name === "psantos26";
+  // Marcador de teléfono: puntuaciones elegidas en Ajustes (TMDb, Trakt e IMDb
+  // por defecto, hasta cuatro) para el tipo de este título.
+  const phoneScores = useMemo(
+    () => phoneScoresFor(getPhoneScores(preferences), endpointType),
+    [preferences, endpointType],
+  );
 
   // ¿Se pueden MOSTRAR los botones de acción con estado (visto, puntuación,
   // favorito, pendiente, listas, reseña)?
@@ -11549,9 +11556,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // Score) leída de su ficha, en escala 10 con sus votos. Sin
                 // ella, el Popcornmeter que trae Trakt (sin recuento).
                 //
-                // Mientras se leen esas fichas, la que va en el marcador de
-                // teléfono (`phoneExtraScore`) reserva su hueco (`pending`):
-                // si no, llegaba tarde y recolocaba las otras tres.
+                // Mientras se leen esas fichas, las elegidas para el marcador
+                // de teléfono (`phoneScores`) reservan su hueco (`pending`):
+                // si no, llegaban tarde y recolocaban las demás.
                 rt={
                   audienceScoreBadge(ratingScores.rt, ratingLinks.rt) ??
                   (tScoreboard?.external?.rtAudience != null
@@ -11559,18 +11566,23 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         value: (Math.round(tScoreboard.external.rtAudience) / 10).toFixed(1),
                         href: ratingLinks.rt,
                       }
-                    : endpointType === "tv" && !ratingScores.ready
+                    : phoneScores.includes("rt") && !ratingScores.ready
                       ? { pending: true }
                       : null)
                 }
-                mc={audienceScoreBadge(ratingScores.mc, ratingLinks.mc)}
+                mc={
+                  audienceScoreBadge(ratingScores.mc, ratingLinks.mc) ??
+                  (phoneScores.includes("mc") && !ratingScores.ready ? { pending: true } : null)
+                }
                 // Letterboxd: media de sus miembros sobre 10 (solo películas).
                 lb={
                   letterboxdScoreBadge(ratingScores.lb, ratingScores.lb?.url || ratingLinks.lb) ??
-                  (endpointType === "movie" && !ratingScores.ready ? { pending: true } : null)
+                  (endpointType === "movie" && phoneScores.includes("lb") && !ratingScores.ready
+                    ? { pending: true }
+                    : null)
                 }
-                // Móvil: cuarta puntuación junto a TMDb, Trakt e IMDb.
-                phoneExtraScore={endpointType === "movie" ? "lb" : endpointType === "tv" ? "rt" : null}
+                // Móvil: las puntuaciones que eligió el usuario en Ajustes.
+                phoneScores={phoneScores}
                 externalLinks={isBackdropPoster ? scoreboardExternalLinks : null}
                 externalLinksWikipedia={wikipediaQuery}
                 onMoreLinks={isBackdropPoster ? () => setExternalLinksOpen(true) : undefined}

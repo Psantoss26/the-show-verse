@@ -1,13 +1,11 @@
 "use client";
 
 import OnlineOnlyForm from "@/components/OnlineOnlyForm";
-import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import Link from "next/link";
 import { useServerOnline } from "@/context/ServerStatusContext";
 import OfflineStorageStatus from "@/components/OfflineStorageStatus";
-import useBodyScrollLock from "@/hooks/useBodyScrollLock";
 import useFitViewportPage from "@/hooks/useFitViewportPage";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -32,9 +30,11 @@ import {
   Shield,
   Globe2,
   SlidersHorizontal,
+  Gauge,
   User,
   Bell,
   Layers,
+  Plus,
   ChevronRight,
   Radar,
   Database,
@@ -59,7 +59,6 @@ import {
   MOBILE_BOTTOM_NAV_MAX_ITEMS,
   sanitizeMobileBottomNav,
 } from "@/lib/ui/mobileBottomNav";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
 import Avatar, { getInitial } from "@/components/ui/Avatar";
 import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
@@ -82,6 +81,13 @@ import {
 } from "@/lib/plex/client";
 import DetailOpenSettings from "@/components/settings/DetailOpenSettings";
 import { isSoundtrackAutoplayOn, withSoundtrackAutoplay } from "@/lib/soundtrack/autoplayPreference";
+import {
+  PHONE_SCORES_MAX,
+  getPhoneScores,
+  withPhoneScores,
+} from "@/lib/ui/phoneScoreboardScores";
+import PhoneScoresEditor from "@/components/settings/PhoneScoresEditor";
+import SettingsGlassModal from "@/components/settings/SettingsGlassModal";
 
 const GLASS_SURFACE =
   "relative overflow-hidden border border-white/[0.08] bg-black/40 shadow-2xl shadow-black/40 backdrop-blur-xl before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-br before:from-white/[0.08] before:via-white/[0.02] before:to-transparent";
@@ -1065,30 +1071,25 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
   const [draft, setDraft] = useState(() => sanitizeMobileBottomNav(value));
   const [draggedKey, setDraggedKey] = useState(null);
   const [draggedFromPalette, setDraggedFromPalette] = useState(false);
-  const [dropTargetIndex, setDropTargetIndex] = useState(null);
+  const [dropTargetKey, setDropTargetKey] = useState(null);
   const [dragPoint, setDragPoint] = useState(null);
+  const [addSlotIndex, setAddSlotIndex] = useState(null);
   const dragSessionRef = useRef({ key: null, fromPalette: false, targetKey: null });
   const suppressPaletteClickRef = useRef(false);
+  const navRef = useRef(null);
+  // Arrastre desde los accesos sueltos: geometría de la barra al empezar (sin
+  // hueco «+»). El destino se decide con ella y no con lo que hay bajo el
+  // puntero: el hueco recoloca los botones, y decidir sobre la barra ya movida
+  // haría saltar entre «añadir» y «sustituir» sin mover el puntero. Mismo
+  // criterio que el editor de «Puntuaciones en el móvil».
+  const paletteSnapRef = useRef(null);
+  // FLIP de los botones de la barra: posición en pantalla antes del cambio.
+  const flipFromRef = useRef(null);
 
-  // Bloquea el scroller real (<html>) y corta el rebote táctil mientras el
-  // compositor está abierto. El fondo no debe poder desplazarse ni recibir
-  // gestos durante una edición.
-  useBodyScrollLock(isOpen);
-
+  // Bloqueo del scroll de fondo, Escape y atrás: SettingsGlassModal.
   useEffect(() => {
     if (isOpen) setDraft(sanitizeMobileBottomNav(value));
   }, [isOpen, value]);
-
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
 
   const selected = draft.map((key) => MOBILE_BOTTOM_NAV_ITEMS.find((item) => item.key === key));
   const previewSlots = Array.from(
@@ -1096,6 +1097,78 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
     (_, index) => selected[index] || null,
   );
   const available = MOBILE_BOTTOM_NAV_ITEMS.filter((item) => !draft.includes(item.key));
+  // Con el hueco «+» (añadir arrastrando), los de detrás se corren un puesto.
+  const previewCells = addSlotIndex === null
+    ? previewSlots
+    : [...selected.slice(0, addSlotIndex), "+", ...selected.slice(addSlotIndex)]
+      .concat(Array(MOBILE_BOTTOM_NAV_MAX_ITEMS).fill(null))
+      .slice(0, MOBILE_BOTTOM_NAV_MAX_ITEMS);
+
+  const navItems = () =>
+    navRef.current ? [...navRef.current.querySelectorAll("[data-mobile-nav-preview-key],[data-mobile-nav-add-slot]")] : [];
+
+  // Antes de un cambio que recoloca la barra: dónde se ve cada botón ahora
+  // (con la animación en curso, si la hay).
+  const captureNavFlip = () => {
+    const from = new Map();
+    for (const el of navItems()) from.set(el.dataset.mobileNavPreviewKey || "+", el.getBoundingClientRect().left);
+    flipFromRef.current = from;
+  };
+
+  // Tras el cambio: cada botón se desliza desde donde estaba; el hueco «+»
+  // nuevo crece en su sitio.
+  useLayoutEffect(() => {
+    const from = flipFromRef.current;
+    flipFromRef.current = null;
+    if (!from || !navRef.current) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    for (const el of navItems()) {
+      for (const animation of el.getAnimations()) if (animation.id === "nav-flip") animation.cancel();
+      if (reduce) continue;
+      const key = el.dataset.mobileNavPreviewKey || "+";
+      const options = { id: "nav-flip", duration: 240, easing: "cubic-bezier(0.22, 1, 0.36, 1)" };
+      if (!from.has(key)) {
+        el.animate([{ opacity: 0, transform: "scale(0.6)" }, { opacity: 1, transform: "none" }], options);
+        continue;
+      }
+      const dx = from.get(key) - el.getBoundingClientRect().left;
+      if (Math.abs(dx) > 0.5) el.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], options);
+    }
+  });
+
+  const snapshotNav = () => {
+    const nav = navRef.current;
+    if (!nav) return null;
+    const items = [...nav.querySelectorAll("[data-mobile-nav-preview-key]")]
+      .map((el) => {
+        const rect = el.getBoundingClientRect();
+        return { key: el.dataset.mobileNavPreviewKey, left: rect.left, right: rect.right, width: rect.width, center: rect.left + rect.width / 2 };
+      })
+      .sort((a, b) => a.center - b.center);
+    return { nav: nav.getBoundingClientRect(), items, full: draft.length >= MOBILE_BOTTOM_NAV_MAX_ITEMS };
+  };
+
+  // Destino de un acceso suelto que se arrastra, con la geometría del inicio:
+  // en el 60 % central de un botón lo sustituye; en un borde o en los huecos
+  // vacíos se añade ahí. Con la barra llena, sustituye el más cercano.
+  const paletteTargetAt = (x, y) => {
+    const snap = paletteSnapRef.current;
+    const none = { key: null, index: null };
+    if (!snap) return none;
+    const { nav, items } = snap;
+    const padX = 16;
+    const padY = Math.max(24, nav.height);
+    if (x < nav.left - padX || x > nav.right + padX || y < nav.top - padY || y > nav.bottom + padY) return none;
+    if (!items.length) return { key: null, index: 0 };
+    if (snap.full) {
+      const nearest = items.reduce((best, item) =>
+        Math.abs(item.center - x) < Math.abs(best.center - x) ? item : best);
+      return { key: nearest.key, index: null };
+    }
+    const hit = items.find((item) => x >= item.left + item.width * 0.2 && x <= item.right - item.width * 0.2);
+    if (hit) return { key: hit.key, index: null };
+    return { key: null, index: items.filter((item) => item.center < x).length };
+  };
   const getPreviewDropTarget = (event) => {
     const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-mobile-nav-preview-slot]");
     if (!target) return { key: null, index: null };
@@ -1129,23 +1202,25 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
       didMove: false,
     };
     setDraggedFromPalette(false);
-    setDropTargetIndex(null);
+    setDropTargetKey(null);
     setDragPoint({ x: event.clientX, y: event.clientY });
     setDraggedKey(key);
   };
   const startPaletteDrag = (event, key) => {
     if (!event.isPrimary || event.button !== 0) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    paletteSnapRef.current = snapshotNav();
     dragSessionRef.current = {
       key,
       fromPalette: true,
+      addIndex: null,
       targetKey: null,
       startX: event.clientX,
       startY: event.clientY,
       didMove: false,
     };
     setDraggedFromPalette(true);
-    setDropTargetIndex(null);
+    setDropTargetKey(null);
     setDragPoint({ x: event.clientX, y: event.clientY });
     setDraggedKey(key);
   };
@@ -1158,9 +1233,16 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
       session.didMove = true;
     }
     if (session.fromPalette) {
-      session.targetKey = targetKey || null;
-      session.targetIndex = targetIndex;
-      setDropTargetIndex(targetIndex);
+      const target = paletteTargetAt(event.clientX, event.clientY);
+      session.targetKey = target.key;
+      const addIndex = target.key ? null : target.index;
+      // El hueco «+» aparece, se mueve o se va: la barra se recoloca animada.
+      if (addIndex !== session.addIndex) {
+        session.addIndex = addIndex;
+        captureNavFlip();
+        setAddSlotIndex(addIndex);
+      }
+      setDropTargetKey(target.key);
     } else {
       session.targetKey = targetKey || null;
       session.targetIndex = targetIndex;
@@ -1169,10 +1251,19 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
   };
   const endPreviewDrag = (event, shouldCommit = true) => {
     const session = dragSessionRef.current;
-    const { key: targetKey, index: targetIndex } = getPreviewDropTarget(event);
-    if (shouldCommit && session.fromPalette && session.key && targetKey) {
+    const { key: targetKey, index: targetIndex } = session.fromPalette
+      ? paletteTargetAt(event.clientX, event.clientY)
+      : getPreviewDropTarget(event);
+    // Al soltar en el hueco «+», el nuevo ocupa su sitio sin saltar: parte de
+    // donde estaba el hueco. Si no se suelta ahí, el hueco se va animado.
+    if (session.fromPalette && session.addIndex != null) {
+      captureNavFlip();
+      const from = flipFromRef.current;
+      if (shouldCommit && session.didMove && from.has("+")) from.set(session.key, from.get("+"));
+    }
+    if (shouldCommit && session.fromPalette && session.key && session.didMove && targetKey) {
       setDraft((current) => current.map((key) => (key === targetKey ? session.key : key)));
-    } else if (shouldCommit && session.fromPalette && session.key && targetIndex !== null) {
+    } else if (shouldCommit && session.fromPalette && session.key && session.didMove && targetIndex !== null) {
       setDraft((current) => {
         if (current.length >= MOBILE_BOTTOM_NAV_MAX_ITEMS) return current;
         const next = [...current];
@@ -1190,9 +1281,11 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
     }
     suppressPaletteClickRef.current = session.fromPalette && session.didMove;
     dragSessionRef.current = { key: null, fromPalette: false, targetKey: null };
+    paletteSnapRef.current = null;
     setDraggedKey(null);
     setDraggedFromPalette(false);
-    setDropTargetIndex(null);
+    setDropTargetKey(null);
+    setAddSlotIndex(null);
     setDragPoint(null);
   };
 
@@ -1201,31 +1294,23 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
     : null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-lg sm:p-6" role="presentation" onPointerDown={onClose}>
-      <motion.section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="mobile-bottom-nav-editor-title"
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.2 }}
-        onPointerDown={(event) => event.stopPropagation()}
-        className={`relative isolate max-h-[calc(100dvh-2rem)] w-full max-w-[48rem] overflow-y-auto overscroll-contain rounded-[2rem] p-4 shadow-[0_28px_90px_-18px_rgba(0,0,0,0.9),0_0_48px_rgba(255,255,255,0.08)] sm:max-h-[90dvh] sm:p-5 md:min-h-[30rem] md:max-w-[42rem] ${LIQUID_GLASS_PANEL}`}
-      >
-        <LiquidGlassOpticalLayers />
-        <div className="relative z-10 md:flex md:min-h-[27.5rem] md:flex-col">
-          <h2 id="mobile-bottom-nav-editor-title" className="sr-only">
-            {t("settings_mobile_nav_title", "Barra inferior móvil")}
-          </h2>
-          <p className="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-10 items-center justify-center pr-12 text-center text-xs leading-4 text-zinc-300">
+    <SettingsGlassModal
+      open={isOpen}
+      onClose={onClose}
+      titleId="mobile-bottom-nav-editor-title"
+      title={t("settings_mobile_nav_title", "Barra inferior móvil")}
+      subtitle={`${draft.length}/${MOBILE_BOTTOM_NAV_MAX_ITEMS} ${t("settings_mobile_nav_subtitle", "accesos")}`}
+      icon={SlidersHorizontal}
+      closeLabel={t("close", "Cerrar")}
+      panelClassName="max-w-[42rem] select-none"
+      bodyClassName="sv-modal-scroll-fade flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6"
+    >
+        <div className="md:flex md:min-h-[24rem] md:flex-col">
+          <p className="pointer-events-none mb-3 text-center text-xs leading-4 text-zinc-300">
             {t("settings_mobile_nav_drag_hint", "Mantén pulsado y arrastra. Sácalo de la barra para quitarlo.")}
           </p>
-          <button type="button" onClick={onClose} className="absolute right-0 top-0 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" aria-label={t("close", "Cerrar")}>
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
 
-        <div className="rounded-[1.8rem] bg-[radial-gradient(90%_140%_at_50%_0%,rgba(255,255,255,0.12),transparent_55%),rgba(255,255,255,0.04)] p-3 pt-10 shadow-[0_18px_40px_rgba(0,0,0,0.25)] md:flex md:flex-1 md:flex-col md:justify-center">
+        <div className="rounded-[1.8rem] bg-[radial-gradient(90%_140%_at_50%_0%,rgba(255,255,255,0.12),transparent_55%),rgba(255,255,255,0.04)] p-3 pt-6 shadow-[0_18px_40px_rgba(0,0,0,0.25)] md:flex md:flex-1 md:flex-col md:justify-center">
           <div role="group" className="mb-5 flex flex-wrap items-center justify-center gap-x-2 gap-y-3 px-2 md:mb-16" aria-label={t("settings_mobile_nav_available", "Accesos disponibles")}>
             {available.map((item, index) => {
               const Icon = MOBILE_BOTTOM_NAV_PREVIEW_ICONS[item.key];
@@ -1257,19 +1342,34 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
               );
             })}
           </div>
-          <nav aria-label={t("settings_mobile_nav_preview", "Vista previa")} className="grid grid-cols-6 gap-1 rounded-[1.35rem] bg-black/35 p-1.5 backdrop-blur-xl">
-            {previewSlots.map((item, index) => {
-              const isDropTarget = draggedFromPalette && dropTargetIndex === index;
+          <nav ref={navRef} aria-label={t("settings_mobile_nav_preview", "Vista previa")} className="grid grid-cols-6 gap-1 rounded-[1.35rem] bg-black/35 p-1.5 backdrop-blur-xl">
+            {previewCells.map((item, index) => {
+              // Hueco «+»: donde caerá el acceso que se arrastra.
+              if (item === "+") {
+                return (
+                  <div
+                    key="add-slot"
+                    data-mobile-nav-add-slot=""
+                    aria-hidden="true"
+                    className="flex min-h-[3.75rem] items-center justify-center rounded-2xl bg-white/10 text-white/80"
+                  >
+                    <Plus className="h-5 w-5" strokeWidth={2.2} />
+                  </div>
+                );
+              }
               if (!item) {
                 return (
                   <div
                     key={`empty-slot-${index}`}
                     data-mobile-nav-preview-slot={index}
                     aria-hidden="true"
-                    className={`min-h-[3.75rem] rounded-2xl transition-[transform,background-color,box-shadow] duration-200 ${isDropTarget ? "scale-105 bg-emerald-400/20 shadow-[0_0_18px_rgba(110,231,183,0.5)]" : "bg-white/[0.015]"}`}
+                    className="min-h-[3.75rem] rounded-2xl bg-white/[0.015]"
                   />
                 );
               }
+              // El que se va a sustituir solo se sombrea de fondo, sin borde ni
+              // brillo de color.
+              const isDropTarget = draggedFromPalette && dropTargetKey === item.key;
               const Icon = MOBILE_BOTTOM_NAV_PREVIEW_ICONS[item.key];
               const dragging = !draggedFromPalette && draggedKey === item.key;
               return (
@@ -1282,7 +1382,7 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
                   onPointerMove={continuePreviewDrag}
                   onPointerUp={endPreviewDrag}
                   onPointerCancel={(event) => endPreviewDrag(event, false)}
-                  className={`touch-none flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold leading-tight transition-[transform,background-color,opacity,box-shadow] duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 ${dragging ? "scale-110 bg-white/15 opacity-70 shadow-lg shadow-black/40" : isDropTarget ? "scale-105 bg-emerald-400/20 shadow-[0_0_18px_rgba(110,231,183,0.5)]" : "bg-white/[0.035] hover:bg-white/[0.1] active:scale-95"}`}
+                  className={`touch-none flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold leading-tight transition-[transform,background-color,opacity,box-shadow] duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 ${dragging ? "scale-110 bg-white/15 opacity-70 shadow-lg shadow-black/40" : isDropTarget ? "bg-white/[0.14]" : "bg-white/[0.035] hover:bg-white/[0.1] active:scale-95"}`}
                   aria-label={`${t(item.labelKey, item.fallbackLabel)} · ${t("settings_mobile_nav_drag_hint", "Mantén pulsado y arrastra. Sácalo de la barra para quitarlo.")}`}
                 >
                   <Icon className={`h-5 w-5 ${MOBILE_BOTTOM_NAV_PREVIEW_TONES[item.tone] || "text-white"}`} strokeWidth={2.2} aria-hidden="true" />
@@ -1302,7 +1402,6 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
           </button>
         </div>
         </div>
-      </motion.section>
       {draggedItem && dragPoint && createPortal(
         <motion.div
           aria-hidden="true"
@@ -1311,7 +1410,7 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
           exit={{ opacity: 0, scale: 0.9 }}
           transition={{ duration: 0.12 }}
           style={{ left: dragPoint.x + 18, top: dragPoint.y + 18 }}
-          className="pointer-events-none fixed z-[100] flex -translate-y-1/2 items-center gap-2 rounded-full bg-zinc-950/95 px-3 py-2 text-xs font-bold text-white shadow-[0_12px_30px_rgba(0,0,0,0.55),0_0_20px_rgba(110,231,183,0.22)] backdrop-blur-xl"
+          className="pointer-events-none fixed z-[10010] flex -translate-y-1/2 items-center gap-2 rounded-full bg-zinc-950/95 px-3 py-2 text-xs font-bold text-white shadow-[0_12px_30px_rgba(0,0,0,0.55),0_0_20px_rgba(110,231,183,0.22)] backdrop-blur-xl"
         >
           {(() => {
             const DragIcon = MOBILE_BOTTOM_NAV_PREVIEW_ICONS[draggedItem.key];
@@ -1321,7 +1420,7 @@ function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
         </motion.div>,
         document.body,
       )}
-    </div>
+    </SettingsGlassModal>
   );
 }
 
@@ -1641,6 +1740,7 @@ function ProfileSettingsClient() {
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAccountSecurityModal, setShowAccountSecurityModal] = useState(false);
   const [showMobileBottomNavEditor, setShowMobileBottomNavEditor] = useState(false);
+  const [showPhoneScoresEditor, setShowPhoneScoresEditor] = useState(false);
   // Modo de la barra de notificaciones (solo en la app de Android que lo admite).
   const statusBarMode = useAndroidStatusBarMode();
 
@@ -2498,6 +2598,23 @@ function ProfileSettingsClient() {
                         })
                       }
                     />
+                    {/* «Puntuaciones en el móvil»: qué notas enseña el marcador
+                        de la ficha en el móvil y el del modal en vista teléfono,
+                        por separado en películas y series
+                        (lib/ui/phoneScoreboardScores.js). Se editan en
+                        PhoneScoresEditor, sobre una ficha de ejemplo. */}
+                    <SettingActionRow
+                      icon={Gauge}
+                      title={t("settings_phone_scores", "Puntuaciones en el móvil")}
+                      description={t(
+                        "settings_phone_scores_summary",
+                        "Elige y ordena hasta {max} puntuaciones del marcador en películas y en series.",
+                      ).replaceAll("{max}", String(PHONE_SCORES_MAX))}
+                      buttonLabel={t("settings_customize", "Personalizar")}
+                      disabled={saving}
+                      onClick={() => setShowPhoneScoresEditor(true)}
+                      wrapDescription
+                    />
                     <SettingActionRow
                       icon={SlidersHorizontal}
                       title={t("settings_mobile_nav_title", "Barra inferior móvil")}
@@ -3321,21 +3438,29 @@ function ProfileSettingsClient() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showMobileBottomNavEditor && (
-          <MobileBottomNavEditor
-            isOpen={showMobileBottomNavEditor}
-            onClose={() => setShowMobileBottomNavEditor(false)}
-            value={preferences.uiSettings?.mobileBottomNav}
-            saving={saving}
-            onSave={(mobileBottomNav) =>
-              updatePreference({
-                uiSettings: { ...preferences.uiSettings, mobileBottomNav },
-              })
-            }
-          />
-        )}
-      </AnimatePresence>
+      {/* Montados siempre: SettingsGlassModal anima la salida con `isOpen`. */}
+      <PhoneScoresEditor
+        isOpen={showPhoneScoresEditor}
+        onClose={() => setShowPhoneScoresEditor(false)}
+        value={getPhoneScores(preferences)}
+        t={t}
+        onSave={(scores) =>
+          updatePreference({
+            uiSettings: withPhoneScores(preferences.uiSettings, scores),
+          })
+        }
+      />
+      <MobileBottomNavEditor
+        isOpen={showMobileBottomNavEditor}
+        onClose={() => setShowMobileBottomNavEditor(false)}
+        value={preferences.uiSettings?.mobileBottomNav}
+        saving={saving}
+        onSave={(mobileBottomNav) =>
+          updatePreference({
+            uiSettings: { ...preferences.uiSettings, mobileBottomNav },
+          })
+        }
+      />
     </main>
   );
 }

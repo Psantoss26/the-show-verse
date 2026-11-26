@@ -298,6 +298,43 @@ export function cleanupFullDetailsTransitionLayers() {
 // difumina, y la capa entera funde sobre la ficha. `artSrc` es ese fondo si ya
 // se conoce; si no, el velo espera transparente (se ve la página de debajo) a
 // que lo ponga `showArt(src)`.
+// El clon de `cloneNode` nace con todo su desplazamiento a cero: con el panel
+// bajado, el contenido saltaba arriba en el primer fotograma del relevo. Se
+// anotan los elementos desplazados del original (mismo orden de árbol que el
+// clon recién hecho) y se reponen con el clon ya en el documento, porque un
+// nodo suelto no tiene cajas y no admite `scrollTop`. Devuelve esa reposición.
+export function captureCloneScroll(source, clone) {
+  const sourceNodes = [source, ...source.querySelectorAll("*")];
+  const cloneNodes = [clone, ...clone.querySelectorAll("*")];
+  const pending = [];
+  sourceNodes.forEach((node, index) => {
+    const target = cloneNodes[index];
+    if (!target || (!node.scrollTop && !node.scrollLeft)) return;
+    pending.push([target, node.scrollTop, node.scrollLeft]);
+  });
+  return () => {
+    for (const [target, top, left] of pending) {
+      target.scrollTop = top;
+      target.scrollLeft = left;
+    }
+  };
+}
+
+// Insertar el clon arranca de nuevo las entradas CSS de sus hijos (los botones
+// de acción repetían su aparición durante el relevo, y en el hilo principal).
+// Se dejan en su estado final; las que siguen al desplazamiento (ScrollTimeline,
+// otra línea de tiempo) quedan, y las infinitas no se pueden terminar.
+export function settleCloneAnimations(clone, timeline) {
+  for (const animation of clone.getAnimations?.({ subtree: true }) || []) {
+    if (animation.timeline !== timeline) continue;
+    try {
+      animation.finish();
+    } catch {
+      // Animación infinita (spinner): se queda como está.
+    }
+  }
+}
+
 export function startFullDetailsTransition(panelElement, variant = "center", { decorateClone, art = false, artSrc = null } = {}) {
   if (typeof document === "undefined" || !panelElement) return null;
 
@@ -337,6 +374,7 @@ export function startFullDetailsTransition(panelElement, variant = "center", { d
   }
 
   const panelClone = panelElement.cloneNode(true);
+  const restoreCloneScroll = captureCloneScroll(panelElement, panelClone);
   panelClone.classList.add("sv-detail-route-transition__panel");
   panelClone.setAttribute("aria-hidden", "true");
   panelClone.style.setProperty("--sv-route-panel-top", `${rect.top}px`);
@@ -358,6 +396,8 @@ export function startFullDetailsTransition(panelElement, variant = "center", { d
 
   layer.append(scrim, panelClone);
   document.body.append(layer);
+  restoreCloneScroll();
+  settleCloneAnimations(panelClone, document.timeline);
 
   layer.classList.add("is-running");
 

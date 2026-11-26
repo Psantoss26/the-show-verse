@@ -1,8 +1,3 @@
-.dialog {
-  border: 0;
-  background: radial-gradient(ellipse at 15% 0%, rgb(52 211 153 / 5%), transparent 45%), #101113;
-  box-shadow: 0 32px 120px rgb(0 0 0 / 65%);
-}
 .scope {
   display: flex;
   width: fit-content;

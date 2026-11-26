@@ -169,6 +169,8 @@ Las flechas de escritorio se despliegan hacia fuera al pasar el ratón (anchura 
 
 Hasta seis accesos configurables entre Inicio, Películas, Series, Descubrir, Biblioteca, Social, Listas, En progreso, Historial, Favoritas, Pendientes, Calendario, Recap y Recomendaciones (`src/lib/ui/mobileBottomNav.js`).
 
+Se editan en Ajustes → Preferencias con `MobileBottomNavEditor` (`ProfileSettingsClient.jsx`): los accesos sueltos arriba y la barra de ejemplo abajo. Al arrastrar un suelto, el destino sale de la geometría de la barra al empezar el arrastre (`paletteSnapRef`), no de lo que hay bajo el puntero: el 60 % central de un botón lo sustituye (solo se aclara su fondo, `bg-white/[0.14]`, sin borde ni brillo de color) y el borde de un botón o los huecos vacíos lo añaden ahí; con la barra llena sustituye el más cercano. Al añadir, la barra muestra antes el hueco «+» en esa posición y los botones de detrás se apartan con FLIP (WAAPI, id `nav-flip`, 240 ms); al soltar, el nuevo parte del sitio del hueco. Es el mismo comportamiento que el editor de «Puntuaciones en el móvil». Tocar un suelto lo añade al final; los de la barra se arrastran para reordenarlos o fuera para quitarlos.
+
 ## Importación y exportación (`/profile/settings`)
 
 | Panel | Qué hace |

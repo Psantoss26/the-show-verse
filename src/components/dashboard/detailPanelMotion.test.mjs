@@ -5,8 +5,10 @@ import test from "node:test";
 import {
   DRAWER_TO_DETAILS_REVEAL_MIN_MS,
   DRAWER_TO_DETAILS_FADE_MS,
+  captureCloneScroll,
   detailsContentReady,
   markDetailsEntered,
+  settleCloneAnimations,
 } from "./detailPanelMotion.js";
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
@@ -85,4 +87,54 @@ test("el velo del drawer es el fondo que pintará la ficha, no el del panel", ()
   assert.ok(go.indexOf("getWarmedSequenceBackdrop(href)") < go.indexOf("heroBackdropSrc"));
   // Y se precalienta al abrir el panel, no al pulsar.
   assert.match(modal, /if \(isRightPlacement\) warmDetailsSequenceTarget\(dashboardDetailHref/);
+});
+
+// Relevo drawer → ficha a tirones: la ampliación del clon corría en el hilo
+// principal (Chrome no compone un `filter: blur` animado) y se congelaba
+// mientras React montaba la ficha. Solo transform y opacity.
+test("la ampliación del clon del drawer solo anima propiedades del compositor", () => {
+  const css = read("app/globals.css");
+  const start = css.indexOf("@keyframes sv-detail-route-panel-zoom");
+  const keyframes = css.slice(start, css.indexOf("@media", start));
+  assert.ok(start > 0);
+  assert.doesNotMatch(keyframes, /filter/);
+  assert.match(keyframes, /transform/);
+  assert.match(keyframes, /opacity/);
+});
+
+const el = (props = {}, children = []) => ({
+  scrollTop: 0,
+  scrollLeft: 0,
+  ...props,
+  querySelectorAll: () => children,
+});
+
+test("el clon conserva el desplazamiento del panel (no salta arriba)", () => {
+  const scroller = el({ scrollTop: 600 });
+  const row = el({ scrollLeft: 120 });
+  const source = el({}, [el(), scroller, row]);
+  const cloneScroller = el();
+  const cloneRow = el();
+  const clone = el({}, [el(), cloneScroller, cloneRow]);
+  captureCloneScroll(source, clone)();
+  assert.equal(cloneScroller.scrollTop, 600);
+  assert.equal(cloneRow.scrollLeft, 120);
+});
+
+test("las animaciones internas del clon quedan en su estado final, no se repiten", () => {
+  const timeline = {};
+  const finished = [];
+  const entry = { timeline, finish: () => finished.push("entry") };
+  const scrollDriven = { timeline: {}, finish: () => finished.push("scroll") };
+  const infinite = { timeline, finish: () => { throw new Error("infinite"); } };
+  settleCloneAnimations({ getAnimations: () => [entry, scrollDriven, infinite] }, timeline);
+  assert.deepEqual(finished, ["entry"]);
+});
+
+test("la marca global de llegada no se pone en el fotograma del clic", () => {
+  const modal = read("components/dashboard/DetailModal.jsx");
+  const go = modal.slice(modal.indexOf("const goToDetailsRoute"), modal.indexOf("const goToFullDetails"));
+  // `markDetailsArrival` recalcula los estilos del documento entero: tras el
+  // primer fotograma del relevo, no antes.
+  assert.ok(go.indexOf("await nextAnimationFrame()") < go.indexOf("markDetailsArrival()"));
 });
