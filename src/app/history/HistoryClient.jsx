@@ -79,7 +79,6 @@ import {
   readResolvedSeasonMetadata,
 } from "@/lib/history/episodeSeasonMetadata";
 import HoverExpandCard, { HoverExpandZoom } from "@/components/ui/HoverExpandCard";
-import { useHoverIntent } from "@/lib/ui/hoverIntent";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { ControlledOptionsSheet, OptionsSheetTrigger, SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
@@ -790,8 +789,8 @@ function getHistoryIndicatorClass({
     visibility === "always"
       ? "flex opacity-100 scale-100"
       : visibility === "mobile-edit"
-        ? "flex opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-intent:scale-100 lg:group-intent:opacity-100"
-        : "hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-intent:scale-100 lg:group-intent:opacity-100";
+        ? "flex opacity-100 scale-100 lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100"
+        : "hidden lg:flex lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100";
 
   return [
     "items-center justify-center absolute top-0 z-20 border-b backdrop-blur-md shadow-sm",
@@ -859,7 +858,7 @@ function HistoryHoverIndicator({ type, dateParts, compact = false }) {
 
   return (
     <div
-      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-0.5" : "bottom-2 px-1"} inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-intent:opacity-100`}
+      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-0.5" : "bottom-2 px-1"} inset-x-0 z-20 mx-auto hidden w-fit items-center overflow-hidden rounded-full opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-opacity duration-200 ease-out motion-reduce:transition-none lg:flex lg:group-hover:opacity-100`}
       aria-hidden="true"
     >
       <span className={`grid ${itemClassName} shrink-0 place-items-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
@@ -2225,7 +2224,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
         <div className="flex items-center gap-2">
-          <h4 className="text-white font-bold text-base leading-tight truncate transition-colors group-intent:text-emerald-300">
+          <h4 className="text-white font-bold text-base leading-tight truncate transition-colors group-hover:text-emerald-300">
             {title}
           </h4>
         </div>
@@ -2296,13 +2295,12 @@ const HistoryItemCard = memo(function HistoryItemCard({
     return (
       <div
         ref={ref}
-        className="relative overflow-hidden bg-zinc-900/30 rounded-xl cursor-pointer intent:bg-zinc-900/60 transition-colors group"
+        className="relative overflow-hidden bg-zinc-900/30 rounded-xl cursor-pointer hover:bg-zinc-900/60 transition-colors group"
         data-history-card=""
-        data-sv-hover-card=""
         data-flip-key={flipKey}
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-intent:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
         <div className="block">{Content}</div>
       </div>
     );
@@ -2317,11 +2315,10 @@ const HistoryItemCard = memo(function HistoryItemCard({
         href={href}
         prefetch
         onClick={onPreviewClick}
-        className="block relative overflow-hidden bg-zinc-900/30 rounded-xl intent:bg-zinc-900/60 transition-colors group"
-        data-sv-hover-card=""
+        className="block relative overflow-hidden bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group"
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-intent:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
+        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
         {Content}
       </Link>
     </div>
@@ -2391,7 +2388,6 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
 
   const CardInner = (
     <HoverExpandCard
-      hoverIntent
       cellClassName={imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"}
       className={`compact-card group overflow-hidden rounded-lg shadow-md ${disabledCls}`}
       // El contador de episodios agrupados NO crece con la tarjeta: va fuera de
@@ -2605,13 +2601,12 @@ const HistoryGridCard = memo(function HistoryGridCard({
       className={[
         // IMPORTANTE: hover SOLO en desktop para evitar "hover pegajoso" en móvil
         `relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group overflow-hidden rounded-xl shadow-md`,
-        "lg:intent:shadow-emerald-900/20 transition-all",
+        "lg:hover:shadow-emerald-900/20 transition-all",
         disabledCls,
       ].join(" ")}
-      data-sv-hover-card=""
     >
       {/* Overlay de borde para que los indicadores queden por debajo */}
-      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 lg:group-intent:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
+      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 lg:group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         {imageMode === "backdrop" ? (
           <Backdrop entry={entry} className="w-full h-full" />
@@ -3166,8 +3161,6 @@ function MobileCalendarOverlay({
 const CALENDAR_SLOT_SHIFT_PX = 52;
 
 export default function HistoryClient() {
-  // Hover de las tarjetas solo al pararse el cursor (src/lib/ui/hoverIntent.js).
-  useHoverIntent();
   // Buscador de la barra: con texto si cabe, o solo icono (ver el hook).
   const toolbarSearchFitRef = usePageToolbarSearchFit();
   const { session, account, hydrated: authHydrated, preferences } = useAuth();

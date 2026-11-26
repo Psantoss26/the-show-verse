@@ -20,9 +20,6 @@ const LINK_STATES = "hover:bg-white/[0.07] focus-visible:outline focus-visible:o
 const ROW_LINK = `${ROW} ${LINK_STATES}`;
 // Personas y títulos: compacto hasta Full HD; más amplio en monitores grandes.
 const ROW_LINK_LARGE = `${ROW_BASE} gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 ${LINK_STATES}`;
-// Fila de las páginas de usuario con hover con intención (src/lib/ui/hoverIntent.js):
-// el fondo de hover llega cuando el cursor se para, no al rozarla.
-const ROW_LINK_LARGE_INTENT = `${ROW_BASE} gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 intent:bg-white/[0.07] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400`;
 const LARGE_POSTER = "aspect-[2/3] w-16 min-[1920px]:w-20 rounded-xl";
 // Backdrop en lugar del póster: más ancho, con el alto de la fila de póster.
 const BACKDROP_MEDIA = "aspect-video w-[132px] sm:w-[180px] min-[1920px]:w-[220px] rounded-xl";
@@ -113,8 +110,6 @@ export function TitleRow({
   mediaClassName = BACKDROP_MEDIA,
   prefetch,
   className = "",
-  // Hover solo al pararse el cursor (Favoritos, Pendientes): ver hoverIntent.js.
-  hoverIntent = false,
 }) {
   const type = item?.media_type === "tv" || mediaType === "tv" ? "tv" : "movie";
   const title = customTitle || item?.title || item?.name || "Sin título";
@@ -183,8 +178,7 @@ export function TitleRow({
           onNavigate?.();
         }
       }}
-      className={`${hoverIntent ? ROW_LINK_LARGE_INTENT : ROW_LINK_LARGE} ${action ? "pr-14" : ""} ${className}`}
-      {...(hoverIntent ? { "data-sv-hover-card": "" } : null)}
+      className={`${ROW_LINK_LARGE} ${action ? "pr-14" : ""} ${className}`}
     >
       {media ? (
         <span className={`relative shrink-0 overflow-hidden ${mediaClassName}`}>{media}</span>
