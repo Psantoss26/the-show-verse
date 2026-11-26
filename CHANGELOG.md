@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Fichas en el móvil y modal en vista teléfono: el marcador enseña una cuarta puntuación junto a TMDb, Trakt e IMDb: la de Letterboxd en películas y la de Rotten Tomatoes (público) en series. Las cuatro se reparten a lo ancho y se ajustan para caber también en pantallas estrechas. → [componentes](docs/frontend/components.md)
 - Series, ventana de valoración de episodios: las etiquetas de la izquierda (E1, E2… o S1, S2…) quedan centradas en el hueco entre el borde del modal y las casillas de nota, en vez de verse pegadas a las casillas; las casillas no se mueven. → [componentes](docs/frontend/components.md)
 - Series, ventana de valoración de episodios: en el móvil y en la app de Android ya no aparecen a veces dos barras de desplazamiento vertical a la derecha; la tabla sacaba la suya propia al sobrar un píxel por abajo. → [componentes](docs/frontend/components.md)
 - App de Android, modales de episodios vistos y de valoración de episodios: ya no parpadean al abrirse. Los desenfoques de cristal de dentro se apagaban mientras el panel entraba y volvían de golpe al terminar, y la app los pintaba un instante sin fondo (en episodios vistos se iba también el cristal del panel). Ahora esos dos modales llevan su contenido siempre sin desenfoques anidados en la app, y los demás modales vuelven a ser como antes. → [hooks](docs/frontend/lib/lib-hooks.md)

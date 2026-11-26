@@ -651,7 +651,7 @@ export default function DetailModal({
   const ratingScores = useRatingScores({
     type: mediaType,
     tmdbId: item?.id,
-    enabled: !isEpisode && !phoneLayout,
+    enabled: !isEpisode,
   });
   // Insignia de Rotten Tomatoes / Metacritic para el marcador: la nota del
   // PÚBLICO (Popcornmeter / User Score) leída de su ficha, en escala 10 y con
@@ -663,11 +663,15 @@ export default function DetailModal({
   // del que les va a tocar y se pintaban con etiqueta hasta que llegaban las
   // notas y se compactaban de golpe. Ya resuelto y sin dato vuelve a ser `null`:
   // la insignia no se pinta, que es lo correcto para un título sin nota allí.
-  const optionalScoreBadge = (scores, href, toBadge = audienceScoreBadge) => {
-    // Fuera de la ficha de teléfono: cinco insignias no caben en ese ancho y
-    // empujaban los botones de la derecha fuera del panel. Tampoco en
-    // episodios: esas fichas son de la serie, no del episodio.
-    if (phoneLayout || isEpisode) return null;
+  //
+  // Ficha de teléfono: solo la cuarta puntuación del marcador móvil
+  // (`phoneExtraScore`: Letterboxd en películas, Rotten Tomatoes en series);
+  // cinco insignias no caben en ese ancho. Tampoco en episodios: esas fichas
+  // son de la serie, no del episodio.
+  const phoneExtraScore = isEpisode ? null : mediaType === "movie" ? "lb" : "rt";
+  const optionalScoreBadge = (scores, href, toBadge = audienceScoreBadge, name = null) => {
+    if (isEpisode) return null;
+    if (phoneLayout && name !== phoneExtraScore) return null;
     if (!ratingScores.ready) return { pending: true };
     return toBadge(scores, href);
   };
@@ -3334,13 +3338,14 @@ export default function DetailModal({
       trakt={scoreboardTrakt}
       traktPublic={null}
       imdb={scoreboardImdb}
-      // Ver `optionalScoreBadge`: fuera de la ficha de teléfono, y con
-      // hueco reservado mientras se leen las fichas de RT y Metacritic.
-      rt={optionalScoreBadge(ratingScores.rt, ratingLinks.rt)}
+      // Ver `optionalScoreBadge`: en la ficha de teléfono solo la cuarta
+      // puntuación, y con hueco reservado mientras se leen las fichas.
+      rt={optionalScoreBadge(ratingScores.rt, ratingLinks.rt, audienceScoreBadge, "rt")}
       mc={optionalScoreBadge(ratingScores.mc, ratingLinks.mc)}
       // Letterboxd solo tiene películas: en series ni reserva hueco.
-      lb={mediaType === "movie" ? optionalScoreBadge(ratingScores.lb, ratingScores.lb?.url || ratingLinks.lb, letterboxdScoreBadge) : null}
+      lb={mediaType === "movie" ? optionalScoreBadge(ratingScores.lb, ratingScores.lb?.url || ratingLinks.lb, letterboxdScoreBadge, "lb") : null}
       mobileScoresOnly={phoneLayout}
+      phoneExtraScore={phoneExtraScore}
       // En tablet la ventana supera `sm` aunque el drawer sea
       // estrecho: sin esto el marcador salía con la disposición
       // ancha y puntuaciones y stats se partían en dos filas.

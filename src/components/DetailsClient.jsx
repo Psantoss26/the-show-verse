@@ -11549,6 +11549,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // RT y Metacritic: nota del PÚBLICO (Popcornmeter / User
                 // Score) leída de su ficha, en escala 10 con sus votos. Sin
                 // ella, el Popcornmeter que trae Trakt (sin recuento).
+                //
+                // Mientras se leen esas fichas, la que va en el marcador de
+                // teléfono (`phoneExtraScore`) reserva su hueco (`pending`):
+                // si no, llegaba tarde y recolocaba las otras tres.
                 rt={
                   audienceScoreBadge(ratingScores.rt, ratingLinks.rt) ??
                   (tScoreboard?.external?.rtAudience != null
@@ -11556,11 +11560,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         value: (Math.round(tScoreboard.external.rtAudience) / 10).toFixed(1),
                         href: ratingLinks.rt,
                       }
-                    : null)
+                    : endpointType === "tv" && !ratingScores.ready
+                      ? { pending: true }
+                      : null)
                 }
                 mc={audienceScoreBadge(ratingScores.mc, ratingLinks.mc)}
                 // Letterboxd: media de sus miembros sobre 10 (solo películas).
-                lb={letterboxdScoreBadge(ratingScores.lb, ratingScores.lb?.url || ratingLinks.lb)}
+                lb={
+                  letterboxdScoreBadge(ratingScores.lb, ratingScores.lb?.url || ratingLinks.lb) ??
+                  (endpointType === "movie" && !ratingScores.ready ? { pending: true } : null)
+                }
+                // Móvil: cuarta puntuación junto a TMDb, Trakt e IMDb.
+                phoneExtraScore={endpointType === "movie" ? "lb" : endpointType === "tv" ? "rt" : null}
                 externalLinks={isBackdropPoster ? scoreboardExternalLinks : null}
                 externalLinksWikipedia={wikipediaQuery}
                 onMoreLinks={isBackdropPoster ? () => setExternalLinksOpen(true) : undefined}

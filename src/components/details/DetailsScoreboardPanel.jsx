@@ -20,6 +20,9 @@
 //   mc:          { value, sub, href } | null          (badge Metacritic, solo >= sm;
 //                                                     no se pinta si hay `lb`)
 //   lb:          { value, sub, href } | null  (badge Letterboxd sobre 10, solo >= sm)
+//   phoneExtraScore: "lb" | "rt" | null  (cuarta puntuación del marcador de
+//                                         teléfono: Letterboxd en películas,
+//                                         Rotten Tomatoes en series)
 //   stats:       { watchers, plays, lists, favorited } | null  (fila de stats)
 //   showFavoritedStat: boolean                  (oculta Favoritos cuando no aplica)
 //   toolbarActions: ReactNode | null            (acciones inline al final)
@@ -139,7 +142,18 @@ export function DetailsRatingsBadges({
   // Marcador: puntuaciones y logos un punto mayores desde
   // `xl` (ver `roomy` en CompactBadge).
   roomy = false,
+  // Marcador de teléfono (`spread`): la cuarta puntuación, junto a TMDb, Trakt
+  // e IMDb. "lb" (Letterboxd, películas) o "rt" (Rotten Tomatoes, series). La
+  // otra, y Metacritic, siguen solo desde `sm`.
+  phoneExtraScore = null,
 }) {
+  // Envoltorio de RT / Metacritic / Letterboxd: solo desde `sm`, salvo la
+  // cuarta puntuación del marcador de teléfono (`.phoneExtraScore`, que la
+  // muestra en `phone-sb` aunque `.optionalScore` la retire por ancho).
+  const isPhoneExtra = (name) => spread && phoneExtraScore === name;
+  const optionalWrapClass = (name) =>
+    `${phone && !isPhoneExtra(name) ? "hidden" : "hidden sm:block"} ${styles.optionalScore} ${isPhoneExtra(name) ? styles.phoneExtraScore : ""}`;
+  const extraOnPhone = isPhoneExtra("lb") ? lb : isPhoneExtra("rt") ? rt : null;
   const isPendingScore = (score) =>
     !!score && score.pending === true && score.value == null;
   const resolvedValue = (score) =>
@@ -192,7 +206,7 @@ export function DetailsRatingsBadges({
           : phone
             ? ""
             : "sm:gap-5"
-      } ${spread ? `phone-sb:w-full phone-sb:justify-evenly ${styles.spreadScores}` : ""}`}
+      } ${spread ? `phone-sb:w-full phone-sb:justify-evenly ${styles.spreadScores} ${extraOnPhone ? styles.spreadScores4 : ""}` : ""}`}
     >
       {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
       <div className="absolute opacity-0 pointer-events-none w-4 h-4">
@@ -282,9 +296,11 @@ export function DetailsRatingsBadges({
       {scoreSlot(
         rt,
         (score) => (
-          <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
+          <div className={optionalWrapClass("rt")}>
             <CompactBadge
               logo="/logo-RottenTomatoes.png"
+              phone={phone}
+              large={isPhoneExtra("rt")}
               value={score.value}
               sub={score.sub}
               href={score.href}
@@ -303,7 +319,7 @@ export function DetailsRatingsBadges({
       {scoreSlot(
         lb ? null : mc,
         (score) => (
-          <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
+          <div className={optionalWrapClass("mc")}>
             <CompactBadge
               logo="/logo-Metacritic.png"
               value={score.value}
@@ -323,9 +339,11 @@ export function DetailsRatingsBadges({
       {scoreSlot(
         lb,
         (score) => (
-          <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
+          <div className={optionalWrapClass("lb")}>
             <CompactBadge
               logo="/logo-Letterboxd.png"
+              phone={phone}
+              large={isPhoneExtra("lb")}
               // Es el icono de la app: un cuadrado oscuro que se funde con el
               // marcador, y lo que se ve son los puntos (74 % del ancho del
               // PNG). Se amplía para que los puntos midan lo que los demás
@@ -994,6 +1012,8 @@ export default function DetailsScoreboardPanel({
   // ventana: el panel marca `data-phone-scoreboard` y la variante `phone-sb:`
   // (globals.css) activa ahí lo mismo que `max-sm:` en un teléfono.
   mobileScoresOnly = false,
+  // Cuarta puntuación del marcador de teléfono (ver DetailsRatingsBadges).
+  phoneExtraScore = null,
   toolbarActions = null,
   className = "",
   children = null,
@@ -1120,6 +1140,7 @@ export default function DetailsScoreboardPanel({
               phone={phoneLayout}
               spread={mobileScoresOnly}
               roomy={roomyScores}
+              phoneExtraScore={phoneExtraScore}
             />
           </div>
 
