@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,16 +15,10 @@ import {
 import {
   abrirLoginEnNavegadorNativo,
   empezarLoginPorNavegador,
-  logToApp,
-  requestNativeGoogleIdToken,
   useAndroidApp,
 } from "@/lib/android/appBridge";
 import GoogleSignInButton, { GoogleBrandButton } from "@/components/auth/GoogleSignInButton";
-import {
-  appGoogleNextStep,
-  appGoogleShouldTryNative,
-  googleRedirectHref,
-} from "@/lib/auth/googleSignIn";
+import { googleRedirectHref } from "@/lib/auth/googleSignIn";
 
 function sanitizeNextPath(value) {
   const next = value || "/";
@@ -121,8 +115,6 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
   // Canje del idToken de Google en curso: tapa el formulario con «Entrando con
   // Google…» hasta que la sesión está en el contexto y se navega.
   const [googleBusy, setGoogleBusy] = useState(false);
-  // El selector nativo ya volvió «cancelado» en este formulario.
-  const nativoCanceladoRef = useRef(false);
   const [err, setErr] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
@@ -182,36 +174,15 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
     setErr(getGoogleErrorMessage(code) || getGoogleErrorMessage("google_popup_failed"));
   }, []);
 
-  // APP DE ANDROID. Primero el selector de cuentas del sistema (Credential
-  // Manager). Si el usuario lo cierra, no se hace nada; si falla de verdad
-  // —sin cuentas, sin Play Services, certificado no registrado—, se abre el
-  // login en el navegador con la recogida de sesión de siempre.
-  const handleAppGoogleLogin = useCallback(async () => {
+  // APP DE ANDROID. Una sola vía: el login de Google en el navegador, con la
+  // recogida de sesión de siempre. El selector de cuentas del sistema
+  // (Credential Manager) se quitó: sin cliente OAuth de Android en Google Cloud
+  // fallaba tras elegir cuenta y obligaba a un segundo intento con otra ventana.
+  const handleAppGoogleLogin = useCallback(() => {
     if (googleBusy) return;
     setErr("");
-    // Tras un «cancelado», directo al navegador: en las APK antiguas eso es
-    // también el fallo tras elegir cuenta (ver appGoogleShouldTryNative).
-    if (!appGoogleShouldTryNative({ cancelledBefore: nativoCanceladoRef.current })) {
-      logToApp("Google: el selector nativo volvió cancelado, uso el navegador");
-      abrirLoginEnNavegador();
-      return;
-    }
-    setGoogleBusy(true);
-    const resultado = await requestNativeGoogleIdToken();
-    const paso = appGoogleNextStep(resultado);
-    if (paso === "exchange") {
-      logToApp("Google: selector nativo ✓, canjeando el token");
-      await entrarConIdToken(resultado.idToken);
-      return;
-    }
-    setGoogleBusy(false);
-    if (paso === "stay") {
-      nativoCanceladoRef.current = true;
-      return;
-    }
-    logToApp(`Google: selector nativo no disponible (${resultado?.error || "?"}), uso el navegador`);
     abrirLoginEnNavegador();
-  }, [abrirLoginEnNavegador, entrarConIdToken, googleBusy]);
+  }, [abrirLoginEnNavegador, googleBusy]);
 
   const updateField = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));

@@ -35,6 +35,18 @@ export function isAndroidOauthState(value) {
  * código OAuth a la app mediante su esquema propio; WebAppActivity abrirá la
  * URL HTTPS interna en el WebView, donde sí vive la cookie `state` original.
  */
+/**
+ * Vuelta de una Auth Tab de Chrome. La pestaña se cierra SOLA al navegar a este
+ * esquema y devuelve la URL a la app (WebAppActivity), así que no se pinta nada
+ * entre Google y la app. El esquema debe coincidir con el que pasa la app al
+ * abrirla (`AuthTabIntent.launch(…, "theshowverse")`).
+ */
+export const AUTH_TAB_SCHEME = "theshowverse";
+
+export function buildAuthTabReturnUrl(claim) {
+  return `${AUTH_TAB_SCHEME}://auth?claim=${encodeURIComponent(claim || "")}`;
+}
+
 export function buildAndroidOauthHandoffUrl(origin, { code, state, error, claim } = {}) {
   // Con `claim`, la app no tiene que reprocesar nada: solo volver al login, que
   // recogerá la sesión ya preparada en el servidor.

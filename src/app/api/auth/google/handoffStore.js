@@ -34,11 +34,16 @@ function limpiarCaducados(ahora) {
 }
 
 /** Abre una entrega para el identificador que ha inventado la app. */
-export function abrirEntrega(appId, { next = "/", ahora = Date.now() } = {}) {
+// `authTab`: la app abrió el login en una Auth Tab de Chrome, que se cierra
+// sola al navegar a `theshowverse://` (ver callback/route.js).
+export function abrirEntrega(
+  appId,
+  { next = "/", authTab = false, ahora = Date.now() } = {},
+) {
   if (!appId) return false;
   limpiarCaducados(ahora);
   if (pendientes.size >= MAXIMO) return false;
-  pendientes.set(appId, { next, state: null, tokens: null, creado: ahora });
+  pendientes.set(appId, { next, authTab: Boolean(authTab), state: null, tokens: null, creado: ahora });
   return true;
 }
 

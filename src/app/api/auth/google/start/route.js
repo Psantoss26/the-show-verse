@@ -31,7 +31,9 @@ export async function GET(request) {
 
   const state = createOauthState({ android: esApp });
   if (appId) {
-    abrirEntrega(appId, { next });
+    // `tab=auth` lo añade la app cuando abre el login en una Auth Tab.
+    const authTab = request.nextUrl.searchParams.get("tab") === "auth";
+    abrirEntrega(appId, { next, authTab });
     asociarEstado(appId, state);
   }
   const redirectUri = getGoogleRedirectUri(request);

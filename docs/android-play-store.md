@@ -101,10 +101,13 @@ al volver manualmente a la app (funciona, pero no es automático).
 
 Google **rechaza su formulario de acceso dentro de un WebView embebido**
 (`disallowed_useragent`). Por eso la app no puede limitarse a cargar
-accounts.google.com: hay dos caminos y la app usa el primero, con el segundo
-como red de seguridad.
+accounts.google.com. Hay dos caminos posibles; **la app usa solo el 2
+(navegador)**. El botón «Continuar con Google» llama a `abrirLoginEnNavegador`
+en `LoginForm.jsx` y nunca abre el selector nativo: sin el cliente Android de
+abajo, el selector se abría, fallaba al elegir cuenta y el siguiente intento
+salía en otra ventana (la del navegador). Una sola vía evita las dos ventanas.
 
-**1) Nativo, sin navegador (el que se ve bien).** Credential Manager abre el
+**1) Nativo, sin navegador (desactivado en la web).** El código nativo y el puente (`requestNativeGoogleIdToken`) siguen en la app por si se recupera. Credential Manager abre el
 selector de cuentas de Android, devuelve un `idToken` y la web lo canjea en
 `/api/auth/google/native`; el backend lo valida contra Google igual que en el
 flujo web y las cookies quedan en el WebView. Requiere registrar un cliente
@@ -133,28 +136,14 @@ El APK que se instala hoy (el de `assembleFullDebug`) lo firma la clave de
 depuración: su SHA-256 es el de `public/.well-known/assetlinks.json`, así que la
 huella que hay que dar de alta es la de depuración de arriba.
 
-El botón «Continuar con Google» de la app prueba SIEMPRE primero este camino
-(`requestNativeGoogleIdToken` → `appGoogleNextStep` en
-`src/lib/auth/googleSignIn.js`): con un token, lo canjea `loginWithGoogle` y la
-sesión entra en el contexto antes de navegar; si el usuario cierra el selector,
-no pasa nada; cualquier otro fallo abre el camino 2. Hasta que el cliente
-Android exista, el sistema da un error de configuración y la app recuerda
-(`Prefs.nativeGoogleUnavailable`) que no debe ofrecer el selector, pero **solo
-24 horas**: después vuelve a intentarlo, así que al registrar el cliente no hace
-falta borrar los datos de la app. «Sin cuentas en el teléfono»
-(`NoCredentialException`) no cuenta como fallo de configuración.
+Para volver a usarlo: registrar el cliente Android (pasos de arriba), probar
+que el selector devuelve token y hacer que `handleAppGoogleLogin` llame a
+`requestNativeGoogleIdToken` antes del navegador (ver el historial de
+`LoginForm.jsx`). En la app quedan `Prefs.nativeGoogleUnavailable` y
+`GoogleCancelacion.esDelUsuario` («[16] Account reauth failed» tras elegir
+cuenta = falta el cliente Android, no una cancelación).
 
-**Ojo: «cancelado» no siempre lo es.** Sin el cliente Android, el selector se
-abre, eliges cuenta y Credential Manager responde con la misma excepción que
-al cerrarlo (`GetCredentialCancellationException`: «[16] Account reauth
-failed»). `GoogleCancelacion.esDelUsuario` mira el mensaje y lo trata como
-fallo de configuración (`account_reauth_failed` → camino 2). Para las APK
-instaladas antes de ese arreglo, la web hace de red: tras un «cancelado», el
-siguiente toque del botón va directo al camino 2
-(`appGoogleShouldTryNative`). Antes, el formulario se quedaba igual tras elegir
-cuenta en cada intento.
-
-**2) Navegador + vuelta a la app (respaldo).** El botón navega a
+**2) Navegador + vuelta a la app (el que se usa).** El botón navega a
 `/api/auth/google/start`, que detecta la app por el User-Agent
 (`TheShowVerseApp/`) y marca el `state` con el prefijo `android.`. Al volver de
 Google, el callback devuelve `theshowverse://open?url=…&app_handoff=1`, la app
@@ -168,6 +157,20 @@ curl -s -D - -o /dev/null \
   "https://theshowverse.com/api/auth/google/callback?code=X&state=android.<64hex>"
 # location: theshowverse://open?url=…app_handoff=1
 ```
+
+**Vuelta sin pantalla intermedia (Auth Tab).** La app abre el login con
+`openLoginInBrowser`. Si Chrome soporta Auth Tab
+(`CustomTabsClient.isAuthTabSupported`, `androidx.browser` 1.9), la abre como
+**Auth Tab** y añade `tab=auth` a `/start`. La entrega lo recuerda
+(`handoffStore`), y el callback redirige a `theshowverse://auth?claim=<id>`
+(`buildAuthTabReturnUrl`) en vez de a `/api/auth/google/done`. La pestaña se
+cierra sola al ver el esquema y la app vuelve al frente al instante: no se pinta
+la pantalla negra con el logo ni hace falta `LoginWatcher`. Sin Auth Tab, la
+pestaña normal acaba en `/done` y el vigía trae la app al frente, como antes.
+
+Ya en la app, `AndroidSessionClaim` reclama la sesión al recuperar el foco y
+entra **sin recargar**: `refreshMe()` mete el usuario en el contexto y
+`router.replace(next)` navega. Solo si eso falla se recarga la página entera.
 
 Si este camino no vuelve a la app, mira en este orden: que el APK instalado
 registre el esquema (`adb shell dumpsys package com.theshowverse.app | grep -A3

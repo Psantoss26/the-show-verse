@@ -51,6 +51,8 @@ class WebAppBridge(
     private val cambiarBarraEstado: (Boolean) -> Unit = {},
     private val cambiarModalAbierto: (Boolean) -> Unit = {},
     private val pedirPermisoAvisos: () -> Unit = {},
+    /** Abre el login en una Auth Tab de Chrome; false si el navegador no la tiene. */
+    private val abrirLoginEnAuthTab: (String) -> Boolean = { false },
 ) {
 
     /**
@@ -200,6 +202,9 @@ class WebAppBridge(
         if (!WebOrigin.isInternal(destino, currentOrigin())) return false
 
         activity.runOnUiThread {
+            // Auth Tab: se cierra sola al terminar y vuelve a la app sin pantalla
+            // intermedia; no hace falta vigilar. Sin ella, pestaña normal + vigía.
+            if (abrirLoginEnAuthTab(destino)) return@runOnUiThread
             abrirEnNavegador(destino)
             appId?.takeIf { it.isNotBlank() }?.let {
                 LoginWatcher.vigilar(activity, currentOrigin(), it)

@@ -15,6 +15,7 @@ import {
 import {
   buildAndroidHandoffPage,
   buildAndroidOauthHandoffUrl,
+  buildAuthTabReturnUrl,
   clearGoogleOauthCookies,
   exchangeGoogleCode,
   getGoogleRedirectUri,
@@ -118,7 +119,13 @@ export async function GET(request) {
       }
     }
 
-    // VUELTA AUTOMÁTICA. Se redirige a una URL **https** del propio dominio, no
+    // AUTH TAB: la pestaña de Chrome se cierra al ver el esquema propio y la app
+    // recoge la sesión al instante, sin pantalla intermedia.
+    if (entrega.authTab) {
+      return NextResponse.redirect(buildAuthTabReturnUrl(entrega.appId), { status: 303 });
+    }
+
+    // VUELTA AUTOMÁTICA (pestaña normal). Se redirige a una URL **https** del propio dominio, no
     // al esquema `theshowverse://`: con los App Links verificados
     // (`/.well-known/assetlinks.json`), Android intercepta esa navegación y la
     // entrega a la app sin pedir nada al usuario. El esquema propio necesitaba

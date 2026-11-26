@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildAuthTabReturnUrl,
   buildAndroidHandoffPage,
   buildAndroidOauthHandoffUrl,
   createOauthState,
@@ -92,4 +93,8 @@ test("the popup code is exchanged with redirect_uri=postmessage and the client s
     if (previous.secret === undefined) delete process.env.GOOGLE_CLIENT_SECRET;
     globalThis.fetch = previous.fetch;
   }
+});
+
+test("the Auth Tab return uses the app scheme and carries the claim id", () => {
+  assert.equal(buildAuthTabReturnUrl("a b"), "theshowverse://auth?claim=a%20b");
 });

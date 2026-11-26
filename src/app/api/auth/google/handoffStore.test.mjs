@@ -69,3 +69,13 @@ test("the status check never consumes the delivery", () => {
   assert.equal(reclamarEntrega("app-3").estado, "lista");
   assert.equal(estadoEntrega("app-3"), "desconocida");
 });
+
+test("an Auth Tab delivery remembers how the app opened the login", () => {
+  __vaciar();
+  abrirEntrega("tab-1", { next: "/lists", authTab: true });
+  asociarEstado("tab-1", "android.s1");
+  assert.equal(buscarPorEstado("android.s1")?.authTab, true);
+  abrirEntrega("tab-2", { next: "/" });
+  asociarEstado("tab-2", "android.s2");
+  assert.equal(buscarPorEstado("android.s2")?.authTab, false);
+});

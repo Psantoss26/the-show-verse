@@ -10,7 +10,10 @@
 //
 // Fuera de la app de Android no hace absolutamente nada.
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 
 import {
   canjearIdTokenDeGoogle,
@@ -26,6 +29,14 @@ const REINTENTOS_AL_VOLVER = 20; // ~30 s: lo que tarda un login normal
 const ESPERA_MS = 1500;
 
 export default function AndroidSessionClaim() {
+  const { refreshMe } = useAuth();
+  const router = useRouter();
+  // El efecto se monta una vez: lee siempre la versión actual de ambos.
+  const authRef = useRef({ refreshMe, router });
+  useEffect(() => {
+    authRef.current = { refreshMe, router };
+  });
+
   useEffect(() => {
     if (!isAndroidApp()) return undefined;
 
@@ -36,9 +47,21 @@ export default function AndroidSessionClaim() {
     // app guardó al abrir el navegador.
     const idDeLaUrl = new URLSearchParams(window.location.search).get("google_claim");
 
-    const entrar = (destino) => {
+    // SIN RECARGA: las cookies ya están en el WebView (las puso la respuesta de
+    // la reclamación); basta con meter el usuario en el contexto y navegar. La
+    // recarga completa pintaba la pantalla de arranque entre el login y la app.
+    const entrar = async (destino) => {
       const limpio =
         typeof destino === "string" && destino.startsWith("/") ? destino : "/";
+      try {
+        const usuario = await authRef.current.refreshMe();
+        if (vivo && usuario) {
+          authRef.current.router.replace(limpio);
+          return;
+        }
+      } catch {
+        /* cae a la recarga */
+      }
       window.location.replace(limpio);
     };
 

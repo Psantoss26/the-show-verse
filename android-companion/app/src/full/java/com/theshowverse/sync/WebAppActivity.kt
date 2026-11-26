@@ -32,6 +32,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.auth.AuthTabIntent
 import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
@@ -123,6 +124,19 @@ class WebAppActivity : AppCompatActivity() {
      */
     private val permisoAvisosLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    /**
+     * Vuelta de la Auth Tab del login de Google. La sesión la recoge la web
+     * (AndroidSessionClaim) al recuperar la app el foco; aquí solo se anota.
+     */
+    private val authTabLauncher =
+        AuthTabIntent.registerActivityResultLauncher(this) { resultado ->
+            if (resultado.resultCode == AuthTabIntent.RESULT_OK) {
+                prefs.addLog("Google: ✓ vuelta de la pestaña de Google")
+            } else {
+                prefs.addLog("Google: pestaña de Google cerrada sin terminar (${resultado.resultCode})")
+            }
+        }
 
     /** Los ajustes de servidor devuelven aquí para recargar con el origen nuevo. */
     private val serverSettingsLauncher =
@@ -277,6 +291,7 @@ class WebAppActivity : AppCompatActivity() {
                 ::cambiarBarraEstado,
                 { abierto -> modalWebAbierto = abierto },
                 ::pedirPermisoAvisos,
+                ::abrirLoginEnAuthTab,
             ),
             WebAppBridge.NAME,
         )
@@ -777,6 +792,27 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     /**
+     * Login de Google en una AUTH TAB de Chrome: la pestaña se cierra sola en
+     * cuanto el callback redirige a `theshowverse://auth` y devuelve el control
+     * a esta actividad, sin pintar la pantalla negra intermedia (/done) ni
+     * esperar a la vigilancia. `tab=auth` le dice al servidor que acabe así.
+     * False si el navegador no la soporta: entonces va la pestaña normal.
+     */
+    private fun abrirLoginEnAuthTab(url: String): Boolean {
+        val navegador = CustomTabsClient.getPackageName(this, null) ?: return false
+        if (!CustomTabsClient.isAuthTabSupported(this, navegador)) return false
+        val conAuthTab = Uri.parse(url).buildUpon().appendQueryParameter("tab", "auth").build()
+        return try {
+            val pestana = AuthTabIntent.Builder().build()
+            pestana.intent.setPackage(navegador)
+            pestana.launch(authTabLauncher, conAuthTab, AUTH_TAB_SCHEME)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
      * Ficha de un título en Plex: se abre en la app de Plex si está instalada
      * (en su ficha exacta, no en el inicio). El intent va dirigido al paquete
      * porque Plex no tiene watch.plex.tv verificado como App Link y, sin
@@ -1007,6 +1043,8 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     companion object {
+        /** Igual que `AUTH_TAB_SCHEME` en src/app/api/auth/google/_utils.js. */
+        private const val AUTH_TAB_SCHEME = "theshowverse"
         private const val INICIO_INDICADOR_DP = -40
         private const val FIN_INDICADOR_DP = 64
 

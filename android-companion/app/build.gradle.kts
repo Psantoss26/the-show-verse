@@ -51,7 +51,7 @@ android {
     // en com.theshowverse.sync —renombrarlo no aportaría nada y tocaría cada
     // fichero— mientras que la app se publica como com.theshowverse.app.
     namespace = "com.theshowverse.sync"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26
@@ -154,7 +154,7 @@ dependencies {
     // Carcasa web: solo la app completa.
     "fullImplementation"("androidx.webkit:webkit:1.11.0")
     "fullImplementation"("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
-    "fullImplementation"("androidx.browser:browser:1.8.0")
+    "fullImplementation"("androidx.browser:browser:1.9.0")
     "fullImplementation"("androidx.core:core-splashscreen:1.0.1")
 
     // Inicio de sesión con Google SIN navegador (selector de cuentas del sistema).
