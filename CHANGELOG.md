@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Perfil: más espacio entre el nombre de usuario y la fila de botones de acción (24 px en escritorio en vez de 16, 20 px en tablet en vez de 16 y 12 px en móvil en vez de 8). → [social y perfiles](docs/features/social-y-perfiles.md)
 - Fichas en el móvil y modal en vista teléfono: el marcador enseña una cuarta puntuación junto a TMDb, Trakt e IMDb: la de Letterboxd en películas y la de Rotten Tomatoes (público) en series. Las cuatro se reparten a lo ancho y se ajustan para caber también en pantallas estrechas. → [componentes](docs/frontend/components.md)
 - Series, ventana de valoración de episodios: las etiquetas de la izquierda (E1, E2… o S1, S2…) quedan centradas en el hueco entre el borde del modal y las casillas de nota, en vez de verse pegadas a las casillas; las casillas no se mueven. → [componentes](docs/frontend/components.md)
 - Series, ventana de valoración de episodios: en el móvil y en la app de Android ya no aparecen a veces dos barras de desplazamiento vertical a la derecha; la tabla sacaba la suya propia al sobrar un píxel por abajo. → [componentes](docs/frontend/components.md)

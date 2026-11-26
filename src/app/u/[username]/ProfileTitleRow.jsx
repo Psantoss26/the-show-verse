@@ -427,7 +427,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
           de debajo. */}
       <div
         ref={actionsRef}
-        className={`col-start-2 row-start-1 flex shrink-0 items-center gap-1 pl-2 @[640px]/detail-page:gap-2 @[1024px]/detail-page:-my-2 @[1024px]/detail-page:row-span-1 @[1024px]/detail-page:pl-4${
+        className={`col-start-2 row-start-1 flex shrink-0 items-center gap-1 pl-3 @[640px]/detail-page:gap-2 @[640px]/detail-page:pl-5 @[1024px]/detail-page:-my-2 @[1024px]/detail-page:row-span-1 @[1024px]/detail-page:pl-6${
           subtitle ? " row-span-2" : ""
         }`}
         aria-label="Acciones de perfil"
