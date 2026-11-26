@@ -181,7 +181,7 @@ export function TitleRow({
       className={`${ROW_LINK_LARGE} ${action ? "pr-14" : ""} ${className}`}
     >
       {media ? (
-        <span className={`relative shrink-0 overflow-hidden bg-zinc-900 ${mediaClassName}`}>{media}</span>
+        <span className={`relative shrink-0 overflow-hidden ${mediaClassName}`}>{media}</span>
       ) : (
         <Poster
           src={posterSrc}

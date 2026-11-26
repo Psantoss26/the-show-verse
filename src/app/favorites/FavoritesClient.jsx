@@ -2029,7 +2029,7 @@ const FavoriteCard = memo(function FavoriteCard({
         >
           <HoverExpandCard
             cellClassName={aspectRatio}
-            className="group overflow-hidden rounded-lg bg-zinc-900 shadow-md"
+            className="group overflow-hidden rounded-lg shadow-md"
           >
             <HoverExpandZoom>
               <SmartPoster item={item} title={title} mode={effectiveImageMode} />
@@ -2062,7 +2062,7 @@ const FavoriteCard = memo(function FavoriteCard({
         className="block"
       >
         <div
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300`}
         >
           {/* Overlay de borde para que los indicadores queden por debajo */}
           <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />

@@ -1766,7 +1766,7 @@ const WatchlistCard = memo(function WatchlistCard({
         >
           <HoverExpandCard
             cellClassName={aspectRatio}
-            className="group overflow-hidden rounded-lg bg-zinc-900 shadow-md"
+            className="group overflow-hidden rounded-lg shadow-md"
             onMouseEnter={handleHover}
           >
             <HoverExpandZoom>
@@ -1794,7 +1794,7 @@ const WatchlistCard = memo(function WatchlistCard({
         className="block"
       >
         <div
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-blue-900/20 transition-shadow duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(59,130,246,0.95)]`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-blue-900/20 transition-shadow duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(59,130,246,0.95)]`}
           onMouseEnter={handleHover}
         >
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
