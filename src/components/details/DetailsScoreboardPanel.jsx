@@ -473,9 +473,13 @@ export function DetailsStatsRow({
       ? ""
       : "sm:pl-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.25rem+env(safe-area-inset-right))] md:overflow-x-visible"
   }`;
+  // Marcador de teléfono (`spread`): sin relleno arriba. Las notas siguen
+  // centradas en su franja de 72 px (no se mueven al desplegar las stats) y con
+  // los 10 px de antes la tinta de las stats quedaba a 31,5 px de la de las
+  // notas, el doble que el hueco de arriba: parecía que las notas estaban subidas.
   const statsTrackClass = `${compactTrailing ? styles.compactStatsTrack : ""} ${narrowLabels === "few" ? styles.narrowStatsTrackFew : narrowLabels ? styles.narrowStatsTrack : ""} py-2.5 flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 ${
     phone ? "" : compactTrailing ? "sm:w-full sm:flex-nowrap sm:gap-x-2" : "sm:w-full sm:flex-wrap"
-  } ${spread ? `phone-sb:w-full phone-sb:justify-evenly phone-sb:gap-x-2.5 ${styles.spreadStats}` : ""}`;
+  } ${spread ? `phone-sb:w-full phone-sb:justify-evenly phone-sb:gap-x-2.5 phone-sb:pt-0 ${styles.spreadStats}` : ""}`;
 
   if (hasCustomStats) {
     return (

@@ -81,7 +81,7 @@ export function CompactBadge({
           : undefined
       }
       className={`
-        relative flex items-center gap-2.5 group group/badge select-none min-w-0 ${large ? "phone-sb:gap-[calc(12*var(--sb-u,1px))]" : ""}
+        relative flex items-center gap-2.5 group group/badge select-none min-w-0 ${large ? "phone-sb:min-h-[calc(48*var(--sb-u,1px))] phone-sb:gap-[calc(12*var(--sb-u,1px))]" : ""}
         ${isInteractive ? "cursor-pointer" : ""}
         ${className}
       `}
@@ -103,9 +103,15 @@ export function CompactBadge({
         />
       </span>
 
-      <div className="flex flex-col justify-center leading-none min-w-0">
+      {/* Marcador de teléfono (`large`): la cifra heredaba una caja de línea de
+          ~1,55em con el aire arriba, y la tinta de cifra + votos quedaba ~4 px por
+          debajo del centro del logo y de la barra. Se recorta la cifra a su tinta
+          (`text-box` cap/alphabetic) y el hueco hasta los votos se fija a mano
+          (mismo espacio visual que antes); la altura de la insignia se conserva
+          con su `min-h`. Los votos no se recortan: `truncate` cortaría la coma. */}
+      <div className={`flex flex-col justify-center leading-none min-w-0 ${large ? "phone-sb:pt-[calc(1.5*var(--sb-u,1px))]" : ""}`}>
         <div className="flex items-baseline gap-1 min-w-0">
-          <span className={`${phone ? "text-lg" : roomy ? "text-lg sm:text-xl xl:text-[22px]" : "text-lg sm:text-xl"} ${large ? "phone-sb:text-[length:calc(22*var(--sb-u,1px))]" : ""} font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors`}>
+          <span className={`${phone ? "text-lg" : roomy ? "text-lg sm:text-xl xl:text-[22px]" : "text-lg sm:text-xl"} ${large ? "phone-sb:text-[length:calc(22*var(--sb-u,1px))] phone-sb:leading-none phone-sb:[text-box:trim-both_cap_alphabetic]" : ""} font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors`}>
             {value != null ? value : "-"}
           </span>
 
@@ -116,7 +122,7 @@ export function CompactBadge({
           )}
         </div>
 
-        <div className="flex items-center gap-1 mt-0.5 min-w-0">
+        <div className={`flex items-center gap-1 mt-0.5 min-w-0 ${large ? "phone-sb:mt-[calc(11*var(--sb-u,1px))]" : ""}`}>
           {label && (
             <span className="text-[9px] font-bold text-white/45 uppercase tracking-widest bg-white/5 px-1 rounded-sm shrink-0">
               {label}
