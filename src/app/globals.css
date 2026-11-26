@@ -5086,8 +5086,11 @@ html[data-details-sequence-transition] .sv-topbar {
   inset: auto;
   left: calc((1 - var(--sv-zoom)) * 50%);
   top: calc((1 - var(--sv-zoom)) * 50%);
-  width: calc(var(--sv-zoom) * 100%);
-  height: calc(var(--sv-zoom) * 100%);
+  /* `!important`: `<NextImage fill>` pone `width/height: 100%` en línea y no
+     deja pasarle otro tamaño por `style` (en desarrollo lanza un error que
+     rompía DetailModal); ver src/lib/ui/crispZoom.js. */
+  width: calc(var(--sv-zoom) * 100%) !important;
+  height: calc(var(--sv-zoom) * 100%) !important;
   max-width: none;
 }
 
