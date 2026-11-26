@@ -59,10 +59,6 @@ export default function HeroSoundtrackPlayer({
   // de progreso con brillo, los saltos de pista sin fondo y el botón de
   // reproducir de cristal. En horizontal (portada a la izquierda) para ocupar
   // una esquina del hero sin taparlo, y con los controles siempre a la vista.
-  //
-  // POSICIÓN: 96px sobre el borde inferior. Más abajo chocaba con el botón
-  // flotante de instalar la app (PwaManager: fijo a 16px del borde, 48px de
-  // alto) en la misma esquina.
   return (
     <aside
       data-hero-soundtrack-player

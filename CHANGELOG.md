@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Sin botón flotante de instalar la app (el de descarga que aparecía en la esquina inferior derecha) en ordenador ni en móvil, y sin la mini barra de «Añadir a pantalla de inicio» de Chrome en Android. La PWA sigue pudiéndose instalar desde el menú del navegador. → [componentes](docs/frontend/components.md)
 - Ajustes → Preferencias, «Puntuaciones en el móvil»: tocar una puntuación del marcador abre un modal «Cambiar puntuación» en el ordenador y la hoja inferior de opciones en el móvil, para cambiarla por otra o quitarla; el bocadillo de la puntuación ya solo aparece al arrastrar, no al pulsar. → [componentes](docs/frontend/components.md)
 - Configuración → Preferencias: en «Puntuaciones en el móvil» y «Barra inferior móvil», la descripción baja a varias líneas cuando no cabe junto al botón «Personalizar», en vez de cortarse con «…». → [páginas](docs/frontend/app-router-pages.md)
 - Configuración → Preferencias: el botón «Personalizar» de «Al abrir un título» es igual que los demás de la página (verde, esquinas redondeadas en vez de píldora gris) y su icono reacciona al pasar el ratón como en las otras filas. → [páginas de usuario](docs/features/paginas-de-usuario.md)
