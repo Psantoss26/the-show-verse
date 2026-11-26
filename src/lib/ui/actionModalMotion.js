@@ -19,15 +19,6 @@
 // Este módulo es puro (sin DOM) para poder probarlo con node --test; el hook
 // `useActionModalMotion` lo conecta con el DOM.
 
-/** Atributo que lleva el panel MIENTRAS entra o sale. En la app de Android
- * (globals.css) apaga los `backdrop-filter` de sus descendientes: dentro de un
- * panel de cristal no se ven (medido en el teléfono: ≤ 16/255) pero cada uno es
- * una pasada más por fotograma, y el panel, al moverse, los obliga a recalcular
- * todos en cada uno. En el modal de episodios vistos (~20 piezas) bajaba los
- * fotogramas tarde a 120 Hz del 24-37 % al 5-7 % al abrir. El cristal del propio panel
- * se queda. */
-export const MOVING_PANEL_ATTR = "data-sv-modal-moving";
-
 /** Ventana durante la que un clic cuenta como origen del modal que se abre
  * (algunos esperan a cargar datos antes de abrir, p. ej. episodios vistos). */
 export const ORIGIN_MAX_AGE_MS = 5000;

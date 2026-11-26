@@ -82,16 +82,16 @@ test("anchor below: el panel encogido conserva su borde superior bajo el botón"
   assert.equal(centerX, originRect.left + originRect.width / 2);
 });
 
-test("en la app de Android, el panel que se mueve apaga los desenfoques anidados", async () => {
+test("en la app de Android, el contenido de los modales pesados va sin desenfoques anidados, siempre", async () => {
   const { readFile } = await import("node:fs/promises");
-  const { MOVING_PANEL_ATTR } = await import("./actionModalMotion.js");
-  assert.equal(MOVING_PANEL_ATTR, "data-sv-modal-moving");
   const css = await readFile(new URL("../../app/globals.css", import.meta.url), "utf8");
-  // Solo los descendientes (el cristal del propio panel se queda) y solo en la app.
-  assert.match(css, /html\[data-android-app\] \[data-sv-modal-moving\] \*\s*\{\s*backdrop-filter:\s*none/);
-  // El hook marca el panel antes de animar.
-  const hook = await readFile(new URL("../../hooks/useActionModalMotion.js", import.meta.url), "utf8");
-  assert.match(hook, /setAttribute\(MOVING_PANEL_ATTR/);
+  assert.match(css, /html\[data-android-app\] \.sv-modal-flat-glass \*\s*\{\s*backdrop-filter:\s*none/);
+  // Conmutarlo durante la animación hacía parpadear el contenido al terminar.
+  assert.doesNotMatch(css, /data-sv-modal-moving/);
+  for (const rel of ["../../components/trakt/TraktEpisodesWatchedModal.jsx", "../../components/details/EpisodeRatingsModal.jsx"]) {
+    const src = await readFile(new URL(rel, import.meta.url), "utf8");
+    assert.match(src, /sv-modal-flat-glass/);
+  }
 });
 
 test("el velo de los episodios vistos desenfoca la imagen con filter, no con backdrop-filter", async () => {

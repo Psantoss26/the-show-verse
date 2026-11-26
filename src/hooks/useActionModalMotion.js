@@ -17,7 +17,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import { BACK_PANEL_ATTR, takeBackGesture } from "@/lib/navigation/modalBackGesture";
-import { MOVING_PANEL_ATTR, ORIGIN_MAX_AGE_MS, buildModalMotion } from "@/lib/ui/actionModalMotion";
+import { ORIGIN_MAX_AGE_MS, buildModalMotion } from "@/lib/ui/actionModalMotion";
 
 // ---- Origen: el último botón pulsado ------------------------------------
 // Un único escuchador en captura (antes que el onClick del botón) recuerda el
@@ -112,9 +112,6 @@ export default function useActionModalMotion(open, { anchor = "center" } = {}) {
       anchor,
     });
 
-    // Mientras se mueve, sin desenfoques anidados en la app (ver MOVING_PANEL_ATTR).
-    panel.setAttribute(MOVING_PANEL_ATTR, "");
-
     const anims = [];
     if (plan.panel) {
       const keyframes = plan.panel.keyframes.map((k) => ({ ...k }));
@@ -142,7 +139,6 @@ export default function useActionModalMotion(open, { anchor = "center" } = {}) {
         .then(() => {
           if (cancelled) return;
           runningRef.current = [];
-          panel.removeAttribute(MOVING_PANEL_ATTR);
         })
         .catch(() => {});
     }

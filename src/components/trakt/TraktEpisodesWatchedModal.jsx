@@ -2026,7 +2026,7 @@ export default function TraktEpisodesWatchedModal({
                   y los devuelve con márgenes negativos: la lista de episodios
                   arranca donde antes y su relleno superior (vacío) queda bajo
                   el halo. `relative z-10` lo pinta encima de la lista. */}
-              <div className="relative z-10 -mt-1 -mb-3 w-full shrink-0 overflow-x-auto no-scrollbar md:hidden">
+              <div className="sv-modal-flat-glass relative z-10 -mt-1 -mb-3 w-full shrink-0 overflow-x-auto no-scrollbar md:hidden">
                 {/* Mismo margen lateral (16px) que la barra de herramientas y la
                     lista de episodios: las tres zonas arrancan alineadas. */}
                 <div className="flex min-w-max gap-2 px-4 pb-6 pt-1">
@@ -2062,7 +2062,7 @@ export default function TraktEpisodesWatchedModal({
                 onTouchCancel={() => {
                   seasonSwipeStartRef.current = null;
                 }}
-                className="sv-modal-scroll-fade relative flex-1 overflow-y-auto scroll-smooth p-4 pb-6 touch-pan-y no-scrollbar sm:pb-4 md:touch-auto"
+                className="sv-modal-scroll-fade sv-modal-flat-glass relative flex-1 overflow-y-auto scroll-smooth p-4 pb-6 touch-pan-y no-scrollbar sm:pb-4 md:touch-auto"
               >
                 {/* Temporada elegida aún cargando con la anterior ya fuera. */}
                 {!seasonExitPending &&

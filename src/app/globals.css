@@ -2714,14 +2714,17 @@ html[data-android-app] .sv-glass-rim {
   backdrop-filter: none;
 }
 
-/* MODALES DE ACCIÓN EN MOVIMIENTO (app de Android): mientras el panel nace del
-   botón o vuelve a él (useActionModalMotion marca `data-sv-modal-moving`), sus
-   piezas de dentro van sin `backdrop-filter`. Dentro del cristal del panel no se
-   ven (≤ 16/255 medido), pero cada una es una pasada más en cada fotograma: en
-   episodios vistos, con ~20 (filas, píldoras de temporada, botones), 24-37 % de
-   fotogramas tarde al abrir a 120 Hz; sin ellas, 5-7 %. Al terminar de entrar
-   vuelven. El cristal del propio panel no se toca. */
-html[data-android-app] [data-sv-modal-moving] * {
+/* CRISTALES ANIDADOS EN MODALES (app de Android): el contenido marcado con
+   `.sv-modal-flat-glass` (episodios vistos, valoración de episodios) va sin
+   `backdrop-filter` en la APK. Dentro del cristal del panel no se ven (≤ 16/255
+   medido), pero cada uno es una pasada más en cada fotograma: en episodios
+   vistos, con ~20 (filas, píldoras de temporada, botones), 24-37 % de fotogramas
+   tarde al abrir a 120 Hz; sin ellas, 5-7 %. Es fijo, no solo mientras el panel
+   entra: apagarlos al moverse y encenderlos al terminar hacía parpadear el
+   contenido (la WebView pinta sin fondo el primer fotograma de un
+   backdrop-filter recién encendido). El cristal del panel y las capas que se
+   abren encima (confirmaciones, submodales) quedan fuera de la clase. */
+html[data-android-app] .sv-modal-flat-glass * {
   backdrop-filter: none;
 }
 
