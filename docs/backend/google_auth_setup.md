@@ -8,8 +8,11 @@ Esta guia cubre el login/registro con Google usando la cuenta propia de The Show
 botón de Google Identity Services (`src/components/auth/GoogleSignInButton.jsx`):
 el diseño y el texto son los de Google («Continuar con Google» o
 «Registrarse con Google»), y al pulsarlo se abre la ventana de Google para elegir
-cuenta sin salir de la página (el diálogo del navegador, FedCM, en Chrome; una
-ventana emergente en el resto).
+cuenta sin salir de la página (una ventana emergente de Google en todos los
+navegadores). No se usa FedCM (`use_fedcm_for_button`): si Google rechaza el
+token —por ejemplo, porque el origen no está autorizado—, Chrome solo registra
+`FedCM get() rejects with NetworkError: Error retrieving a token` y el botón no
+hace nada; con la ventana emergente se ve el error de Google.
 
 1. Google devuelve un `idToken` al botón.
 2. `loginWithGoogle` (`AuthContext`) lo envía a `/api/auth/google/native`.

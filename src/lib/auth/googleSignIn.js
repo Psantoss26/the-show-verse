@@ -2,8 +2,8 @@
 //
 // WEB. Se usa el botón OFICIAL de Google Identity Services (GIS): lo pinta
 // Google, con su diseño y su texto, y al pulsarlo abre la ventana de Google para
-// elegir cuenta (FedCM en Chrome, ventana emergente en el resto) sin salir de la
-// página. Devuelve un idToken que se canjea en /api/auth/google/native, y la
+// elegir cuenta (ventana emergente de Google; sin FedCM, que falla en silencio)
+// sin salir de la página. Devuelve un idToken que se canjea en /api/auth/google/native, y la
 // sesión entra en el contexto ANTES de navegar: así no se ve la web sin sesión
 // un instante. La redirección clásica (/api/auth/google/start) queda de
 // respaldo si el script de Google no carga.

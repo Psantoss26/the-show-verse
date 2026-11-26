@@ -106,9 +106,12 @@ export default function GoogleSignInButton({
             callback: (response) => {
               if (response?.credential) activeCredentialHandler?.(response.credential);
             },
+            // Ventana emergente de Google, también en Chrome. NO se usa FedCM
+            // (`use_fedcm_for_button`): si Google rechaza el token —p. ej.
+            // origen sin autorizar—, `get()` falla con «NetworkError: Error
+            // retrieving a token», GIS no avisa ni prueba otra vía y el clic
+            // se pierde. La ventana emergente enseña el error de Google.
             ux_mode: "popup",
-            // Ventana de cuentas del propio navegador (FedCM) donde exista.
-            use_fedcm_for_button: true,
             auto_select: false,
             cancel_on_tap_outside: true,
             itp_support: true,
