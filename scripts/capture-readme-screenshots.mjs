@@ -122,6 +122,12 @@ async function capture(browser, token, storage, shot) {
   try {
     await context.addCookies([{ name: 'showverse_access_token', value: token, domain: new URL(base).hostname, path: '/' }]);
     await context.addInitScript(entries => { for (const [key, value] of Object.entries(entries)) localStorage.setItem(key, value); }, storage);
+    // Google profile photos come back blocked (ERR_BLOCKED_BY_ORB) in headless Chrome, which leaves the
+    // avatar as an initial: fetch them from Node and hand them to the page.
+    await context.route(/^https:\/\/lh\d\.googleusercontent\.com\//, async route => {
+      const response = await fetch(route.request().url());
+      await route.fulfill({ status: response.status, contentType: response.headers.get('content-type') || 'image/jpeg', body: Buffer.from(await response.arrayBuffer()) });
+    });
     // Hide the Next.js dev indicator.
     await context.addInitScript(() => document.addEventListener('DOMContentLoaded', () => {
       const style = document.createElement('style');
