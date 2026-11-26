@@ -11,7 +11,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
   Check,
   DownloadCloud,
   Eye,
@@ -2301,16 +2300,12 @@ function ProfileSettingsClient() {
     >
       <SettingsBackground />
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 pt-8 pb-1 lg:pt-12 desktop:pb-12">
-        <header className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Link
-              href="/profile"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-white/10 to-white/5 text-zinc-300 shadow-lg backdrop-blur-lg transition hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400 shrink-0"
-              aria-label={t("settings_back", "Volver al perfil")}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
+      <div className="relative z-10 mx-auto max-w-6xl px-4 pt-4 pb-1 sm:pt-8 lg:pt-12 desktop:pb-12">
+        {/* Misma distancia navbar → título que Favoritos, Pendientes y demás
+            páginas de usuario: mismo relleno superior y fila de «Tu cuenta» de
+            16 px de alto. */}
+        <header className="mb-6 sm:mb-8">
+          <div className="flex h-4 items-center gap-3 mb-2">
             <div className="h-px w-10 bg-emerald-500" />
             <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 truncate">
               {t("settings_account", "Tu cuenta")}
@@ -2342,7 +2337,7 @@ function ProfileSettingsClient() {
         </header>
 
         {/* Profile Info Summary Card */}
-        <div className="mb-8 rounded-3xl bg-gradient-to-r from-emerald-950/20 to-indigo-950/20 border border-white/[0.06] p-4 sm:p-6 flex flex-row items-center justify-between gap-4 backdrop-blur-xl relative overflow-hidden">
+        <div className="mb-5 sm:mb-6 rounded-3xl bg-gradient-to-r from-emerald-950/20 to-indigo-950/20 border border-white/[0.06] p-4 sm:p-6 flex flex-row items-center justify-between gap-4 backdrop-blur-xl relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.04] to-indigo-500/[0.04] pointer-events-none" />
           <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
             <div className="h-12 w-12 sm:h-14 sm:w-14 overflow-hidden rounded-2xl bg-white/5 flex items-center justify-center shrink-0 shadow-lg text-emerald-400">

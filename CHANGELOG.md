@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Configuración del perfil: sin botón de volver junto a «Tu cuenta» (al perfil se vuelve con el navbar o con atrás). El título queda a la misma distancia de la barra superior que en Favoritos, Pendientes y demás páginas de usuario, en móvil y en escritorio (antes quedaba 36 px más abajo en móvil y 20 px en tablet y escritorio, por un relleno mayor y por el botón de volver, que estiraba la fila de «Tu cuenta»). También se acortan los huecos entre el título y la tarjeta de usuario (24 px en móvil, 32 px desde tablet; antes 32) y entre la tarjeta y la barra de secciones (20/24 px; antes 32). → [páginas](docs/frontend/app-router-pages.md)
 - Fichas y vista rápida: los modales de los botones de Favoritos y Pendientes ya no enseñan el nombre de la película o serie bajo el encabezado («Añadir a favoritos», «Quitar de pendientes»…). → [componentes](docs/frontend/components.md)
 - Perfil: más espacio entre el nombre de usuario y la fila de botones de acción (24 px en escritorio en vez de 16, 20 px en tablet en vez de 16 y 12 px en móvil en vez de 8). → [social y perfiles](docs/features/social-y-perfiles.md)
 - Fichas en el móvil y modal en vista teléfono: el marcador enseña una cuarta puntuación junto a TMDb, Trakt e IMDb: la de Letterboxd en películas y la de Rotten Tomatoes (público) en series. Las cuatro se reparten a lo ancho y se ajustan para caber también en pantallas estrechas. → [componentes](docs/frontend/components.md)
