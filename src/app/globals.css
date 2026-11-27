@@ -4856,7 +4856,10 @@ html[data-details-sequence-transition] .sv-topbar {
 .sv-score-row:not(:has([data-scoreboard-stats])) > .sv-score-panel {
   min-width: 18rem;
 }
-@container (width < 4.5rem) {
+/* El nombre se va ANTES de rozar los cantos: «Plataformas» (el más largo, ~72px)
+   más 0,75rem de margen a cada lado. Los bloques de una fila tienen el mismo
+   ancho, así que todos lo pierden a la vez. */
+@container (width < 6rem) {
   .sv-score-tile .sv-score-tile-label {
     display: none;
   }
@@ -4907,6 +4910,23 @@ html[data-details-sequence-transition] .sv-topbar {
   }
   .sv-score-row .sv-score-tiles[data-tile-count="4"] .sv-score-tile-label {
     display: none;
+  }
+}
+
+/* Con TRES (sin Actividad) siguen en fila, como en la fila ancha, hasta mucho
+   más abajo: tres tiras apiladas quedaban bajas y aplastadas. Cada bloque crece
+   por igual, icono encima del nombre; si el bloque se estrecha por debajo de
+   6rem el nombre se oculta (regla de ancho de arriba) y queda el icono. */
+@container sbrow (40rem <= width < 56rem) {
+  .sv-score-row .sv-score-tiles[data-tile-count="3"] {
+    flex-direction: row;
+    min-width: 9.5rem;
+  }
+  .sv-score-row .sv-score-tiles[data-tile-count="3"] .sv-score-tile {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    flex-direction: column;
   }
 }
 
