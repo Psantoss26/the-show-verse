@@ -2457,10 +2457,21 @@ body {
    del selector de secciones, el buscador abierto para escribir) y, si la fila
    no cabe, la compacta un paso más con `data-fit`:
      no-labels  sin rótulos
+     lean       además, los botones sueltos (Filtros) en icono
      icons      desplegables en icono y flecha
      bare       además, el selector de secciones sin títulos */
 .sv-page-toolbar[data-fit] .sv-page-toolbar-label {
   display: none;
+}
+
+/* lean: solo los botones sueltos de la barra (Filtros) pasan a icono; los
+   desplegables siguen mostrando su valor. */
+.sv-page-toolbar[data-fit="lean"] > .sv-page-toolbar-trigger .sv-page-toolbar-value {
+  display: none;
+}
+
+.sv-page-toolbar[data-fit="lean"] > .sv-page-toolbar-trigger {
+  min-width: 0 !important;
 }
 
 .sv-page-toolbar:is([data-fit="icons"], [data-fit="bare"]) .sv-page-toolbar-value {
@@ -3808,6 +3819,18 @@ svg.recharts-surface *:focus {
   .sv-group-compact-title[data-compact],
   .sv-group-compact-scores[data-compact] {
     transform: scale(0.75);
+  }
+}
+/* Fijada, la fila de medias no reserva el alto del botón «+» (min-h-8 /
+   sm:min-h-10, para que la cabecera normal no encoja al terminar un
+   cálculo): la cabecera compacta mide lo de siempre, el alto de línea del
+   título a 18 / 28 px (text-lg / text-[1.75rem] con leading-tight). */
+.sv-group-compact-scores[data-compact] {
+  min-height: calc(1.125rem * 1.25);
+}
+@media (min-width: 640px) {
+  .sv-group-compact-scores[data-compact] {
+    min-height: calc(1.75rem * 1.25);
   }
 }
 [data-group-still] :is(.sv-group-compact-title, .sv-group-compact-scores) {
