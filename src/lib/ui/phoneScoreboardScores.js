@@ -82,6 +82,20 @@ export function phoneScoresFor(scores, mediaType) {
   return sanitizePhoneScores(scores)[typeOf(mediaType)];
 }
 
+// Lo que se pinta de verdad: una puntuación elegida que se quedó sin nota (ya
+// no se espera; p. ej. Rotten Tomatoes en muchas series de anime) cede su
+// puesto a TMDb, salvo que TMDb ya esté en el marcador o tampoco tenga nota.
+// Así el marcador no se queda con un hueco menos. Solo la primera que falte.
+// `hasScore(key)`: hay nota o se está esperando (hueco reservado).
+export function phoneScoresWithFallback(list, hasScore) {
+  if (!Array.isArray(list) || list.includes("tmdb") || !hasScore("tmdb")) return list;
+  const missing = list.findIndex((key) => !hasScore(key));
+  if (missing < 0) return list;
+  const next = [...list];
+  next[missing] = "tmdb";
+  return next;
+}
+
 // --- Operaciones del editor (sobre la lista de un tipo) ---------------------
 // Todas devuelven una lista válida: si la operación no cabe, la lista igual.
 

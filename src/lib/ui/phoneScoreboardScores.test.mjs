@@ -9,6 +9,7 @@ import {
   isPhoneScoreAllowed,
   phoneScoreOptionsFor,
   phoneScoresFor,
+  phoneScoresWithFallback,
   placePhoneScore,
   removePhoneScore,
   replacePhoneScore,
@@ -84,4 +85,20 @@ test("withPhoneScores conserva el resto de uiSettings", () => {
     mobileCardsPerRow: 4,
     [PHONE_SCORES_KEY]: { movie: ["imdb", "rt"], tv: ["imdb"] },
   });
+});
+
+test("sin nota de Rotten Tomatoes, TMDb ocupa su puesto", () => {
+  const has = (missing) => (key) => !missing.includes(key);
+  // RT elegida y sin nota: TMDb entra en su posición.
+  assert.deepEqual(phoneScoresWithFallback(["rt", "trakt", "imdb"], has(["rt"])), ["tmdb", "trakt", "imdb"]);
+  assert.deepEqual(phoneScoresWithFallback(["trakt", "imdb", "rt"], has(["rt"])), ["trakt", "imdb", "tmdb"]);
+  // TMDb ya está en el marcador: no se duplica.
+  assert.deepEqual(phoneScoresWithFallback(["tmdb", "rt", "imdb"], has(["rt"])), ["tmdb", "rt", "imdb"]);
+  // Sin TMDb tampoco: se queda como estaba.
+  assert.deepEqual(phoneScoresWithFallback(["rt", "imdb"], has(["rt", "tmdb"])), ["rt", "imdb"]);
+  // Con todas las notas, nada cambia.
+  const full = ["rt", "imdb"];
+  assert.equal(phoneScoresWithFallback(full, has([])), full);
+  // Varias sin nota: TMDb sustituye solo a la primera.
+  assert.deepEqual(phoneScoresWithFallback(["rt", "mc", "imdb"], has(["rt", "mc"])), ["tmdb", "mc", "imdb"]);
 });

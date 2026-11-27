@@ -50,7 +50,7 @@ import {
 import { formatShortNumber } from "@/lib/details/formatters";
 import { useLinksWithWikipedia } from "@/lib/details/useWikipediaLink";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
-import { DEFAULT_PHONE_SCORES } from "@/lib/ui/phoneScoreboardScores";
+import { DEFAULT_PHONE_SCORES, phoneScoresWithFallback } from "@/lib/ui/phoneScoreboardScores";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
 // Badge de estadística de Trakt (Watchers, Plays, Lists, Favorited).
@@ -153,7 +153,12 @@ export function DetailsRatingsBadges({
   phoneAddSlotAt = null,
 }) {
   // Ya filtradas por tipo (`phoneScoresFor`): aquí solo se consultan.
-  const phonePicked = phoneScores ?? DEFAULT_PHONE_SCORES.movie;
+  // La que no tenga nota (ni se espere) cede su puesto a TMDb.
+  const phoneAvailable = { tmdb, trakt: trakt || traktPublic, imdb, rt, mc, lb };
+  const phonePicked = phoneScoresWithFallback(
+    phoneScores ?? DEFAULT_PHONE_SCORES.movie,
+    (name) => !!phoneAvailable[name],
+  );
   const onPhone = (name) => spread && phonePicked.includes(name);
   // TMDb / Trakt / IMDb no elegidas: en el teléfono se retiran (`.phoneOff`);
   // en la ficha, desde `sm`, siguen. Las elegidas no llevan envoltorio.
