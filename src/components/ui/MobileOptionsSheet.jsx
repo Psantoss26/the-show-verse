@@ -531,7 +531,9 @@ export function SheetOptionGroup({ label, icon: Icon, children, layout = "wrap",
 // `media`: imagen delante de la etiqueta (p. ej. el logo de una plataforma),
 // como hermana del texto y no dentro: dentro de la línea de texto se alineaba
 // a la línea base y empujaba logo y texto ~3 px por encima del centro.
-export function SheetOption({ active, onClick, children, icon: Icon, media = null, count = null, disabled = false, className = "" }) {
+// `trailing`: algo más al final de la píldora (p. ej. el progreso de la
+// agrupación elegida mientras llegan sus datos).
+export function SheetOption({ active, onClick, children, icon: Icon, media = null, count = null, trailing = null, disabled = false, className = "" }) {
   const accent = useContext(OptionsSheetContext);
   // Cambiar un filtro, el orden o la agrupación vuelve a pintar la página
   // entera (cientos de tarjetas). Hecho dentro del clic, el hilo quedaba
@@ -578,7 +580,8 @@ export function SheetOption({ active, onClick, children, icon: Icon, media = nul
           {count}
         </span>
       ) : null}
-      {shownActive && !Icon ? <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+      {trailing}
+      {shownActive && !Icon && !trailing ? <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
     </button>
   );
 }

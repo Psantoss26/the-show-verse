@@ -41,6 +41,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, RotateCw, Star } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
+import { ProgressRing } from "@/components/ui/GroupingProgress";
 
 const SOURCES = {
   imdb: { label: "IMDb", src: "/score-logos/imdb.png", w: 131, h: 66 },
@@ -102,29 +103,6 @@ function ScoreItem({ item, index, count }) {
 }
 
 const boxKey = (source) => `od:${source}`;
-
-// Anillo de progreso de la chapa mientras se calcula.
-function ProgressRing({ value }) {
-  const r = 8;
-  const c = 2 * Math.PI * r;
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-full w-full -rotate-90">
-      <circle cx="10" cy="10" r={r} fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2.5" />
-      <circle
-        cx="10"
-        cy="10"
-        r={r}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeDasharray={c}
-        strokeDashoffset={c * (1 - Math.min(1, Math.max(0.06, value)))}
-        className="transition-[stroke-dashoffset] duration-300 ease-out"
-      />
-    </svg>
-  );
-}
 
 function OnDemandBox({ demand }) {
   const source = SOURCES[demand.key];

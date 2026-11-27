@@ -102,6 +102,7 @@ import {
 } from "@/lib/userLists/listScoreCache";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
+import GroupingProgress, { sumProgress } from "@/components/ui/GroupingProgress";
 import { ControlledOptionsSheet, OptionsSheetTrigger, SheetOption, SheetOptionBreak, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
 import useGroupScoresOnDemand from "@/hooks/useGroupScoresOnDemand";
@@ -1352,6 +1353,8 @@ function InlineDropdownMenu({
   compactMobile = false,
   icon: Icon,
   children,
+  // Progreso ({ done, total }) de lo que muestra el botón (la agrupación).
+  progress = null,
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -1451,6 +1454,13 @@ function InlineDropdownMenu({
             {mobileValueLabel || valueLabel}
           </span>
         </div>
+        {progress ? (
+          <GroupingProgress
+            progress={progress}
+            className="-mr-1"
+            ringClassName="h-4 w-4 text-red-500"
+          />
+        ) : null}
         <ChevronDown
           className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
         />
@@ -1489,12 +1499,26 @@ function InlineDropdownMenu({
 // Dentro de la hoja de filtros móvil, cada opción es una píldora.
 function DropdownItem(props) {
   if (useInOptionsSheet()) {
-    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+    return (
+      <SheetOption
+        active={props.active}
+        onClick={props.onClick}
+        trailing={
+          props.progress ? (
+            <GroupingProgress progress={props.progress} textClassName="text-[11px] opacity-70" />
+          ) : null
+        }
+      >
+        {props.children}
+      </SheetOption>
+    );
   }
   return <DropdownMenuItem {...props} />;
 }
 
-function DropdownMenuItem({ active, onClick, children }) {
+// `progress` ({ done, total }): la agrupación elegida aún espera datos
+// (plataformas, notas): su marca pasa a ser el anillo de progreso.
+function DropdownMenuItem({ active, onClick, children, progress = null }) {
   return (
     <button
       type="button"
@@ -1506,7 +1530,9 @@ function DropdownMenuItem({ active, onClick, children }) {
       {/* El hueco de la marca se reserva SIEMPRE: el menú mide lo que su
           contenido (`max-content`), y así su ancho no cambia según qué opción
           esté elegida ni el texto queda pegado al icono. */}
-      {active ? (
+      {progress ? (
+        <GroupingProgress progress={progress} ringClassName="h-4 w-4 text-red-500" />
+      ) : active ? (
         <CheckCircle2 className="w-4 h-4 shrink-0 text-red-500" />
       ) : (
         <span aria-hidden="true" className="w-4 h-4 shrink-0" />
@@ -1521,6 +1547,8 @@ function GroupingDropdownContent({
   onGroupChange,
   onSubGroupChange,
   close,
+  // Progreso por clave de agrupación mientras llegan sus datos.
+  progressByKey = null,
 }) {
   const subgroupOptions = FAVORITES_GROUP_OPTIONS.filter(
     (option) => option.key !== "none" && option.key !== groupBy,
@@ -1540,6 +1568,7 @@ function GroupingDropdownContent({
         <DropdownItem
           key={option.key}
           active={groupBy === option.key}
+          progress={groupBy === option.key ? progressByKey?.[option.key] : null}
           onClick={() => {
             onGroupChange(option.key);
             if (option.key === "none") close();
@@ -1574,6 +1603,7 @@ function GroupingDropdownContent({
             <DropdownItem
               key={option.key}
               active={subGroupBy === option.key}
+              progress={subGroupBy === option.key ? progressByKey?.[option.key] : null}
               onClick={() => {
                 onSubGroupChange(option.key);
                 close();
@@ -2088,6 +2118,10 @@ export default function FavoritesClient() {
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
+  // Progreso ({ done, total }) de cada carga, para el menú «Agrupar».
+  const [providerProgress, setProviderProgress] = useState(null);
+  const [imdbProgress, setImdbProgress] = useState(null);
+  const [traktProgress, setTraktProgress] = useState(null);
 
   // Navegación de historial (atrás/adelante): la página debe verse ESTÁTICA, tal
   // como estaba. En ese caso se renderiza el contenido COMPLETO desde el primer
@@ -2593,6 +2627,7 @@ export default function FavoritesClient() {
     frozen: freezeOrder,
     setImdbScores,
     setLoading: setLoadingImdb,
+    setProgress: setImdbProgress,
   });
 
   // Prefetch Trakt scores in background (non-blocking)
@@ -2622,10 +2657,12 @@ export default function FavoritesClient() {
 
       if (itemsToFetch.length === 0) {
         setLoadingTrakt(false);
+        setTraktProgress(null);
         return;
       }
 
       setLoadingTrakt(true);
+      setTraktProgress({ done: 0, total: itemsToFetch.length });
 
       try {
         let fetchedCount = 0;
@@ -2662,9 +2699,15 @@ export default function FavoritesClient() {
           const batch = itemsToFetch.slice(i, i + batchSize);
           const results = await Promise.all(batch.map(processItem));
           const hasBatchUpdates = results.some(Boolean);
+          const done = Math.min(i + batchSize, itemsToFetch.length);
 
+          if (!cancelled) {
+            startTransition(() => {
+              if (hasBatchUpdates) setTraktScores(new Map(scores));
+              setTraktProgress({ done, total: itemsToFetch.length });
+            });
+          }
           if (hasBatchUpdates && !cancelled) {
-            startTransition(() => setTraktScores(new Map(scores)));
             await new Promise((resolve) => setTimeout(resolve, 0));
           }
         }
@@ -2677,6 +2720,7 @@ export default function FavoritesClient() {
       } finally {
         if (!cancelled) {
           setLoadingTrakt(false);
+          setTraktProgress(null);
         }
       }
     };
@@ -2924,10 +2968,12 @@ export default function FavoritesClient() {
 
       if (itemsToFetch.length === 0) {
         setLoadingProviders(false);
+        setProviderProgress(null);
         return;
       }
 
       setLoadingProviders(true);
+      setProviderProgress({ done: 0, total: itemsToFetch.length });
 
       try {
         const plexIndexPromise = fetchPlexLibraryIndex();
@@ -2968,13 +3014,20 @@ export default function FavoritesClient() {
           });
 
           if (!cancelled) {
-            startTransition(() => setProvidersByItem(new Map(providerMap)));
+            const done = Math.min(i + batchSize, itemsToFetch.length);
+            startTransition(() => {
+              setProvidersByItem(new Map(providerMap));
+              setProviderProgress({ done, total: itemsToFetch.length });
+            });
             writeProvidersCache(providerMap);
             await new Promise((resolve) => setTimeout(resolve, 0));
           }
         }
       } finally {
-        if (!cancelled) setLoadingProviders(false);
+        if (!cancelled) {
+          setLoadingProviders(false);
+          setProviderProgress(null);
+        }
       }
     };
 
@@ -3268,6 +3321,16 @@ export default function FavoritesClient() {
       navigateToGroup(previousGroup.key);
     },
     [grouped, navigateToGroup],
+  );
+
+  // Progreso de los datos que necesita la agrupación elegida (menú «Agrupar»).
+  const groupingProgressByKey = {
+    provider: loadingProviders ? providerProgress : null,
+    imdb_rating: loadingImdb ? imdbProgress : null,
+    trakt_rating: loadingTrakt ? traktProgress : null,
+  };
+  const activeGroupingProgress = sumProgress(
+    [groupBy, subGroupBy].map((key) => groupingProgressByKey[key]),
   );
 
   const scoreLoadingLabel =
@@ -3700,6 +3763,7 @@ export default function FavoritesClient() {
               )}
               compactMobile
               icon={Layers3}
+              progress={activeGroupingProgress}
             >
               {({ close }) => (
                 <GroupingDropdownContent
@@ -3708,6 +3772,7 @@ export default function FavoritesClient() {
                   onGroupChange={handleGroupChange}
                   onSubGroupChange={handleSubGroupChange}
                   close={close}
+                  progressByKey={groupingProgressByKey}
                 />
               )}
             </InlineDropdown>
@@ -3899,6 +3964,7 @@ export default function FavoritesClient() {
               )}
               compactMobile
               icon={Layers3}
+              progress={activeGroupingProgress}
             >
               {({ close }) => (
                 <GroupingDropdownContent
@@ -3907,6 +3973,7 @@ export default function FavoritesClient() {
                   onGroupChange={handleGroupChange}
                   onSubGroupChange={handleSubGroupChange}
                   close={close}
+                  progressByKey={groupingProgressByKey}
                 />
               )}
             </InlineDropdown>

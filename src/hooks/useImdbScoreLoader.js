@@ -48,6 +48,9 @@ export default function useImdbScoreLoader({
   frozen,
   setImdbScores,
   setLoading,
+  // Opcional: recibe { done, total } de los títulos sin nota mientras se
+  // piden (menú «Agrupar») y null al terminar.
+  setProgress = null,
   batchSize = IMDB_SCORE_BATCH_SIZE,
   parallelBatches = IMDB_SCORE_PARALLEL_BATCHES,
 }) {
@@ -130,26 +133,39 @@ export default function useImdbScoreLoader({
 
       if (missing.length === 0 && stale.length === 0) {
         setLoading(false);
+        setProgress?.(null);
         return;
       }
       setLoading(true);
+      setProgress?.(missing.length > 0 ? { done: 0, total: missing.length } : null);
 
       try {
         if (missing.length > 0) {
           let failed = [];
-          const applyBatch = (batch, batchScores) => {
+          let done = 0;
+          // `count`: solo la primera pasada avanza el progreso (el reintento
+          // vuelve sobre títulos ya contados).
+          const applyBatch = (batch, batchScores, count = false) => {
             const result = persistBatch(batch, batchScores);
             failed = failed.concat(result.failed);
-            if (cancelled || result.resolved.size === 0) return;
-            startTransition(() =>
-              setImdbScores((prev) => {
-                const next = new Map(prev);
-                result.resolved.forEach((score, key) => next.set(key, score));
-                return next;
-              }),
-            );
+            if (cancelled) return;
+            if (count) done += batch.length;
+            if (result.resolved.size === 0 && !count) return;
+            const progress = { done, total: missing.length };
+            startTransition(() => {
+              if (result.resolved.size > 0) {
+                setImdbScores((prev) => {
+                  const next = new Map(prev);
+                  result.resolved.forEach((score, key) => next.set(key, score));
+                  return next;
+                });
+              }
+              if (count) setProgress?.(progress);
+            });
           };
-          await fetchInBatches(missing, applyBatch);
+          await fetchInBatches(missing, (batch, batchScores) =>
+            applyBatch(batch, batchScores, true),
+          );
           // Un fallo pasajero no debe dejar esos títulos al final de su grupo
           // hasta la próxima visita: se reintentan una vez, ya sin ráfaga.
           if (!cancelled && failed.length > 0) {
@@ -170,7 +186,10 @@ export default function useImdbScoreLoader({
       } catch (error) {
         console.error("Error loading IMDb scores:", error);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setProgress?.(null);
+        }
       }
     };
 
@@ -178,5 +197,5 @@ export default function useImdbScoreLoader({
     return () => {
       cancelled = true;
     };
-  }, [scoreItemsKey, enabled, frozen, setImdbScores, setLoading, batchSize, parallelBatches]);
+  }, [scoreItemsKey, enabled, frozen, setImdbScores, setLoading, setProgress, batchSize, parallelBatches]);
 }
