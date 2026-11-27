@@ -5,7 +5,12 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { watchlist, userRatings } from '../db/schema.js';
 import { eq, and, desc, inArray } from 'drizzle-orm';
-import { getMediaMetadataMap, hydrateMediaRow } from '../utils/mediaMetadata.js';
+import {
+  getMediaMetadataMap,
+  hydrateMediaRow,
+  USER_LIST_METADATA_MAX_AGE_MS,
+  USER_LIST_METADATA_REFRESH_BUDGET_MS,
+} from '../utils/mediaMetadata.js';
 import {
   resolveEnglishPosterPaths,
   titleKey,
@@ -52,7 +57,10 @@ export default async function watchlistRoutes(fastify) {
 
     const tmdbIds = [...new Set(items.map((item) => item.tmdbId).filter(Boolean))];
     const [metadataByKey, ratings] = await Promise.all([
-      getMediaMetadataMap(items),
+      getMediaMetadataMap(items, {
+        maxAgeMs: USER_LIST_METADATA_MAX_AGE_MS,
+        refreshBudgetMs: USER_LIST_METADATA_REFRESH_BUDGET_MS,
+      }),
       tmdbIds.length
         ? db
             .select({
