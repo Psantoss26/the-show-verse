@@ -1244,9 +1244,6 @@ function InlineDropdownMenu({
   children,
   // Progreso ({ done, total }) de lo que muestra el botón (la agrupación).
   progress = null,
-  // Grupo de botones unidos («Agrupar» + «Subagrupar»): qué lado(s) se
-  // tocan con el vecino ("start", "end"); `""` = se puede unir pero ahora no.
-  join = null,
   // Botón que aparece y desaparece (ver `data-toolbar-collapse`).
   collapsed,
 }) {
@@ -1339,10 +1336,7 @@ function InlineDropdownMenu({
         type="button"
         onClick={() => setOpen((v) => !v)}
         tabIndex={collapsed ? -1 : undefined}
-        data-join={join ?? undefined}
-        className={`h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm sv-page-toolbar-trigger lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 ${
-          join == null ? "" : "sv-toolbar-join-trigger"
-        }`}
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm sv-page-toolbar-trigger lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-blue-500" />}
@@ -1476,8 +1470,7 @@ function GroupingDropdownContent({
   );
 }
 
-// Menú del botón «Subagrupar», que aparece unido a «Agrupar» al poner una
-// agrupación. No ofrece la agrupación ya elegida.
+// Menú del botón «Subagrupar», que aparece al poner una agrupación. No ofrece la agrupación ya elegida.
 function SubGroupingDropdownContent({
   groupBy,
   subGroupBy,
@@ -3300,7 +3293,6 @@ export default function WatchlistClient() {
               compactMobile
               icon={Layers3}
               progress={groupProgress}
-              join={groupBy === "none" ? "" : "end"}
             >
               {({ close }) => (
                 <GroupingDropdownContent
@@ -3311,7 +3303,7 @@ export default function WatchlistClient() {
                 />
               )}
             </InlineDropdown>
-            {/* Unido a «Agrupar»: solo con una agrupación puesta. */}
+            {/* Solo con una agrupación puesta. */}
             <InlineDropdown
               label="Subagrupar"
               valueLabel={getSubGroupingValueLabel(subGroupBy)}
@@ -3319,7 +3311,6 @@ export default function WatchlistClient() {
               compactMobile
               icon={ListTree}
               progress={subGroupProgress}
-              join="start"
               collapsed={groupBy === "none"}
             >
               {({ close }) => (
@@ -3496,7 +3487,6 @@ export default function WatchlistClient() {
               compactMobile
               icon={Layers3}
               progress={groupProgress}
-              join={groupBy === "none" ? "" : "end"}
             >
               {({ close }) => (
                 <GroupingDropdownContent
@@ -3507,7 +3497,7 @@ export default function WatchlistClient() {
                 />
               )}
             </InlineDropdown>
-            {/* Unido a «Agrupar»: solo con una agrupación puesta. */}
+            {/* Solo con una agrupación puesta. */}
             <InlineDropdown
               label="Subagrupar"
               valueLabel={getSubGroupingValueLabel(subGroupBy)}
@@ -3515,7 +3505,6 @@ export default function WatchlistClient() {
               compactMobile
               icon={ListTree}
               progress={subGroupProgress}
-              join="start"
               collapsed={groupBy === "none"}
             >
               {({ close }) => (
