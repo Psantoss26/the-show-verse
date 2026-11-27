@@ -5,6 +5,7 @@ import { pickLadderBackdrop, pickLadderPoster } from "@/lib/details/tmdbImages";
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 
 import OptimizedImage from "@/components/OptimizedImage";
+import GroupScoreStats from "@/components/ui/GroupScoreStats";
 import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
 import {
   useEffect,
@@ -368,12 +369,6 @@ function buildImg(path, size = "w500") {
 
 function clampNumber(v) {
   return typeof v === "number" && !Number.isNaN(v) ? v : null;
-}
-
-function formatAvg(v) {
-  if (typeof v !== "number" || Number.isNaN(v)) return "—";
-  const r = Math.round(v * 10) / 10;
-  return Number.isInteger(r) ? String(r) : r.toFixed(1);
 }
 
 function normText(s) {
@@ -1068,55 +1063,6 @@ function SmartPoster({ item, title, mode = "poster" }) {
   );
 }
 
-function StatBox({
-  label,
-  value,
-  icon: Icon,
-  imgSrc,
-  colorClass,
-  horizontal = false,
-}) {
-  return (
-    <motion.div layout
-      className={`flex min-w-0 transition-colors duration-200 ${horizontal ? "flex-row items-center gap-1.5 sm:gap-2" : "flex-col items-start"}`}
-    >
-      <motion.div layout
-        className={`flex items-center gap-1.5 opacity-75 min-w-0 ${horizontal ? "" : "mb-1"}`}
-      >
-        {imgSrc ? (
-          <OptimizedImage
-            src={imgSrc}
-            alt={label}
-            className={`w-auto object-contain opacity-85 shrink-0 transition-colors duration-200 ${horizontal ? "h-3.5 sm:h-4" : "h-3 sm:h-3.5"}`}
-          />
-        ) : Icon ? (
-          <Icon
-            className={`shrink-0 transition-colors duration-200 ${colorClass} ${horizontal ? "w-3.5 h-3.5 sm:w-4 sm:h-4" : "w-3 h-3 sm:w-3.5 sm:h-3.5"}`}
-          />
-        ) : null}
-
-          <motion.span
-            layout="position"
-            initial={false}
-            animate={{ opacity: horizontal ? 0 : 1 }}
-            aria-hidden={horizontal}
-            className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate ${horizontal ? "w-0 -ml-1.5" : ""}`}
-          >
-            {label}
-          </motion.span>
-      </motion.div>
-
-      <motion.div layout className="flex items-baseline gap-1.5 min-w-0">
-        <motion.span layout
-          className={`font-black text-white tabular-nums tracking-tight leading-none truncate transition-colors duration-200 ${horizontal ? "text-sm sm:text-base" : "text-lg sm:text-xl"}`}
-        >
-          {value}
-        </motion.span>
-      </motion.div>
-    </motion.div>
-  );
-}
-
 function GroupDivider({
   title,
   stats,
@@ -1162,7 +1108,7 @@ function GroupDivider({
       // Fijada bajo el navbar: sus superficies pasan al cristal del
       // navbar (regla `[data-menu-pinned]` en globals.css).
       data-menu-pinned={renderSticky}
-      className={`sticky z-[60] ${hasPreviousGroup ? "my-4" : "mt-2 mb-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 ${skipMotion ? "transition-none" : "transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]"} top-[calc(var(--sv-page-sticky-top)+52px)] sm:top-[108px] lg:top-[136px]`}
+      className={`sticky z-[60] ${hasPreviousGroup ? "my-4 sm:my-6" : "mt-2 mb-4 sm:mt-0 sm:mb-6"} -mx-2 px-2 sm:mx-0 sm:px-0 ${skipMotion ? "transition-none" : "transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]"} top-[calc(var(--sv-page-sticky-top)+52px)] sm:top-[108px] lg:top-[136px]`}
       // Solo opacidad al entrar: trasladar este nodo alteraría la medición
       // del punto de acople. Al retroceder no se anima.
       initial={skipMotion ? false : { opacity: 0 }}
@@ -1184,64 +1130,32 @@ function GroupDivider({
           >
             <motion.div layout="position" className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
               <motion.div layout
-                className={`bg-gradient-to-b from-blue-500 to-cyan-600 shadow-[0_0_15px_rgba(59,130,246,0.4)] shrink-0 ${stickyTransitionClass} ${renderSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
+                className={`bg-gradient-to-b from-blue-500 to-cyan-600 shadow-[0_0_15px_rgba(59,130,246,0.4)] shrink-0 ${stickyTransitionClass} ${renderSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-6 sm:h-8 rounded-full"}`}
               />
 
               <motion.div layout="position"
-                className={`min-w-0 flex-1 ${stickyTransitionClass} ${renderSticky ? "flex flex-wrap items-center gap-x-3 gap-y-1" : ""}`}
+                className={`min-w-0 flex-1 ${stickyTransitionClass} flex items-center gap-x-2 sm:gap-x-3`}
               >
                 <motion.h2 layout="position"
-                  className={`font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md ${stickyTransitionClass} ${renderSticky ? "text-base sm:text-lg" : "text-base sm:text-2xl"}`}
+                  data-group-title
+                  className={`min-w-0 truncate font-black tracking-tight text-white leading-tight drop-shadow-md ${stickyTransitionClass} ${renderSticky ? "text-base sm:text-xl" : "text-lg sm:text-[1.75rem]"}`}
                 >
                   {title}
                 </motion.h2>
 
                 <motion.div layout="position"
-                  className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 ${stickyTransitionClass} ${renderSticky ? "mt-0 text-[10px] sm:text-xs" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
+                  data-group-meta
+                  className={`shrink-0 font-bold text-zinc-300 items-center gap-x-2 sm:gap-x-3 ${stickyTransitionClass} ${renderSticky ? "hidden sm:flex text-xs sm:text-sm" : "hidden sm:flex text-sm sm:text-base"}`}
                 >
-                  <span className="text-zinc-300 font-bold">{count}</span>
-                  <span>items</span>
-                  <span className="w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full bg-zinc-700" />
-                  <span className="opacity-90">{pct}%</span>
+                  <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
+                  <span><span className="text-white tabular-nums">{count}</span> items</span>
+                  <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
+                  <span className="text-white tabular-nums">{pct}%</span>
                 </motion.div>
               </motion.div>
             </motion.div>
 
-            <motion.div layout className="flex items-center gap-2 sm:gap-4 shrink-0">
-              {stats?.imdb?.avg != null &&
-                typeof stats.imdb.avg === "number" &&
-                !Number.isNaN(stats.imdb.avg) &&
-                stats.imdb.avg > 0 && (
-                  <StatBox
-                    label="IMDb"
-                    value={formatAvg(stats.imdb.avg)}
-                    imgSrc="/logo-IMDb.png"
-                    horizontal={renderSticky}
-                  />
-                )}
-              {stats?.trakt?.avg != null &&
-                typeof stats.trakt.avg === "number" &&
-                !Number.isNaN(stats.trakt.avg) &&
-                stats.trakt.avg > 0 && (
-                  <StatBox
-                    label="Trakt"
-                    value={formatAvg(stats.trakt.avg)}
-                    imgSrc="/logo-Trakt.png"
-                    horizontal={renderSticky}
-                  />
-                )}
-              {stats?.tmdb?.avg != null &&
-                typeof stats.tmdb.avg === "number" &&
-                !Number.isNaN(stats.tmdb.avg) &&
-                stats.tmdb.avg > 0 && (
-                  <StatBox
-                    label="TMDb"
-                    value={formatAvg(stats.tmdb.avg)}
-                    imgSrc="/logo-TMDb.png"
-                    horizontal={renderSticky}
-                  />
-                )}
-            </motion.div>
+            <GroupScoreStats stats={stats} compact={renderSticky} />
           </motion.div>
         </motion.div>
         <motion.div layout
@@ -3056,8 +2970,10 @@ export default function WatchlistClient() {
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
           data-grouped={groupBy !== "none" ? "" : undefined}
-          className={`${isBackNav ? "" : "sv-toolbar-rise "}sticky top-[var(--sv-page-sticky-top)] z-[70] space-y-1 ${isBackNav ? "transition-none" : "transition-all duration-300"} sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6 ${
-            groupBy === "none" ? "mb-6" : "mb-2"
+          className={`${isBackNav ? "" : "sv-toolbar-rise "}sticky top-[var(--sv-page-sticky-top)] z-[70] space-y-1 ${isBackNav ? "transition-none" : "transition-all duration-300"} sm:top-[calc(5rem+var(--sv-safe-top,0px))] ${
+            // Con agrupación, el margen de la primera cabecera se funde con
+            // este (colapso de márgenes): el hueco hasta ella es solo este.
+            groupBy === "none" ? "mb-6 sm:mb-5 lg:mb-6" : "mb-2 sm:mb-3"
           }`}
           // Solo el fundido: la subida va en CSS (`.sv-toolbar-rise`), que
           // en móvil la quita si hay agrupación.
