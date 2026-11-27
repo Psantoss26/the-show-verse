@@ -1,3 +1,8 @@
+import {
+  DASHBOARD_PREVIEW_ENTER_TRANSITION,
+  DASHBOARD_PREVIEW_EXIT_TRANSITION,
+} from "@/lib/dashboard/previewTiming";
+
 const TONE_STYLES = {
   movies: {
     legacy: {
@@ -46,6 +51,13 @@ const SPECULAR_CLASS =
 
 const LEGACY_SPECULAR_CLASS = `${SPECULAR_CLASS} opacity-75`;
 
+const cubic = (ease) => `cubic-bezier(${ease.join(", ")})`;
+
+// Mismo tiempo y curva que la vista previa de la tarjeta (previewTiming), para
+// que el número y la tarjeta entren y salgan a la vez.
+const ENTER_TIMING = `${DASHBOARD_PREVIEW_ENTER_TRANSITION.duration}s ${cubic(DASHBOARD_PREVIEW_ENTER_TRANSITION.ease)}`;
+const EXIT_TIMING = `${DASHBOARD_PREVIEW_EXIT_TRANSITION.duration}s ${cubic(DASHBOARD_PREVIEW_EXIT_TRANSITION.ease)}`;
+
 export default function DashboardRankNumber({
   rank,
   tone,
@@ -85,24 +97,27 @@ export default function DashboardRankNumber({
     );
   }
 
+  const timing = hovered ? ENTER_TIMING : EXIT_TIMING;
+  const layerStyle = { transition: `opacity ${timing}` };
+
+  // La sombra del conjunto va en capas que se funden por opacidad: animar
+  // `filter: drop-shadow` repinta el número en cada fotograma y, fuera de la
+  // transición, saltaba de golpe. El z-index cambia al instante (no se
+  // interpola) para que el número quede delante de la tarjeta desde el inicio.
   const wrapperClass = [
     "relative isolate inline-grid select-none font-black [-webkit-font-smoothing:antialiased] [text-rendering:geometricPrecision] [font-family:system-ui,-apple-system,BlinkMacSystemFont,\"Segoe_UI\",sans-serif]",
-    "transition-all duration-500 ease-out origin-right",
-    hovered
-      ? "z-30 opacity-100 drop-shadow-[0_20px_35px_rgba(0,0,0,0.95)]"
-      : "z-[5] opacity-[0.62] translate-x-0 drop-shadow-[0_4px_8px_rgba(0,0,0,0.7)]",
+    hovered ? "z-30" : "z-[5]",
     className,
   ].join(" ");
 
-  const transformStyle = interactive
-    ? {
-        transform: hovered
-          ? "perspective(800px) rotateY(24deg) rotateX(-6deg) scale(1.15) translate3d(calc(-0.6rem - 1.2vw), 0, 50px)"
-          : "perspective(800px) rotateY(0deg) rotateX(0deg) scale(0.95) translate3d(0, 0, 0)",
-        transition: "transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease-out, z-index 0.5s",
-        transformOrigin: "right center",
-      }
-    : undefined;
+  const transformStyle = {
+    transform: hovered
+      ? "perspective(800px) rotateY(24deg) rotateX(-6deg) scale(1.15) translate3d(calc(-0.6rem - 1.2vw), 0, 50px)"
+      : "perspective(800px) rotateY(0deg) rotateX(0deg) scale(0.95) translate3d(0, 0, 0)",
+    opacity: hovered ? 1 : 0.62,
+    transition: `transform ${timing}, opacity ${timing}`,
+    transformOrigin: "right center",
+  };
 
   return (
     <span
@@ -111,16 +126,34 @@ export default function DashboardRankNumber({
       className={wrapperClass}
       style={transformStyle}
     >
-      {/* Capas por defecto */}
+      {/* Sombras del conjunto (reposo / hover) fundidas por opacidad */}
       <span
         aria-hidden="true"
-        className={`col-start-1 row-start-1 [paint-order:stroke_fill] transition-opacity duration-500 ease-out ${styles.default.rim} ${hovered ? "opacity-0" : "opacity-100"}`}
+        className={`col-start-1 row-start-1 text-transparent [text-shadow:0_4px_8px_rgba(0,0,0,0.7)] ${hovered ? "opacity-0" : "opacity-100"}`}
+        style={layerStyle}
       >
         {rank}
       </span>
       <span
         aria-hidden="true"
-        className={`col-start-1 row-start-1 bg-clip-text text-transparent [paint-order:stroke_fill] transition-opacity duration-500 ease-out ${styles.default.glass} ${hovered ? "opacity-0" : "opacity-100"}`}
+        className={`col-start-1 row-start-1 text-transparent [text-shadow:0_20px_35px_rgba(0,0,0,0.95)] ${hovered ? "opacity-100" : "opacity-0"}`}
+        style={layerStyle}
+      >
+        {rank}
+      </span>
+
+      {/* Capas por defecto */}
+      <span
+        aria-hidden="true"
+        className={`col-start-1 row-start-1 [paint-order:stroke_fill] ${styles.default.rim} ${hovered ? "opacity-0" : "opacity-100"}`}
+        style={layerStyle}
+      >
+        {rank}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`col-start-1 row-start-1 bg-clip-text text-transparent [paint-order:stroke_fill] ${styles.default.glass} ${hovered ? "opacity-0" : "opacity-100"}`}
+        style={layerStyle}
       >
         {rank}
       </span>
@@ -128,13 +161,15 @@ export default function DashboardRankNumber({
       {/* Capas hover (liquid glass destacado) */}
       <span
         aria-hidden="true"
-        className={`col-start-1 row-start-1 [paint-order:stroke_fill] transition-opacity duration-500 ease-out ${styles.hover.rim} ${hovered ? "opacity-100" : "opacity-0"}`}
+        className={`col-start-1 row-start-1 [paint-order:stroke_fill] ${styles.hover.rim} ${hovered ? "opacity-100" : "opacity-0"}`}
+        style={layerStyle}
       >
         {rank}
       </span>
       <span
         aria-hidden="true"
-        className={`col-start-1 row-start-1 bg-clip-text text-transparent [paint-order:stroke_fill] transition-opacity duration-500 ease-out ${styles.hover.glass} ${hovered ? "opacity-100" : "opacity-0"}`}
+        className={`col-start-1 row-start-1 bg-clip-text text-transparent [paint-order:stroke_fill] ${styles.hover.glass} ${hovered ? "opacity-100" : "opacity-0"}`}
+        style={layerStyle}
       >
         {rank}
       </span>
@@ -142,7 +177,8 @@ export default function DashboardRankNumber({
       {/* Brillo especular */}
       <span
         aria-hidden="true"
-        className={`col-start-1 row-start-1 bg-clip-text text-transparent transition-opacity duration-500 ease-out ${SPECULAR_CLASS} ${hovered ? "opacity-90" : "opacity-10"}`}
+        className={`col-start-1 row-start-1 bg-clip-text text-transparent ${SPECULAR_CLASS} ${hovered ? "opacity-90" : "opacity-10"}`}
+        style={layerStyle}
       >
         {rank}
       </span>

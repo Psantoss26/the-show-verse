@@ -22,7 +22,6 @@ import {
   deriveSectionLabel,
   normalizeDashboardSectionTitle,
 } from "@/lib/dashboard/sectionLabel";
-import useSpotlightLogo from "@/lib/dashboard/useSpotlightLogo";
 import { shouldUseDashboardBackdropRow } from "@/lib/dashboard/rowLayout";
 import {
   DASHBOARD_PREVIEW_CLOSE_DELAY_MS,
@@ -34,7 +33,6 @@ import {
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import usePreviewMorph from "@/lib/dashboard/usePreviewMorph";
 import useNeighborPush from "@/lib/dashboard/useNeighborPush";
-import useSpotlightExpansion from "@/lib/dashboard/useSpotlightExpansion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import NextImage from "next/image";
@@ -111,7 +109,6 @@ import { useEngineRows } from "@/components/dashboard/useEngineRows";
 import {
   yearOf,
   ratingOf,
-  getSpotlightBadge,
   formatRuntime,
   buildImg,
   PREVIEW_BACKDROP_SIZE,
@@ -124,7 +121,6 @@ import {
   movieBackdropCache,
   getArtworkPreference,
   fetchBestBackdrop,
-  fetchBestBackdropNoLang,
   preparePreviewBackdrop,
 } from "@/lib/dashboard/media";
 import { fadeInUp, staggerContainer, scaleIn } from "@/lib/motion/revealVariants";
@@ -145,7 +141,6 @@ const DASHBOARD_SECTION_CACHE_TTL_MS = 60 * 60 * 1000;
 const DASHBOARD_FETCH_TIMEOUT_MS = 8500;
 const INITIAL_VISIBLE_ENGINE_ROWS = 6;
 const ENGINE_ROW_REVEAL_BATCH_SIZE = 4;
-const spotlightBackdropCache = new Map();
 
 function toItemsArray(value) {
   if (Array.isArray(value)) return value;
@@ -328,14 +323,8 @@ const dashboardSegmentButtonClass = (active) =>
 // surface />`), que `usePreviewMorph` recorta al desplegarse, y la sombra en su
 // hermana, que un recorte de la carcasa cortaría. La imagen redondea sus
 // esquinas superiores por su cuenta.
-const dashboardPreviewCardClass = (heightClass, isSpotlight = false) =>
-  [
-    "relative text-white cursor-pointer",
-    isSpotlight
-      ? "overflow-hidden transform-gpu rounded-2xl bg-neutral-950 ring-1 ring-inset ring-white/10 shadow-[0_24px_64px_-18px_rgba(0,0,0,0.95)]"
-      : "z-0 flex flex-col rounded-xl",
-    isSpotlight ? heightClass : "",
-  ].join(" ");
+const dashboardPreviewCardClass =
+  "relative z-0 flex flex-col rounded-xl text-white cursor-pointer";
 
 const dashboardPreviewMediaClass =
   "relative aspect-video w-full shrink-0 overflow-hidden rounded-t-[inherit] bg-transparent";
@@ -484,20 +473,10 @@ function ExpandableSectionTitle({ title, href, className = "", accent = "amber" 
 // el navegador las trae al entrar en la parte visible de la fila.
 const EAGER_POSTER_SLIDES = 8;
 
-function getInitialDashboardPreviewBackdrop(
-  movie,
-  backdropOverride,
-  isSpotlight = false,
-) {
+function getInitialDashboardPreviewBackdrop(movie, backdropOverride) {
   if (!movie?.id) return null;
 
   const mediaType = getMediaTypeForItem(movie);
-  if (isSpotlight) {
-    return (
-      spotlightBackdropCache.get(getBackdropCacheKey(movie, mediaType)) || null
-    );
-  }
-
   if (backdropOverride) return backdropOverride;
 
   const cachedBackdrop = movieBackdropCache.get(
@@ -512,10 +491,7 @@ function getInitialDashboardPreviewBackdrop(
  * ==================================================================== */
 function InlinePreviewCard({
   movie,
-  heightClass,
   backdropOverride,
-  isSpotlight = false,
-  showContextBadge = false,
   alignment = "center",
 }) {
   const { session, account } = useAuth();
@@ -548,23 +524,10 @@ function InlinePreviewCard({
     movie?.id,
     "cardBackdrop",
   );
-  // Destacada (spotlight, con el logo encima): el backdrop SIN idioma de
-  // «Vista previa» elegido o más votado, como la cabecera de DetailModal.
-  const { path: previewBackdrop, pending: previewBackdropPending } = useCardArtworkState(
-    mediaType,
-    isSpotlight ? movie?.id : null,
-    "backdrop",
-  );
   const [backdropPath, setBackdropPath] = useState(() =>
-    isSpotlight && (previewBackdrop || previewBackdropPending)
-      ? previewBackdrop
-      : !isSpotlight && (cardBackdrop || cardBackdropPending)
+    cardBackdrop || cardBackdropPending
       ? cardBackdrop
-      : getInitialDashboardPreviewBackdrop(
-          movie,
-          stableBackdropOverride,
-          isSpotlight,
-        ),
+      : getInitialDashboardPreviewBackdrop(movie, stableBackdropOverride),
   );
   const [backdropReady, setBackdropReady] = useState(() => !!backdropPath);
 
@@ -574,8 +537,6 @@ function InlinePreviewCard({
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
 
-  // `undefined` mientras se resuelve: ni logo ni título (ver useSpotlightLogo).
-  const logoPath = useSpotlightLogo(movie?.id, mediaType, isSpotlight);
   const [soundtrackTrack, setSoundtrackTrack] = useState(null);
   const [soundtrackLoading, setSoundtrackLoading] = useState(false);
   const [soundtrackPlaying, setSoundtrackPlaying] = useState(false);
@@ -715,60 +676,32 @@ function InlinePreviewCard({
       };
 
       const backdropCacheKey = getBackdropCacheKey(movie, mediaType);
-      if (isSpotlight) {
-        const cachedBackdrop = spotlightBackdropCache.get(backdropCacheKey);
-        if (previewBackdrop) {
-          revealBackdrop(previewBackdrop);
-        } else if (previewBackdropPending) {
-          // Se espera a saber si hay votado (el efecto vuelve a correr).
-          revealBackdrop(null);
-        } else if (cachedBackdrop !== undefined) {
+      if (cardBackdrop) {
+        revealBackdrop(cardBackdrop);
+      } else if (cardBackdropPending) {
+        // Se espera a saber si hay votado (el efecto vuelve a correr).
+        revealBackdrop(null);
+      } else if (stableBackdropOverride) {
+        movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
+        revealBackdrop(stableBackdropOverride);
+      } else {
+        const cachedBackdrop = movieBackdropCache.get(backdropCacheKey);
+        if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
           try {
-            // Preferimos backdrop textless; si el título no tiene uno (frecuente
-            // en "Más esperadas"/estrenos), caemos al backdrop/póster del propio
-            // item en lugar de dejarlo NEGRO (mismo fallback que la rama normal).
-            const preferred = await fetchBestBackdropNoLang(movie.id, mediaType, {
-              allowLanguageFallback: false,
+            const preferred = await fetchBestBackdrop(movie.id, mediaType, {
+              originalLanguage: movie.original_language,
             });
             const chosen = preferred || getPreviewBackdropFallback(movie);
-            spotlightBackdropCache.set(backdropCacheKey, chosen);
+
+            movieBackdropCache.set(backdropCacheKey, chosen);
+
             revealBackdrop(chosen);
           } catch {
             const fallback = getPreviewBackdropFallback(movie);
-            spotlightBackdropCache.set(backdropCacheKey, fallback);
+            movieBackdropCache.set(backdropCacheKey, fallback);
             revealBackdrop(fallback);
-          }
-        }
-      } else {
-        if (cardBackdrop) {
-          revealBackdrop(cardBackdrop);
-        } else if (cardBackdropPending) {
-          // Se espera a saber si hay votado (el efecto vuelve a correr).
-          revealBackdrop(null);
-        } else if (stableBackdropOverride) {
-          movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
-          revealBackdrop(stableBackdropOverride);
-        } else {
-          const cachedBackdrop = movieBackdropCache.get(backdropCacheKey);
-          if (cachedBackdrop !== undefined) {
-            revealBackdrop(cachedBackdrop);
-          } else {
-            try {
-              const preferred = await fetchBestBackdrop(movie.id, mediaType, {
-                originalLanguage: movie.original_language,
-              });
-              const chosen = preferred || getPreviewBackdropFallback(movie);
-
-              movieBackdropCache.set(backdropCacheKey, chosen);
-
-              revealBackdrop(chosen);
-            } catch {
-              const fallback = getPreviewBackdropFallback(movie);
-              movieBackdropCache.set(backdropCacheKey, fallback);
-              revealBackdrop(fallback);
-            }
           }
         }
       }
@@ -870,19 +803,15 @@ function InlinePreviewCard({
       abort = true;
     };
   }, [
-    isSpotlight,
     mediaType,
     movie,
     stableBackdropOverride,
     cardBackdrop,
     cardBackdropPending,
-    previewBackdrop,
-    previewBackdropPending,
   ]);
 
   // Carga perezosa (en hover == al montar) de los datos que alimentan la fila
-  // meta compartida. También se usa en spotlight para el mismo diseño de estado
-  // y géneros que FeaturedHero/DetailModal.
+  // meta compartida (mismo diseño de estado y géneros que FeaturedHero/DetailModal).
   useEffect(() => {
     if (!movie?.id) return undefined;
 
@@ -1035,16 +964,14 @@ function InlinePreviewCard({
     return () => {
       cancelled = true;
     };
-  }, [isSpotlight, mediaType, movie?.id]);
+  }, [mediaType, movie?.id]);
 
   const cardRef = useRef(null);
   const reduceMotion = useReducedMotion();
-  // La destacada se abre ensanchando su propia tarjeta (no es un pop-out).
   usePreviewMorph(cardRef, {
     alignment,
     tileRadius: 8,
     reduceMotion,
-    enabled: !isSpotlight,
   });
 
   const openPreviewModal = () => {
@@ -1253,7 +1180,6 @@ function InlinePreviewCard({
   const bgSrc = backdropPath
     ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
     : null;
-  const logoSrc = logoPath ? buildImg(logoPath, "w500") : null;
   const tmdbRating = ratingOf(movie);
   const hasTmdbRating = tmdbRating !== "–";
 
@@ -1284,18 +1210,11 @@ function InlinePreviewCard({
       // aquí multiplicaba el movimiento y rasterizaba de nuevo el cristal.
       initial={false}
       ref={cardRef}
-      className={dashboardPreviewCardClass(heightClass, isSpotlight)}
+      className={dashboardPreviewCardClass}
       onClick={openPreviewModal}
     >
-      {!isSpotlight && <DashboardPreviewGlass surface />}
-      <div
-        data-preview-media=""
-        className={
-          isSpotlight
-            ? "absolute inset-0 h-full w-full overflow-hidden bg-neutral-950"
-            : dashboardPreviewMediaClass
-        }
-      >
+      <DashboardPreviewGlass surface />
+      <div data-preview-media="" className={dashboardPreviewMediaClass}>
         {/* Contenido de la ventana: `usePreviewMorph` lo escala a la inversa
             para descubrir la imagen sin deformarla. */}
         <div data-preview-media-inner="" className="absolute inset-0">
@@ -1307,23 +1226,17 @@ function InlinePreviewCard({
 
           {bgSrc && (
             <div
-              className={`pointer-events-none absolute inset-0 ${
-                isSpotlight ? "" : "sv-preview-fade"
-              } ${showTrailer ? "z-[5]" : ""}`}
+              className={`pointer-events-none absolute inset-0 sv-preview-fade ${
+                showTrailer ? "z-[5]" : ""
+              }`}
             >
               <NextImage
                 key={bgSrc}
                 src={bgSrc}
                 alt={movie.title || movie.name}
                 fill
-                sizes={
-                  isSpotlight
-                    ? "(min-width:1280px) 924px, (min-width:768px) 818px, (min-width:640px) 711px, 604px"
-                    : "(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
-                }
-                className={`pointer-events-none object-cover transition-opacity duration-300 ${
-                  isSpotlight ? "" : "scale-[1.015]"
-                } ${
+                sizes="(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
+                className={`pointer-events-none scale-[1.015] object-cover transition-opacity duration-300 ${
                   showTrailer && trailerPlaying
                     ? "opacity-0"
                     : backdropReady
@@ -1334,14 +1247,6 @@ function InlinePreviewCard({
                 fetchPriority="high"
                 onLoad={() => setBackdropReady(true)}
                 onError={() => {
-                  if (isSpotlight) {
-                    spotlightBackdropCache.set(
-                      getBackdropCacheKey(movie, mediaType),
-                      null,
-                    );
-                    setBackdropReady(false);
-                    return;
-                  }
                   const fallback = getPreviewBackdropFallback(movie);
                   if (fallback && fallback !== backdropPath) {
                     movieBackdropCache.set(getBackdropCacheKey(movie, mediaType), fallback);
@@ -1364,9 +1269,7 @@ function InlinePreviewCard({
               {trailerSrc && (
                 <>
                   <div
-                    className={`sv-preview-trailer-viewport absolute inset-0 overflow-hidden ${
-                      isSpotlight ? "" : "sv-preview-fade"
-                    }`}
+                    className="sv-preview-trailer-viewport sv-preview-fade absolute inset-0 overflow-hidden"
                     style={trailerAspect ? { "--sv-trailer-aspect": trailerAspect } : undefined}
                   >
                     <iframe
@@ -1393,129 +1296,16 @@ function InlinePreviewCard({
             </>
           )}
 
-          {/* Sin velo inferior fuera del spotlight: no hay nada superpuesto que
-              proteger, y un degradado oscuro sobre la costura añadía una banda
-              que no existe en el cristal de debajo (mismo motivo que DetailModal). */}
-          {isSpotlight && (
-            <>
-              <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-black/65 via-black/20 to-transparent" />
-              <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-            </>
-          )}
+          {/* Sin velo inferior: no hay nada superpuesto que proteger, y un
+              degradado oscuro sobre la costura añadía una banda que no existe
+              en el cristal de debajo (mismo motivo que DetailModal). */}
         </div>
       </div>
 
       <div
         data-preview-info=""
-        className={
-          isSpotlight
-            ? "absolute inset-0 z-10 h-full w-full"
-            : dashboardPreviewInfoClass
-        }
+        className={dashboardPreviewInfoClass}
       >
-        {isSpotlight ? (
-          <div className="flex h-full items-end p-5 md:p-6 xl:p-8">
-            <div className="min-w-0 max-w-[88%] sm:max-w-[82%] md:max-w-[72%] xl:max-w-[68%]">
-              {logoSrc ? (
-                <div className="relative mb-5 h-16 w-full max-w-[17rem] md:mb-6 md:h-20 md:max-w-[19rem] xl:h-24 xl:max-w-[21rem]">
-                  <NextImage
-                    src={logoSrc}
-                    alt={movie.title || movie.name}
-                    fill
-                    sizes="(min-width:1280px) 336px, 272px"
-                    className="object-contain object-left drop-shadow-[0_3px_12px_rgba(0,0,0,0.95)]"
-                    loading="eager"
-                  />
-                </div>
-              ) : logoPath === undefined ? (
-                // Logo aún por resolver: se reserva su hueco, sin título.
-                <div
-                  aria-hidden="true"
-                  className="mb-5 h-16 w-full max-w-[17rem] md:mb-6 md:h-20 md:max-w-[19rem] xl:h-24 xl:max-w-[21rem]"
-                />
-              ) : (
-                <h3 className="mb-5 text-balance text-2xl font-black leading-none tracking-[-0.03em] text-white drop-shadow-lg sm:text-3xl md:mb-6">
-                  {movie.title || movie.name}
-                </h3>
-              )}
-
-              <motion.div
-                className="mb-3 w-full sm:w-auto"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.12 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <DetailActionsRow
-                  compactLabelWhenTight
-                  size="lg"
-                  className="labeled-row"
-                  showSeparator={false}
-                  onTrailer={handleToggleTrailer}
-                  trailerAvailable
-                  trailerLoading={trailerLoading}
-                  trailerLabel="Ver trailer"
-                  trailerPlaying={showTrailer}
-                  onSoundtrack={handleToggleSoundtrack}
-                  soundtrackAvailable
-                  favorite={favorite}
-                  favoriteLoading={loadingStates || updating}
-                  onToggleFavorite={handleToggleFavorite}
-                  watchlist={watchlist}
-                  watchlistLoading={loadingStates || updating}
-                  onToggleWatchlist={handleToggleWatchlist}
-                />
-              </motion.div>
-
-              {/* Sin badge de contexto (DESTACADO / MEJOR VALORADO / Estreno) en
-                  las secciones spotlight, por preferencia de diseño. */}
-              <div className="mb-2 w-full max-w-full">
-                <DetailsMetaGenresRow
-                  yearIso={yearOf(movie)}
-                  displayRuntimeValue={
-                    previewDetails.runtimeFallback ||
-                    (typeof extras?.runtime === "number"
-                      ? formatRuntime(extras.runtime)
-                      : extras?.runtime)
-                  }
-                  status={previewDetails.status}
-                  genres={
-                    previewDetails.genreObjects.length
-                      ? previewDetails.genreObjects
-                      : genreObjects
-                  }
-                />
-              </div>
-
-              {extras?.awards && (
-                <div className="mb-2.5 flex items-center gap-2 text-xs font-bold text-emerald-300 drop-shadow-md sm:text-sm">
-                  <Award className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="line-clamp-1">{extras.awards}</span>
-                </div>
-              )}
-
-              <div className="min-h-7">
-                {extras?.ratingsReady && (
-                  <DetailsRatingsBadges
-                    // Solo la puntuación, igual que IMDb: sin el número de votos.
-                    tmdb={hasTmdbRating ? { value: tmdbRating, sub: null } : null}
-                    imdb={
-                      typeof extras?.imdbRating === "number"
-                        ? { value: extras.imdbRating.toFixed(1), sub: null }
-                        : null
-                    }
-                  />
-                )}
-              </div>
-
-              {error && (
-                <p className="mt-2 line-clamp-1 text-xs text-red-300">
-                  {error}
-                </p>
-              )}
-            </div>
-          </div>
-        ) : (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1630,7 +1420,6 @@ function InlinePreviewCard({
               </p>
             )}
           </motion.div>
-        )}
       </div>
 
       <AnimatePresence>
@@ -1989,8 +1778,6 @@ export function Row({
   labelText, // Label superior para la sección
   sectionHref,
   reserveWhileEmpty = false,
-  spotlight = false, // Fila DESTACADA (×1,6). La elige el padre (una por dashboard).
-  showContextBadge = false,
   accent = "amber",
   // Primera sección tras el FeaturedHero: oculta mientras se está arriba del
   // todo (en móvil asoma tras la navbar inferior) y se reproduce al volver.
@@ -2010,9 +1797,7 @@ export function Row({
       ? undefined
       : sectionHref || EXPANDABLE_SECTION_HREFS[title];
 
-  // Tarjetas por fila en móvil (3 por defecto, 4 si el usuario lo elige). El
-  // tamaño spotlight se limita a escritorio para que todas las filas poster
-  // móviles compartan esta misma densidad.
+  // Tarjetas por fila en móvil (3 por defecto, 4 si el usuario lo elige).
   const { preferences } = useAuth();
   const mobileCardsPerRow = getMobileCardsPerRow(preferences);
   // Al VOLVER (atrás/adelante) el montaje es nuevo y `content-visibility`
@@ -2202,29 +1987,15 @@ export function Row({
   ]);
 
   const hasActivePreview = !!hoveredId;
-  // Fila DESTACADA (×1,6): se conserva solo en escritorio. En móvil todas las
-  // filas poster genéricas comparten el mismo tamaño y número de tarjetas; las
-  // excepciones usan componentes independientes.
-  const isSpotlight =
-    !isMobile && spotlight;
   // Filas póster normales: las vecinas se apartan para dejar el hueco de la
   // vista previa, sincronizadas con su despliegue.
   useNeighborPush(rowRef, {
     index: hoveredIndex,
     alignment: hoveredAlignment,
-    enabled: hydrated && !isMobile && !isSpotlight,
+    enabled: hydrated && !isMobile,
     reduceMotion,
   });
-  useSpotlightExpansion(rowRef, {
-    index: hoveredIndex,
-    enabled: hydrated && isSpotlight,
-    reduceMotion,
-  });
-  const heightClassDesktop = isSpotlight
-    ? "h-[340px] sm:h-[400px] md:h-[460px] xl:h-[520px]"
-    : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
-  const spotlightPosterWidthClass =
-    "w-[200px] sm:w-[220px] md:w-[300px] xl:w-[340px]";
+  const heightClassDesktop = "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
   const normalPosterWidthClass =
     "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px]";
   // Ancho del preview = alto de la tarjeta póster × 16/9, para que su imagen
@@ -2290,13 +2061,7 @@ export function Row({
         )}
         <div
           aria-hidden="true"
-          className={
-            isMobile
-              ? isSpotlight
-                ? "min-h-[300px]"
-                : "min-h-[200px]"
-              : heightClassDesktop
-          }
+          className={isMobile ? "min-h-[200px]" : heightClassDesktop}
         />
       </motion.div>
     );
@@ -2343,17 +2108,11 @@ export function Row({
   const showNext = (isHoveredRow || hasActivePreview) && canNext;
 
   const breakpointsRow = {
-    0: {
-      slidesPerView: isSpotlight ? 2 : mobileCardsPerRow,
-      spaceBetween: isSpotlight ? 14 : 12,
-    },
-    640: {
-      slidesPerView: isMobile ? mobileCardsPerRow : isSpotlight ? 2.2 : 4,
-      spaceBetween: isSpotlight ? 18 : 14,
-    },
-    768: { slidesPerView: "auto", spaceBetween: isSpotlight ? 24 : 14 },
-    1024: { slidesPerView: "auto", spaceBetween: isSpotlight ? 30 : 18 },
-    1280: { slidesPerView: "auto", spaceBetween: isSpotlight ? 36 : 20 },
+    0: { slidesPerView: mobileCardsPerRow, spaceBetween: 12 },
+    640: { slidesPerView: isMobile ? mobileCardsPerRow : 4, spaceBetween: 14 },
+    768: { slidesPerView: "auto", spaceBetween: 14 },
+    1024: { slidesPerView: "auto", spaceBetween: 18 },
+    1280: { slidesPerView: "auto", spaceBetween: 20 },
   };
 
   // No incluimos `hydrated` en la key: hacerlo remonta el Swiper al hidratar y
@@ -2424,22 +2183,10 @@ export function Row({
         <div>
           <Swiper
             key={swiperKey}
-            slidesPerView={isSpotlight ? 2 : mobileCardsPerRow}
-            spaceBetween={isSpotlight ? 14 : 12}
+            slidesPerView={mobileCardsPerRow}
+            spaceBetween={12}
             onSwiper={handleSwiper}
-            onSlideChange={(swiper) => {
-              updateNav(swiper);
-              if (!isSpotlight) return;
-              clearTimeout(hoverTimeoutRef.current);
-              clearTimeout(closeTimeoutRef.current);
-              hoverIntentRef.current += 1;
-              setHoveredId((prev) => {
-                if (prev) setAnimatingOutId(prev);
-                return null;
-              });
-              setHoveredIndex(null);
-              clearHoverBackdrop();
-            }}
+            onSlideChange={updateNav}
             onResize={updateNav}
             onReachBeginning={updateNav}
             onReachEnd={updateNav}
@@ -2473,22 +2220,13 @@ export function Row({
               const isThirdToLast = i === normalizedItems.length - 3;
               const isNearEnd = isLast || isSecondToLast || isThirdToLast;
 
-              // La destacada mantiene el tamaño del slot de Swiper y anima
-              // solo su superficie y el desplazamiento de las vecinas.
-              const base = isSpotlight
-                ? "relative flex-shrink-0 translate-x-0"
-                : "relative flex-shrink-0";
-
-              const isStandardPopoverPreview =
-                isActive && !isSpotlight;
+              const base = "relative flex-shrink-0";
 
               const sizeClasses = isMobile
                 ? "w-full"
-                : isActive
-                  ? `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-20`
-                  : `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-10`;
-              // Caja de la tarjeta: SIEMPRE altura fija (posterBoxClass), también
-              // en la vista previa destacada. Si la activa usa una altura
+                : `${normalPosterWidthClass} ${isActive ? "z-20" : "z-10"}`;
+              // Caja de la tarjeta: SIEMPRE altura fija (posterBoxClass). Si la
+              // activa usa una altura
               // derivada del aspecto (aspect-video / h-full), al cerrar el
               // `transition-all` anima la altura y desplaza la sección inferior.
               // Con altura fija la fila nunca cambia de alto.
@@ -2563,9 +2301,7 @@ export function Row({
                   className={
                     isMobile
                       ? "select-none"
-                      : `!w-auto select-none ${slideZIndexClass} ${
-                          isSpotlight ? "!flex !items-center" : ""
-                        }`
+                      : `!w-auto select-none ${slideZIndexClass}`
                   }
                 >
                   <div
@@ -2573,75 +2309,32 @@ export function Row({
                     className={`${base} ${sizeClasses} ${itemBoxClass} ${zOverflowClasses}`}
                     onMouseEnter={(e) => handleMouseEnterItem(e, itemKey, i, m, backdropOverride)}
                     onMouseLeave={handleMouseLeaveItem}
-                    onFocus={isSpotlight ? (e) => {
-                      if (!e.currentTarget.contains(e.relatedTarget)) handleMouseEnterItem(e, itemKey, i, m, backdropOverride);
-                    } : undefined}
-                    onBlur={isSpotlight ? (e) => {
-                      if (!e.currentTarget.contains(e.relatedTarget)) handleMouseLeaveItem();
-                    } : undefined}
                   >
-                    {isSpotlight ? (
-                      <div
-                        data-spotlight-shell=""
-                        className="absolute left-0 top-0 h-full w-full overflow-hidden rounded-2xl"
-                      >
-                        <div className={`absolute left-0 top-0 h-full ${spotlightPosterWidthClass}`}>
-                          {posterButton}
-                        </div>
-                        <AnimatePresence initial={false} onExitComplete={() => {
-                          setAnimatingOutId((prev) => prev === itemKey ? null : prev);
-                        }}>
-                          {isActive && (
-                            <motion.div
-                              key="spotlight-preview"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              transition={{ duration: reduceMotion ? 0 : 0.42 }}
-                              className="absolute left-0 top-0 h-full"
-                              style={{ width: "var(--spotlight-preview-width)", pointerEvents: isActive ? "auto" : "none" }}
-                            >
-                              <InlinePreviewCard
-                                movie={m}
-                                heightClass="h-full"
-                                backdropOverride={backdropOverride}
-                                isSpotlight
-                                showContextBadge={showContextBadge}
-                              />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    ) : (
-                      <>
-                        {/* El póster NO se oculta mientras hay vista previa:
-                            esta crece desde él y, al cerrarse, vuelve a
-                            encogerse hasta coincidir con él (`usePreviewMorph`). */}
-                        <div data-preview-tile-art="" className="h-full w-full">
-                          {posterButton}
-                        </div>
-                        <AnimatePresence
-                          initial={false}
-                          onExitComplete={() => {
-                            setAnimatingOutId((prev) => (prev === itemKey ? null : prev));
-                          }}
-                        >
-                          {isActive && (
-                              <div
-                                key="preview-normal"
-                                className={`absolute top-0 ${standardPreviewAlignmentClass} ${normalPreviewWidthClass} z-[80] hidden sm:block`}
-                              >
-                                <InlinePreviewCard
-                                  movie={m}
-                                  heightClass={heightClassDesktop}
-                                  backdropOverride={backdropOverride}
-                                  alignment={hoveredAlignment}
-                                />
-                              </div>
-                            )}
-                        </AnimatePresence>
-                      </>
-                    )}
+                    {/* El póster NO se oculta mientras hay vista previa:
+                        esta crece desde él y, al cerrarse, vuelve a
+                        encogerse hasta coincidir con él (`usePreviewMorph`). */}
+                    <div data-preview-tile-art="" className="h-full w-full">
+                      {posterButton}
+                    </div>
+                    <AnimatePresence
+                      initial={false}
+                      onExitComplete={() => {
+                        setAnimatingOutId((prev) => (prev === itemKey ? null : prev));
+                      }}
+                    >
+                      {isActive && (
+                          <div
+                            key="preview-normal"
+                            className={`absolute top-0 ${standardPreviewAlignmentClass} ${normalPreviewWidthClass} z-[80] hidden sm:block`}
+                          >
+                            <InlinePreviewCard
+                              movie={m}
+                              backdropOverride={backdropOverride}
+                              alignment={hoveredAlignment}
+                            />
+                          </div>
+                        )}
+                    </AnimatePresence>
                   </div>
                 </SwiperSlide>
               );

@@ -4,7 +4,7 @@
 export function shouldUseDashboardBackdropRow({
   isMobile,
   rowIndex,
-  isSpotlight = false,
+  forcePoster = false,
 }) {
-  return !isMobile && rowIndex % 2 === 1 && !isSpotlight;
+  return !isMobile && rowIndex % 2 === 1 && !forcePoster;
 }

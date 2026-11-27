@@ -373,8 +373,20 @@ favoritos» primero y luego los «Porque te gustó…»), nunca dos seguidas sal
 no queden filas genéricas. En Inicio el cliente coloca justo tras la fila de
 recomendaciones un bloque fijo: Tendencias, Más esperadas, Calendario y
 **«En cines»**. «Más esperadas» es una fila póster normal (mismas tarjetas y
-vista previa que el resto); Inicio no tiene fila destacada ×1,6, que solo queda
-en Películas y Series (Tendencias). Esta última no sale del motor: la carga `src/app/page.jsx` en el servidor
+vista previa que el resto). Ningún dashboard tiene ya fila destacada ×1,6: en
+Películas y Series «Tendencias ahora mismo» también es una fila póster normal,
+que solo se fuerza a póster para que la alternancia póster/backdrop no la cambie
+(`forcePoster` de `shouldUseDashboardBackdropRow`). «Populares en streaming en
+España» (`region_top`) en Películas y Series es la fila Top 10: tarjeta backdrop
+con el puesto grande al lado (`DashboardRankNumber`, modo `interactive`). Su
+vista previa usa la misma receta que las filas backdrop: la caja lleva
+`data-preview-tile`, la tarjeta sigue visible en `data-preview-tile-art` y
+`BackdropPreviewCard` crece desde ella y vuelve a encogerse hasta coincidir con ella
+(`usePreviewMorph`), alineándose sola en los bordes de la fila. Mientras se
+repliega, la diapositiva queda en `z-[50]` y la fila sin recortar
+(`animatingOutId`). El número entra y sale con el mismo tiempo y curva
+(`previewTiming.js`) y su sombra cambia fundiendo dos capas `text-shadow`, sin
+animar `filter`. «En cines» no sale del motor: la carga `src/app/page.jsx` en el servidor
 con `fetchNowInCinemas` (`src/lib/streaming/cinemaListings.js`). Son las
 películas con sesiones en España según JustWatch (ofertas `CINEMA`, por
 popularidad), sin preventas: se quita cualquiera cuyo estreno en cines en España

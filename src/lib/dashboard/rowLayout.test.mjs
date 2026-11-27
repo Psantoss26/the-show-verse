@@ -12,7 +12,7 @@ test("mobile dashboard rows always use poster cards", () => {
   }
 });
 
-test("desktop keeps poster/backdrop alternation and spotlight posters", () => {
+test("desktop keeps poster/backdrop alternation and forced posters", () => {
   assert.equal(
     shouldUseDashboardBackdropRow({ isMobile: false, rowIndex: 0 }),
     false,
@@ -25,7 +25,7 @@ test("desktop keeps poster/backdrop alternation and spotlight posters", () => {
     shouldUseDashboardBackdropRow({
       isMobile: false,
       rowIndex: 1,
-      isSpotlight: true,
+      forcePoster: true,
     }),
     false,
   );

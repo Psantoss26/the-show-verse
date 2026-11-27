@@ -72,12 +72,9 @@ import PreviewTrailerAudioButton, {
   usePreviewTrailerAudio,
 } from "@/components/dashboard/PreviewTrailerAudioControl";
 import {
-  fetchBestBackdropNoLang,
   fetchBestBackdrop as fetchBestCardBackdrop,
   fetchBestPoster as fetchBestCardPoster,
 } from "@/lib/dashboard/media";
-import useSpotlightLogo from "@/lib/dashboard/useSpotlightLogo";
-import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
 import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
@@ -155,12 +152,10 @@ const PREVIEW_BACKDROP_SIZE = "w780";
 const getPreviewBackdropFallback = (movie) =>
   movie?.backdrop_path || movie?.poster_path || null;
 
-const dashboardPreviewCardClass = (heightClass, isSpotlight = false) =>
+const dashboardPreviewCardClass = (heightClass) =>
   [
     "relative overflow-hidden rounded-lg text-white cursor-pointer transform-gpu",
-    isSpotlight
-      ? "bg-neutral-950 ring-1 ring-inset ring-white/10 shadow-[0_24px_64px_-18px_rgba(0,0,0,0.95)]"
-      : `z-0 grid grid-rows-[76%_24%] ${LIQUID_GLASS_DETAIL_SURFACE}`,
+    `z-0 grid grid-rows-[76%_24%] ${LIQUID_GLASS_DETAIL_SURFACE}`,
     "transition-all duration-300",
     heightClass,
   ].join(" ");
@@ -261,7 +256,6 @@ function preloadImage(src) {
 /* =================== CACHÉS COMPARTIDOS (cliente) =================== */
 const movieExtrasCache = new Map(); // movie.id -> { runtime, awards, imdbRating }
 const movieBackdropCache = new Map(); // movie.id -> backdrop file_path | null | undefined
-const movieSpotlightBackdropCache = new Map();
 
 /* ====================================================================
  * LOGICA IMAGENES (Backdrops / Posters)
@@ -584,7 +578,7 @@ function Top10MobileBackdropCard({
 }
 
 // ✅ DISEÑO NUEVO: rounded-lg
-function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
+function InlinePreviewCard({ movie, heightClass }) {
   const { session, account } = useAuth();
   const router = useRouter();
   // Backdrop elegido en la ficha (pestaña «Backdrop») o, sin él, el más
@@ -608,15 +602,6 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
   });
   const [backdropPath, setBackdropPath] = useState(null);
   const [backdropReady, setBackdropReady] = useState(false);
-  // `undefined` mientras se resuelve: ni logo ni título (ver useSpotlightLogo).
-  const logoPath = useSpotlightLogo(movie?.id, "movie", isSpotlight);
-  // Destacada (con el logo encima): el backdrop SIN idioma de «Vista previa»
-  // elegido o más votado, como la cabecera de DetailModal.
-  const { path: previewBackdrop, pending: previewBackdropPending } = useCardArtworkState(
-    "movie",
-    isSpotlight ? movie?.id : null,
-    "backdrop",
-  );
 
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -680,50 +665,27 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
         setBackdropReady(!!path);
       };
 
-      if (isSpotlight) {
-        const cachedBackdrop = movieSpotlightBackdropCache.get(movie.id);
-        if (previewBackdrop) {
-          revealBackdrop(previewBackdrop);
-        } else if (previewBackdropPending) {
-          // Se espera a saber si hay votado (el efecto vuelve a correr).
-          revealBackdrop(null);
-        } else if (cachedBackdrop !== undefined) {
-          revealBackdrop(cachedBackdrop);
-        } else {
-          try {
-            const chosen = await fetchBestBackdropNoLang(movie.id, "movie", {
-              allowLanguageFallback: false,
-            });
-            movieSpotlightBackdropCache.set(movie.id, chosen);
-            revealBackdrop(chosen);
-          } catch {
-            movieSpotlightBackdropCache.set(movie.id, null);
-            revealBackdrop(null);
-          }
-        }
+      const cachedBackdrop = movieBackdropCache.get(movie.id);
+      if (cardBackdrop) {
+        revealBackdrop(cardBackdrop);
+      } else if (cardBackdropPending) {
+        // Se espera a saber si hay votado (el efecto vuelve a correr).
+        revealBackdrop(null);
+      } else if (cachedBackdrop !== undefined) {
+        revealBackdrop(cachedBackdrop);
       } else {
-        const cachedBackdrop = movieBackdropCache.get(movie.id);
-        if (cardBackdrop) {
-          revealBackdrop(cardBackdrop);
-        } else if (cardBackdropPending) {
-          // Se espera a saber si hay votado (el efecto vuelve a correr).
-          revealBackdrop(null);
-        } else if (cachedBackdrop !== undefined) {
-          revealBackdrop(cachedBackdrop);
-        } else {
-          try {
-            const preferred = await fetchBestBackdrop(movie.id, {
-              originalLanguage: movie.original_language,
-            });
-            const chosen = preferred || getPreviewBackdropFallback(movie);
-            movieBackdropCache.set(movie.id, chosen);
+        try {
+          const preferred = await fetchBestBackdrop(movie.id, {
+            originalLanguage: movie.original_language,
+          });
+          const chosen = preferred || getPreviewBackdropFallback(movie);
+          movieBackdropCache.set(movie.id, chosen);
 
-            revealBackdrop(chosen);
-          } catch {
-            const fallback = getPreviewBackdropFallback(movie);
-            movieBackdropCache.set(movie.id, fallback);
-            revealBackdrop(fallback);
-          }
+          revealBackdrop(chosen);
+        } catch {
+          const fallback = getPreviewBackdropFallback(movie);
+          movieBackdropCache.set(movie.id, fallback);
+          revealBackdrop(fallback);
         }
       }
 
@@ -818,7 +780,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
     return () => {
       abort = true;
     };
-  }, [isSpotlight, movie, cardBackdrop, cardBackdropPending, previewBackdrop, previewBackdropPending]);
+  }, [movie, cardBackdrop, cardBackdropPending]);
 
   const href = `/details/movie/${movie.id}`;
 
@@ -933,7 +895,6 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
   const bgSrc = backdropPath
     ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
     : null;
-  const logoSrc = logoPath ? buildImg(logoPath, "w500") : null;
   const tmdbRating = ratingOf(movie);
   const hasTmdbRating = tmdbRating !== "–";
 
@@ -962,20 +923,14 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
   return (
     <motion.div
       initial={false}
-      className={dashboardPreviewCardClass(heightClass, isSpotlight)}
+      className={dashboardPreviewCardClass(heightClass)}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
       onFocus={prefetchHref}
       onTouchStart={prefetchHref}
     >
-      {!isSpotlight && <DashboardPreviewGlass />}
-      <div
-        className={
-          isSpotlight
-            ? "absolute inset-0 h-full w-full overflow-hidden bg-neutral-950"
-            : dashboardPreviewMediaClass
-        }
-      >
+      <DashboardPreviewGlass />
+      <div className={dashboardPreviewMediaClass}>
         {!showTrailer && !backdropReady && (
           <div className="absolute inset-0 bg-neutral-900" />
         )}
@@ -985,20 +940,13 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
             key={bgSrc}
             src={bgSrc}
             alt={movie.title || movie.name}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
-              isSpotlight ? "" : "scale-[1.015]"
-            } ${backdropReady ? "opacity-100" : "opacity-0"}`}
-            style={isSpotlight ? undefined : dashboardPreviewBackdropFadeStyle}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 scale-[1.015] ${backdropReady ? "opacity-100" : "opacity-0"}`}
+            style={dashboardPreviewBackdropFadeStyle}
             loading="eager"
             decoding="async"
             fetchPriority="high"
             onLoad={() => setBackdropReady(true)}
             onError={() => {
-              if (isSpotlight) {
-                movieSpotlightBackdropCache.set(movie.id, null);
-                setBackdropReady(false);
-                return;
-              }
               const fallback = getPreviewBackdropFallback(movie);
               if (fallback && fallback !== backdropPath) {
                 movieBackdropCache.set(movie.id, fallback);
@@ -1021,7 +969,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
               <div
                 className="sv-preview-trailer-viewport absolute inset-0 overflow-hidden"
                 style={{
-                  ...(isSpotlight ? null : dashboardPreviewBackdropFadeStyle),
+                  ...dashboardPreviewBackdropFadeStyle,
                   ...(trailerAspect ? { "--sv-trailer-aspect": trailerAspect } : null),
                 }}
               >
@@ -1044,155 +992,117 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
           </>
         )}
 
-        {isSpotlight ? (
-          <>
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/65 via-black/20 to-transparent" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-          </>
-        ) : (
-          // Velo fundido con la imagen (misma máscara): antes acababa en un 80%
-          // de negro justo en el borde y marcaba un escalón con el cristal.
-          <div
-            className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent from-50% to-black/45"
-            style={dashboardPreviewBackdropFadeStyle}
-          />
-        )}
+        {/* Velo fundido con la imagen (misma máscara): antes acababa en un 80%
+            de negro justo en el borde y marcaba un escalón con el cristal. */}
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent from-50% to-black/45"
+          style={dashboardPreviewBackdropFadeStyle}
+        />
       </div>
 
-      {isSpotlight ? (
-        <DashboardSpotlightPreview
-          item={movie}
-          mediaType="movie"
-          title={movie.title || movie.name}
-          logoSrc={logoSrc}
-          logoPending={logoPath === undefined}
-          backdropSrc={bgSrc}
-          year={yearOf(movie)}
-          runtime={formatRuntime(extras?.runtime)}
-          genres={genres}
-          genreObjects={extras?.genreObjects}
-          status={extras?.status}
-          tmdbRating={tmdbRating}
-          tmdbVotes={movie.vote_count}
-          imdbRating={extras?.imdbRating}
-          ratingsReady={extras?.ratingsReady}
-          awards={extras?.awards}
-          trailerVisible={showTrailer}
-          trailerLoading={trailerLoading}
-          onToggleTrailer={handleToggleTrailer}
-          onCloseTrailer={() => setShowTrailer(false)}
-          favorite={favorite}
-          watchlist={watchlist}
-          actionLoading={loadingStates || updating}
-          onToggleFavorite={handleToggleFavorite}
-          onToggleWatchlist={handleToggleWatchlist}
-          error={error}
-        />
-      ) : (
-        <div className={dashboardPreviewInfoClass}>
-          <div className="flex h-full items-center justify-between gap-4 px-4 py-2 sm:px-6 sm:py-2.5 lg:px-8">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-200 sm:text-xs">
-                {yearOf(movie) && <span>{yearOf(movie)}</span>}
-                {extras?.runtime && (
-                  <span>• {formatRuntime(extras.runtime)}</span>
-                )}
+      <div className={dashboardPreviewInfoClass}>
+        <div className="flex h-full items-center justify-between gap-4 px-4 py-2 sm:px-6 sm:py-2.5 lg:px-8">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-200 sm:text-xs">
+              {yearOf(movie) && <span>{yearOf(movie)}</span>}
+              {extras?.runtime && (
+                <span>• {formatRuntime(extras.runtime)}</span>
+              )}
 
-                {extras?.ratingsReady && hasTmdbRating && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <OptimizedImage
-                      src="/logo-TMDb.png"
-                      alt="TMDb"
-                      className="h-3 w-auto"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <span className="font-medium">{tmdbRating}</span>
-                  </span>
-                )}
+              {extras?.ratingsReady && hasTmdbRating && (
+                <span className="inline-flex items-center gap-1.5">
+                  <OptimizedImage
+                    src="/logo-TMDb.png"
+                    alt="TMDb"
+                    className="h-3 w-auto"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span className="font-medium">{tmdbRating}</span>
+                </span>
+              )}
 
-                {extras?.ratingsReady &&
-                  typeof extras?.imdbRating === "number" && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <OptimizedImage
-                      src="/logo-IMDb.png"
-                      alt="IMDb"
-                      className="h-4 w-auto"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <span className="font-medium">
-                      {extras.imdbRating.toFixed(1)}
-                    </span>
+              {extras?.ratingsReady &&
+                typeof extras?.imdbRating === "number" && (
+                <span className="inline-flex items-center gap-1.5">
+                  <OptimizedImage
+                    src="/logo-IMDb.png"
+                    alt="IMDb"
+                    className="h-4 w-auto"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span className="font-medium">
+                    {extras.imdbRating.toFixed(1)}
                   </span>
-                )}
+                </span>
+              )}
+            </div>
+
+            {genres && (
+              <div className="mt-1 line-clamp-1 text-[11px] text-neutral-100/90 sm:text-xs">
+                {genres}
               </div>
+            )}
 
-              {genres && (
-                <div className="mt-1 line-clamp-1 text-[11px] text-neutral-100/90 sm:text-xs">
-                  {genres}
-                </div>
+            {extras?.awards && (
+              <div className="mt-1 line-clamp-1 text-[10px] leading-tight text-emerald-300 sm:text-[11px]">
+                {extras.awards}
+              </div>
+            )}
+
+            {error && (
+              <p className="mt-1 text-[11px] text-red-400 line-clamp-1">
+                {error}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
+            <LiquidButton
+              onClick={handleToggleTrailer}
+              loading={trailerLoading}
+              active
+              activeColor="yellow"
+              groupId="movies-preview-actions"
+              title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
+              className={`!bg-white !text-black ${previewBtnClass}`}
+            >
+              {showTrailer ? (
+                <X className="text-black" />
+              ) : (
+                <Play className="ml-0.5 fill-current text-black" />
               )}
+            </LiquidButton>
 
-              {extras?.awards && (
-                <div className="mt-1 line-clamp-1 text-[10px] leading-tight text-emerald-300 sm:text-[11px]">
-                  {extras.awards}
-                </div>
-              )}
+            <LiquidButton data-online-only="true"
+              onClick={handleToggleFavorite}
+              loading={loadingStates || updating}
+              active={favorite}
+              activeColor="red"
+              groupId="movies-preview-actions"
+              title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+              className={previewBtnClass}
+            >
+              <Heart className={favorite ? "fill-current" : ""} />
+            </LiquidButton>
 
-              {error && (
-                <p className="mt-1 text-[11px] text-red-400 line-clamp-1">
-                  {error}
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
-              <LiquidButton
-                onClick={handleToggleTrailer}
-                loading={trailerLoading}
-                active
-                activeColor="yellow"
-                groupId="movies-preview-actions"
-                title={showTrailer ? "Cerrar trailer" : "Ver trailer"}
-                className={`!bg-white !text-black ${previewBtnClass}`}
-              >
-                {showTrailer ? (
-                  <X className="text-black" />
-                ) : (
-                  <Play className="ml-0.5 fill-current text-black" />
-                )}
-              </LiquidButton>
-
-              <LiquidButton data-online-only="true"
-                onClick={handleToggleFavorite}
-                loading={loadingStates || updating}
-                active={favorite}
-                activeColor="red"
-                groupId="movies-preview-actions"
-                title={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-                className={previewBtnClass}
-              >
-                <Heart className={favorite ? "fill-current" : ""} />
-              </LiquidButton>
-
-              <LiquidButton data-online-only="true"
-                onClick={handleToggleWatchlist}
-                loading={loadingStates || updating}
-                active={watchlist}
-                activeColor="blue"
-                groupId="movies-preview-actions"
-                title={
-                  watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
-                }
-                className={previewBtnClass}
-              >
-                <BookmarkPlus className={watchlist ? "fill-current" : ""} />
-              </LiquidButton>
-            </div>
+            <LiquidButton data-online-only="true"
+              onClick={handleToggleWatchlist}
+              loading={loadingStates || updating}
+              active={watchlist}
+              activeColor="blue"
+              groupId="movies-preview-actions"
+              title={
+                watchlist ? "Quitar de pendientes" : "Añadir a pendientes"
+              }
+              className={previewBtnClass}
+            >
+              <BookmarkPlus className={watchlist ? "fill-current" : ""} />
+            </LiquidButton>
           </div>
         </div>
-      )}
+      </div>
     </motion.div>
   );
 }
@@ -1209,7 +1119,7 @@ function Row({
   const nativeTouch = useTouchRowScroll();
   const reduceMotion = useReducedMotion();
   // Tarjetas por fila en móvil (ajuste de usuario): NO afecta a filas
-  // destacadas (isSpotlight) ni a Top10 en móvil (diseño de backdrop propio).
+  // Top10 en móvil (diseño de backdrop propio).
   const { preferences } = useAuth();
   const mobileCardsPerRow = getMobileCardsPerRow(preferences);
   // Al VOLVER (atrás/adelante) el montaje es nuevo y `content-visibility`
@@ -1308,21 +1218,22 @@ function Row({
   // KEY estable de la engine (region_top), no por el título —así el título se
   // puede cambiar libremente sin romper el diseño de ranking—.
   const isTop10 = rowKey === "region_top";
-  // Fila DESTACADA: mismas tarjetas póster y misma vista previa, pero a ~1,6×
-  // para resaltar la sección más relevante (Tendencias). Solo una por dashboard.
-  const isSpotlight = title === "Tendencias ahora mismo";
   const hasActivePreview = !!hoveredId;
+  // Vista previa que se está replegando: su diapositiva sigue por encima de
+  // las vecinas (y la fila sin recortar) hasta que termina el cierre. Se
+  // deriva durante el render para que valga desde el mismo fotograma.
+  const [animatingOutId, setAnimatingOutId] = useState(null);
+  const [lastHoveredId, setLastHoveredId] = useState(hoveredId);
+  if (lastHoveredId !== hoveredId) {
+    setLastHoveredId(hoveredId);
+    if (lastHoveredId) setAnimatingOutId(lastHoveredId);
+  }
+  const keepPreviewLayer = hasActivePreview || !!animatingOutId;
 
-  const heightClassDesktop = isSpotlight
-    ? "h-[340px] sm:h-[400px] md:h-[460px] xl:h-[520px]"
-    : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
+  const heightClassDesktop = "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
   // Tokens de tamaño de la tarjeta póster y de la vista previa (hover).
-  const spotlightPosterWidthClass =
-    "w-[200px] sm:w-[220px] md:w-[300px] xl:w-[340px]";
   const normalPosterWidthClass =
     "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px]";
-  const spotlightPreviewWidthClass =
-    "w-[604px] sm:w-[711px] md:w-[818px] xl:w-[924px]";
   const normalPreviewWidthClass =
     "w-[320px] sm:w-[320px] md:w-[430px] xl:w-[480px]";
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
@@ -1351,13 +1262,7 @@ function Row({
         </div>
         <div
           aria-hidden="true"
-          className={
-            isMobile
-              ? isSpotlight
-                ? "min-h-[300px]"
-                : "min-h-[200px]"
-              : heightClassDesktop
-          }
+          className={isMobile ? "min-h-[200px]" : heightClassDesktop}
         />
       </motion.div>
     );
@@ -1451,24 +1356,24 @@ function Row({
 
   const breakpointsRow = {
     0: {
-      slidesPerView: isSpotlight ? 2 : mobileCardsPerRow,
-      spaceBetween: isSpotlight ? 14 : isTop10 ? 16 : 12,
+      slidesPerView: mobileCardsPerRow,
+      spaceBetween: isTop10 ? 16 : 12,
     },
     640: {
-      slidesPerView: isSpotlight ? 2.2 : 4,
-      spaceBetween: isSpotlight ? 18 : isTop10 ? 18 : 14,
+      slidesPerView: 4,
+      spaceBetween: isTop10 ? 18 : 14,
     },
     768: {
       slidesPerView: "auto",
-      spaceBetween: isSpotlight ? 24 : isTop10 ? 24 : 14,
+      spaceBetween: isTop10 ? 24 : 14,
     },
     1024: {
       slidesPerView: "auto",
-      spaceBetween: isSpotlight ? 30 : isTop10 ? 28 : 18,
+      spaceBetween: isTop10 ? 28 : 18,
     },
     1280: {
       slidesPerView: "auto",
-      spaceBetween: isSpotlight ? 36 : isTop10 ? 32 : 20,
+      spaceBetween: isTop10 ? 32 : 20,
     },
   };
 
@@ -1478,7 +1383,7 @@ function Row({
       {...revealProps}
       variants={fadeInUp}
       className={`relative group ${
-        hasActivePreview ? "z-[100]" : isBackNav ? "" : "sv-deferred-row"
+        keepPreviewLayer ? "z-[100]" : isBackNav ? "" : "sv-deferred-row"
       }`}
     >
       <motion.div
@@ -1501,7 +1406,7 @@ function Row({
       </motion.div>
 
       <div
-        className={`relative ${hasActivePreview ? "z-30" : ""}`}
+        className={`relative ${keepPreviewLayer ? "z-30" : ""}`}
         onMouseEnter={() => {
           if (closeTimeoutRef.current) {
             clearTimeout(closeTimeoutRef.current);
@@ -1529,8 +1434,8 @@ function Row({
       >
         <Swiper
           key={`row-${rowKey || title}-${isMobile ? "m" : "d"}-${mobileCardsPerRow}${rowSwiperKeySuffix(nativeTouch)}`}
-          slidesPerView={isSpotlight ? 2 : mobileCardsPerRow}
-          spaceBetween={isSpotlight ? 14 : isTop10 ? 16 : 12}
+          slidesPerView={mobileCardsPerRow}
+          spaceBetween={isTop10 ? 16 : 12}
           onSwiper={handleSwiper}
           onSlideChange={updateNav}
           onResize={updateNav}
@@ -1545,7 +1450,7 @@ function Row({
           preventClicksPropagation={true}
           {...rowSwiperScrollProps(nativeTouch, isMobile)}
           modules={[Navigation, FreeMode]}
-          className={`group relative ${hasActivePreview ? "!overflow-visible" : ""} ${
+          className={`group relative ${keepPreviewLayer ? "!overflow-visible" : ""} ${
             isTop10
               ? "!pt-3 sm:!pt-16 md:!pt-44 !pb-2 sm:!pb-52 md:!pb-72 !-mt-3 sm:!-mt-16 md:!-mt-44 !-mb-2 sm:!-mb-52 md:!-mb-72"
               : ""
@@ -1556,9 +1461,14 @@ function Row({
           {safeItems.map((m, i) => {
             const itemKey = `movie:${m.id}:${i}`;
             const isActive = !isMobile && hoveredId === itemKey;
+            const isAnimatingOut = animatingOutId === itemKey;
 
-            const base =
-              "relative flex-shrink-0 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]";
+            // Top10: la vista previa crece desde la tarjeta con `usePreviewMorph`
+            // (como las filas backdrop) y se alinea sola en los bordes, así que
+            // la caja no se mueve ni anima su tamaño.
+            const base = isTop10
+              ? "relative flex-shrink-0"
+              : "relative flex-shrink-0 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]";
             // Caja de la tarjeta: SIEMPRE altura fija (posterBoxClass), también
             // en la vista previa destacada. Si la activa usa una altura derivada
             // del aspecto (aspect-video / h-full), al cerrar el `transition-all`
@@ -1571,34 +1481,32 @@ function Row({
               : isTop10
                 ? "w-[280px] sm:w-[320px] md:w-[390px] xl:w-[440px] z-10"
                 : isActive
-                ? `${isSpotlight ? spotlightPreviewWidthClass : normalPreviewWidthClass} z-20`
-                  : `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-10`;
+                ? `${normalPreviewWidthClass} z-20`
+                  : `${normalPosterWidthClass} z-10`;
 
             let transformClass = "";
-            if (!isMobile && hoveredIndex !== null && hoveredIndex >= 0) {
+            if (!isTop10 && !isMobile && hoveredIndex !== null && hoveredIndex >= 0) {
               const activeIndex = hoveredIndex;
               const totalItems = safeItems.length;
 
               if (activeIndex >= totalItems - 3 && i <= activeIndex) {
                 if (activeIndex === totalItems - 1) {
-                  transformClass = isSpotlight
-                    ? "sm:-translate-x-[300px] md:-translate-x-[420px] xl:-translate-x-[470px]"
-                    : "sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]";
+                  transformClass =
+                    "sm:-translate-x-[190px] md:-translate-x-[260px] xl:-translate-x-[290px]";
                 } else if (activeIndex === totalItems - 2) {
-                  transformClass = isSpotlight
-                    ? "sm:-translate-x-[210px] md:-translate-x-[290px] xl:-translate-x-[320px]"
-                    : "sm:-translate-x-[130px] md:-translate-x-[180px] xl:-translate-x-[200px]";
+                  transformClass =
+                    "sm:-translate-x-[130px] md:-translate-x-[180px] xl:-translate-x-[200px]";
                 } else if (activeIndex === totalItems - 3) {
-                  transformClass = isSpotlight
-                    ? "sm:-translate-x-[105px] md:-translate-x-[145px] xl:-translate-x-[160px]"
-                    : "sm:-translate-x-[65px] md:-translate-x-[90px] xl:-translate-x-[100px]";
+                  transformClass =
+                    "sm:-translate-x-[65px] md:-translate-x-[90px] xl:-translate-x-[100px]";
                 }
               }
             }
 
             const cardElement = (
               <div
-                className={`${base} ${sizeClasses} ${cardBoxClass} ${transformClass} ${isActive ? "overflow-visible" : "overflow-hidden"}`}
+                data-preview-tile={isTop10 ? "" : undefined}
+                className={`${base} ${sizeClasses} ${cardBoxClass} ${transformClass} ${isActive || isTop10 ? "overflow-visible" : "overflow-hidden"}`}
                 onMouseEnter={() => {
                   if (!isMobile) {
                     if (closeTimeoutRef.current) {
@@ -1643,120 +1551,134 @@ function Row({
                   }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
                 }}
               >
-                <AnimatePresence initial={false} mode="popLayout">
-                  {isActive ? (
-                    <motion.div
-                      key="preview"
-                      initial={
-                        reduceMotion
-                          ? false
-                          : { opacity: 0, scale: 0.96, y: 6 }
-                      }
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{
-                        opacity: 0,
-                        scale: 0.97,
-                        y: 4,
-                        transition: reduceMotion
-                          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-                          : DASHBOARD_PREVIEW_EXIT_TRANSITION,
+                {isTop10 ? (
+                  <>
+                    {/* La tarjeta NO se oculta mientras hay vista previa: esta
+                        crece desde ella y, al cerrarse, vuelve a encogerse
+                        hasta coincidir con ella (`usePreviewMorph`). */}
+                    <div data-preview-tile-art="" className="h-full w-full">
+                      <Top10MobileBackdropCard
+                        movie={m}
+                        rank={i + 1}
+                        showRank={false}
+                        frameClassName="h-full rounded-lg"
+                        imageClassName="object-contain"
+                      />
+                    </div>
+                    <AnimatePresence
+                      initial={false}
+                      onExitComplete={() => {
+                        setAnimatingOutId((prev) =>
+                          prev === itemKey ? null : prev,
+                        );
                       }}
-                      transition={
-                        reduceMotion
-                          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-                          : DASHBOARD_PREVIEW_ENTER_TRANSITION
-                      }
-                      className="w-full h-full hidden sm:block"
-                      style={{ willChange: "transform" }}
                     >
-                      {isTop10 ? (
-                        <BackdropPreviewCard
-                          item={m}
-                          index={i}
-                          totalCount={safeItems.length}
-                          activeIndex={activeIndex}
-                          perView={perView}
-                          onPreviewMouseEnter={() => {
-                            if (closeTimeoutRef.current) {
-                              clearTimeout(closeTimeoutRef.current);
-                              closeTimeoutRef.current = null;
-                            }
-                            if (openTimeoutRef.current) {
-                              clearTimeout(openTimeoutRef.current);
-                              openTimeoutRef.current = null;
-                            }
-                            hoverIntentRef.current += 1;
-                            setHoveredId(itemKey);
-                            setHoveredIndex(i);
-                            showHoverBackdrop(m);
-                          }}
-                          onPreviewMouseLeave={() => {
-                            if (closeTimeoutRef.current) {
-                              clearTimeout(closeTimeoutRef.current);
-                            }
-                            closeTimeoutRef.current = window.setTimeout(() => {
-                              closeTimeoutRef.current = null;
+                      {isActive && (
+                        <div key="preview" className="hidden sm:block">
+                          <BackdropPreviewCard
+                            item={m}
+                            index={i}
+                            totalCount={safeItems.length}
+                            activeIndex={activeIndex}
+                            perView={perView}
+                            onPreviewMouseEnter={() => {
+                              if (closeTimeoutRef.current) {
+                                clearTimeout(closeTimeoutRef.current);
+                                closeTimeoutRef.current = null;
+                              }
+                              if (openTimeoutRef.current) {
+                                clearTimeout(openTimeoutRef.current);
+                                openTimeoutRef.current = null;
+                              }
                               hoverIntentRef.current += 1;
-                              setHoveredId((prev) =>
-                                prev === itemKey ? null : prev,
-                              );
-                              setHoveredIndex(null);
-                              if (isTop10) clearHoverBackdrop();
-                            }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
-                          }}
-                        />
-                      ) : (
+                              setHoveredId(itemKey);
+                              setHoveredIndex(i);
+                              showHoverBackdrop(m);
+                            }}
+                            onPreviewMouseLeave={() => {
+                              if (closeTimeoutRef.current) {
+                                clearTimeout(closeTimeoutRef.current);
+                              }
+                              closeTimeoutRef.current = window.setTimeout(() => {
+                                closeTimeoutRef.current = null;
+                                hoverIntentRef.current += 1;
+                                setHoveredId((prev) =>
+                                  prev === itemKey ? null : prev,
+                                );
+                                setHoveredIndex(null);
+                                if (isTop10) clearHoverBackdrop();
+                              }, DASHBOARD_PREVIEW_CLOSE_DELAY_MS);
+                            }}
+                          />
+                        </div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                ) : (
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {isActive ? (
+                      <motion.div
+                        key="preview"
+                        initial={
+                          reduceMotion
+                            ? false
+                            : { opacity: 0, scale: 0.96, y: 6 }
+                        }
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{
+                          opacity: 0,
+                          scale: 0.97,
+                          y: 4,
+                          transition: reduceMotion
+                            ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                            : DASHBOARD_PREVIEW_EXIT_TRANSITION,
+                        }}
+                        transition={
+                          reduceMotion
+                            ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                            : DASHBOARD_PREVIEW_ENTER_TRANSITION
+                        }
+                        className="w-full h-full hidden sm:block"
+                        style={{ willChange: "transform" }}
+                      >
                         <InlinePreviewCard
-                          movie={m}
-                          heightClass={
-                            isSpotlight ? "h-full" : heightClassDesktop
-                          }
-                          isSpotlight={isSpotlight}
-                        />
-                      )}
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="poster"
-                      initial={
-                        reduceMotion ? false : { opacity: 0, scale: 0.97 }
-                      }
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{
-                        opacity: 0,
-                        scale: 0.97,
-                        transition: reduceMotion
-                          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-                          : DASHBOARD_PREVIEW_EXIT_TRANSITION,
-                      }}
-                      transition={
-                        reduceMotion
-                          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-                          : DASHBOARD_PREVIEW_ENTER_TRANSITION
-                      }
-                      className="w-full h-full"
-                      style={{ willChange: "transform, opacity" }}
-                    >
-                      {isTop10 ? (
-                        <Top10MobileBackdropCard
-                          movie={m}
-                          rank={i + 1}
-                          showRank={false}
-                          frameClassName="h-full rounded-lg"
-                          imageClassName="object-contain"
-                        />
-                      ) : (
+                            movie={m}
+                            heightClass={heightClassDesktop}
+                          />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="poster"
+                        initial={
+                          reduceMotion ? false : { opacity: 0, scale: 0.97 }
+                        }
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{
+                          opacity: 0,
+                          scale: 0.97,
+                          transition: reduceMotion
+                            ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                            : DASHBOARD_PREVIEW_EXIT_TRANSITION,
+                        }}
+                        transition={
+                          reduceMotion
+                            ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
+                            : DASHBOARD_PREVIEW_ENTER_TRANSITION
+                        }
+                        className="w-full h-full"
+                        style={{ willChange: "transform, opacity" }}
+                      >
                         <Link
-                          href={`/details/movie/${m.id}`}
-                          prefetch={false}
-                          className="block w-full h-full"
-                        >
-                          <PosterImage movie={m} cache={posterCacheRef} />
-                        </Link>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                            href={`/details/movie/${m.id}`}
+                            prefetch={false}
+                            className="block w-full h-full"
+                          >
+                            <PosterImage movie={m} cache={posterCacheRef} />
+                          </Link>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                )}
               </div>
             );
 
@@ -1764,11 +1686,13 @@ function Row({
               <SwiperSlide
                 key={itemKey}
                 className={`select-none md:!w-auto ${
-                  isSpotlight || isTop10 ? "md:!flex md:!items-center" : ""
+                  isTop10 ? "md:!flex md:!items-center" : ""
                 } ${
                   isActive
                     ? "!relative !z-[100] !overflow-visible"
-                    : "!relative !z-10"
+                    : isAnimatingOut
+                      ? "!relative !z-[50] !overflow-visible"
+                      : "!relative !z-10"
                 }`}
               >
                 {isTop10 ? (
@@ -1982,13 +1906,14 @@ export default function MoviesPageClient({
                 return;
               }
               genericIndex += 1;
-              // En escritorio "Tendencias ahora mismo" conserva el spotlight;
-              // en móvil el componente compartido normaliza también su tamaño.
-              const isSpotlight = title === "Tendencias ahora mismo";
+              // "Tendencias ahora mismo" es una fila póster normal (mismo tamaño
+              // y vista previa que las demás); solo se fuerza a póster para que
+              // la alternancia no la convierta en fila backdrop.
+              const isTrending = title === "Tendencias ahora mismo";
               const useBackdrop = shouldUseDashboardBackdropRow({
                 isMobile,
                 rowIndex: genericIndex,
-                isSpotlight,
+                forcePoster: isTrending,
               });
               nodes.push(
                 useBackdrop ? (
@@ -2013,8 +1938,6 @@ export default function MoviesPageClient({
                     posterOverrides={EMPTY_OBJECT}
                     backdropOverrides={EMPTY_OBJECT}
                     overridesReady
-                    spotlight={isSpotlight}
-                    showContextBadge={isSpotlight}
                     accent="sky"
                     replayRevealAtTop={index === 0}
                   />
