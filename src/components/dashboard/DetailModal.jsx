@@ -141,14 +141,15 @@ import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
-import DetailsScoreboardPanel, { ScoreboardPill, ScoreboardPillRow } from "@/components/details/DetailsScoreboardPanel";
+import DetailsScoreboardPanel, { ScoreboardPill } from "@/components/details/DetailsScoreboardPanel";
 import { ActionShareButton, ScoreboardTile } from "@/components/details/DetailHeaderBits";
 import {
   FollowingActivityAvatars,
   FollowingActivityModal,
   hasFollowingActivity,
-  useFollowingActivity,
+  useFollowingActivityState,
 } from "@/components/details/FollowingActivity";
+import TilesLayoutFlip from "@/components/details/TilesLayoutFlip";
 import useRatingLinks, { useRatingScores } from "@/lib/details/useRatingLinks";
 import { audienceScoreBadge } from "@/lib/details/ratingScores";
 import { letterboxdScoreBadge } from "@/lib/details/letterboxdScore";
@@ -623,7 +624,14 @@ export default function DetailModal({
   // `pending`: mientras AuthContext no hidrata vale la copia guardada, así el
   // bloque Actividad (y con él la rejilla 2×2 de los bloques) sale desde el
   // primer pintado y no entra después recolocando los demás.
-  const followingActivity = useFollowingActivity(mediaType, item?.id, {
+  // `activityTile`: si los bloques llevan Actividad. La primera vez que se abre
+  // un título no se sabe hasta que contesta la petición; mientras, se conservan
+  // los bloques del título anterior y `<TilesLayoutFlip>` anima el cambio.
+  const {
+    data: followingActivity,
+    resolved: followingActivityResolved,
+    activityTile: showActivityTile,
+  } = useFollowingActivityState(mediaType, item?.id, {
     enabled: canAccessFollowingActivity,
     pending: !authHydrated && !isEpisode,
   });
@@ -2557,6 +2565,9 @@ export default function DetailModal({
   // "Tus amigos" ni en la ficha ni en el panel de teléfono).
   const openFollowingActivity = (event) => {
     stopNestedModalOpeningEvent(event);
+    // Bloque conservado del título anterior mientras llega la actividad de
+    // este: no hay nada que abrir todavía.
+    if (!showFollowingActivity) return;
     setFollowingOpen(true);
   };
 
@@ -3393,8 +3404,10 @@ export default function DetailModal({
       <div className={`@container/sbrow ${className}`}>
         <div ref={scoreRowFitRef} className="sv-score-row flex items-stretch gap-3">
           {panel}
-          <div
-            data-tile-count={showFollowingActivity ? 4 : 3}
+          <TilesLayoutFlip
+            layoutKey={showActivityTile ? 4 : 3}
+            data-tile-count={showActivityTile ? 4 : 3}
+            data-tiles-resolving={followingActivityResolved ? undefined : ""}
             className="sv-score-tiles flex shrink-0 flex-col gap-2 @4xl/sbrow:flex-row @4xl/sbrow:gap-2"
           >
             <ScoreboardTile
@@ -3405,7 +3418,7 @@ export default function DetailModal({
               aria-haspopup="dialog"
               aria-label="Abrir plataformas"
             />
-            {showFollowingActivity && (
+            {showActivityTile && (
               <ScoreboardTile
                 wideBy="container"
                 icon={UsersRound}
@@ -3424,7 +3437,7 @@ export default function DetailModal({
               aria-label="Abrir enlaces externos"
             />
             <ActionShareButton variant="tile" tileWideBy="container" {...shareTitleProps} />
-          </div>
+          </TilesLayoutFlip>
         </div>
       </div>
     );
@@ -4596,7 +4609,7 @@ export default function DetailModal({
                   el marcador, como en la ficha móvil. Cada uno abre su modal. */}
               {mobileDetails ? (
                 <div data-panel-reveal="" className="col-span-2 mt-3">
-                  <ScoreboardPillRow>
+                  <TilesLayoutFlip layoutKey={showActivityTile ? 4 : 3} className="flex gap-3 [&>*]:flex-1">
                     <ScoreboardPill
                       iconOnly
                       icon={MonitorPlay}
@@ -4608,7 +4621,7 @@ export default function DetailModal({
                       aria-haspopup="dialog"
                       aria-label="Abrir plataformas disponibles"
                     />
-                    {showFollowingActivity ? (
+                    {showActivityTile ? (
                       <ScoreboardPill
                         iconOnly
                         icon={UsersRound}
@@ -4642,7 +4655,7 @@ export default function DetailModal({
                       card={shareCard}
                       story={shareStory}
                     />
-                  </ScoreboardPillRow>
+                  </TilesLayoutFlip>
                 </div>
               ) : null}
             </div>

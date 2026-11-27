@@ -223,7 +223,7 @@ export function DetailsRatingsBadges({
   const scoreSlot = (name, score, render, placeholder = { value: "0.0", sub: "00 k" }) => {
     if (!score) return null;
     const node = !isPendingScore(score) ? render(score) : (
-      <div className={`invisible ${spread && !onPhone(name) ? styles.phoneOff : ""}`} aria-hidden="true">
+      <div data-score-pending="" className={`invisible ${spread && !onPhone(name) ? styles.phoneOff : ""}`} aria-hidden="true">
         {render({ ...score, ...placeholder, href: undefined })}
       </div>
     );
@@ -1092,6 +1092,7 @@ export default function DetailsScoreboardPanel({
   const hasRatings = [tmdb, trakt, traktPublic, imdb, rt, mc, lb].some(
     hasVisibleScore,
   );
+  const hasPendingRatings = [tmdb, trakt, traktPublic, imdb, rt, mc, lb].some(Boolean);
   const hasStats = Object.values(stats || {}).some(
     (v) => typeof v === "number",
   );
@@ -1116,8 +1117,16 @@ export default function DetailsScoreboardPanel({
     (typeof onMorePlatforms === "function" && platformsMenuOnly) ||
     typeof onActivity === "function" ||
     !!toolbarActions;
+  // Si el panel se pinta igualmente (hay stats o se esperan), las puntuaciones
+  // PENDIENTES también montan la barra: su hueco invisible reserva el alto. Sin
+  // ella, al abrir un título aún sin ninguna nota el marcador nacía con solo la
+  // fila de stats (~58px) y los bloques de al lado (DetailModal), que toman su
+  // alto, salían aplastados hasta que llegaba la primera.
+  const reservePendingRatings =
+    hasPendingRatings && (hasStats || hasCustomStats || statsPending);
   const hasToolbar =
     hasRatings ||
+    reservePendingRatings ||
     hasExternalLinks ||
     hasStreamingProviders ||
     typeof onMorePlatforms === "function" ||

@@ -24,8 +24,9 @@ import useDeferredBelowHero from "@/lib/details/useDeferredBelowHero";
 import {
   FollowingActivityModal,
   hasFollowingActivity,
-  useFollowingActivity,
+  useFollowingActivityState,
 } from "@/components/details/FollowingActivity";
+import TilesLayoutFlip from "@/components/details/TilesLayoutFlip";
 import Avatar from "@/components/ui/Avatar";
 // -- Hooks de React --
 import {
@@ -314,7 +315,7 @@ import {
 // ficha rápida del dashboard (DetailModal) para que rendericen las MISMAS tarjetas.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { ActionShareButton, ScoreboardTile, UnifiedRateButton } from "@/components/details/DetailHeaderBits";
-import DetailsScoreboardPanel, { ScoreboardPill, ScoreboardPillRow } from "@/components/details/DetailsScoreboardPanel";
+import DetailsScoreboardPanel, { ScoreboardPill } from "@/components/details/DetailsScoreboardPanel";
 import {
   MOBILE_SCOREBOARD_ENTRY_ANIMATION,
   MOBILE_STATS_REVEAL_BASE,
@@ -8407,12 +8408,21 @@ export default function DetailsClient({
   // Actividad de las cuentas que sigues con este título, en su modal. Solo con
   // sesión; sin nadie que mostrar, ni botón Actividad ni avatares.
   const canAccessFollowingActivity = authenticated || hasBackendSession;
-  const followingActivity = useFollowingActivity(type, id, {
+  // `activityTile`: si los bloques (y la fila de píldoras del teléfono) llevan
+  // Actividad. Sin copia de la última visita no se sabe hasta que contesta la
+  // petición; mientras, se conservan los del título anterior y
+  // `<TilesLayoutFlip>` anima el cambio.
+  const { data: followingActivity, activityTile: showActivityTile } = useFollowingActivityState(type, id, {
     enabled: canAccessFollowingActivity,
     // Hasta saber la sesión vale la copia de la última visita (ver el hook).
     pending: !authHydrated,
   });
   const showFollowingActivity = hasFollowingActivity(followingActivity);
+  // Bloque conservado del título anterior mientras llega la actividad de este:
+  // no hay nada que abrir todavía.
+  const openFollowingActivity = () => {
+    if (showFollowingActivity) setFollowingOpen(true);
+  };
 
   const sectionItems = useMemo(() => {
     const items = [];
@@ -11610,14 +11620,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // bloque junto a Enlaces y Compartir (más abajo).
                 />
                 {!isBackdropPoster && (
-                  <div className={`sv-score-tiles hidden sm:flex sm:shrink-0 sm:flex-col ${showFollowingActivity ? "sm:gap-2" : "sm:gap-3"} xl:flex-row xl:gap-2`}>
+                  <TilesLayoutFlip layoutKey={showActivityTile ? 4 : 3} className={`sv-score-tiles hidden sm:flex sm:shrink-0 sm:flex-col ${showActivityTile ? "sm:gap-2" : "sm:gap-3"} xl:flex-row xl:gap-2`}>
                     {/* Actividad: solo si alguien a quien sigues ha tocado
                         el título; abre el mismo modal que los avatares. */}
-                    {showFollowingActivity && (
+                    {showActivityTile && (
                       <ScoreboardTile
                         icon={UsersRound}
                         label="Actividad"
-                        onClick={() => setFollowingOpen(true)}
+                        onClick={openFollowingActivity}
                         aria-haspopup="dialog"
                         aria-label="Ver la actividad de quienes sigues"
                       />
@@ -11636,7 +11646,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       card={shareCard}
                       story={shareStory}
                     />
-                  </div>
+                  </TilesLayoutFlip>
                 )}
                 </div>
               </div>
@@ -11653,7 +11663,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   fila y sus píldoras entran en cascada, como los botones de la
                   portada (`.sv-mobile-pill-cascade` en globals.css). */}
               <div className={`mt-3 sm:hidden ${MOBILE_REVEAL_BASE} ${detailsRestored || sequenceTransitionActive ? "" : `${MOBILE_SECONDARY_REVEAL_ANIMATION} sv-mobile-pill-cascade`}`} {...heroRevealProps}>
-                <ScoreboardPillRow>
+                <TilesLayoutFlip layoutKey={showActivityTile ? 4 : 3} className="flex gap-3 [&>*]:flex-1">
                   <ScoreboardPill
                     iconOnly
                     icon={MonitorPlay}
@@ -11662,12 +11672,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     aria-haspopup="dialog"
                     aria-label="Abrir plataformas disponibles"
                   />
-                  {showFollowingActivity ? (
+                  {showActivityTile ? (
                     <ScoreboardPill
                       iconOnly
                       icon={UsersRound}
                       label="Actividad"
-                      onClick={() => setFollowingOpen(true)}
+                      onClick={openFollowingActivity}
                       aria-haspopup="dialog"
                       aria-label="Ver la actividad de tus amigos"
                     />
@@ -11688,7 +11698,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     card={shareCard}
                     story={shareStory}
                   />
-                </ScoreboardPillRow>
+                </TilesLayoutFlip>
               </div>
             </div>
 

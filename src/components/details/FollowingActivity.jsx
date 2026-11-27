@@ -30,6 +30,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import ModalTitleIcon from "@/components/details/ModalTitleIcon";
+import { shownActivityTile } from "@/lib/details/tilesLayoutFlip";
 
 import Avatar from "@/components/ui/Avatar";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -80,6 +81,14 @@ function browserStorage() {
 
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
+// Tope de espera de `resolved`: si la petición no contesta, los bloques salen
+// sin Actividad (y entra después si llega), en vez de quedarse ocultos.
+const RESOLVE_TIMEOUT_MS = 4000;
+
+// ¿Llevaba bloque Actividad el último título resuelto? Mientras el siguiente no
+// sabe si lo lleva, sus bloques salen como los de este (ver `activityTile`).
+let lastActivityTile = false;
+
 /**
  * Actividad de tus seguidos con un título (null mientras carga o si no hay
  * sesión).
@@ -90,28 +99,68 @@ const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : us
  * la vez que Enlaces y Compartir y no aparece después, cuando llegan la sesión
  * y la petición. La copia se lee en un efecto de layout (antes de pintar la
  * ficha hidratada) y no en el estado inicial, que el servidor no puede saber.
+ *
+ * `resolved`: ya se sabe si hay actividad (aunque sea ninguna). La primera vez
+ * que se abre un título en el navegador no hay copia guardada, y hasta que
+ * contesta la petición no se sabe si va el bloque Actividad: los bloques
+ * (Plataformas, Actividad, Enlaces, Compartir) esperan a esto para nacer ya con
+ * su distribución final (rejilla 2×2 con cuatro) en vez de pasar de tres a
+ * cuatro.
  */
-export function useFollowingActivity(type, id, { enabled = true, pending = false } = {}) {
+export function useFollowingActivityState(type, id, { enabled = true, pending = false } = {}) {
   const key = `${type}:${id}`;
-  const [state, setState] = useState(() => ({ key, data: cache.get(key)?.data || null }));
+  const valid = Boolean(id) && (type === "movie" || type === "tv");
+  // `known`: ya se sabe si hay actividad para `key` (caché, copia guardada,
+  // respuesta o tope de espera), aunque sea «nadie».
+  const [state, setState] = useState(() => {
+    const cached = cache.get(key)?.data || null;
+    return { key, data: cached, known: Boolean(cached) };
+  });
   useIsomorphicLayoutEffect(() => {
-    if (!id || (type !== "movie" && type !== "tv")) return;
-    if (cache.get(key)?.data) return;
+    if (!valid) return;
+    const cached = cache.get(key)?.data;
+    if (cached) {
+      setState((prev) => (prev.key === key && prev.known ? prev : { key, data: cached, known: true }));
+      return;
+    }
     const stored = readStoredFollowing(browserStorage(), key);
-    if (stored) setState((prev) => (prev.key === key && prev.data ? prev : { key, data: stored }));
-  }, [type, id, key]);
+    setState((prev) => {
+      if (prev.key === key && prev.known) return prev;
+      return stored ? { key, data: stored, known: true } : { key, data: null, known: false };
+    });
+  }, [valid, key]);
   useEffect(() => {
-    if (!enabled || !id || (type !== "movie" && type !== "tv")) return undefined;
+    if (!enabled || !valid) return undefined;
     let active = true;
+    const timer = setTimeout(() => {
+      if (active) setState((prev) => (prev.key === key && !prev.known ? { ...prev, known: true } : prev));
+    }, RESOLVE_TIMEOUT_MS);
     fetchFollowing(type, id).then((data) => {
-      if (active) setState({ key, data });
+      if (active) setState({ key, data, known: true });
     });
     return () => {
       active = false;
+      clearTimeout(timer);
     };
-  }, [enabled, type, id, key]);
+  }, [enabled, valid, type, id, key]);
+  const current = state.key === key;
   // Al cambiar de título no se enseña la actividad del anterior.
-  return (enabled || pending) && state.key === key ? state.data : null;
+  const data = (enabled || pending) && current ? state.data : null;
+  // Sin sesión (ni por saber) no hay actividad que esperar.
+  const resolved = !valid || (!enabled && !pending) || (current && state.known);
+  const hasActivity = hasFollowingActivity(data);
+  // `activityTile`: si pintar el bloque Actividad. Hasta saberlo se conservan
+  // los bloques del título anterior (nada desaparece ni se recoloca al pulsar
+  // otro título); al saberlo, `<TilesLayoutFlip>` anima el cambio si lo hay.
+  const activityTile = shownActivityTile({ resolved, hasActivity, previous: lastActivityTile });
+  useEffect(() => {
+    if (valid && resolved) lastActivityTile = hasActivity;
+  }, [valid, resolved, hasActivity]);
+  return { data, resolved, activityTile };
+}
+
+export function useFollowingActivity(type, id, options) {
+  return useFollowingActivityState(type, id, options).data;
 }
 
 export function hasFollowingActivity(data) {
