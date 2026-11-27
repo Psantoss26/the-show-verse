@@ -360,11 +360,13 @@ export default function GroupScoreStats({
 
   return (
     // Elemento normal (no motion): framer escribiría su `transform` encima de
-    // la escala de fijado.
+    // la escala de fijado. Alto mínimo = el del botón «+» (h-8 / sm:h-10):
+    // las medias solo miden ~22 px y la cabecera encogía al terminar el
+    // cálculo y desaparecer el botón.
     <div
       ref={rootRef}
       data-compact={compact || undefined}
-      className={`sv-group-compact-scores relative flex shrink-0 items-center ${className}`}
+      className={`sv-group-compact-scores relative flex min-h-8 shrink-0 items-center sm:min-h-10 ${className}`}
     >
       {/* Copia invisible con todas las medias, solo para medirlas. */}
       <div
