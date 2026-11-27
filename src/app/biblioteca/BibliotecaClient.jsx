@@ -4,6 +4,8 @@
 import { getPlexLink } from "@/lib/streaming/plexLinks";
 import OptimizedImage from "@/components/OptimizedImage";
 import GroupScoreStats from "@/components/ui/GroupScoreStats";
+import useGroupScoresOnDemand from "@/hooks/useGroupScoresOnDemand";
+import { getScoreItemKey, readScoreCache } from "@/lib/userLists/listScoreCache";
 import {
   useCallback,
   useDeferredValue,
@@ -304,17 +306,42 @@ function BackdropGlyph({ className = "" }) {
   );
 }
 
+// Las medias de Plex no traen nota de ninguna fuente: las tres se calculan a
+// mano por agrupación (useGroupScoresOnDemand) con el título de TMDb que Plex
+// asocia a cada elemento. `missing`: títulos sin nota conocida de la fuente.
+const LIBRARY_SCORE_SOURCES = ["imdb", "trakt", "tmdb"];
+
+function getLibraryScoreItem(item) {
+  const mediaType = item?.tmdbType === "movie" || item?.tmdbType === "tv" ? item.tmdbType : null;
+  const id = Number(item?.tmdbId || 0);
+  if (!mediaType || !Number.isFinite(id) || id <= 0) return null;
+  return { id, media_type: mediaType };
+}
+
 function createLibraryGroupStats() {
   return {
-    tmdb: { sum: 0, count: 0, avg: 0 },
+    tmdb: { sum: 0, count: 0, avg: 0, missing: 0 },
+    imdb: { sum: 0, count: 0, avg: 0, missing: 0 },
+    trakt: { sum: 0, count: 0, avg: 0, missing: 0 },
     my: { sum: 0, count: 0, avg: 0 },
   };
 }
 
-function addLibraryGroupStats(stats, item) {
-  if (item.tmdbRating) {
-    stats.tmdb.sum += item.tmdbRating;
-    stats.tmdb.count++;
+function addLibraryGroupStats(stats, item, scoreItem, scoresBySource) {
+  const key = scoreItem ? getScoreItemKey(scoreItem) : "";
+  if (key) {
+    for (const source of LIBRARY_SCORE_SOURCES) {
+      const scores = scoresBySource[source];
+      if (!scores.has(key)) {
+        stats[source].missing++;
+        continue;
+      }
+      const score = scores.get(key);
+      if (score) {
+        stats[source].sum += score;
+        stats[source].count++;
+      }
+    }
   }
   if (item.userRating) {
     stats.my.sum += item.userRating;
@@ -323,8 +350,9 @@ function addLibraryGroupStats(stats, item) {
 }
 
 function finalizeLibraryGroupStats(stats) {
-  if (stats.tmdb.count > 0) stats.tmdb.avg = stats.tmdb.sum / stats.tmdb.count;
-  if (stats.my.count > 0) stats.my.avg = stats.my.sum / stats.my.count;
+  for (const stat of Object.values(stats)) {
+    if (stat.count > 0) stat.avg = stat.sum / stat.count;
+  }
 }
 
 // ================== UI COMPONENTS ==================
@@ -488,6 +516,7 @@ function GroupDivider({
   count,
   total,
   stats,
+  onDemand = null,
   mobileFiltersOpen,
   isFirstGroup = false,
 }) {
@@ -516,6 +545,7 @@ function GroupDivider({
   return (
     <motion.div
       ref={ref}
+      data-group-still={skipMotion || undefined}
       className={`sticky z-[60] ${isFirstGroup ? mobileFiltersOpen ? "mt-0 mb-4 sm:mb-6" : "mt-2 mb-4 sm:mt-0 sm:mb-6" : "my-4 sm:my-6"} -mx-2 px-2 sm:mx-0 sm:px-0 transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:top-[136px] ${
         mobileFiltersOpen
           ? "top-[calc(var(--sv-page-sticky-top)+176px)] sm:top-[232px]"
@@ -533,32 +563,40 @@ function GroupDivider({
         className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg transition-all duration-300 ${isSticky ? "shadow-md" : "shadow-xl"}`}
       >
         <div
-          className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 transition-all duration-300 ${isSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
+          className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 transition-all duration-300 ${isSticky ? "py-2 sm:py-1.5" : "py-2.5 sm:py-5"}`}
         >
           <div
             className={`bg-gradient-to-b from-amber-500 to-orange-600 shadow-[0_0_15px_rgba(245,158,11,0.3)] shrink-0 transition-all duration-300 ${isSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-6 sm:h-8 rounded-full"}`}
           />
+          {/* Fijada, el título se encoge con una escala (globals.css,
+              .sv-group-compact-title), sin cambiar la letra ni la maquetación. */}
           <div
-            className={`min-w-0 flex-1 transition-all duration-300 flex items-center gap-x-2 sm:gap-x-3`}
+            data-compact={isSticky || undefined}
+            className="sv-group-compact-title min-w-0 flex-1 flex items-center gap-x-2 sm:gap-x-3"
           >
             <h2
               data-group-title
-              className={`min-w-0 truncate font-black tracking-tight text-white leading-tight drop-shadow-md transition-all duration-300 ${isSticky ? "text-base sm:text-xl" : "text-lg sm:text-[1.75rem]"}`}
+              className="min-w-0 truncate text-lg font-black leading-tight tracking-tight text-white drop-shadow-md sm:text-[1.75rem]"
             >
               {title}
             </h2>
-            <div
-              data-group-meta
-              className={`shrink-0 font-bold text-zinc-300 items-center gap-x-2 sm:gap-x-3 transition-all duration-300 ${isSticky ? "hidden sm:flex text-xs sm:text-sm" : "hidden sm:flex text-sm sm:text-base"}`}
-            >
-              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
-              <span><span className="text-white tabular-nums">{count}</span> títulos</span>
-              <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
-              <span className="text-white tabular-nums">{pct}%</span>
+            {/* Solo si cabe sin acercarse a las medias (GroupScoreStats). */}
+            <div data-group-meta className="flex shrink-0">
+              <div className="flex items-center gap-x-2 whitespace-nowrap text-sm font-bold text-zinc-300 sm:gap-x-3 sm:text-base">
+                <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
+                <span><span className="text-white tabular-nums">{count}</span> títulos</span>
+                <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
+                <span className="text-white tabular-nums">{pct}%</span>
+              </div>
             </div>
           </div>
 
-          <GroupScoreStats stats={stats} sources={["tmdb"]} compact={isSticky} />
+          <GroupScoreStats
+            stats={stats}
+            sources={LIBRARY_SCORE_SOURCES}
+            compact={isSticky}
+            onDemand={onDemand}
+          />
         </div>
       </div>
     </motion.div>
@@ -1350,6 +1388,17 @@ export default function BibliotecaClient() {
     [summary],
   );
 
+  // Medias por agrupación, calculadas a mano (caché compartida con Favoritos y
+  // Pendientes: lo ya calculado allí sale directamente).
+  const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
+  const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
+  const [tmdbScores, setTmdbScores] = useState(() => readScoreCache("tmdb"));
+  const { getGroupOnDemand } = useGroupScoresOnDemand({
+    imdb: { scores: imdbScores, setScores: setImdbScores },
+    trakt: { scores: traktScores, setScores: setTraktScores },
+    tmdb: { scores: tmdbScores, setScores: setTmdbScores },
+  });
+
   // Grouping logic
   const grouped = useMemo(() => {
     if (groupBy === "none") return null;
@@ -1385,12 +1434,16 @@ export default function BibliotecaClient() {
 
     const entries = Array.from(groups.entries()).map(([key, items]) => {
       const stats = createLibraryGroupStats();
+      const scoreItems = [];
+      const scoresBySource = { imdb: imdbScores, trakt: traktScores, tmdb: tmdbScores };
       for (const item of items) {
-        addLibraryGroupStats(stats, item);
+        const scoreItem = getLibraryScoreItem(item);
+        if (scoreItem) scoreItems.push(scoreItem);
+        addLibraryGroupStats(stats, item, scoreItem, scoresBySource);
       }
       finalizeLibraryGroupStats(stats);
 
-      return { key, label: key, items, stats };
+      return { key, label: key, items, scoreItems, stats };
     });
 
     // Sort groups
@@ -1417,7 +1470,7 @@ export default function BibliotecaClient() {
     }
 
     return entries;
-  }, [filteredItems, groupBy]);
+  }, [filteredItems, groupBy, imdbScores, traktScores, tmdbScores]);
 
   // Firma del ORDEN visible (con el grupo de cada título): cuando cambia,
   // <FlipReorder> anima la recolocación de las tarjetas, como en Favoritos.
@@ -1816,6 +1869,11 @@ export default function BibliotecaClient() {
                 count={group.items.length}
                 total={filteredItems.length}
                 stats={group.stats}
+                onDemand={getGroupOnDemand(group.key, group.scoreItems, {
+                  imdb: group.stats.imdb.missing,
+                  trakt: group.stats.trakt.missing,
+                  tmdb: group.stats.tmdb.missing,
+                })}
                 mobileFiltersOpen={mobileFiltersOpen}
                 isFirstGroup={groupIndex === 0}
               />

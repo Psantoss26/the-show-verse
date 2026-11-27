@@ -104,7 +104,11 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import { ControlledOptionsSheet, OptionsSheetTrigger, SheetOption, SheetOptionBreak, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
-import GroupScoreStats, { MY_RATING_GROUP_SCORE_PRIORITY } from "@/components/ui/GroupScoreStats";
+import useGroupScoresOnDemand from "@/hooks/useGroupScoresOnDemand";
+import GroupScoreStats, {
+  MY_RATING_GROUP_SCORE_PRIORITY,
+  MY_RATING_YIELD_TO_META,
+} from "@/components/ui/GroupScoreStats";
 import {
   AdvancedFiltersBadge,
   AdvancedFiltersButton,
@@ -1222,28 +1226,39 @@ function isRatingGroupKey(groupBy) {
 
 function createFavoriteGroupStats() {
   return {
-    tmdb: { sum: 0, count: 0, avg: 0 },
-    imdb: { sum: 0, count: 0, avg: 0 },
-    trakt: { sum: 0, count: 0, avg: 0 },
+    // `missing`: títulos sin nota conocida de la fuente (ni «sin nota»
+    // confirmado); con alguno, la cabecera ofrece calcularla a mano.
+    tmdb: { sum: 0, count: 0, avg: 0, missing: 0 },
+    imdb: { sum: 0, count: 0, avg: 0, missing: 0 },
+    trakt: { sum: 0, count: 0, avg: 0, missing: 0 },
     my: { sum: 0, count: 0, avg: 0 },
   };
 }
 
-function addFavoriteGroupStats(stats, item, imdbScores, traktScores) {
-  if (item.vote_average) {
-    stats.tmdb.sum += item.vote_average;
+// TMDb: la nota viene con el título (`vote_average`); si no la trae, la que se
+// calculó a mano (`tmdbScores`).
+const favoriteHasTmdbVote = (item) => item?.vote_average != null;
+
+function addFavoriteGroupStats(stats, item, imdbScores, traktScores, tmdbScores) {
+  const key = getScoreItemKey(item);
+  const tmdbRating = favoriteHasTmdbVote(item) ? item.vote_average : tmdbScores.get(key);
+  if (!favoriteHasTmdbVote(item) && !tmdbScores.has(key)) stats.tmdb.missing++;
+  if (tmdbRating) {
+    stats.tmdb.sum += tmdbRating;
     stats.tmdb.count++;
   }
   if (item.user_rating) {
     stats.my.sum += item.user_rating;
     stats.my.count++;
   }
-  const imdbRating = imdbScores.get(getScoreItemKey(item));
+  const imdbRating = imdbScores.get(key);
+  if (!imdbScores.has(key)) stats.imdb.missing++;
   if (imdbRating) {
     stats.imdb.sum += imdbRating;
     stats.imdb.count++;
   }
-  const traktRating = traktScores.get(getScoreItemKey(item));
+  const traktRating = traktScores.get(key);
+  if (!traktScores.has(key)) stats.trakt.missing++;
   if (traktRating) {
     stats.trakt.sum += traktRating;
     stats.trakt.count++;
@@ -1639,6 +1654,7 @@ function GroupDivider({
   hasNextGroup = false,
   onPreviousGroup,
   onNextGroup,
+  onDemand = null,
 }) {
   // El divisor es sticky y entra animándose: al retroceder eso recoloca la
   // lista. Se consulta aquí porque este componente vive FUERA del cliente
@@ -1669,6 +1685,7 @@ function GroupDivider({
       ref={ref}
       layoutRoot
       data-group-divider
+      data-group-still={skipMotion || undefined}
       // Fijada bajo el navbar: sus superficies pasan al cristal del
       // navbar (regla `[data-menu-pinned]` en globals.css).
       data-menu-pinned={renderSticky}
@@ -1690,32 +1707,46 @@ function GroupDivider({
             className={`sv-group-surface pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"}`}
           />
           <motion.div layout="position"
-            className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 ${stickyTransitionClass} ${renderSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
+            className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 ${stickyTransitionClass} ${renderSticky ? "py-2 sm:py-1.5" : "py-2.5 sm:py-5"}`}
           >
             <motion.div layout="position" className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
               <motion.div layout
                 className={`bg-gradient-to-b from-red-500 to-red-600 shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0 ${stickyTransitionClass} ${renderSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-6 sm:h-8 rounded-full"}`}
               />
 
-              <motion.div layout="position"
-                className={`min-w-0 flex-1 ${stickyTransitionClass} flex items-center gap-x-2 sm:gap-x-3`}
+              {/* Fijada, el título se encoge con una escala (globals.css,
+                  .sv-group-compact-title), sin cambiar la letra ni la
+                  maquetación. La escala va en un hijo sin motion: framer
+                  pisaría el transform; el envoltorio sí sigue a la barra roja. */}
+              <motion.div layout="position" className="flex min-w-0 flex-1">
+              <div
+                data-compact={renderSticky || undefined}
+                className="sv-group-compact-title min-w-0 flex-1 flex items-center gap-x-2 sm:gap-x-3"
               >
-                <motion.h2 layout="position"
+                <h2
                   data-group-title
-                  className={`min-w-0 truncate font-black tracking-tight text-white leading-tight drop-shadow-md ${stickyTransitionClass} ${renderSticky ? "text-base sm:text-xl" : "text-lg sm:text-[1.75rem]"}`}
+                  className="min-w-0 truncate text-lg font-black leading-tight tracking-tight text-white drop-shadow-md sm:text-[1.75rem]"
                 >
                   {title}
-                </motion.h2>
+                </h2>
 
-                <motion.div layout="position"
-                  data-group-meta
-                  className={`shrink-0 font-bold text-zinc-300 items-center gap-x-2 sm:gap-x-3 ${stickyTransitionClass} ${renderSticky ? "hidden sm:flex text-xs sm:text-sm" : "hidden sm:flex text-sm sm:text-base"}`}
-                >
-                  <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
-                  <span><span className="text-white tabular-nums">{count}</span> items</span>
-                  <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
-                  <span className="text-white tabular-nums">{pct}%</span>
-                </motion.div>
+                {/* Solo si cabe sin acercarse a las medias (GroupScoreStats). */}
+                <div data-group-meta className="flex shrink-0">
+                  {/* `data-meta-core` y `data-meta-extra`: sin sitio para
+                      todo, GroupScoreStats puede dejar solo «· N items»
+                      (data-fit="short"). */}
+                  <div className="flex items-center gap-x-2 whitespace-nowrap text-sm font-bold text-zinc-300 sm:gap-x-3 sm:text-base">
+                    <span data-meta-core className="flex items-center gap-x-2 sm:gap-x-3">
+                      <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
+                      <span><span className="text-white tabular-nums">{count}</span> items</span>
+                    </span>
+                    <span data-meta-extra className="flex items-center gap-x-2 sm:gap-x-3">
+                      <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
+                      <span className="text-white tabular-nums">{pct}%</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
               </motion.div>
             </motion.div>
 
@@ -1723,6 +1754,8 @@ function GroupDivider({
               stats={stats}
               compact={renderSticky}
               priority={groupBy === "user_rating" ? MY_RATING_GROUP_SCORE_PRIORITY : undefined}
+              yieldToMeta={groupBy === "user_rating" ? MY_RATING_YIELD_TO_META : undefined}
+              onDemand={onDemand}
             />
           </motion.div>
         </motion.div>
@@ -2043,6 +2076,8 @@ export default function FavoritesClient() {
   );
   const [imdbScores, setImdbScores] = useStableState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useStableState(() => readScoreCache("trakt"));
+  // Notas de TMDb calculadas a mano para títulos que no traen `vote_average`.
+  const [tmdbScores, setTmdbScores] = useStableState(() => readScoreCache("tmdb"));
   const layoutImdbScores = imdbScores;
   const layoutTraktScores = traktScores;
   const [providersByItem, setProvidersByItem] = useStableState(
@@ -2226,6 +2261,13 @@ export default function FavoritesClient() {
     advancedNeeds.trakt ||
     groupBy === "trakt_rating" ||
     subGroupBy === "trakt_rating";
+  // Las fuentes que la página no carga por defecto se calculan a mano por
+  // agrupación (TMDb solo falta en títulos sin `vote_average`).
+  const { getGroupOnDemand } = useGroupScoresOnDemand({
+    imdb: needsImdbScores ? null : { scores: imdbScores, setScores: setImdbScores },
+    trakt: needsTraktScores ? null : { scores: traktScores, setScores: setTraktScores },
+    tmdb: { scores: tmdbScores, setScores: setTmdbScores },
+  });
 
   // Al VOLVER (atrás/adelante) mantenemos el orden CONGELADO —tal cual lo dejó el
   // usuario— hasta que cambie explícitamente la ordenación. Mientras esté congelado
@@ -2988,6 +3030,7 @@ export default function FavoritesClient() {
           item,
           layoutImdbScores,
           layoutTraktScores,
+          tmdbScores,
         );
       }
     }
@@ -3037,6 +3080,7 @@ export default function FavoritesClient() {
     subGroupBy,
     layoutImdbScores,
     layoutTraktScores,
+    tmdbScores,
     layoutProvidersByItem,
     watchCounts,
     loadingProviders,
@@ -4004,6 +4048,16 @@ export default function FavoritesClient() {
                     hasNextGroup={groupIndex < grouped.length - 1}
                     onPreviousGroup={() => scrollToPreviousGroup(group.key)}
                     onNextGroup={() => scrollToNextGroup(group.key)}
+                    onDemand={getGroupOnDemand(
+                      group.key,
+                      group.items,
+                      {
+                        imdb: group.stats.imdb.missing,
+                        trakt: group.stats.trakt.missing,
+                        tmdb: group.stats.tmdb.missing,
+                      },
+                      { tmdb: favoriteHasTmdbVote },
+                    )}
                   />
                   {group.subgroups?.length ? (
                     <div className="">

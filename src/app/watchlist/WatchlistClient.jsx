@@ -5,6 +5,7 @@ import { pickLadderBackdrop, pickLadderPoster } from "@/lib/details/tmdbImages";
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 
 import OptimizedImage from "@/components/OptimizedImage";
+import useGroupScoresOnDemand from "@/hooks/useGroupScoresOnDemand";
 import GroupScoreStats from "@/components/ui/GroupScoreStats";
 import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
 import {
@@ -569,23 +570,34 @@ function isRatingGroupKey(groupBy) {
 
 function createWatchlistGroupStats() {
   return {
-    tmdb: { sum: 0, count: 0, avg: 0 },
-    imdb: { sum: 0, count: 0, avg: 0 },
-    trakt: { sum: 0, count: 0, avg: 0 },
+    // `missing`: títulos sin nota conocida de la fuente (ni «sin nota»
+    // confirmado); con alguno, la cabecera ofrece calcularla a mano.
+    tmdb: { sum: 0, count: 0, avg: 0, missing: 0 },
+    imdb: { sum: 0, count: 0, avg: 0, missing: 0 },
+    trakt: { sum: 0, count: 0, avg: 0, missing: 0 },
   };
 }
 
-function addWatchlistGroupStats(stats, item, imdbScores, traktScores) {
-  if (item.vote_average) {
-    stats.tmdb.sum += item.vote_average;
+// TMDb: la nota viene con el título (`vote_average`); si no la trae, la que se
+// calculó a mano (`tmdbScores`).
+const watchlistHasTmdbVote = (item) => item?.vote_average != null;
+
+function addWatchlistGroupStats(stats, item, imdbScores, traktScores, tmdbScores) {
+  const key = getScoreItemKey(item);
+  const tmdbRating = watchlistHasTmdbVote(item) ? item.vote_average : tmdbScores.get(key);
+  if (!watchlistHasTmdbVote(item) && !tmdbScores.has(key)) stats.tmdb.missing++;
+  if (tmdbRating) {
+    stats.tmdb.sum += tmdbRating;
     stats.tmdb.count++;
   }
-  const imdbRating = imdbScores.get(getScoreItemKey(item));
+  const imdbRating = imdbScores.get(key);
+  if (!imdbScores.has(key)) stats.imdb.missing++;
   if (imdbRating) {
     stats.imdb.sum += imdbRating;
     stats.imdb.count++;
   }
-  const traktRating = traktScores.get(getScoreItemKey(item));
+  const traktRating = traktScores.get(key);
+  if (!traktScores.has(key)) stats.trakt.missing++;
   if (traktRating) {
     stats.trakt.sum += traktRating;
     stats.trakt.count++;
@@ -1075,6 +1087,7 @@ function GroupDivider({
   hasNextGroup = false,
   onPreviousGroup,
   onNextGroup,
+  onDemand = null,
 }) {
   // El divisor es sticky y entra animándose: al retroceder eso recoloca la
   // lista. Se consulta aquí porque este componente vive FUERA del cliente
@@ -1105,6 +1118,7 @@ function GroupDivider({
       ref={ref}
       layoutRoot
       data-group-divider
+      data-group-still={skipMotion || undefined}
       // Fijada bajo el navbar: sus superficies pasan al cristal del
       // navbar (regla `[data-menu-pinned]` en globals.css).
       data-menu-pinned={renderSticky}
@@ -1126,36 +1140,43 @@ function GroupDivider({
             className={`sv-group-surface pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"}`}
           />
           <motion.div layout="position"
-            className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 ${stickyTransitionClass} ${renderSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
+            className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 ${stickyTransitionClass} ${renderSticky ? "py-2 sm:py-1.5" : "py-2.5 sm:py-5"}`}
           >
             <motion.div layout="position" className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
               <motion.div layout
                 className={`bg-gradient-to-b from-blue-500 to-cyan-600 shadow-[0_0_15px_rgba(59,130,246,0.4)] shrink-0 ${stickyTransitionClass} ${renderSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-6 sm:h-8 rounded-full"}`}
               />
 
-              <motion.div layout="position"
-                className={`min-w-0 flex-1 ${stickyTransitionClass} flex items-center gap-x-2 sm:gap-x-3`}
+              {/* Fijada, el título se encoge con una escala (globals.css,
+                  .sv-group-compact-title), sin cambiar la letra ni la
+                  maquetación. La escala va en un hijo sin motion: framer
+                  pisaría el transform; el envoltorio sí sigue a la barra roja. */}
+              <motion.div layout="position" className="flex min-w-0 flex-1">
+              <div
+                data-compact={renderSticky || undefined}
+                className="sv-group-compact-title min-w-0 flex-1 flex items-center gap-x-2 sm:gap-x-3"
               >
-                <motion.h2 layout="position"
+                <h2
                   data-group-title
-                  className={`min-w-0 truncate font-black tracking-tight text-white leading-tight drop-shadow-md ${stickyTransitionClass} ${renderSticky ? "text-base sm:text-xl" : "text-lg sm:text-[1.75rem]"}`}
+                  className="min-w-0 truncate text-lg font-black leading-tight tracking-tight text-white drop-shadow-md sm:text-[1.75rem]"
                 >
                   {title}
-                </motion.h2>
+                </h2>
 
-                <motion.div layout="position"
-                  data-group-meta
-                  className={`shrink-0 font-bold text-zinc-300 items-center gap-x-2 sm:gap-x-3 ${stickyTransitionClass} ${renderSticky ? "hidden sm:flex text-xs sm:text-sm" : "hidden sm:flex text-sm sm:text-base"}`}
-                >
-                  <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
-                  <span><span className="text-white tabular-nums">{count}</span> items</span>
-                  <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
-                  <span className="text-white tabular-nums">{pct}%</span>
-                </motion.div>
+                {/* Solo si cabe sin acercarse a las medias (GroupScoreStats). */}
+                <div data-group-meta className="flex shrink-0">
+                  <div className="flex items-center gap-x-2 whitespace-nowrap text-sm font-bold text-zinc-300 sm:gap-x-3 sm:text-base">
+                    <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
+                    <span><span className="text-white tabular-nums">{count}</span> items</span>
+                    <span aria-hidden="true" className="h-1 w-1 rounded-full bg-zinc-500" />
+                    <span className="text-white tabular-nums">{pct}%</span>
+                  </div>
+                </div>
+              </div>
               </motion.div>
             </motion.div>
 
-            <GroupScoreStats stats={stats} compact={renderSticky} />
+            <GroupScoreStats stats={stats} compact={renderSticky} onDemand={onDemand} />
           </motion.div>
         </motion.div>
         <motion.div layout
@@ -1781,6 +1802,8 @@ export default function WatchlistClient() {
   );
   const [imdbScores, setImdbScores] = useStableState(() => readScoreCache("imdb"));
   const [traktScores, setTraktScores] = useStableState(() => readScoreCache("trakt"));
+  // Notas de TMDb calculadas a mano para títulos que no traen `vote_average`.
+  const [tmdbScores, setTmdbScores] = useStableState(() => readScoreCache("tmdb"));
   const layoutImdbScores = imdbScores;
   const layoutTraktScores = traktScores;
   const [providersByItem, setProvidersByItem] = useStableState(
@@ -1945,6 +1968,13 @@ export default function WatchlistClient() {
     advancedNeeds.trakt ||
     groupBy === "trakt_rating" ||
     subGroupBy === "trakt_rating";
+  // Las fuentes que la página no carga por defecto se calculan a mano por
+  // agrupación (TMDb solo falta en títulos sin `vote_average`).
+  const { getGroupOnDemand } = useGroupScoresOnDemand({
+    imdb: needsImdbScores ? null : { scores: imdbScores, setScores: setImdbScores },
+    trakt: needsTraktScores ? null : { scores: traktScores, setScores: setTraktScores },
+    tmdb: { scores: tmdbScores, setScores: setTmdbScores },
+  });
 
   // Al VOLVER (atrás/adelante) el orden se mantiene CONGELADO —tal cual lo dejó el
   // usuario— hasta que cambie la ordenación: se saltan los refrescos asíncronos de
@@ -2546,6 +2576,7 @@ export default function WatchlistClient() {
           item,
           layoutImdbScores,
           layoutTraktScores,
+          tmdbScores,
         );
       }
     }
@@ -2595,6 +2626,7 @@ export default function WatchlistClient() {
     subGroupBy,
     layoutImdbScores,
     layoutTraktScores,
+    tmdbScores,
     layoutProvidersByItem,
     watchCounts,
     loadingProviders,
@@ -3501,6 +3533,16 @@ export default function WatchlistClient() {
                     hasNextGroup={groupIndex < grouped.length - 1}
                     onPreviousGroup={() => scrollToPreviousGroup(group.key)}
                     onNextGroup={() => scrollToNextGroup(group.key)}
+                    onDemand={getGroupOnDemand(
+                      group.key,
+                      group.items,
+                      {
+                        imdb: group.stats.imdb.missing,
+                        trakt: group.stats.trakt.missing,
+                        tmdb: group.stats.tmdb.missing,
+                      },
+                      { tmdb: watchlistHasTmdbVote },
+                    )}
                   />
                   {group.subgroups?.length ? (
                     <div className="">

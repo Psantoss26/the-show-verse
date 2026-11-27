@@ -3785,6 +3785,65 @@ svg.recharts-surface *:focus {
   }
 }
 
+/* Cabeceras de agrupación (Favoritos, Pendientes, Biblioteca) al fijarse: el
+   título y las medias NO cambian de tamaño de letra ni de maquetación (eso
+   hacía saltar cada pieza por su lado mientras framer las recolocaba); se
+   encogen con una sola escala, el título anclado a la izquierda y las medias a
+   la derecha. La maquetación (y lo que cabe) es la misma fijada o no. */
+.sv-group-compact-title,
+.sv-group-compact-scores {
+  transition: transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sv-group-compact-title {
+  transform-origin: left center;
+}
+.sv-group-compact-scores {
+  transform-origin: right center;
+}
+.sv-group-compact-title[data-compact],
+.sv-group-compact-scores[data-compact] {
+  transform: scale(0.875);
+}
+@media (min-width: 640px) {
+  .sv-group-compact-title[data-compact],
+  .sv-group-compact-scores[data-compact] {
+    transform: scale(0.75);
+  }
+}
+[data-group-still] :is(.sv-group-compact-title, .sv-group-compact-scores) {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-group-compact-title,
+  .sv-group-compact-scores {
+    transition: none;
+  }
+}
+
+/* «N items · %» de la cabecera: solo si cabe junto al título sin acercarse a
+   las medias (lo decide GroupScoreStats con data-fit). Plegada sigue en el
+   árbol para poder medir su ancho natural (scrollWidth). Antes de medir: en
+   móvil plegada, desde sm visible. */
+[data-group-meta][data-fit="no"] {
+  max-width: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+/* Forma corta (`short`): solo «· N items». El porcentaje sale del flujo pero
+   sigue en el árbol con su ancho, para volver a medirlo. */
+[data-group-meta][data-fit="short"] [data-meta-extra] {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+@media (max-width: 639.98px) {
+  [data-group-meta]:not([data-fit]) {
+    max-width: 0;
+    overflow: hidden;
+    visibility: hidden;
+  }
+}
+
 /* Imagen que no se pudo cargar (p. ej. sin conexión y fuera de caché): no se
    muestra el icono de imagen rota ni su texto alternativo. Ver brokenImages.js. */
 img[data-img-broken] {
