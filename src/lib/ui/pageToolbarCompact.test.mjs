@@ -213,8 +213,14 @@ test("la barra se compacta midiendo lo que piden sus piezas", async () => {
     read("../../hooks/usePageToolbarSearchFit.js"),
   ]);
 
-  // Pasos, de menos a más: rótulos, valores, títulos de sección.
-  assert.match(hook, /const STAGES = \["", "no-labels", "icons", "bare"\];/);
+  // Pasos, de menos a más: rótulos, botones sueltos (Filtros), valores,
+  // títulos de sección.
+  assert.match(hook, /const STAGES = \["", "no-labels", "lean", "icons", "bare"\];/);
+  // El buscador en cuadrado se presenta como un botón.
+  assert.match(hook, /input\.style\.cursor = "default";/);
+  // En "lean" solo los botones sueltos pasan a icono: los desplegables
+  // conservan su valor.
+  assert.match(css, /\.sv-page-toolbar\[data-fit="lean"\] > \.sv-page-toolbar-trigger \.sv-page-toolbar-value \{\s*\n\s*display: none;/);
   assert.match(css, /\.sv-page-toolbar\[data-fit\] \.sv-page-toolbar-label \{\s*\n\s*display: none;/);
   assert.match(css, /\[data-fit="icons"\], \[data-fit="bare"\]\) \.sv-page-toolbar-value \{\s*\n\s*display: none;/);
   assert.match(css, /\.sv-page-toolbar\[data-fit="bare"\] \.sv-page-toolbar-section-label \{\s*\n\s*display: none;/);

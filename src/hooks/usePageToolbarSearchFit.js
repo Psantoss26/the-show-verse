@@ -94,6 +94,9 @@ export default function usePageToolbarSearchFit() {
           input.setAttribute("placeholder", "");
           input.style.paddingLeft = "2.5rem";
           input.style.paddingRight = "0";
+          // En cuadrado es un botón más de la barra: la flecha, como los demás
+          // (el cursor de texto lo hacía parecer un campo).
+          input.style.cursor = "default";
         } else {
           if (input.dataset.fitPlaceholder != null) {
             input.setAttribute("placeholder", input.dataset.fitPlaceholder);
@@ -101,6 +104,7 @@ export default function usePageToolbarSearchFit() {
           }
           input.style.paddingLeft = "";
           input.style.paddingRight = "";
+          input.style.cursor = "";
         }
       }
       for (const button of search.querySelectorAll("button")) {
@@ -143,9 +147,15 @@ export default function usePageToolbarSearchFit() {
     // más hasta que la fila cabe:
     //   ""          tal cual
     //   "no-labels" sin rótulos ("TIPO:", "ORDENAR:")
+    //   "lean"      además, los botones sueltos ("Filtros") en icono: los
+    //               desplegables conservan su valor, que es lo que dice cómo
+    //               está filtrada, agrupada y ordenada la lista. En el
+    //               Historial a 1920px faltaban ~40px y, sin este paso, los
+    //               desplegables quedaban en icono y el buscador se llevaba
+    //               ~230px vacíos.
     //   "icons"     desplegables en icono y flecha
     //   "bare"      además, el selector de secciones sin títulos
-    const STAGES = ["", "no-labels", "icons", "bare"];
+    const STAGES = ["", "no-labels", "lean", "icons", "bare"];
     const fitStage = (searchPx) => {
       for (const stage of STAGES) {
         if (stage) toolbar.dataset.fit = stage;
