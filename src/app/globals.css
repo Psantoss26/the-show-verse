@@ -3821,6 +3821,14 @@ svg.recharts-surface *:focus {
     transform: scale(0.75);
   }
 }
+/* En el ordenador las medias fijadas encogen menos que el título: a 0,75 el
+   logo (22 px) y la cifra quedaban pequeños. La escala no cambia la
+   maquetación, así que la cabecera mide lo mismo. */
+@media (min-width: 1024px) {
+  .sv-group-compact-scores[data-compact] {
+    transform: scale(0.875);
+  }
+}
 /* Fijada, la fila de medias no reserva el alto del botón «+» (min-h-8 /
    sm:min-h-10, para que la cabecera normal no encoja al terminar un
    cálculo): la cabecera compacta mide lo de siempre, el alto de línea del
