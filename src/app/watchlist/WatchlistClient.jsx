@@ -1160,7 +1160,7 @@ function GroupDivider({
               >
                 <h2
                   data-group-title
-                  className="min-w-0 truncate text-lg font-black leading-tight tracking-tight text-white drop-shadow-md sm:text-[1.75rem]"
+                  className="min-w-0 truncate text-lg font-black leading-tight tracking-tight text-white drop-shadow-md sm:text-[1.75rem] lg:text-[2.25rem] lg:leading-10"
                 >
                   {title}
                 </h2>
