@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  appGoogleNextStep,
   googleCodeClientOptions,
   googlePopupNextStep,
   googleRedirectHref,
@@ -40,4 +41,17 @@ test("the redirect fallback keeps a sanitized destination", () => {
 
 test("the redirect callback lands on /login with the session marker", () => {
   assert.equal(GOOGLE_SESSION_PARAM, "google_session");
+});
+
+test("in the Android app the native picker wins and only real failures open the browser", () => {
+  assert.equal(appGoogleNextStep({ ok: true, idToken: "t" }), "exchange");
+  assert.equal(appGoogleNextStep({ ok: false, cancelled: true }), "stay");
+  assert.equal(appGoogleNextStep({ ok: false, error: "unavailable" }), "browser");
+  assert.equal(appGoogleNextStep({ ok: false, error: "timeout" }), "browser");
+  assert.equal(appGoogleNextStep({ ok: false, error: "no_credentials" }), "browser");
+  assert.equal(appGoogleNextStep(null), "browser");
+});
+
+test("after a 'cancelled' picker the next tap in the app goes to the browser", () => {
+  assert.equal(appGoogleNextStep({ ok: false, error: "account_reauth_failed" }), "browser");
 });

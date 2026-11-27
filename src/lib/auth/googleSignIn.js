@@ -8,8 +8,9 @@
 // (/api/auth/google/start) queda de respaldo si el script de Google no carga o
 // la ventana no se puede abrir.
 //
-// APP DE ANDROID. Login en el navegador con la recogida de sesión de siempre
-// (googleRedirectHref con `app`); no se usa el selector nativo de cuentas.
+// APP DE ANDROID. El selector nativo de cuentas (Credential Manager) va
+// primero; solo si falla de verdad —no si el usuario lo cierra— se abre el
+// login en el navegador con la recogida de sesión de siempre.
 
 export const GIS_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
 
@@ -78,6 +79,17 @@ export function googleRedirectHref(next, { app } = {}) {
   const params = new URLSearchParams({ next: sanitizeNextPath(next) });
   if (app) params.set("app", app);
   return `/api/auth/google/start?${params.toString()}`;
+}
+
+/**
+ * Qué hacer en la app con el resultado del selector nativo:
+ *   "exchange" → canjear el idToken; "stay" → el usuario lo cerró, no hacer
+ *   nada; "browser" → caer al login en el navegador.
+ */
+export function appGoogleNextStep(result) {
+  if (result?.ok && result?.idToken) return "exchange";
+  if (result?.cancelled) return "stay";
+  return "browser";
 }
 
 let gisPromise = null;

@@ -15,10 +15,12 @@ import {
 import {
   abrirLoginEnNavegadorNativo,
   empezarLoginPorNavegador,
+  logToApp,
+  requestNativeGoogleIdToken,
   useAndroidApp,
 } from "@/lib/android/appBridge";
 import GoogleSignInButton, { GoogleBrandButton } from "@/components/auth/GoogleSignInButton";
-import { googleRedirectHref } from "@/lib/auth/googleSignIn";
+import { appGoogleNextStep, googleRedirectHref } from "@/lib/auth/googleSignIn";
 
 function sanitizeNextPath(value) {
   const next = value || "/";
@@ -174,15 +176,26 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
     setErr(getGoogleErrorMessage(code) || getGoogleErrorMessage("google_popup_failed"));
   }, []);
 
-  // APP DE ANDROID. Una sola vía: el login de Google en el navegador, con la
-  // recogida de sesión de siempre. El selector de cuentas del sistema
-  // (Credential Manager) se quitó: sin cliente OAuth de Android en Google Cloud
-  // fallaba tras elegir cuenta y obligaba a un segundo intento con otra ventana.
-  const handleAppGoogleLogin = useCallback(() => {
+  // APP DE ANDROID. Primero el selector de cuentas del sistema (Credential
+  // Manager). Si el usuario lo cierra, no se hace nada; si falla de verdad
+  // —sin cuentas, sin Play Services, certificado no registrado—, se abre el
+  // login en el navegador con la recogida de sesión de siempre.
+  const handleAppGoogleLogin = useCallback(async () => {
     if (googleBusy) return;
     setErr("");
+    setGoogleBusy(true);
+    const resultado = await requestNativeGoogleIdToken();
+    const paso = appGoogleNextStep(resultado);
+    if (paso === "exchange") {
+      logToApp("Google: selector nativo ✓, canjeando el token");
+      await entrarConIdToken(resultado.idToken);
+      return;
+    }
+    setGoogleBusy(false);
+    if (paso === "stay") return;
+    logToApp(`Google: selector nativo no disponible (${resultado?.error || "?"}), uso el navegador`);
     abrirLoginEnNavegador();
-  }, [abrirLoginEnNavegador, googleBusy]);
+  }, [abrirLoginEnNavegador, entrarConIdToken, googleBusy]);
 
   const updateField = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));

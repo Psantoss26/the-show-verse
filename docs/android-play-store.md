@@ -101,30 +101,36 @@ al volver manualmente a la app (funciona, pero no es automático).
 
 Google **rechaza su formulario de acceso dentro de un WebView embebido**
 (`disallowed_useragent`). Por eso la app no puede limitarse a cargar
-accounts.google.com. Hay dos caminos posibles; **la app usa solo el 2
-(navegador)**. El botón «Continuar con Google» llama a `abrirLoginEnNavegador`
-en `LoginForm.jsx` y nunca abre el selector nativo: sin el cliente Android de
-abajo, el selector se abría, fallaba al elegir cuenta y el siguiente intento
-salía en otra ventana (la del navegador). Una sola vía evita las dos ventanas.
+accounts.google.com. Hay dos caminos: **primero el 1 (selector nativo)** y,
+solo si falla de verdad, el 2 (navegador). `handleAppGoogleLogin` en
+`LoginForm.jsx` llama a `requestNativeGoogleIdToken` y decide con
+`appGoogleNextStep` (`googleSignIn.js`): token → se canjea; cerrado por el
+usuario → no se hace nada (tocar otra vez vuelve a abrir el selector); error →
+navegador.
 
-**1) Nativo, sin navegador (desactivado en la web).** El código nativo y el puente (`requestNativeGoogleIdToken`) siguen en la app por si se recupera. Credential Manager abre el
+**1) Nativo, sin navegador.** Credential Manager abre el
 selector de cuentas de Android, devuelve un `idToken` y la web lo canjea en
 `/api/auth/google/native`; el backend lo valida contra Google igual que en el
-flujo web y las cookies quedan en el WebView. Requiere registrar un cliente
-**OAuth de tipo Android** en Google Cloud:
+flujo web y las cookies quedan en el WebView. Requiere un cliente
+**OAuth de tipo Android** en Google Cloud. **Ya está creado** (proyecto
+`the-show-verse`, «The Show Verse Android (debug)», huella de depuración de
+abajo) y probado en el teléfono: el selector devuelve un token con
+`aud` = cliente web y `azp` = cliente Android, y `/api/auth/google/native` lo
+canjea por la sesión. Para dar de alta otro certificado:
 
 1. Google Cloud Console → *APIs y servicios → Credenciales → Crear credenciales
    → ID de cliente de OAuth → Android*.
 2. Nombre del paquete: `com.theshowverse.app`.
 3. Huella SHA-1 del certificado que firma la app. Hacen falta las de **todos**
-   los certificados con los que se instale:
-   - Depuración (la de esta máquina, ya calculada):
+   los certificados con los que se instale (un cliente Android por huella):
+   - Depuración (la de esta máquina, **registrada**):
      `D4:72:46:A2:11:94:DC:64:52:E4:5E:BF:11:D4:A7:F9:E3:BB:05:85`
      ```bash
      keytool -list -v -keystore ~/.android/debug.keystore \
        -storepass android -alias androiddebugkey | grep SHA1
      ```
-   - Release: la de tu keystore de subida.
+   - Release: la de tu keystore de subida (sin registrar; hace falta si se
+     firma con `TSV_KEYSTORE_FILE`).
    - Play App Signing: la que aparece en Play Console → *Integridad de la
      aplicación* (es la que de verdad firma lo que instalan los usuarios).
 4. No hay que tocar el `client_id` de la app: el que se le pasa a Credential
@@ -133,17 +139,16 @@ flujo web y las cookies quedan en el WebView. Requiere registrar un cliente
    paquete a pedir tokens.
 
 El APK que se instala hoy (el de `assembleFullDebug`) lo firma la clave de
-depuración: su SHA-256 es el de `public/.well-known/assetlinks.json`, así que la
-huella que hay que dar de alta es la de depuración de arriba.
+depuración: su SHA-256 es el de `public/.well-known/assetlinks.json`, así que
+con el cliente de depuración basta. Mientras la pantalla de consentimiento esté
+en modo de prueba, solo las cuentas de prueba del proyecto pueden entrar así.
 
-Para volver a usarlo: registrar el cliente Android (pasos de arriba), probar
-que el selector devuelve token y hacer que `handleAppGoogleLogin` llame a
-`requestNativeGoogleIdToken` antes del navegador (ver el historial de
-`LoginForm.jsx`). En la app quedan `Prefs.nativeGoogleUnavailable` y
-`GoogleCancelacion.esDelUsuario` («[16] Account reauth failed» tras elegir
-cuenta = falta el cliente Android, no una cancelación).
+Si con una huella sin registrar el selector falla tras elegir cuenta
+(«[16] Account reauth failed»), `GoogleCancelacion.esDelUsuario` no lo toma por
+cancelación y la web cae al navegador; `Prefs.nativeGoogleUnavailable` hace que
+la app no vuelva a probar el selector hasta el día siguiente.
 
-**2) Navegador + vuelta a la app (el que se usa).** El botón navega a
+**2) Navegador + vuelta a la app (respaldo).** El botón navega a
 `/api/auth/google/start`, que detecta la app por el User-Agent
 (`TheShowVerseApp/`) y marca el `state` con el prefijo `android.`. Al volver de
 Google, el callback devuelve `theshowverse://open?url=…&app_handoff=1`, la app
