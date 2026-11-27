@@ -3820,6 +3820,21 @@ svg.recharts-surface *:focus {
   }
 }
 
+/* Título y «N items · %» centrados por sus mayúsculas y cifras, no por su
+   caja de línea: cada sistema coloca la letra dentro de la línea según las
+   métricas de la fuente, y con tamaños tan distintos (36 y 16 px) centrar
+   las cajas dejaba los datos hasta 2 px por encima en algunos equipos. Con
+   text-box las cajas miden la altura de mayúscula. El título recorta con
+   `clip` y margen para que tildes y descendentes no se corten. */
+[data-group-title] {
+  text-box: trim-both cap alphabetic;
+  overflow: clip;
+  overflow-clip-margin: 0.35em;
+}
+[data-group-meta] span {
+  text-box: trim-both cap alphabetic;
+}
+
 /* «N items · %» de la cabecera: solo si cabe junto al título sin acercarse a
    las medias (lo decide GroupScoreStats con data-fit). Plegada sigue en el
    árbol para poder medir su ancho natural (scrollWidth). Antes de medir: en
