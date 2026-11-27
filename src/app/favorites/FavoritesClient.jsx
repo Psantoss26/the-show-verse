@@ -110,6 +110,7 @@ import useGroupScoresOnDemand from "@/hooks/useGroupScoresOnDemand";
 import GroupScoreStats, {
   MY_RATING_GROUP_SCORE_PRIORITY,
 } from "@/components/ui/GroupScoreStats";
+import GroupSurface from "@/components/ui/GroupSurface";
 import {
   AdvancedFiltersBadge,
   AdvancedFiltersButton,
@@ -1730,11 +1731,10 @@ function GroupDivider({
     >
       <motion.div layout="position" className="flex min-w-0 items-center gap-3 lg:gap-4">
         <motion.div layout="position" className="relative isolate min-w-0 flex-1">
-          {/* Only the surface scales. Text must not inherit its projection. */}
-          <motion.div layout
-            aria-hidden="true"
-            style={{ borderRadius: 16 }}
-            className={`sv-group-surface pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"}`}
+          {/* Glass changes size without scaling (GroupSurface.jsx). */}
+          <GroupSurface
+            skipMotion={skipMotion}
+            className={`bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"}`}
           />
           <motion.div layout="position"
             className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 ${stickyTransitionClass} ${renderSticky ? "py-2 sm:py-1.5" : "py-2.5 sm:py-5"}`}
