@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Loader2, LogIn, UserPlus, Mail, Lock, User, UserCheck, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  LIQUID_GLASS_MODAL_BUTTON,
   LIQUID_GLASS_MODAL_FIELD,
   LIQUID_GLASS_MODAL_HEADER,
   LIQUID_GLASS_PANEL,
@@ -282,48 +281,44 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
           <div className="h-px flex-1 bg-white/[0.06]" />
         </div>
 
+        {/* Selector Entrar/Crear. La píldora es UNA sola pieza que se desliza
+            con CSS (translateX 0 → 100 %). Antes era un `layoutId` de framer
+            que se desmontaba en un botón y se montaba en el otro: su vidrio
+            traía `transition` (también de `transform`) y la transición CSS
+            peleaba con la que framer escribe en cada fotograma, y como la
+            tarjeta cambia de alto en el mismo clic, la medida de partida salía
+            desplazada y la píldora llegaba en diagonal. */}
         <div className="relative mb-6 grid grid-cols-2 rounded-2xl bg-white/[0.03] p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("login");
-              setErr("");
-            }}
-            className={`relative z-10 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${
-              !isRegister ? "text-white" : "text-zinc-500 hover:text-white"
-            }`}
-          >
-            {!isRegister && (
-              <motion.div
-                layoutId="activeTabIndicator"
-                className={`absolute inset-0 ${LIQUID_GLASS_MODAL_BUTTON}`}
-                transition={{ type: "spring", stiffness: 350, damping: 28 }}
-              />
-            )}
-            <span className="relative z-20">Entrar</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("register");
-              setErr("");
-            }}
-            className={`relative z-10 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${
-              isRegister ? "text-white" : "text-zinc-500 hover:text-white"
-            }`}
-          >
-            {isRegister && (
-              <motion.div
-                layoutId="activeTabIndicator"
-                className={`absolute inset-0 ${LIQUID_GLASS_MODAL_BUTTON}`}
-                transition={{ type: "spring", stiffness: 350, damping: 28 }}
-              />
-            )}
-            <span className="relative z-20">Crear</span>
-          </button>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-xl bg-white/[0.08] bg-gradient-to-b from-white/[0.16] to-white/[0.04] shadow-sm transition-transform duration-[380ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+            style={{ transform: `translateX(${isRegister ? 100 : 0}%)` }}
+          />
+          {[
+            ["login", "Entrar"],
+            ["register", "Crear"],
+          ].map(([value, label]) => {
+            const active = mode === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => {
+                  setMode(value);
+                  setErr("");
+                }}
+                className={`relative rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${
+                  active ? "text-white" : "text-zinc-500 hover:text-white"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
-        <div className="space-y-4">
+        <div>
           <div className="block text-left group">
             <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
               {isRegister ? "Email" : "Email o usuario"}
@@ -347,9 +342,33 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
             </div>
           </div>
 
-          {isRegister && (
-            <>
-              <div className="block text-left group">
+          {/* Campos solo de «Crear»: siempre montados y plegados con
+              grid-template-rows 0fr ↔ 1fr, así la tarjeta crece y encoge de
+              forma continua en vez de saltar de alto. Al abrir, primero se hace
+              el hueco y luego aparecen; al cerrar, se desvanecen y se pliegan.
+              El fieldset desactivado los saca de la validación y del envío al
+              iniciar sesión (Usuario es obligatorio). La opacidad va en estos
+              campos, que no llevan backdrop-filter: el cristal es la tarjeta. */}
+          <div
+            className="grid motion-reduce:transition-none!"
+            style={{
+              gridTemplateRows: isRegister ? "1fr" : "0fr",
+              transition: "grid-template-rows 380ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          >
+            <fieldset
+              disabled={!isRegister}
+              aria-hidden={!isRegister}
+              className="m-0 min-h-0 min-w-0 overflow-hidden border-0 p-0 motion-reduce:transition-none!"
+              style={{
+                opacity: isRegister ? 1 : 0,
+                transform: `translateY(${isRegister ? 0 : -6}px)`,
+                transition: isRegister
+                  ? "opacity 240ms ease 140ms, transform 380ms cubic-bezier(0.22, 1, 0.36, 1) 60ms"
+                  : "opacity 140ms ease, transform 200ms ease",
+              }}
+            >
+              <div className="block pt-4 text-left group">
                 <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
                   Usuario
                 </span>
@@ -370,7 +389,7 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
                 </div>
               </div>
 
-              <div className="block text-left group">
+              <div className="block pt-4 text-left group">
                 <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
                   Nombre visible
                 </span>
@@ -387,10 +406,10 @@ export default function LoginForm({ next: nextProp, googleClientId = "" }) {
                   />
                 </div>
               </div>
-            </>
-          )}
+            </fieldset>
+          </div>
 
-          <div className="block text-left group">
+          <div className="block pt-4 text-left group">
             <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
               Contraseña
             </span>
