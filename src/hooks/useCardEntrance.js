@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
+import { registerCardEntrance } from "@/lib/ui/cardEntranceRegistry";
 
 // Entrada de la tarjeta (fundido + leve escala) con Web Animations, UNA sola vez
 // por tarjeta montada.
@@ -21,7 +22,7 @@ export default function useCardEntrance(
     const el = ref.current;
     if (!enabled || !el) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    el.animate(
+    const animation = el.animate(
       [
         { opacity: 0, transform: fromTransform },
         { opacity: 1, transform: "none" },
@@ -33,6 +34,8 @@ export default function useCardEntrance(
         fill: "backwards",
       },
     );
+    // Si la tarjeta se ha montado por cambiar de grupo, <FlipReorder> la cancela.
+    registerCardEntrance(el, animation);
     // Solo al montar: la entrada no depende de cambios posteriores.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

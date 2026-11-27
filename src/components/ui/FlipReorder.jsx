@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, createRef } from "react";
+import { cancelCardEntrance, hasCardEntrance } from "@/lib/ui/cardEntranceRegistry";
 
 // Recolocación animada de tarjetas cuando cambia el ORDEN de una lista
 // (ordenar, filtrar, llegada de puntuaciones que reordenan).
@@ -69,11 +70,25 @@ export default class FlipReorder extends Component {
 
     // Posición VISUAL (incluye una recolocación en curso, para encadenar sin
     // saltos si el orden vuelve a cambiar a mitad), en coordenadas de documento.
+    // También la opacidad visible de las que estaban a mitad de una entrada o
+    // salida con fundido: la siguiente recolocación sigue desde ahí en vez de
+    // saltar de golpe a 0 o a 1 (parpadeo al llegar lotes seguidos).
+    const fading = new Set();
+    for (const animation of this.running) {
+      if (animation.fades) fading.add(animation.effect?.target);
+    }
     const { scrollX, scrollY } = window;
     const rects = new Map();
     for (const [key, el] of collectItems(container, this.props.itemSelector)) {
       const r = el.getBoundingClientRect();
-      rects.set(key, { x: r.left + scrollX, y: r.top + scrollY });
+      const opacity = fading.has(el) || hasCardEntrance(el)
+        ? Number.parseFloat(getComputedStyle(el).opacity)
+        : 1;
+      rects.set(key, {
+        x: r.left + scrollX,
+        y: r.top + scrollY,
+        opacity: Number.isFinite(opacity) ? opacity : 1,
+      });
     }
     return rects;
   }
@@ -96,12 +111,20 @@ export default class FlipReorder extends Component {
     for (const [key, el] of items) {
       const from = snapshot.get(key);
       if (!from) continue; // tarjeta nueva: la anima su propia entrada
+      // Ya estaba a la vista (quizá en otro grupo, montada de nuevo): se mueve,
+      // no «entra». Sin esto se fundía desde 0 a la vez que se trasladaba.
+      cancelCardEntrance(el);
       const r = el.getBoundingClientRect();
       const toX = r.left + scrollX;
       const toY = r.top + scrollY;
       const dx = from.x - toX;
       let dy = from.y - toY;
-      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+        // No se mueve, pero iba a mitad de un fundido (entrada o recolocación
+        // cortada): lo termina desde la opacidad que tenía, sin saltos.
+        if (from.opacity < 1) this.play(el, [{ opacity: from.opacity }, { opacity: 1 }]);
+        continue;
+      }
 
       const oldLeft = from.x - scrollX;
       const oldTop = from.y - scrollY;
@@ -117,10 +140,14 @@ export default class FlipReorder extends Component {
           ? -r.height - OFFSCREEN_ENTRY_MARGIN_PX
           : vh + OFFSCREEN_ENTRY_MARGIN_PX) - r.top;
 
-      let keyframes = [
-        { translate: `${dx}px ${dy}px` },
-        { translate: "0px 0px" },
-      ];
+      const fromOpacity = from.opacity;
+      let keyframes =
+        fromOpacity < 1
+          ? [
+              { translate: `${dx}px ${dy}px`, opacity: fromOpacity },
+              { translate: "0px 0px", opacity: 1 },
+            ]
+          : [{ translate: `${dx}px ${dy}px` }, { translate: "0px 0px" }];
       if (!wasOnScreen) {
         // Viene de lejos (p. ej. del final de la lista al invertir el orden):
         // entra desde justo fuera del borde por el que venía, con fundido, en
@@ -137,18 +164,23 @@ export default class FlipReorder extends Component {
         // fuera de la vista.
         const exitDy = r.top < 0 ? edgeOffset(-1) : edgeOffset(vh);
         keyframes = [
-          { translate: `${dx}px ${dy}px`, opacity: 1 },
+          { translate: `${dx}px ${dy}px`, opacity: fromOpacity },
           { translate: `0px ${exitDy}px`, opacity: 0 },
         ];
       }
 
-      const animation = el.animate(keyframes, {
-        duration: FLIP_DURATION_MS,
-        easing: FLIP_EASING,
-      });
-      this.running.add(animation);
-      animation.onfinish = () => this.running.delete(animation);
+      this.play(el, keyframes);
     }
+  }
+
+  play(el, keyframes) {
+    const animation = el.animate(keyframes, {
+      duration: FLIP_DURATION_MS,
+      easing: FLIP_EASING,
+    });
+    animation.fades = "opacity" in keyframes[0];
+    this.running.add(animation);
+    animation.onfinish = () => this.running.delete(animation);
   }
 
   render() {

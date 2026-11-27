@@ -93,6 +93,7 @@ import HoverExpandCard, { HoverExpandZoom } from "@/components/ui/HoverExpandCar
 import FlipReorder from "@/components/ui/FlipReorder";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
 import useCardEntrance from "@/hooks/useCardEntrance";
+import useLayoutThrottledValue from "@/hooks/useLayoutThrottledValue";
 import {
   getScoreItemKey,
   readScoreCache,
@@ -2106,15 +2107,18 @@ export default function FavoritesClient() {
   const [traktScores, setTraktScores] = useStableState(() => readScoreCache("trakt"));
   // Notas de TMDb calculadas a mano para títulos que no traen `vote_average`.
   const [tmdbScores, setTmdbScores] = useStableState(() => readScoreCache("tmdb"));
-  const layoutImdbScores = imdbScores;
-  const layoutTraktScores = traktScores;
+  // Lo que recoloca tarjetas (ordenar y agrupar) llega por lotes: se aplica como
+  // mucho una vez por recolocación animada (ver layoutThrottle.js), para que
+  // <FlipReorder> no corte cada movimiento a mitad y las tarjetas no salten.
+  const layoutImdbScores = useLayoutThrottledValue(imdbScores);
+  const layoutTraktScores = useLayoutThrottledValue(traktScores);
   const [providersByItem, setProvidersByItem] = useStableState(
     () => initialCache.providers,
   );
   // El agrupado debe reaccionar a cada lote de plataformas. Mantener una copia
   // inicial congelada hacía que la primera visita se quedara en “Cargando
   // plataformas…” hasta recargar y leer la caché ya persistida.
-  const layoutProvidersByItem = providersByItem;
+  const layoutProvidersByItem = useLayoutThrottledValue(providersByItem);
   const [loadingImdb, setLoadingImdb] = useState(false);
   const [loadingTrakt, setLoadingTrakt] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(false);
