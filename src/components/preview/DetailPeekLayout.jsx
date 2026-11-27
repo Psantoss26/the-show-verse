@@ -17,6 +17,7 @@ import {
 } from "@/components/details/MobileDetailsHero";
 import { morphPeekCard, peekHrefKeepsParts } from "@/lib/navigation/peekHandoff";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
+import { takeBackGesture } from "@/lib/navigation/modalBackGesture";
 
 /* ======================= VISTA PREVIA (PULSACIÓN LARGA) ======================= */
 // Ancho de la tarjeta: lo que da el teléfono menos 6px por lado, sin pasar de
@@ -209,11 +210,17 @@ export default function DetailPeekLayout({
     card.style.pointerEvents = "none";
     // Desde donde esté ahora (también si se cierra a mitad de la apertura).
     const current = window.getComputedStyle(card);
+    // Cierre por el gesto de atrás de la app de Android: parte de donde lo
+    // dejó el dedo (modalBackGesture mueve la tarjeta con `translate`/`scale`).
+    const gesture = takeBackGesture(card);
+    const startTransform = gesture
+      ? `${gesture}${current.transform === "none" ? "" : ` ${current.transform}`}`
+      : current.transform;
     card.getAnimations().forEach((animation) => animation.cancel());
     const exitMs = reduceMotion ? 120 : SHEET_EXIT.duration;
     const fadeDelay = reduceMotion ? 0 : PEEK_EXIT_FADE_DELAY_MS;
     card.animate(
-      [{ transform: current.transform }, { transform: fromCss }],
+      [{ transform: startTransform }, { transform: fromCss }],
       { duration: exitMs, easing: reduceMotion ? "ease-out" : SHEET_EXIT.easing, fill: "forwards" },
     );
     const exit = card.animate(
@@ -286,6 +293,8 @@ export default function DetailPeekLayout({
           // es la tarjeta, que es lo que se desplaza en pantallas bajas.
           ref={cardRef}
           data-peek-card=""
+          // El gesto de atrás de la app de Android mueve la tarjeta.
+          data-sv-back-panel=""
           className={`pointer-events-auto relative max-h-[calc(100svh-2rem)] overflow-y-auto overflow-x-hidden overscroll-contain rounded-[1.75rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${LIQUID_GLASS_DETAIL_SURFACE}`}
           style={{
             width: geometry.width,

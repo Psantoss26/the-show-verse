@@ -68,6 +68,7 @@ import {
 } from "@/lib/navigation/detailsWarmup";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 import useModalGuard from "@/hooks/useModalGuard";
+import { isAndroidApp, useAndroidApp } from "@/lib/android/appBridge";
 import {
   TITLE_PEEK_ATTR,
   TITLE_PEEK_HOLD_MS,
@@ -182,6 +183,11 @@ function waitForKeyboardClose(done) {
 // de atrás es la página limpia. Ir a la ficha sustituye esa entrada; cerrarla
 // la deshace (`history.back()`), y el gesto de atrás con ella abierta la
 // cierra.
+//
+// EN LA APP DE ANDROID es un modal más (como los de DetailsClient): empuja la
+// entrada de modal (useModalGuard `closeOnBack`, ver lib/navigation/
+// modalBackEntry), la app no anima la página detrás, la tarjeta sigue al dedo
+// durante el gesto (modalBackGesture) y, al soltar, se cierra con su salida.
 
 function resolvePeekTarget(node) {
   const target = node?.closest?.(TITLE_PEEK_SELECTOR);
@@ -207,6 +213,7 @@ export default function MobileTitlePeek() {
   // instante, sin su animación de salida.
   const [presenceKey, setPresenceKey] = useState(0);
 
+  const inApp = useAndroidApp();
   const close = useCallback(() => setPeek(null), []);
   const removeInstantly = useCallback(() => {
     setPresenceKey((key) => key + 1);
@@ -214,7 +221,7 @@ export default function MobileTitlePeek() {
   }, []);
   // Mientras se va a la ficha la página ya no es de la vista previa: ni
   // bloqueo del scroll ni Escape.
-  useModalGuard({ open: !!peek && !peek.leavingTo, onClose: close });
+  useModalGuard({ open: !!peek && !peek.leavingTo, onClose: close, closeOnBack: inApp });
 
   useEffect(() => {
     setPortalReady(true);
@@ -225,6 +232,8 @@ export default function MobileTitlePeek() {
   // El `popstate` de nuestro propio `history.back()` al cerrar.
   const ignorePopRef = useRef(false);
   const pushPeekEntry = useCallback(() => {
+    // En la app la entrada es la de modal (useModalGuard, arriba).
+    if (isAndroidApp()) return false;
     if (ownsEntryRef.current || !pushCleanBackEntry()) return false;
     ownsEntryRef.current = true;
     holdCleanBackEntry(true);
@@ -260,7 +269,8 @@ export default function MobileTitlePeek() {
   );
 
   // Atrás con la vista previa abierta (el gesto ya enseña la página limpia):
-  // se cierra sin su salida animada.
+  // se cierra sin su salida animada. En la app no llega aquí: atrás lo atiende
+  // modalBackEntry y la cierra con `close`, con su salida.
   useEffect(() => {
     const onPopState = () => {
       // Atrás que solo cierra un modal abierto encima de la vista previa.
