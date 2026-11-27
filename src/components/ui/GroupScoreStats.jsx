@@ -32,6 +32,10 @@
 // grupo (useGroupScoresOnDemand) y la chapa pasa a un anillo de progreso (o a
 // «reintentar» si no se pudo). Compite por el hueco como una media más, justo
 // detrás de la primera; ya calculada, la media ocupa ese mismo puesto.
+//
+// Si el título no deja sitio para todo, la cabecera pasa a la forma reducida:
+// solo IMDb, TMDb y tu media (`REDUCED_SOURCES`), sin la media de Trakt ni su
+// botón de calcular, y sobre ese conjunto se sigue quitando por prioridad.
 
 import { useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -46,10 +50,11 @@ const SOURCES = {
 
 // Orden de importancia por defecto: IMDb y tu media primero.
 export const DEFAULT_SCORE_PRIORITY = ["imdb", "my", "tmdb", "trakt"];
-// Agrupando por tus notas, tu media repite el título: va la última.
-export const MY_RATING_GROUP_SCORE_PRIORITY = ["imdb", "tmdb", "trakt", "my"];
-// …y es la primera en dejar sitio a «N items · %» (prop `yieldToMeta`).
-export const MY_RATING_YIELD_TO_META = ["my"];
+// Agrupando por tus notas, tu media repite el título: no se muestra, y Trakt
+// solo si cabe. Lo que no está en `priority` no se pinta.
+export const MY_RATING_GROUP_SCORE_PRIORITY = ["imdb", "tmdb", "trakt"];
+// Lo único que queda cuando el título no deja sitio para todo.
+const REDUCED_SOURCES = new Set(["imdb", "tmdb", "my"]);
 
 function isScore(v) {
   return typeof v === "number" && !Number.isNaN(v) && v > 0;
@@ -203,6 +208,11 @@ function measureFit(root, measurer, ranked, yieldToMeta = null) {
   // Dónde acabaría el título a su ancho natural.
   const leftEnd = titleLeft + title.scrollWidth;
   const budget = contentRight - gap - leftEnd;
+  // «N items · %» plegada mide 0 pero el hueco que la separa del título sigue
+  // ocupando la fila: sin restarlo, las medias «cabían» y el título se cortaba.
+  const meta = row.querySelector("[data-group-meta]");
+  const metaGap = meta ? Number.parseFloat(getComputedStyle(meta.parentElement).columnGap) || 0 : 0;
+  const scoreBudget = budget - metaGap;
 
   const widths = {};
   for (const el of measurer?.children ?? []) widths[el.dataset.key] = el.offsetWidth;
@@ -210,15 +220,14 @@ function measureFit(root, measurer, ranked, yieldToMeta = null) {
   let fit = 0;
   for (const item of ranked) {
     const next = used + (widths[item.key] || 0);
-    if (next > budget + 0.5) break;
+    // offsetWidth redondea: 1 px de holgura para no cortar el título.
+    if (next > scoreBudget - 1) break;
     used = next;
     fit += 1;
   }
 
-  const meta = row.querySelector("[data-group-meta]");
   let metaFits = null;
   if (meta) {
-    const metaGap = Number.parseFloat(getComputedStyle(meta.parentElement).columnGap) || 0;
     const line = meta.firstElementChild;
     const core = meta.querySelector("[data-meta-core]");
     const extra = meta.querySelector("[data-meta-extra]");
@@ -229,6 +238,11 @@ function measureFit(root, measurer, ranked, yieldToMeta = null) {
     const shortWidth = core && extra ? core.offsetWidth : null;
     const room = (w, metaWidth, margin = META_MARGIN) => w + metaGap + metaWidth + margin <= budget;
     metaFits = fit === ranked.length && room(used, fullWidth);
+    // Sin sitio para el porcentaje, «· N items» solo si cabe con todas las
+    // medias. La forma corta se conforma con medio margen: la fila ya separa.
+    if (!metaFits && fit === ranked.length && shortWidth !== null && room(used, shortWidth, META_MARGIN / 2)) {
+      return { fit, meta: "short" };
+    }
     if (!metaFits && yieldToMeta?.size) {
       let n = fit;
       let w = used;
@@ -257,7 +271,9 @@ export default function GroupScoreStats({
 }) {
   const rootRef = useRef(null);
   const measurerRef = useRef(null);
-  const [fitCount, setFitCount] = useState(null);
+  // `reduced`: sin Trakt porque no cabía todo; `fit`: cuántas de la lista
+  // (completa o reducida) se ven.
+  const [fitState, setFitState] = useState(null);
 
   const demands = (Array.isArray(onDemand) ? onDemand : []).filter((d) => SOURCES[d?.key]);
   // Con la fuente a medias (solo los títulos que ya estaban en caché), su
@@ -282,7 +298,9 @@ export default function GroupScoreStats({
   const entries = [
     ...items.map((item) => ({ key: item.key, source: item.key, box: false })),
     ...boxes.map((d) => ({ key: boxKey(d.key), source: d.key, box: true })),
-  ].sort((a, b) => rank(a.source) - rank(b.source));
+  ]
+    .filter((e) => priority.includes(e.source))
+    .sort((a, b) => rank(a.source) - rank(b.source));
   // Los botones y lo pedido a mano van detrás de la primera media: el botón
   // mientras falta y la media en cuanto llega.
   const requestedSources = new Set(demands.filter((d) => d.requested).map((d) => d.key));
@@ -291,6 +309,7 @@ export default function GroupScoreStats({
   const ranked = first
     ? [first, ...entries.filter(promoted), ...entries.filter((e) => e !== first && !promoted(e))]
     : entries;
+  const reducedRanked = ranked.filter((e) => REDUCED_SOURCES.has(e.source));
   const itemsKey = `${items.map((item) => `${item.key}:${item.value}`).join("|")}|${boxes
     .map((d) => `${d.key}:${Boolean(d.progress)}:${Boolean(d.failed)}`)
     .join(",")}|${[...requestedSources].join(",")}`;
@@ -302,8 +321,15 @@ export default function GroupScoreStats({
     if (!row) return undefined;
     const meta = row.querySelector("[data-group-meta]");
     const refit = () => {
-      const next = measureFit(root, measurerRef.current, ranked, yieldToMeta ? new Set(yieldToMeta) : null);
-      setFitCount((prev) => (prev === next.fit ? prev : next.fit));
+      const yieldSet = yieldToMeta ? new Set(yieldToMeta) : null;
+      let next = measureFit(root, measurerRef.current, ranked, yieldSet);
+      let reduced = false;
+      // El título manda: si no cabe todo, fuera Trakt (media y botón).
+      if (next.fit < ranked.length && reducedRanked.length < ranked.length) {
+        next = measureFit(root, measurerRef.current, reducedRanked, yieldSet);
+        reduced = true;
+      }
+      setFitState((prev) => (prev?.fit === next.fit && prev?.reduced === reduced ? prev : { fit: next.fit, reduced }));
       // Atributo y no estado: la línea la pinta la página, no este componente.
       if (meta && next.meta !== null) {
         meta.dataset.fit = next.meta === "short" ? "short" : next.meta ? "yes" : "no";
@@ -326,7 +352,9 @@ export default function GroupScoreStats({
   // oculto (display:none no suma hueco en la fila) da acceso a la fila.
   if (!items.length && !boxes.length) return <div ref={rootRef} hidden />;
 
-  const keep = new Set(ranked.slice(0, fitCount ?? ranked.length).map((item) => item.key));
+  const measured = items.filter((item) => priority.includes(item.key));
+  const shown = fitState?.reduced ? reducedRanked : ranked;
+  const keep = new Set(shown.slice(0, fitState?.fit ?? shown.length).map((item) => item.key));
   const visible = items.filter((item) => keep.has(item.key));
   const visibleBoxes = boxes.filter((d) => keep.has(boxKey(d.key)));
 
@@ -349,9 +377,11 @@ export default function GroupScoreStats({
             <OnDemandBox demand={d} />
           </div>
         ))}
-        {items.map((item, index) => (
+        {/* Solo las que pueden pintarse y en el mismo orden: la última va
+            sin margen derecho y medirla con él quitaba sitio a «N items · %». */}
+        {measured.map((item, index) => (
           <div key={item.key} data-key={item.key} className="flex shrink-0">
-            <ScoreItem item={item} index={index} count={items.length} />
+            <ScoreItem item={item} index={index} count={measured.length} />
           </div>
         ))}
       </div>

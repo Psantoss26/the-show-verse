@@ -107,7 +107,6 @@ import PageStatCard from "@/components/ui/PageStatCard";
 import useGroupScoresOnDemand from "@/hooks/useGroupScoresOnDemand";
 import GroupScoreStats, {
   MY_RATING_GROUP_SCORE_PRIORITY,
-  MY_RATING_YIELD_TO_META,
 } from "@/components/ui/GroupScoreStats";
 import {
   AdvancedFiltersBadge,
@@ -1754,7 +1753,6 @@ function GroupDivider({
               stats={stats}
               compact={renderSticky}
               priority={groupBy === "user_rating" ? MY_RATING_GROUP_SCORE_PRIORITY : undefined}
-              yieldToMeta={groupBy === "user_rating" ? MY_RATING_YIELD_TO_META : undefined}
               onDemand={onDemand}
             />
           </motion.div>
