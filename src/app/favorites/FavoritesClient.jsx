@@ -21,7 +21,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { TitleRow } from "@/components/details/sectionSheet/SectionSheetRows";
 import LoginRequiredScreen from "@/components/auth/LoginRequiredScreen";
-import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "framer-motion";
+import { motion, MotionConfig, useReducedMotion } from "framer-motion";
 import useStickyGroup from "@/lib/hooks/useStickyGroup";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
@@ -39,6 +39,7 @@ import {
   Grid2X2,
   LayoutGrid,
   Layers3,
+  ListTree,
   List,
   Search,
   X,
@@ -103,8 +104,8 @@ import {
 } from "@/lib/userLists/listScoreCache";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
-import GroupingProgress, { sumProgress } from "@/components/ui/GroupingProgress";
-import { ControlledOptionsSheet, OptionsSheetTrigger, SheetOption, SheetOptionBreak, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
+import GroupingProgress from "@/components/ui/GroupingProgress";
+import { ControlledOptionsSheet, OptionsSheetTrigger, SheetOption, SheetOptionCollapse, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
 import useGroupScoresOnDemand from "@/hooks/useGroupScoresOnDemand";
 import GroupScoreStats, {
@@ -1045,11 +1046,15 @@ function getGroupOptionLabel(key) {
   );
 }
 
-function getGroupingValueLabel(groupBy, subGroupBy) {
+// La subagrupación ya no va en este valor: tiene su propio botón.
+function getGroupingValueLabel(groupBy) {
   if (groupBy === "none") return "Sin agrupar";
-  const groupLabel = getGroupOptionLabel(groupBy);
-  if (!subGroupBy || subGroupBy === "none") return groupLabel;
-  return `${groupLabel} / ${getGroupOptionLabel(subGroupBy)}`;
+  return getGroupOptionLabel(groupBy);
+}
+
+function getSubGroupingValueLabel(subGroupBy) {
+  if (!subGroupBy || subGroupBy === "none") return "Ninguna";
+  return getGroupOptionLabel(subGroupBy);
 }
 
 function getCompactGroupOptionLabel(key) {
@@ -1068,11 +1073,14 @@ function getCompactGroupOptionLabel(key) {
   return labels[key] || getGroupOptionLabel(key);
 }
 
-function getCompactGroupingValueLabel(groupBy, subGroupBy) {
+function getCompactGroupingValueLabel(groupBy) {
   if (groupBy === "none") return "Sin agr.";
-  const groupLabel = getCompactGroupOptionLabel(groupBy);
-  if (!subGroupBy || subGroupBy === "none") return groupLabel;
-  return `${groupLabel}/${getCompactGroupOptionLabel(subGroupBy)}`;
+  return getCompactGroupOptionLabel(groupBy);
+}
+
+function getCompactSubGroupingValueLabel(subGroupBy) {
+  if (!subGroupBy || subGroupBy === "none") return "Ning.";
+  return getCompactGroupOptionLabel(subGroupBy);
 }
 
 function formatRatingBucketLabel(bucket) {
@@ -1341,9 +1349,15 @@ function buildSmartFavoriteRatingSubgroups(items, subGroupBy, groupContext) {
 // ================== UI COMPONENTS ==================
 // Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
 // pinta como un grupo con todas sus opciones a la vista.
+// `collapsed` (true/false): el desplegable aparece y desaparece («Subagrupar»,
+// solo con una agrupación puesta); plegado sin salto en la barra y en la hoja.
 function InlineDropdown(props) {
   if (useInOptionsSheet()) {
-    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+    const group = (
+      <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>
+    );
+    if (props.collapsed === undefined) return group;
+    return <SheetOptionCollapse open={!props.collapsed}>{group}</SheetOptionCollapse>;
   }
   return <InlineDropdownMenu {...props} />;
 }
@@ -1357,8 +1371,15 @@ function InlineDropdownMenu({
   children,
   // Progreso ({ done, total }) de lo que muestra el botón (la agrupación).
   progress = null,
+  // Grupo de botones unidos («Agrupar» + «Subagrupar»): qué lado(s) se
+  // tocan con el vecino ("start", "end"); `""` = se puede unir pero ahora no.
+  join = null,
+  // Botón que aparece y desaparece (ver `data-toolbar-collapse`).
+  collapsed,
 }) {
   const [open, setOpen] = useState(false);
+  // Plegado no puede quedarse con su menú abierto.
+  if (collapsed && open) setOpen(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
@@ -1433,12 +1454,22 @@ function InlineDropdownMenu({
   }, [open, updateMenuPosition]);
 
   return (
-    <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
+    <div
+      ref={ref}
+      className="relative min-w-0 w-full lg:w-auto lg:shrink"
+      data-toolbar-collapse={
+        collapsed === undefined ? undefined : collapsed ? "closed" : "open"
+      }
+    >
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm sv-page-toolbar-trigger lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
+        tabIndex={collapsed ? -1 : undefined}
+        data-join={join ?? undefined}
+        className={`h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm sv-page-toolbar-trigger lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 ${
+          join == null ? "" : "sv-toolbar-join-trigger"
+        }`}
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-red-500" />}
@@ -1470,28 +1501,23 @@ function InlineDropdownMenu({
 
       {typeof document !== "undefined" &&
         createPortal(
-          <AnimatePresence>
-            {open && menuStyle && (
-              <motion.div
-                ref={menuRef}
-                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                transition={{ duration: 0.16, ease: "easeOut" }}
-                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
-                style={{
-                  ...menuStyle,
-                }}
+          // Entrada en CSS (`.sv-inline-menu`, globals.css) y cierre al
+          // instante, como los de CreditFilterControls: framer reescribía el
+          // estilo de la caja de cristal en cada fotograma.
+          open && menuStyle ? (
+            <div
+              ref={menuRef}
+              className="sv-inline-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+              style={menuStyle}
+            >
+              <div
+                className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
+                style={{ scrollbarWidth: "thin" }}
               >
-                <div
-                  className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
-                  style={{ scrollbarWidth: "thin" }}
-                >
-                  {children({ close: () => setOpen(false) })}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>,
+                {children({ close: () => setOpen(false) })}
+              </div>
+            </div>
+          ) : null,
           document.body,
         )}
     </div>
@@ -1545,17 +1571,11 @@ function DropdownMenuItem({ active, onClick, children, progress = null }) {
 
 function GroupingDropdownContent({
   groupBy,
-  subGroupBy,
   onGroupChange,
-  onSubGroupChange,
   close,
   // Progreso por clave de agrupación mientras llegan sus datos.
   progressByKey = null,
 }) {
-  const subgroupOptions = FAVORITES_GROUP_OPTIONS.filter(
-    (option) => option.key !== "none" && option.key !== groupBy,
-  );
-
   // En la hoja móvil el grupo ya lleva su título («Agrupar»).
   const inSheet = useInOptionsSheet();
 
@@ -1573,49 +1593,59 @@ function GroupingDropdownContent({
           progress={groupBy === option.key ? progressByKey?.[option.key] : null}
           onClick={() => {
             onGroupChange(option.key);
-            if (option.key === "none") close();
+            close();
           }}
         >
           {option.itemLabel}
         </DropdownItem>
       ))}
+    </>
+  );
+}
 
-      {groupBy !== "none" && (
-        <>
-          {inSheet ? (
-            <SheetOptionBreak label="Subagrupación" />
-          ) : (
-            <>
-              <div className="mx-2 my-2 h-px bg-white/10" />
-              <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
-                Subagrupación
-              </div>
-            </>
-          )}
-          <DropdownItem
-            active={!subGroupBy || subGroupBy === "none"}
-            onClick={() => {
-              onSubGroupChange("none");
-              close();
-            }}
-          >
-            Sin subagrupación
-          </DropdownItem>
-          {subgroupOptions.map((option) => (
-            <DropdownItem
-              key={option.key}
-              active={subGroupBy === option.key}
-              progress={subGroupBy === option.key ? progressByKey?.[option.key] : null}
-              onClick={() => {
-                onSubGroupChange(option.key);
-                close();
-              }}
-            >
-              {option.itemLabel}
-            </DropdownItem>
-          ))}
-        </>
+// Menú del botón «Subagrupar», que aparece unido a «Agrupar» al poner una
+// agrupación. No ofrece la agrupación ya elegida.
+function SubGroupingDropdownContent({
+  groupBy,
+  subGroupBy,
+  onSubGroupChange,
+  close,
+  progressByKey = null,
+}) {
+  const subgroupOptions = FAVORITES_GROUP_OPTIONS.filter(
+    (option) => option.key !== "none" && option.key !== groupBy,
+  );
+  const inSheet = useInOptionsSheet();
+
+  return (
+    <>
+      {inSheet ? null : (
+        <div className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
+          Subagrupación
+        </div>
       )}
+      <DropdownItem
+        active={!subGroupBy || subGroupBy === "none"}
+        onClick={() => {
+          onSubGroupChange("none");
+          close();
+        }}
+      >
+        Sin subagrupación
+      </DropdownItem>
+      {subgroupOptions.map((option) => (
+        <DropdownItem
+          key={option.key}
+          active={subGroupBy === option.key}
+          progress={subGroupBy === option.key ? progressByKey?.[option.key] : null}
+          onClick={() => {
+            onSubGroupChange(option.key);
+            close();
+          }}
+        >
+          {option.itemLabel}
+        </DropdownItem>
+      ))}
     </>
   );
 }
@@ -3333,9 +3363,13 @@ export default function FavoritesClient() {
     imdb_rating: loadingImdb ? imdbProgress : null,
     trakt_rating: loadingTrakt ? traktProgress : null,
   };
-  const activeGroupingProgress = sumProgress(
-    [groupBy, subGroupBy].map((key) => groupingProgressByKey[key]),
-  );
+  // Cada botón («Agrupar», «Subagrupar») lleva el progreso de lo suyo.
+  const groupProgress =
+    groupBy === "none" ? null : groupingProgressByKey[groupBy] || null;
+  const subGroupProgress =
+    groupBy === "none" || !subGroupBy || subGroupBy === "none"
+      ? null
+      : groupingProgressByKey[subGroupBy] || null;
 
   const scoreLoadingLabel =
     loadingImdb && loadingTrakt
@@ -3760,20 +3794,37 @@ export default function FavoritesClient() {
             </InlineDropdown>
             <InlineDropdown
               label="Agrupar"
-              valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
-              mobileValueLabel={getCompactGroupingValueLabel(
-                groupBy,
-                subGroupBy,
-              )}
+              valueLabel={getGroupingValueLabel(groupBy)}
+              mobileValueLabel={getCompactGroupingValueLabel(groupBy)}
               compactMobile
               icon={Layers3}
-              progress={activeGroupingProgress}
+              progress={groupProgress}
+              join={groupBy === "none" ? "" : "end"}
             >
               {({ close }) => (
                 <GroupingDropdownContent
                   groupBy={groupBy}
-                  subGroupBy={subGroupBy}
                   onGroupChange={handleGroupChange}
+                  close={close}
+                  progressByKey={groupingProgressByKey}
+                />
+              )}
+            </InlineDropdown>
+            {/* Unido a «Agrupar»: solo con una agrupación puesta. */}
+            <InlineDropdown
+              label="Subagrupar"
+              valueLabel={getSubGroupingValueLabel(subGroupBy)}
+              mobileValueLabel={getCompactSubGroupingValueLabel(subGroupBy)}
+              compactMobile
+              icon={ListTree}
+              progress={subGroupProgress}
+              join="start"
+              collapsed={groupBy === "none"}
+            >
+              {({ close }) => (
+                <SubGroupingDropdownContent
+                  groupBy={groupBy}
+                  subGroupBy={subGroupBy}
                   onSubGroupChange={handleSubGroupChange}
                   close={close}
                   progressByKey={groupingProgressByKey}
@@ -3961,20 +4012,37 @@ export default function FavoritesClient() {
 
             <InlineDropdown
               label="Agrupar"
-              valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
-              mobileValueLabel={getCompactGroupingValueLabel(
-                groupBy,
-                subGroupBy,
-              )}
+              valueLabel={getGroupingValueLabel(groupBy)}
+              mobileValueLabel={getCompactGroupingValueLabel(groupBy)}
               compactMobile
               icon={Layers3}
-              progress={activeGroupingProgress}
+              progress={groupProgress}
+              join={groupBy === "none" ? "" : "end"}
             >
               {({ close }) => (
                 <GroupingDropdownContent
                   groupBy={groupBy}
-                  subGroupBy={subGroupBy}
                   onGroupChange={handleGroupChange}
+                  close={close}
+                  progressByKey={groupingProgressByKey}
+                />
+              )}
+            </InlineDropdown>
+            {/* Unido a «Agrupar»: solo con una agrupación puesta. */}
+            <InlineDropdown
+              label="Subagrupar"
+              valueLabel={getSubGroupingValueLabel(subGroupBy)}
+              mobileValueLabel={getCompactSubGroupingValueLabel(subGroupBy)}
+              compactMobile
+              icon={ListTree}
+              progress={subGroupProgress}
+              join="start"
+              collapsed={groupBy === "none"}
+            >
+              {({ close }) => (
+                <SubGroupingDropdownContent
+                  groupBy={groupBy}
+                  subGroupBy={subGroupBy}
                   onSubGroupChange={handleSubGroupChange}
                   close={close}
                   progressByKey={groupingProgressByKey}

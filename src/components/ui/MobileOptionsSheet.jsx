@@ -586,6 +586,28 @@ export function SheetOption({ active, onClick, children, icon: Icon, media = nul
   );
 }
 
+// Grupo que aparece y desaparece según otra opción (p. ej. «Subagrupar», solo
+// con una agrupación puesta). Siempre está montado y se pliega a alto 0 con
+// una transición de `grid-template-rows` (`.sv-sheet-collapse`, globals.css):
+// la hoja crece o encoge sin salto. El hueco con el grupo siguiente va DENTRO
+// de lo que se pliega (la hoja separa sus grupos con `space-y-5`), así que
+// plegado no deja hueco doble.
+export function SheetOptionCollapse({ open, children }) {
+  return (
+    <div
+      className="sv-sheet-collapse"
+      data-open={open ? "true" : "false"}
+      style={{ marginBottom: 0 }}
+      inert={open ? undefined : true}
+      aria-hidden={open ? undefined : "true"}
+    >
+      <div className="sv-sheet-collapse-inner">
+        <div className="pb-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 // Subtítulo dentro de un grupo (p. ej. «Subagrupación» bajo «Agrupar»): ocupa
 // la fila entera, así que las píldoras siguientes empiezan debajo.
 export function SheetOptionBreak({ label }) {

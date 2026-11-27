@@ -75,10 +75,35 @@ export default function usePageToolbarSearchFit() {
     // se compactaban ni se estiraban para llenar la fila).
     const parts = () => {
       const search = toolbar.querySelector(":scope > .sv-page-toolbar-search");
-      const dropdowns = [...toolbar.children].filter((child) =>
-        child.querySelector(":scope > button .sv-page-toolbar-value"),
+      const dropdowns = [...toolbar.children].filter(
+        (child) =>
+          !isCollapsed(child) &&
+          child.querySelector(":scope > button .sv-page-toolbar-value"),
       );
       return { search, dropdowns };
+    };
+
+    // BOTONES QUE APARECEN Y DESAPARECEN («Subagrupar», unido a «Agrupar»).
+    // Llevan `data-toolbar-collapse="open" | "closed"`: cerrados siguen en la
+    // fila con ancho 0 y un margen que anula su hueco (globals.css), así que no
+    // cuentan para la medida; al cambiar el atributo, su ancho y su margen se
+    // animan como el resto de la barra (ver `animateFrom`).
+    const isCollapsed = (el) => el.dataset?.toolbarCollapse === "closed";
+    const marginLeftOf = (el) =>
+      Number.parseFloat(getComputedStyle(el).marginLeft) || 0;
+    // Anchos y márgenes de la barra en reposo tras cada medida: React cambia el
+    // atributo antes de que el hook se entere, así que el «antes» de esa
+    // animación no se puede medir ya, se recuerda.
+    let settled = new Map();
+    let toggled = new Set();
+    const rememberSettled = () => {
+      settled = new Map();
+      for (const child of toolbar.children) {
+        settled.set(child, {
+          width: child.getBoundingClientRect().width,
+          marginLeft: marginLeftOf(child),
+        });
+      }
     };
 
     // El campo en modo icono: relleno solo para la lupa, sin texto de ayuda y
@@ -127,15 +152,19 @@ export default function usePageToolbarSearchFit() {
     // Lo que pide la fila con el buscador a `searchPx`. Se suma lo que pide
     // cada pieza (`scrollWidth` incluye el botón que asoma fuera de su
     // envoltorio), no lo que ocupa.
+    // Los márgenes cuentan: el botón unido a su vecino se mete en el hueco
+    // con uno negativo.
     const neededWidth = (searchPx) => {
       const children = [...toolbar.children].filter(
-        (child) => child.offsetParent !== null,
+        (child) => child.offsetParent !== null && !isCollapsed(child),
       );
       const gap = Number.parseFloat(getComputedStyle(toolbar).columnGap) || 0;
       return children.reduce((sum, child) => {
         if (child.matches(".sv-page-toolbar-search")) return sum + searchPx;
         return (
-          sum + Math.max(child.getBoundingClientRect().width, child.scrollWidth)
+          sum +
+          Math.max(child.getBoundingClientRect().width, child.scrollWidth) +
+          marginLeftOf(child)
         );
       }, gap * Math.max(0, children.length - 1));
     };
@@ -188,25 +217,56 @@ export default function usePageToolbarSearchFit() {
       return { paddingLeft: style.paddingLeft, paddingRight: style.paddingRight };
     };
 
-    const animateFrom = (widths, texts, input, padding) => {
+    const animateFrom = (widths, margins, toggledNow, texts, input, padding) => {
       const children = [...toolbar.children].filter(
         (child) => child.offsetParent !== null,
       );
       const options = { duration: FIT_ANIMATION_MS, easing: FIT_ANIMATION_EASING };
       // Todos los anchos finales ANTES de animar nada: cada animación que
       // arranca devuelve su pieza al ancho de partida y apretaría a las demás.
-      const targets = children.map((child) => child.getBoundingClientRect().width);
+      const targets = children.map((child) => ({
+        width: child.getBoundingClientRect().width,
+        marginLeft: marginLeftOf(child),
+      }));
       for (const [index, child] of children.entries()) {
         const from = widths.get(child);
-        const to = targets[index];
-        if (from == null || Math.abs(from - to) < 0.5) continue;
-        const keyframe = (width) => ({
+        const to = targets[index].width;
+        const fromMargin = margins.get(child) ?? targets[index].marginLeft;
+        const toMargin = targets[index].marginLeft;
+        if (
+          from == null ||
+          (Math.abs(from - to) < 0.5 && Math.abs(fromMargin - toMargin) < 0.5)
+        ) {
+          continue;
+        }
+        const appearing = toggledNow.has(child);
+        const keyframe = (width, marginLeft) => ({
           flexGrow: 0,
           flexShrink: 0,
           flexBasis: `${width}px`,
           minWidth: 0,
+          marginLeft: `${marginLeft}px`,
+          // Cerrado lleva `visibility: hidden`: mientras se pliega, se ve.
+          ...(appearing ? { visibility: "visible", overflow: "hidden" } : null),
         });
-        animations.push(child.animate([keyframe(from), keyframe(to)], options));
+        animations.push(
+          child.animate(
+            [keyframe(from, fromMargin), keyframe(to, toMargin)],
+            options,
+          ),
+        );
+        // Lo que entra o sale funde su contenido (icono, rótulo, flecha), no
+        // la caja: con `opacity` en la caja, su cristal se quedaba plano
+        // mientras dura (el botón es su propio «backdrop root»).
+        if (appearing) {
+          const opening = !isCollapsed(child);
+          const fade = opening
+            ? [{ opacity: 0 }, { opacity: 0, offset: 0.35 }, { opacity: 1 }]
+            : [{ opacity: 1 }, { opacity: 0, offset: 0.6 }, { opacity: 0 }];
+          for (const part of child.querySelectorAll(":scope > button > *")) {
+            animations.push(part.animate(fade, options));
+          }
+        }
         // El botón de un desplegable sigue a su envoltorio mientras dura (sin
         // estirar mide su contenido y saltaría a su ancho final de golpe), y
         // recorta lo que aún no cabe.
@@ -263,20 +323,44 @@ export default function usePageToolbarSearchFit() {
         animateNext &&
         !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
       animateNext = false;
+      const toggledNow = toggled;
+      toggled = new Set();
       const widths = new Map();
+      const margins = new Map();
       const texts = new Set();
       const input = search.querySelector("input");
       let padding = null;
       if (animate) {
         if (input) padding = inputPadding(input);
+        // Un botón que aparece o desaparece ya cambió en el DOM: se parte de
+        // la barra en reposo recordada. A mitad de otra animación, de lo que
+        // se ve.
+        const fromSettled = toggledNow.size > 0 && !animations.length;
         for (const child of toolbar.children) {
-          widths.set(child, child.getBoundingClientRect().width);
+          const remembered = fromSettled ? settled.get(child) : null;
+          widths.set(
+            child,
+            remembered ? remembered.width : child.getBoundingClientRect().width,
+          );
+          margins.set(
+            child,
+            remembered ? remembered.marginLeft : marginLeftOf(child),
+          );
         }
         for (const text of toolbar.querySelectorAll(TEXT_SELECTOR)) {
           if (isShown(text)) texts.add(text);
         }
       }
       cancelAnimations();
+      // Un botón plegado no se estira: suelta los estilos en línea que le
+      // dejó la medida de cuando estaba abierto.
+      for (const child of toolbar.children) {
+        if (!isCollapsed(child)) continue;
+        child.style.flexGrow = "";
+        child.style.flexShrink = "";
+        const trigger = child.querySelector(":scope > button");
+        if (trigger) trigger.style.width = "";
+      }
 
       // Sin transiciones mientras se mide: las reglas globales de la barra
       // animaban `flex-basis` y el ancho mínimo de los desplegables, y aquí se
@@ -319,7 +403,8 @@ export default function usePageToolbarSearchFit() {
       // no se anime el salto desde el estado de medida.
       toolbar.getBoundingClientRect();
       delete toolbar.dataset.fitMeasuring;
-      if (animate) animateFrom(widths, texts, input, padding);
+      rememberSettled();
+      if (animate) animateFrom(widths, margins, toggledNow, texts, input, padding);
     };
     const schedule = () => {
       if (!frame) frame = window.requestAnimationFrame(update);
@@ -370,13 +455,28 @@ export default function usePageToolbarSearchFit() {
     observeChildren();
     // Los desplegables cambian de ancho con su valor ("Todo" → "Películas"),
     // y pueden aparecer o desaparecer elementos.
+    // Un botón que aparece o desaparece (`data-toolbar-collapse`) se anima.
     const mutations = new MutationObserver((records) => {
       if (records.some((r) => r.type === "childList" && r.target === toolbar)) {
         observeChildren();
       }
-      schedule();
+      for (const record of records) {
+        if (record.type === "attributes" && record.target.parentElement === toolbar) {
+          toggled.add(record.target);
+          animateNext = true;
+        }
+      }
+      // La animación en curso se corta y la nueva parte de lo que se ve.
+      if (toggled.size) updateNow();
+      else schedule();
     });
-    mutations.observe(toolbar, { subtree: true, childList: true, characterData: true });
+    mutations.observe(toolbar, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["data-toolbar-collapse"],
+    });
     // Al acabar cualquier transición de la barra, cálculo con el tamaño final.
     toolbar.addEventListener("transitionend", onResize);
     toolbar.addEventListener("focusin", onFocusIn);

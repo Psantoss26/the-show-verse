@@ -2486,9 +2486,83 @@ body {
   display: none;
 }
 
-/* Mientras el hook prueba pasos, nada se anima: se mediría a medio camino. */
-.sv-page-toolbar[data-fit-measuring] * {
+/* Mientras el hook prueba pasos, nada se anima: se mediría a medio camino.
+   Las esquinas del grupo de botones unidos sí: no cambian ningún ancho, y
+   cortarles la transición las hacía saltar (la medida va en el mismo
+   fotograma que el cambio). */
+.sv-page-toolbar[data-fit-measuring] *:not(.sv-toolbar-join-trigger) {
   transition: none !important;
+}
+
+/* GRUPO DE BOTONES UNIDOS: «Agrupar» + «Subagrupar» (Favoritos, Pendientes).
+   El segundo solo existe con una agrupación puesta; cerrado sigue en la fila
+   con ancho 0 y un margen que se come el hueco de la barra (`gap-3`), para
+   que aparecer y desaparecer sea animar su ancho (usePageToolbarSearchFit)
+   y no un salto. Abierto, se mete en ese hueco hasta dejar una costura de
+   3px, y las esquinas que se tocan pasan de redondas a casi rectas. */
+.sv-page-toolbar > [data-toolbar-collapse] {
+  margin-left: calc(3px - 0.75rem);
+}
+
+.sv-page-toolbar > [data-toolbar-collapse="closed"] {
+  flex: 0 0 0px;
+  min-width: 0;
+  margin-left: -0.75rem;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.sv-toolbar-join-trigger {
+  transition-property: color, background-color, border-color, box-shadow,
+    --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, border-radius;
+  transition-duration: 150ms, 150ms, 150ms, 150ms, 150ms, 150ms, 150ms, 260ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sv-toolbar-join-trigger[data-join~="end"] {
+  border-top-right-radius: 0.375rem;
+  border-bottom-right-radius: 0.375rem;
+}
+
+.sv-toolbar-join-trigger[data-join~="start"] {
+  border-top-left-radius: 0.375rem;
+  border-bottom-left-radius: 0.375rem;
+}
+
+/* Grupo plegable de la hoja de opciones móvil (SheetOptionCollapse). Solo se
+   anima el alto (filas de la rejilla) y el fundido del contenido: las píldoras
+   no llevan cristal, así que la opacidad no les quita nada. */
+.sv-sheet-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sv-sheet-collapse[data-open="false"] {
+  grid-template-rows: 0fr;
+}
+
+/* `clip` con margen: con `hidden` se cortaba la sombra de las píldoras. */
+.sv-sheet-collapse-inner {
+  min-height: 0;
+  overflow: clip;
+  overflow-clip-margin: 1rem;
+  transition: opacity 200ms ease-out;
+}
+
+.sv-sheet-collapse[data-open="false"] > .sv-sheet-collapse-inner {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-sheet-collapse,
+  .sv-sheet-collapse-inner {
+    transition: none;
+  }
+
+  .sv-toolbar-join-trigger {
+    transition-duration: 150ms, 150ms, 150ms, 150ms, 150ms, 150ms, 150ms, 0ms;
+  }
 }
 
 /* EL BUSCADOR TAMBIÉN CEDE, PERO SIN DEJAR HUECO. Ocupa el hueco sobrante de
