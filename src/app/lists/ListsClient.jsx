@@ -1697,7 +1697,9 @@ const ListModeRow = memo(function ListModeRow({
     <div ref={ref}>
       {/* ✅ antes: Link fijo a /lists/:id */}
       <ListNavWrapper list={list} className="group block">
-        <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all sm:gap-5">
+        {/* Fondo de las filas de lista del perfil y de Social: degradado
+            suave y sombra, sin borde. */}
+        <div className="flex items-center gap-4 rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] p-3 shadow-lg transition hover:from-white/[0.13] hover:to-white/[0.06] sm:gap-5">
           {/* Ancho = huecos 2:3 del alto interior (3 en el móvil, 5 desde sm).
               Sin fondo ni borde: con menos de cinco títulos no queda caja negra. */}
           <div className="h-[5.5rem] w-[10.75rem] shrink-0 overflow-hidden rounded-lg sm:h-24 sm:w-[19.5rem] lg:h-28 lg:w-[22.75rem]">

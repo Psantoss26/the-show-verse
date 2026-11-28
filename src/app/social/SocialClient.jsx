@@ -349,7 +349,7 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
         : "";
 
   return (
-    <article className="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
+    <article className={`flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4 ${FONDO_FILA}`}>
       {conBackdrop ? (
         <CartelEvento evento={evento} backdrop className={BACKDROP_FILA} />
       ) : conPoster ? (
@@ -411,7 +411,7 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
 function EventoResena({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
   const [verSpoiler, setVerSpoiler] = useState(false);
   return (
-    <article className="rounded-xl bg-white/[0.04] px-3 py-4 sm:px-4">
+    <article className={`px-3 py-4 sm:px-4 ${FONDO_FILA}`}>
       <div className="flex items-start gap-3">
         {conBackdrop ? (
           <>
@@ -463,6 +463,10 @@ function EventoResena({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
     </article>
   );
 }
+
+// Zona de cada registro (eventos y reseñas): el fondo de las filas de las
+// vistas de lista del perfil (ProfileSection), no transparente sobre el fondo.
+const FONDO_FILA = "rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] shadow-lg";
 
 // Vistas «Lista con backdrop» y «Lista con póster»: el mismo criterio y tamaño
 // que la Actividad y las listas de las secciones del perfil. Crecen con la
