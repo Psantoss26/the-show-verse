@@ -11,6 +11,7 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { TitleRow } from "@/components/details/sectionSheet/SectionSheetRows";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
@@ -320,12 +321,21 @@ function DiscoverCardImage({ item, type, mode, title }) {
   const { imgRef, onLoad, ready, instant } = useImageLoadReady(src);
 
   return (
-    <div className="relative h-full w-full bg-zinc-900">
-      {!src && !pending ? (
-        <div className="absolute inset-0 flex items-center justify-center text-zinc-700">
-          <Film className="h-8 w-8 opacity-60" />
-        </div>
-      ) : null}
+    // Sin fondo propio (como SmartPoster de Favoritos): un gris fijo bajo la
+    // portada asomaba como filo claro en cantos y esquinas. El gris de carga es
+    // el marcador, que se desvanece al estar la imagen lista.
+    <div className="relative h-full w-full">
+      <div
+        className={`absolute inset-0 flex items-center justify-center bg-neutral-900 ${
+          instant ? "" : "transition-opacity duration-300"
+        } ${ready ? "opacity-0" : "opacity-100"}`}
+      >
+        {/* El icono entra con retraso (`starting:`): si la portada sale de
+            caché en unos ms no llega a asomar. */}
+        {!pending ? (
+          <Film className="h-8 w-8 text-neutral-700 transition-opacity duration-200 delay-200 starting:opacity-0" />
+        ) : null}
+      </div>
       {src ? (
         <OptimizedImage
           ref={imgRef}
@@ -458,8 +468,6 @@ async function fetchDiscoverImdbScores(list, signal) {
 /* =========================
    UI Components
 ========================= */
-
-const ORANGE_RING = "rgba(249,115,22,0.95)";
 
 // Dentro de la hoja de filtros (MobileOptionsSheet) el desplegable se pinta
 // como un grupo con todas sus opciones a la vista (como en Favoritos).
@@ -915,45 +923,31 @@ function DiscoverCard({
   });
 
   if (viewMode === "list") {
-    const tmdb = Number(item.vote_average);
+    // La misma fila que la vista de lista de Favoritos (TitleRow), con el
+    // backdrop 16:9 a su tamaño de siempre (180 px; 280 px desde sm).
     return (
-      <div ref={shellRef} className={shellClassName} data-flip-key={flipKey} data-discover-card="">
-        <Link
+      <div
+        ref={shellRef}
+        className={shellClassName}
+        data-flip-key={flipKey}
+        data-discover-card=""
+        {...intentProps}
+      >
+        <TitleRow
+          item={item}
+          mediaType={type}
           href={href}
           prefetch={false}
           onClick={onPreviewClick}
-          {...intentProps}
-          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(249,115,22,0.95)]"
-        >
-          <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
-              {image}
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
-              <h4 className="text-white font-bold text-base leading-tight truncate transition-colors group-hover:text-orange-300">
-                {title}
-              </h4>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold leading-tight text-zinc-400 tabular-nums">
-                <span className={`inline-flex items-center gap-1 ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}>
-                  {type === "movie" ? <Film className="h-3.5 w-3.5" /> : <MonitorPlay className="h-3.5 w-3.5" />}
-                  {type === "movie" ? "Película" : "Serie"}
-                </span>
-                {year && <span>{year}</span>}
-                {Number.isFinite(tmdb) && tmdb > 0 ? (
-                  <span className="text-sky-400">TMDb {tmdb.toFixed(1)}</span>
-                ) : null}
-                {imdbScore ? (
-                  <span className="text-amber-300">IMDb {Number(imdbScore).toFixed(1)}</span>
-                ) : null}
-              </div>
-              {item.overview ? (
-                <p className="max-sm:hidden text-sm leading-snug text-zinc-400 line-clamp-2">
-                  {item.overview}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </Link>
+          title={title}
+          year={year}
+          showImdb
+          imdbRating={imdbScore}
+          showTitleMeta
+          media={image}
+          mediaClassName="aspect-video w-[180px] sm:w-[280px] rounded-lg shadow-md"
+          className="relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(249,115,22,0.95)]"
+        />
       </div>
     );
   }
@@ -964,7 +958,7 @@ function DiscoverCard({
         <Link href={href} prefetch={false} onClick={onPreviewClick} {...intentProps} className="block">
           <HoverExpandCard
             cellClassName={aspectRatio}
-            className="group overflow-hidden rounded-lg bg-zinc-900 shadow-md"
+            className="group overflow-hidden rounded-lg shadow-md"
           >
             <HoverExpandZoom>{image}</HoverExpandZoom>
             <DiscoverHoverIndicator
@@ -983,12 +977,9 @@ function DiscoverCard({
     <div ref={shellRef} className={shellClassName} data-flip-key={flipKey} data-discover-card="">
       <Link href={href} prefetch={false} onClick={onPreviewClick} {...intentProps} className="block">
         <div
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-orange-900/20 transition-shadow duration-300`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-orange-900/20 transition-shadow duration-300`}
         >
-          <div
-            className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_var(--sv-discover-ring)]"
-            style={{ "--sv-discover-ring": ORANGE_RING }}
-          />
+          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(249,115,22,0.95)]" />
           {image}
           <DiscoverHoverIndicator
             type={type}

@@ -752,7 +752,7 @@ function LibraryMediaCard({
   const renderMedia = () => (
     <div className="relative w-full h-full">
       <div
-        className={`absolute inset-0 flex items-center justify-center bg-zinc-900 ${
+        className={`absolute inset-0 flex items-center justify-center bg-neutral-900 ${
           instant ? "" : "transition-opacity duration-300"
         } ${ready ? "opacity-0" : "opacity-100"}`}
       >
@@ -801,20 +801,19 @@ function LibraryMediaCard({
         data-library-card=""
       >
         <article
-          className={`relative block bg-zinc-900/30 rounded-xl transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)] ${canOpen ? "cursor-pointer hover:bg-zinc-900/60" : ""}`}
+          className={`relative flex items-center gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 bg-black/15 rounded-2xl transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)] ${canOpen ? "cursor-pointer hover:bg-white/[0.07]" : ""}`}
           onClick={openItem}
         >
-          <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
+          {/* Como la fila de lista de Favoritos (TitleRow): backdrop 16:9 sin
+              fondo propio, título y datos a su lado. */}
+            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md shrink-0">
               {renderMedia()}
             </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-              <div className="flex items-center gap-2">
-                <h4 className="text-white font-bold text-base leading-tight truncate">
-                  {title}
-                </h4>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-zinc-500 -ml-0.5 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <h4 className="line-clamp-2 text-sm font-bold leading-tight text-white min-[1920px]:text-base">
+                {title}
+              </h4>
+              <div className="mt-1 flex items-center gap-2 text-xs font-bold text-zinc-400 flex-wrap min-[1920px]:text-sm">
                 {year && <span>{year}</span>}
                 {duration && (
                   <>
@@ -834,7 +833,6 @@ function LibraryMediaCard({
                 )}
               </div>
             </div>
-          </div>
         </article>
       </div>
     );
@@ -852,7 +850,7 @@ function LibraryMediaCard({
           <HoverExpandCard
             as="article"
             cellClassName={aspectRatio}
-            className={`group rounded-lg overflow-hidden bg-zinc-900 shadow-md ${canOpen ? "cursor-pointer" : ""}`}
+            className={`group rounded-lg overflow-hidden shadow-md ${canOpen ? "cursor-pointer" : ""}`}
             enabled={canOpen && enableHoverLift}
             onClick={openItem}
           >
@@ -877,10 +875,10 @@ function LibraryMediaCard({
     >
       <div className="block">
         <article
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300 ${canOpen ? "cursor-pointer" : ""}`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-amber-900/20 transition-shadow duration-300 ${canOpen ? "cursor-pointer" : ""}`}
           onClick={openItem}
         >
-          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />
+          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)]" />
           {renderMedia()}
           <LibraryHoverIndicator isMovie={isMovie} resolution={primaryRes} />
         </article>
