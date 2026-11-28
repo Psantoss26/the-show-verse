@@ -388,7 +388,7 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
           <time
             dateTime={evento.createdAt}
             title={tiempoTitle(evento.createdAt)}
-            className="mt-1 block text-xs font-medium text-zinc-600 sm:hidden"
+            className="mt-1 block text-[13px] font-bold tabular-nums leading-4 text-zinc-400 sm:hidden"
           >
             {relativeTime(evento.createdAt)}
           </time>
@@ -397,7 +397,7 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
       <time
         dateTime={evento.createdAt}
         title={tiempoTitle(evento.createdAt)}
-        className={`shrink-0 text-xs font-medium text-zinc-600 ${conBackdrop ? "hidden sm:block" : ""}`}
+        className={`shrink-0 whitespace-nowrap text-sm font-bold tabular-nums leading-5 text-zinc-400 ${conBackdrop ? "hidden sm:block" : ""}`}
       >
         {relativeTime(evento.createdAt)}
       </time>
@@ -455,7 +455,7 @@ function EventoResena({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
           <time
             dateTime={evento.createdAt}
             title={tiempoTitle(evento.createdAt)}
-            className="mt-3 block text-xs font-medium text-zinc-500"
+            className="mt-3 block text-[13px] font-bold tabular-nums text-zinc-400"
           >
             {relativeTime(evento.createdAt)}
           </time>
