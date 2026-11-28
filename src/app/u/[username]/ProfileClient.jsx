@@ -1622,13 +1622,13 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
             data-offline-local-nav="true"
             data-profile-tab-active={active || undefined}
             data-section-key={it.id}
-            className={`relative z-10 flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 @[640px]/detail-page:w-auto @[640px]/detail-page:justify-start @[640px]/detail-page:px-3.5 @[640px]/detail-page:text-xs @[640px]/detail-page:tracking-widest ${
+            className={`relative z-10 flex w-auto min-w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center gap-1.5 whitespace-nowrap @[640px]/detail-page:min-w-0 @[640px]/detail-page:gap-0 px-2 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 @[640px]/detail-page:w-auto @[640px]/detail-page:justify-start @[640px]/detail-page:px-3.5 @[640px]/detail-page:text-xs @[640px]/detail-page:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             {it.label}
             {typeof it.count === "number" && (
-              <CountBadge tone={active ? "active" : "glass"} className="ml-1.5 hidden @[640px]/detail-page:inline-flex">
+              <CountBadge tone={active ? "active" : "glass"} size="tab" className="@[640px]/detail-page:ml-1.5">
                 {it.count}
               </CountBadge>
             )}

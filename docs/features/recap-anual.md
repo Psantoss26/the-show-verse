@@ -18,6 +18,13 @@ Intro, minutos vistos, películas frente a series, primer y último título del 
 
 La *persona* del año sale de las señales del usuario: El Maratoniano, El Cinéfilo, El Explorador, El Arqueólogo, El Estreno Andante, El Noctámbulo, El Crítico, El Fiel o El Constante (`PERSONAS` en `yearInReviewCore.js`). Cada pantalla puede llevar una banda sonora (`useRecapSoundtrack`).
 
+### Transiciones
+
+- **Entre pantallas** (`RecapStory`): la que entra se desliza encima de la que sale, que no se desvanece; así no asoma el fondo negro a mitad del cambio. Se anima `transform` como cadena (no `x`/`scale`) para que framer lo mande a WAAPI y vaya en el compositor mientras se monta la pantalla nueva. Con *reduced motion*, solo un fundido corto.
+- **Entre vistas** (`RecapClient`): cargando, mensajes (sin sesión, Pro, error, año vacío) y el resumen se relevan con un fundido de 350 ms; la vista anterior se queda opaca debajo hasta el final. Las frases de «cargando» también se relevan con un fundido.
+- **Segmentos de progreso**: claves estables y transición CSS en los que no son el activo; al saltar o volver atrás, el segmento que se deja se llena o se vacía deslizando en vez de saltar. El activo lo pinta el temporizador en cada fotograma, fuera de React.
+- **Entradas dentro de cada pantalla** (`recapUi`): `Reveal` y `WordsReveal` animan `transform` como cadena (compositor). `CountUp` escribe la cifra en el nodo de texto en cada fotograma, sin re-renderizar la pantalla 60 veces por segundo.
+
 ## Reglas de cálculo (`backend/src/lib/yearInReviewCore.js`)
 
 - Días, meses y horas en la **zona horaria del usuario**.

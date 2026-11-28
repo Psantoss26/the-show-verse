@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { LogIn, RefreshCw, Sparkles, X } from "lucide-react";
 
@@ -25,6 +25,33 @@ const LOADING_LINES = [
   "Afinando la banda sonora…",
   "Eligiendo tu película favorita…",
 ];
+
+// Relevo entre vistas (cargando → resumen, mensaje…): la nueva entra encima
+// con opacidad y la anterior se queda opaca debajo hasta que acaba, para que
+// no asome la página de detrás a mitad del fundido. Solo opacidad (WAAPI).
+const VIEW_FADE = { duration: 0.35, ease: [0.22, 1, 0.36, 1] };
+const viewVariants = {
+  enter: { opacity: 0, zIndex: 2 },
+  shown: { opacity: 1, zIndex: 2, transition: { ...VIEW_FADE, zIndex: { duration: 0 } } },
+  leave: { opacity: 1, zIndex: 1, transition: { ...VIEW_FADE, zIndex: { duration: 0 } } },
+};
+
+function ViewSwap({ viewKey, children }) {
+  return (
+    <AnimatePresence initial={false}>
+      <motion.div
+        key={viewKey}
+        variants={viewVariants}
+        initial="enter"
+        animate="shown"
+        exit="leave"
+        className="fixed inset-0 z-[2147483000]"
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
 
 function FullScreen({ children, label }) {
   useBodyScrollLock(true);
@@ -72,7 +99,21 @@ function Loading({ year, onClose }) {
         >
           {year || "Tu año"}
         </motion.p>
-        <p className="mt-6 text-lg font-bold" aria-live="polite">{LOADING_LINES[line]}</p>
+        <p className="relative mt-6 h-7 text-lg font-bold" aria-live="polite">
+          {/* Las frases se relevan con un fundido corto en vez de saltar. */}
+          <AnimatePresence initial={false}>
+            <motion.span
+              key={line}
+              className="absolute inset-x-0"
+              initial={reduce ? { opacity: 0 } : { opacity: 0, transform: "translateY(8px)" }}
+              animate={reduce ? { opacity: 1 } : { opacity: 1, transform: "translateY(0px)" }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, transform: "translateY(-8px)" }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {LOADING_LINES[line]}
+            </motion.span>
+          </AnimatePresence>
+        </p>
       </div>
     </FullScreen>
   );
@@ -140,76 +181,82 @@ export default function RecapClient({ year = null }) {
 
   // Recap es de Pro. Se decide con los derechos ya cargados: mientras tanto
   // sigue su curso normal (nunca un bloqueo por un instante).
-  if (authenticated && entitlementsReady && !has("recap")) {
-    return (
-      <Message title="Tu año es Pro" onClose={close}>
-        <p>El resumen anual forma parte de Pro: tu serie y película del año, tu banda sonora y tu perfil de espectador, listos para compartir.</p>
-        <Link
-          href="/planes"
-          className="inline-flex items-center gap-2 rounded-full bg-[#c6f432] px-6 py-3 font-bold text-black transition-transform hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/70"
-        >
-          <Sparkles aria-hidden="true" className="h-5 w-5" /> Ver planes
-        </Link>
-      </Message>
-    );
-  }
+  const locked = authenticated && entitlementsReady && !has("recap");
+  const viewKey = locked ? "locked" : state.status === "ready" ? `ready-${state.data.year}` : state.status;
+  return <ViewSwap viewKey={viewKey}>{renderView()}</ViewSwap>;
 
-  if (state.status === "ready") {
-    return <RecapStory key={state.data.year} recap={state.data} user={recapUser} onClose={close} />;
-  }
+  function renderView() {
+    if (locked) {
+      return (
+        <Message title="Tu año es Pro" onClose={close}>
+          <p>El resumen anual forma parte de Pro: tu serie y película del año, tu banda sonora y tu perfil de espectador, listos para compartir.</p>
+          <Link
+            href="/planes"
+            className="inline-flex items-center gap-2 rounded-full bg-[#c6f432] px-6 py-3 font-bold text-black transition-transform hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/70"
+          >
+            <Sparkles aria-hidden="true" className="h-5 w-5" /> Ver planes
+          </Link>
+        </Message>
+      );
+    }
 
-  if (state.status === "unauthenticated") {
-    return (
-      <Message title="Tu año te espera" onClose={close}>
-        <p>Inicia sesión para ver tu resumen anual: lo que viste, tus favoritos y tu perfil de espectador.</p>
-        <Link
-          href={`/login?next=${encodeURIComponent(year ? `/recap/${year}` : "/recap")}`}
-          className="inline-flex items-center gap-2 rounded-full bg-[#c6f432] px-6 py-3 font-bold text-black transition-transform hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/70"
-        >
-          <LogIn aria-hidden="true" className="h-5 w-5" /> Iniciar sesión
-        </Link>
-      </Message>
-    );
-  }
+    if (state.status === "ready") {
+      return <RecapStory key={state.data.year} recap={state.data} user={recapUser} onClose={close} />;
+    }
 
-  if (state.status === "error") {
-    return (
-      <Message title="Algo se ha cortado" onClose={close}>
-        <p>No hemos podido preparar tu resumen. Vuelve a intentarlo en un momento.</p>
-        <button
-          type="button"
-          onClick={() => setAttempt((value) => value + 1)}
-          className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 font-bold text-black focus:outline-none focus-visible:ring-4 focus-visible:ring-white/70"
-        >
-          <RefreshCw aria-hidden="true" className="h-5 w-5" /> Reintentar
-        </button>
-      </Message>
-    );
-  }
+    if (state.status === "unauthenticated") {
+      return (
+        <Message title="Tu año te espera" onClose={close}>
+          <p>Inicia sesión para ver tu resumen anual: lo que viste, tus favoritos y tu perfil de espectador.</p>
+          <Link
+            href={`/login?next=${encodeURIComponent(year ? `/recap/${year}` : "/recap")}`}
+            className="inline-flex items-center gap-2 rounded-full bg-[#c6f432] px-6 py-3 font-bold text-black transition-transform hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/70"
+          >
+            <LogIn aria-hidden="true" className="h-5 w-5" /> Iniciar sesión
+          </Link>
+        </Message>
+      );
+    }
 
-  if (state.status === "empty") {
-    const years = (state.data?.availableYears || []).filter((item) => item.plays >= 5);
-    return (
-      <Message title={`${state.data.year} está en blanco`} onClose={close}>
-        <p>
-          Aún no hay nada registrado en {state.data.year}. Marca lo que veas y aquí tendrás tu resumen.
-        </p>
-        {years.length ? (
-          <nav aria-label="Años con resumen" className="flex flex-wrap justify-center gap-2">
-            {years.slice(0, 8).map((item) => (
-              <Link
-                key={item.year}
-                href={`/recap/${item.year}`}
-                className="rounded-full bg-white/12 px-4 py-2 font-bold text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              >
-                {item.year}
-              </Link>
-            ))}
-          </nav>
-        ) : null}
-      </Message>
-    );
-  }
+    if (state.status === "error") {
+      return (
+        <Message title="Algo se ha cortado" onClose={close}>
+          <p>No hemos podido preparar tu resumen. Vuelve a intentarlo en un momento.</p>
+          <button
+            type="button"
+            onClick={() => setAttempt((value) => value + 1)}
+            className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 font-bold text-black focus:outline-none focus-visible:ring-4 focus-visible:ring-white/70"
+          >
+            <RefreshCw aria-hidden="true" className="h-5 w-5" /> Reintentar
+          </button>
+        </Message>
+      );
+    }
 
-  return <Loading year={year} onClose={close} />;
+    if (state.status === "empty") {
+      const years = (state.data?.availableYears || []).filter((item) => item.plays >= 5);
+      return (
+        <Message title={`${state.data.year} está en blanco`} onClose={close}>
+          <p>
+            Aún no hay nada registrado en {state.data.year}. Marca lo que veas y aquí tendrás tu resumen.
+          </p>
+          {years.length ? (
+            <nav aria-label="Años con resumen" className="flex flex-wrap justify-center gap-2">
+              {years.slice(0, 8).map((item) => (
+                <Link
+                  key={item.year}
+                  href={`/recap/${item.year}`}
+                  className="rounded-full bg-white/12 px-4 py-2 font-bold text-white transition-colors hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  {item.year}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
+        </Message>
+      );
+    }
+
+    return <Loading year={year} onClose={close} />;
+  }
 }

@@ -13,7 +13,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Pause, Play, Volume2, VolumeX, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
 import {
@@ -74,16 +74,30 @@ function cardPayload(recap, user) {
   };
 }
 
+// Cambio de pantalla: la que entra se monta ENCIMA (zIndex) y cubre a la que
+// sale, que no se desvanece: con las dos a media opacidad asomaba el fondo
+// negro y el cambio parpadeaba. Se anima `transform` como cadena (no x/scale)
+// para que framer lo mande a WAAPI y vaya en el compositor: la pantalla nueva
+// se monta a la vez y, en JS, el desplazamiento iba a tirones.
+const SLIDE_EASE = [0.22, 1, 0.36, 1];
+const SLIDE_DURATION = 0.5;
+const instantZ = { zIndex: { duration: 0 } };
+
 const slideVariants = {
-  enter: (direction) => ({ x: `${direction * 14}%`, scale: 0.94, opacity: 0 }),
-  center: { x: "0%", scale: 1, opacity: 1 },
-  exit: (direction) => ({ x: `${direction * -14}%`, scale: 0.94, opacity: 0 }),
+  enter: (direction) => ({ transform: `translateX(${direction * 22}%) scale(0.96)`, opacity: 0, zIndex: 2 }),
+  center: { transform: "translateX(0%) scale(1)", opacity: 1, zIndex: 2, transition: { duration: SLIDE_DURATION, ease: SLIDE_EASE, ...instantZ } },
+  exit: (direction) => ({
+    transform: `translateX(${direction * -8}%) scale(0.94)`,
+    opacity: 1,
+    zIndex: 1,
+    transition: { duration: SLIDE_DURATION, ease: SLIDE_EASE, ...instantZ },
+  }),
 };
 
 const reducedVariants = {
-  enter: { opacity: 0 },
-  center: { opacity: 1 },
-  exit: { opacity: 0 },
+  enter: { opacity: 0, zIndex: 2 },
+  center: { opacity: 1, zIndex: 2, transition: { duration: 0.2, ...instantZ } },
+  exit: { opacity: 1, zIndex: 1, transition: { duration: 0.2, ...instantZ } },
 };
 
 export default function RecapStory({ recap, user, onClose }) {
@@ -107,7 +121,7 @@ export default function RecapStory({ recap, user, onClose }) {
   const autoplay = started && !reduceMotion && Boolean(slide?.duration);
   const paused = userPaused || holding || hidden;
 
-  const fillRef = useRef(null);
+  const fillRefs = useRef([]);
   const elapsed = useRef(0);
   const frameRef = useRef(null);
   const press = useRef(null);
@@ -181,9 +195,23 @@ export default function RecapStory({ recap, user, onClose }) {
     });
   }, []);
 
+  // Segmentos de progreso que no son el activo: llenos los ya vistos, vacíos
+  // los que faltan. Se escriben a mano (el activo lo pinta el temporizador
+  // fuera de React) y llevan transición CSS: al pasar antes de tiempo, el que
+  // se deja se completa deslizando, y al volver atrás se vacía igual, sin saltos.
+  useLayoutEffect(() => {
+    // El activo también se fija aquí, antes de pintar: sin transform el
+    // segmento saldría lleno un fotograma hasta que corre el temporizador.
+    const activeShown = autoplay ? Math.min(1, elapsed.current / slide.duration) : index === 0 && !started ? 0 : 1;
+    fillRefs.current.forEach((fill, i) => {
+      if (!fill) return;
+      fill.style.transform = `scaleX(${i === index ? activeShown : i < index ? 1 : 0})`;
+    });
+  }, [index, slides.length, autoplay, started, slide]);
+
   // Temporizador de la pantalla activa.
   useEffect(() => {
-    const fill = fillRef.current;
+    const fill = fillRefs.current[index];
     if (fill) {
       const shown = autoplay ? Math.min(1, elapsed.current / slide.duration) : index === 0 && !started ? 0 : 1;
       fill.style.transform = `scaleX(${shown})`;
@@ -194,7 +222,8 @@ export default function RecapStory({ recap, user, onClose }) {
       elapsed.current += now - last;
       last = now;
       const progress = Math.min(1, elapsed.current / slide.duration);
-      if (fillRef.current) fillRef.current.style.transform = `scaleX(${progress})`;
+      const activeFill = fillRefs.current[index];
+      if (activeFill) activeFill.style.transform = `scaleX(${progress})`;
       if (progress >= 1) {
         if (index < slides.length - 1) goTo(index + 1);
         return;
@@ -373,7 +402,6 @@ export default function RecapStory({ recap, user, onClose }) {
               initial="enter"
               animate="center"
               exit="exit"
-              transition={{ duration: reduceMotion ? 0.2 : 0.55, ease: [0.22, 1, 0.36, 1] }}
               aria-roledescription="diapositiva"
               aria-label={`${index + 1} de ${slides.length}: ${slide.label}`}
               className="absolute inset-0 overflow-hidden"
@@ -404,17 +432,17 @@ export default function RecapStory({ recap, user, onClose }) {
           >
             <div className="flex gap-1" aria-hidden="true">
               {slides.map((item, i) => (
-                // La clave cambia con el estado del segmento: al volver atrás, el
-                // segmento que el temporizador había pintado se monta de nuevo vacío.
                 <span
-                  key={`${item.id}-${i < index ? "done" : i === index ? "active" : "todo"}`}
+                  key={item.id}
                   className="h-[3px] flex-1 overflow-hidden rounded-full"
                   style={{ background: "color-mix(in srgb, currentColor 30%, transparent)" }}
                 >
                   <span
-                    ref={i === index ? fillRef : undefined}
-                    className="block h-full origin-left rounded-full"
-                    style={{ background: "currentColor", transform: `scaleX(${i < index ? 1 : 0})` }}
+                    ref={(node) => {
+                      fillRefs.current[i] = node;
+                    }}
+                    className={`block h-full origin-left rounded-full ${i === index ? "" : "transition-transform duration-300 ease-out motion-reduce:transition-none"}`}
+                    style={{ background: "currentColor" }}
                   />
                 </span>
               ))}

@@ -5,7 +5,7 @@
 // pantallas entran con opacidad y un cristal dentro se vería plano.
 
 import { motion, useReducedMotion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Star } from "lucide-react";
 
 import { backgroundArt, formatDecimal, formatNumber, tmdbImg } from "@/lib/recap/recapModel";
@@ -14,14 +14,18 @@ import styles from "./recap.module.css";
 export const ANTON = { fontFamily: "var(--font-anton), var(--font-pt-sans), sans-serif" };
 export const EASE_OUT = [0.22, 1, 0.36, 1];
 
+// Las entradas animan `transform` como cadena, no `y`: así framer las manda a
+// WAAPI y van en el compositor. Con `y` iban en JS y, como coinciden con el
+// cambio de pantalla (que monta la pantalla nueva entera), daban tirones.
+
 /** Entrada básica: sube y aparece, con retraso. */
 export function Reveal({ delay = 0, y = 26, className = "", children, as = "div", ...props }) {
   const reduce = useReducedMotion();
   const Component = motion[as] || motion.div;
   return (
     <Component
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y }}
-      animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      initial={reduce ? { opacity: 0 } : { opacity: 0, transform: `translateY(${y}px)` }}
+      animate={reduce ? { opacity: 1 } : { opacity: 1, transform: "translateY(0px)" }}
       transition={{ duration: reduce ? 0.2 : 0.75, delay: reduce ? 0 : delay, ease: EASE_OUT }}
       className={className}
       {...props}
@@ -44,8 +48,8 @@ export function WordsReveal({ text, delay = 0, stagger = 0.07, className = "", s
         <span key={`${word}-${index}`} aria-hidden="true" className="-mt-[0.18em] inline-block overflow-hidden pb-[0.06em] pt-[0.18em] align-bottom">
           <motion.span
             className="inline-block"
-            initial={reduce ? { opacity: 0 } : { y: "105%" }}
-            animate={reduce ? { opacity: 1 } : { y: "0%" }}
+            initial={reduce ? { opacity: 0 } : { transform: "translateY(105%)" }}
+            animate={reduce ? { opacity: 1 } : { transform: "translateY(0%)" }}
             transition={{ duration: reduce ? 0.2 : 0.8, delay: reduce ? 0 : delay + index * stagger, ease: EASE_OUT }}
           >
             {word}
@@ -57,35 +61,52 @@ export function WordsReveal({ text, delay = 0, stagger = 0.07, className = "", s
   );
 }
 
-/** Cifra que cuenta desde 0 (ease-out exponencial). */
+/**
+ * Cifra que cuenta desde 0 (ease-out exponencial). El número se escribe en el
+ * DOM en cada fotograma, sin re-renderizar React: con setState por fotograma
+ * la pantalla entera se renderizaba 60 veces por segundo justo mientras
+ * entraba, y el cambio de pantalla y las entradas daban tirones.
+ */
 export function CountUp({ value, duration = 1.8, delay = 0.2, decimals = 0, className = "", style }) {
   const reduce = useReducedMotion();
   const target = Number(value) || 0;
-  const [shown, setShown] = useState(reduce ? target : 0);
+  const format = (n) => (decimals > 0 ? formatDecimal(n, decimals) : formatNumber(n));
+  const textRef = useRef(null);
   const frame = useRef(0);
 
   useEffect(() => {
+    const node = textRef.current;
+    if (!node) return undefined;
+    const write = (n) => {
+      const next = decimals > 0 ? formatDecimal(n, decimals) : formatNumber(n);
+      // Se toca el nodo de texto que creó React (no textContent, que lo
+      // sustituiría y dejaría a React con uno suelto).
+      const text = node.firstChild;
+      if (text && text.nodeValue !== next) text.nodeValue = next;
+      else if (!text) node.textContent = next;
+    };
     if (reduce) {
-      setShown(target);
+      write(target);
       return undefined;
     }
+    write(0);
     let start = 0;
     const tick = (now) => {
       if (!start) start = now + delay * 1000;
       const t = Math.min(1, Math.max(0, (now - start) / (duration * 1000)));
       const eased = t === 1 ? 1 : 1 - 2 ** (-10 * t);
-      setShown(target * eased);
+      write(target * eased);
       if (t < 1) frame.current = requestAnimationFrame(tick);
     };
     frame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame.current);
-  }, [target, duration, delay, reduce]);
+  }, [target, duration, delay, reduce, decimals]);
 
-  const text = decimals > 0 ? formatDecimal(shown, decimals) : formatNumber(shown);
-  const final = decimals > 0 ? formatDecimal(target, decimals) : formatNumber(target);
+  const final = format(target);
   return (
     <span className={`tabular-nums ${className}`} style={style}>
-      <span aria-hidden="true">{text}</span>
+      {/* El texto inicial lo pone React una vez; luego lo lleva el efecto. */}
+      <span ref={textRef} aria-hidden="true" suppressHydrationWarning>{reduce ? final : format(0)}</span>
       <span className="sr-only">{final}</span>
     </span>
   );
