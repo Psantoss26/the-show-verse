@@ -2300,9 +2300,9 @@ function ProfileSettingsClient() {
 
   // SIN ESTADO DE CARGA. Dos cambios respecto a la versión con spinner:
   //
-  //  - Ya NO se espera a `preferencesReady`. `preferences` arranca desde la
-  //    instantánea de localStorage (AuthContext las inicializa con
-  //    `readAuthPreferencesCache`), así que los ajustes se pintan con el último
+  //  - Ya NO se espera a `preferencesReady`. `preferences` toma la instantánea
+  //    de localStorage en el mismo efecto de arranque que activa `hydrated`
+  //    (AuthContext), así que los ajustes se pintan con el último
   //    valor conocido y se revalidan en segundo plano: el mismo
   //    stale-while-revalidate que ya usa el resto de la app. De paso desaparece
   //    el bloqueo real que tenía esta pantalla: si la sesión entraba en el bucle

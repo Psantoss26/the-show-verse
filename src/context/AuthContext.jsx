@@ -219,7 +219,11 @@ async function readJsonResponse(response) {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [hydrated, setHydrated] = useState(false);
-  const [preferences, setPreferences] = useState(readAuthPreferencesCache);
+  // Arranca con los valores por defecto, los mismos que ve el servidor (no tiene
+  // localStorage): la copia local se aplica en el efecto de arranque de abajo.
+  // Leída aquí, el primer render del cliente no coincidía con el HTML (p. ej.
+  // «Puntuaciones en el móvil» en el marcador de la ficha) y React lo tiraba.
+  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const [loadingPreferences, setLoadingPreferences] = useState(false);
   const [preferencesReady, setPreferencesReady] = useState(false);
   // Indica que existe una instantánea completa de preferencias (incluidos los
@@ -357,11 +361,16 @@ export const AuthProvider = ({ children }) => {
   useLayoutEffect(() => {
     const cachedUser = readAuthUserCache();
     const cachedPreferences = hasAuthPreferencesCache();
+    const restoredPreferences =
+      cachedPreferences || /showverse_default_view=/.test(document.cookie)
+        ? readAuthPreferencesCache()
+        : null;
     startTransition(() => {
       if (cachedUser) {
         setUser(cachedUser);
         setHydrated(true);
       }
+      if (restoredPreferences) setPreferences(restoredPreferences);
       setPreferencesCached(cachedPreferences);
     });
   }, []);
