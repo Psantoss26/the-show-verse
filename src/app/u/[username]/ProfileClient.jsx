@@ -1339,6 +1339,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               <NeuralGraphView
                 username={user.username}
                 headerCollapsed={neuralHeaderCollapsed}
+                headerMorphing={headerMorphing}
                 onToggleHeader={() => {
                   const next = !neuralHeaderCollapsed;
                   setNeuralHeaderCollapsed(next);

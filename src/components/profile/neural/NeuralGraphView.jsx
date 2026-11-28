@@ -46,6 +46,7 @@ import { NEURAL_STAGE_CLASS, NeuralSkeletonArt, documentTop } from "./NeuralGrap
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { getTitleNames } from "@/lib/search/titleNames";
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
+import { freezeNeuralCanvas, syncFrozenStageHeight } from "@/lib/profile/neuralCanvasFreeze";
 import {
   FLAG_FAVORITE,
   FLAG_WATCHED,
@@ -409,7 +410,7 @@ function lockPageScroll(locked) {
   }
 }
 
-export default function NeuralGraphView({ username, headerCollapsed = false, onToggleHeader = null }) {
+export default function NeuralGraphView({ username, headerCollapsed = false, headerMorphing = false, onToggleHeader = null }) {
   const router = useRouter();
   const { status, payload } = useNeuralPayload(username);
   // Preferencias guardadas (por cuenta). El componente solo existe en el
@@ -856,13 +857,17 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
   // Un encuadre pedido antes de que el lienzo tenga tamaño queda PENDIENTE y
   // se aplica en cuanto se mide (si no, se perdía y la red salía ampliada).
   const pendingFitRef = useRef(false);
+  // Lienzo congelado mientras la cabecera del perfil hace su morph (ver
+  // «Lienzo congelado» más abajo): su tamaño no es el del marco, así que un
+  // encuadre en ese momento quedaría descentrado y se deja pendiente.
+  const canvasFrozenRef = useRef(false);
   // `animate`: true (transición), false (al instante) o "follow": un paso
   // suave hacia el encuadre, para acompañar a la red mientras se asienta sin
   // saltos de zoom (con un tope de zoom que no llega a mostrar los títulos).
   const fitView = useCallback((animate = true) => {
     if (!graph) return;
     const { w, h } = sizeRef.current;
-    if (!w || !h) {
+    if (!w || !h || canvasFrozenRef.current) {
       // Se recuerda el modo: uno de acompañamiento se aplicará con su tope.
       pendingFitRef.current = animate === "follow" || animate === "start" ? "start" : "snap";
       return;
@@ -1069,10 +1074,13 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       frame = 0;
       const top = Math.round(documentTop(stage));
       stage.style.setProperty("--neural-top", `${top}px`);
+      const stageHeight = stage.offsetHeight;
+      // Con el lienzo congelado, la máscara de fundido sigue al marco.
+      if (canvasFrozenRef.current) syncFrozenStageHeight(stage, stageHeight);
       // SIN DESPLAZAMIENTO VERTICAL: la vista ya ocupa justo la pantalla, y lo
       // que queda por debajo es relleno de la página. Solo si cabe entera: en
       // pantallas muy bajas (alto mínimo del lienzo) se deja desplazar.
-      lockPageScroll(top + stage.offsetHeight <= window.innerHeight + 2);
+      lockPageScroll(top + stageHeight <= window.innerHeight + 2);
     };
     const schedule = () => {
       if (!frame) frame = window.requestAnimationFrame(measure);
@@ -1122,6 +1130,26 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     // requestAnimationFrame ya se ve su estado de ese fotograma), para que el
     // lienzo encaje sin desfase de un cuadro.
   }, [headerCollapsed, menuShown, menuOpen]);
+
+  // ── Lienzo congelado durante el morph de la cabecera ─────────────────────
+  // Mientras la cabecera del perfil se compacta o despliega, el lienzo no
+  // sigue al marco fotograma a fotograma (ver neuralCanvasFreeze.js): solo se
+  // redimensiona al empezar y al acabar, con la cámara compensada
+  // (anchorUntilRef) para que la red no se mueva en pantalla.
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    const stage = stageRef.current;
+    if (!headerMorphing || fullscreen || !canvas || !stage) return undefined;
+    canvasFrozenRef.current = true;
+    anchorUntilRef.current = Number.POSITIVE_INFINITY;
+    const release = freezeNeuralCanvas({ canvas, stage, viewportHeight: window.innerHeight });
+    return () => {
+      canvasFrozenRef.current = false;
+      // El redimensionado final (observador, antes de pintar) aún compensa.
+      anchorUntilRef.current = performance.now() + 200;
+      release();
+    };
+  }, [headerMorphing, fullscreen, status]);
 
   // ── Tamaño del lienzo ─────────────────────────────────────────────────────
   useEffect(() => {
