@@ -1,48 +1,42 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { FROZEN_STAGE_HEIGHT_VAR, freezeNeuralCanvas, frozenCanvasStyle, syncFrozenStageHeight } from "./neuralCanvasFreeze.js";
+import { freezeNeuralCanvas, frozenCanvasStyle } from "./neuralCanvasFreeze.js";
 
-function fakeElement(offsetHeight = 0) {
-  const props = new Map();
-  return {
-    offsetHeight,
-    style: {
-      setProperty: (name, value) => props.set(name, value),
-      removeProperty: (name) => props.delete(name),
-      getPropertyValue: (name) => props.get(name) ?? "",
-    },
-  };
+const MASK = "linear-gradient(rgba(0, 0, 0, 0), rgb(0, 0, 0) 32px)";
+
+function fakeElement(offsetHeight = 0, computedMask = "none") {
+  return { offsetHeight, style: {}, computedMask };
 }
+const view = { getComputedStyle: (el) => ({ maskImage: el.computedMask }) };
 
 test("el lienzo congelado no es más bajo que el marco ni que la pantalla", () => {
-  assert.equal(frozenCanvasStyle(500, 800).height, "800px");
-  assert.equal(frozenCanvasStyle(900.4, 800).height, "901px");
+  assert.equal(frozenCanvasStyle(500, 800, false).height, "800px");
+  assert.equal(frozenCanvasStyle(900.4, 800, false).height, "901px");
+  assert.equal(frozenCanvasStyle(500, 800, false).top, "auto");
 });
 
-test("el lienzo congelado se ancla abajo y la máscara sigue al marco", () => {
-  const style = frozenCanvasStyle(500, 800);
-  assert.equal(style.top, "auto");
-  assert.equal(style.maskPosition, "bottom");
-  assert.equal(style.maskRepeat, "no-repeat");
-  assert.equal(style.maskSize, `100% var(${FROZEN_STAGE_HEIGHT_VAR}, 100%)`);
-});
-
-test("congelar fija el alto una vez; liberar devuelve los estilos del CSS", () => {
-  const canvas = fakeElement();
+test("con fundido (móvil), la máscara pasa del lienzo al marco y vuelve al liberar", () => {
+  const canvas = fakeElement(0, MASK);
   const stage = fakeElement(520);
-  const release = freezeNeuralCanvas({ canvas, stage, viewportHeight: 844 });
+  const release = freezeNeuralCanvas({ canvas, stage, viewportHeight: 844, view });
   assert.equal(canvas.style.height, "844px");
-  assert.equal(stage.style.getPropertyValue(FROZEN_STAGE_HEIGHT_VAR), "520px");
-
-  // El marco crece durante el morph: el lienzo NO cambia (sin redibujar).
-  syncFrozenStageHeight(stage, 600);
-  assert.equal(canvas.style.height, "844px");
-  assert.equal(stage.style.getPropertyValue(FROZEN_STAGE_HEIGHT_VAR), "600px");
+  assert.equal(canvas.style.maskImage, "none");
+  assert.equal(stage.style.maskImage, MASK);
 
   release();
-  for (const property of ["top", "height", "maskSize", "maskPosition", "maskRepeat"]) {
+  for (const property of ["top", "height", "maskImage", "webkitMaskImage"]) {
     assert.equal(canvas.style[property], "", property);
   }
-  assert.equal(stage.style.getPropertyValue(FROZEN_STAGE_HEIGHT_VAR), "");
+  assert.equal(stage.style.maskImage, "");
+});
+
+test("sin fundido (escritorio), el marco no recibe máscara", () => {
+  const canvas = fakeElement();
+  const stage = fakeElement(520);
+  const release = freezeNeuralCanvas({ canvas, stage, viewportHeight: 844, view });
+  assert.equal(stage.style.maskImage, undefined);
+  assert.equal(canvas.style.maskImage, undefined);
+  release();
+  assert.equal(canvas.style.height, "");
 });

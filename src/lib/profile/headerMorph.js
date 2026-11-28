@@ -2,8 +2,16 @@
 //
 // Las dos cabeceras están siempre montadas y SUPERPUESTAS en la misma caja: la
 // activa ocupa sitio y la otra queda encima, absoluta e invisible. Al cambiar:
-//   - la caja anima su ALTURA (de la cabecera que se va a la que llega), para
-//     que pestañas y contenido —el lienzo neuronal— acompañen el cambio;
+//   - la caja toma al instante la altura de la que llega y lo que va DEBAJO
+//     (pestañas y contenido) sale desplazado donde estaba y vuelve a su sitio
+//     con transform. Antes se animaba la altura de la caja: eso va en el hilo
+//     principal y, en el móvil, con el hilo ocupado (montar la sección) las
+//     pestañas y el lienzo se quedaban atrás de las piezas que viajan (que van
+//     por el compositor) y alcanzaban de golpe: un «bache». Ahora TODO el
+//     morph es transform y opacidad;
+//   - lo marcado con `data-header-morph-pin` dentro de lo de debajo (el lienzo
+//     neuronal) se desplaza al revés a la vez: queda quieto en pantalla
+//     mientras su marco se mueve;
 //   - las cabeceras se funden (la que se va antes, la que llega después);
 //   - las piezas que existen en las dos (avatar, nombre y las cuatro tarjetas
 //     de recuento, marcadas con `data-header-morph`) VIAJAN de una a otra: la
@@ -57,7 +65,8 @@ const IDENTITY = "translate(0px, 0px) scale(1)";
 // sitio, `outgoing` la que ya está absoluta encima; el DOM ya refleja el estado
 // final. `onFinish` se llama solo si la animación termina sola (no al
 // cancelarla). Devuelve una función que cancela la animación en curso.
-export function morphProfileHeader({ box, incoming, outgoing, onFinish }) {
+// `followers`: lo que va debajo de la caja (se desplaza con su altura).
+export function morphProfileHeader({ incoming, outgoing, followers = [], onFinish }) {
   const oldHeight = outgoing.offsetHeight;
   const newHeight = incoming.offsetHeight;
   const from = pieces(outgoing);
@@ -65,14 +74,25 @@ export function morphProfileHeader({ box, incoming, outgoing, onFinish }) {
   const timing = { duration: HEADER_MORPH_MS, easing: HEADER_MORPH_EASING };
   const animations = [];
 
-  // Recorte solo mientras dura: en reposo las tarjetas tienen sombras y
-  // escalado al pasar el ratón que no deben cortarse.
-  box.style.overflow = "clip";
-  animations.push(box.animate({ height: [`${oldHeight}px`, `${newHeight}px`] }, timing));
+  // `add`: se suma a las entradas CSS de la sección (que también usan
+  // transform) en vez de anularlas.
+  const shift = oldHeight - newHeight;
+  const slide = (el, offset) =>
+    el.animate({ transform: [`translateY(${offset}px)`, "translateY(0px)"] }, { ...timing, composite: "add" });
+  if (shift) {
+    for (const follower of followers) {
+      animations.push(slide(follower, shift));
+      for (const pin of follower.querySelectorAll("[data-header-morph-pin]")) animations.push(slide(pin, -shift));
+    }
+  }
+  // Fundido corto y temprano (la curva hace casi todo el viaje al principio):
+  // así no se ven las dos cabeceras a medias ni lo que no viaja recortado.
+  const outgoingFade = outgoing.animate(
+    { opacity: [1, 0, 0], offset: [0, 0.3, 1] },
+    { duration: HEADER_MORPH_MS, easing: "linear" },
+  );
   animations.push(
-    // Fundido corto y temprano (la curva hace casi todo el viaje al principio):
-    // así no se ven las dos cabeceras a medias ni lo que no viaja recortado.
-    outgoing.animate({ opacity: [1, 0, 0], offset: [0, 0.3, 1] }, { duration: HEADER_MORPH_MS, easing: "linear" }),
+    outgoingFade,
     incoming.animate({ opacity: [0, 0, 1, 1], offset: [0, 0.08, 0.5, 1] }, { duration: HEADER_MORPH_MS, easing: "linear" }),
   );
 
@@ -95,18 +115,15 @@ export function morphProfileHeader({ box, incoming, outgoing, onFinish }) {
     );
   }
 
-  let done = false;
-  const finish = () => {
-    if (done) return;
-    done = true;
-    box.style.overflow = "";
-  };
-  animations[0].finished.then(() => {
-    finish();
-    onFinish?.();
-  }, finish);
+  let cancelled = false;
+  outgoingFade.finished.then(
+    () => {
+      if (!cancelled) onFinish?.();
+    },
+    () => {},
+  );
   return () => {
+    cancelled = true;
     for (const animation of animations) animation.cancel();
-    finish();
   };
 }

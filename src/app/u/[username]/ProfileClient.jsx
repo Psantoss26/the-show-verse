@@ -882,9 +882,14 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
       return;
     }
     cancelHeaderMorphRef.current = morphProfileHeader({
-      box,
       incoming: compactHeader ? compactLayer : fullLayer,
       outgoing: compactHeader ? fullLayer : compactLayer,
+      // Pestañas y contenido: los hermanos que siguen a la caja.
+      followers: (() => {
+        const list = [];
+        for (let el = box.nextElementSibling; el; el = el.nextElementSibling) list.push(el);
+        return list;
+      })(),
       onFinish: () => setHeaderMorphing(false),
     });
   }, [compactHeader]);
@@ -1175,7 +1180,9 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           ref={compactLayerRef}
           aria-hidden={!compactHeader}
           inert={!compactHeader || undefined}
-          className={compactHeader ? "" : "pointer-events-none absolute inset-x-0 top-0 opacity-0"}
+          // El hueco hasta las pestañas va DENTRO de cada cabecera (padding):
+          // así forma parte de la altura que anima el morph.
+          className={compactHeader ? "pb-1.5" : "pointer-events-none absolute inset-x-0 top-0 pb-1.5 opacity-0"}
         >
             <div className="flex items-center gap-3 py-1.5">
               <ProfileAvatar user={user} size="h-8 w-8 shrink-0" morph="avatar" />
@@ -1217,7 +1224,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           ref={fullLayerRef}
           aria-hidden={compactHeader}
           inert={compactHeader || undefined}
-          className={compactHeader ? "pointer-events-none absolute inset-x-0 top-0 opacity-0" : ""}
+          className={`pb-3 @[640px]/detail-page:pb-8 ${compactHeader ? "pointer-events-none absolute inset-x-0 top-0 opacity-0" : ""}`}
         >
         <header className="flex flex-wrap items-center gap-3 @[1024px]/detail-page:flex-nowrap @[1024px]/detail-page:justify-between @[1024px]/detail-page:gap-6">
           <ProfileAvatar user={user} size={`h-16 w-16 shrink-0 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26${enter("sv-section-header-in")}`} morph="avatar" />
@@ -1302,7 +1309,6 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
             sections={sections}
             onNavigate={navigateToTab}
             routeBase={routeBase}
-            compact={compactHeader}
           />
         </div>
 
@@ -1529,7 +1535,7 @@ const PROFILE_TAB_UNDERLINE =
 
 // Barra de pestañas del perfil. "Perfil" = resumen; el resto muestra su conteo
 // y carga su sección bajo demanda.
-function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact = false }) {
+function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
   const navRef = useRef(null);
   const items = [
     { id: "profile", label: "Perfil" },
@@ -1572,12 +1578,10 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
       data-profile-swipe-exempt
       data-mobile-page-swipe-ignore
       aria-label="Secciones del perfil"
-      // Con la cabecera compacta, el margen superior se iguala al hueco de
-      // encima para que la fila compacta quede centrada entre la barra de
-      // navegación y las pestañas.
-      className={`relative flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain transition-[margin] duration-(--sv-header-morph-ms) ease-(--sv-header-morph-easing) [scrollbar-width:none] [-ms-overflow-style:none] motion-reduce:transition-none [&::-webkit-scrollbar]:hidden ${
-        compact ? "mt-1.5" : "mt-3 @[640px]/detail-page:mt-8"
-      }`}
+      // Sin margen superior: el hueco con la cabecera es el padding inferior
+      // de cada cabecera (con la compacta, igual al hueco de encima para que
+      // la fila quede centrada entre la barra de navegación y las pestañas).
+      className="relative flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
     >
       {indicator}
       {items.map((it) => {

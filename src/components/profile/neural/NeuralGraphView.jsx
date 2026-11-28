@@ -46,7 +46,7 @@ import { NEURAL_STAGE_CLASS, NeuralSkeletonArt, documentTop } from "./NeuralGrap
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { getTitleNames } from "@/lib/search/titleNames";
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
-import { freezeNeuralCanvas, syncFrozenStageHeight } from "@/lib/profile/neuralCanvasFreeze";
+import { freezeNeuralCanvas } from "@/lib/profile/neuralCanvasFreeze";
 import {
   FLAG_FAVORITE,
   FLAG_WATCHED,
@@ -1075,8 +1075,6 @@ export default function NeuralGraphView({ username, headerCollapsed = false, hea
       const top = Math.round(documentTop(stage));
       stage.style.setProperty("--neural-top", `${top}px`);
       const stageHeight = stage.offsetHeight;
-      // Con el lienzo congelado, la máscara de fundido sigue al marco.
-      if (canvasFrozenRef.current) syncFrozenStageHeight(stage, stageHeight);
       // SIN DESPLAZAMIENTO VERTICAL: la vista ya ocupa justo la pantalla, y lo
       // que queda por debajo es relleno de la página. Solo si cabe entera: en
       // pantallas muy bajas (alto mínimo del lienzo) se deja desplazar.
@@ -1140,6 +1138,10 @@ export default function NeuralGraphView({ username, headerCollapsed = false, hea
     const canvas = canvasRef.current;
     const stage = stageRef.current;
     if (!headerMorphing || fullscreen || !canvas || !stage) return undefined;
+    // El DOM ya está en su estado final: el marco toma YA su alto final (si no,
+    // el primer fotograma lo pintaría con el de antes y el lienzo, anclado a su
+    // borde inferior, daría un salto).
+    measureStageRef.current();
     canvasFrozenRef.current = true;
     anchorUntilRef.current = Number.POSITIVE_INFINITY;
     const release = freezeNeuralCanvas({ canvas, stage, viewportHeight: window.innerHeight });
@@ -1612,6 +1614,8 @@ export default function NeuralGraphView({ username, headerCollapsed = false, hea
       >
         <canvas
           ref={canvasRef}
+          // Quieto en pantalla durante el morph de la cabecera (headerMorph.js).
+          data-header-morph-pin
           role="img"
           aria-label={
             graph
