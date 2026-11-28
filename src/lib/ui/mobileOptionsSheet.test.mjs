@@ -95,9 +95,8 @@ test("las vistas laterales abren sus filtros en la hoja, dentro del ancho del pa
   assert.match(filmography, /<SheetOptionGroup label="Tipo de título"/);
   assert.doesNotMatch(filmography, /tabs=\{|role="radiogroup"/);
   assert.match(sheet, /placement === "sectionSheet" \? "sm:ml-auto sm:w-\[30rem\]/);
-  // La vista lateral de debajo marca `data-sv-sheet-open`: la hoja no se lo quita.
-  assert.match(sheet, /if \(root\.hasAttribute\(SHEET_OPEN_ATTR\)\) return;/);
-  assert.match(sheet, /if \(pageBelowHolders \|\| !ownsPageBelowAttr\) return;/);
+  // La vista lateral de debajo marca `data-sv-sheet-open`: la hoja no lo toca.
+  assert.doesNotMatch(sheet, /data-sv-sheet-open"/);
 });
 
 test("la hoja anima entera al abrir y al cerrar aunque la página esté ocupada", () => {
@@ -105,10 +104,11 @@ test("la hoja anima entera al abrir y al cerrar aunque la página esté ocupada"
   // que la cortaba si arrancaba tarde.
   assert.match(sheet, /onAnimationEnd=\{\(event\) => \{\s*if \(closing && event\.target === event\.currentTarget && EXIT_ANIMATIONS\.has\(event\.animationName\)\)/);
   assert.match(sheet, /MOBILE_OPTIONS_SHEET_EXIT_MS \+ EXIT_FALLBACK_EXTRA_MS/);
-  // La pausa de la página (recalcula ~11.000 elementos) no va en el primer
-  // fotograma de la animación.
-  assert.match(sheet, /pageBelowHolders > 0 \? \(hold\(\), \(\) => \{\}\) : afterTwoFrames\(hold\)/);
-  assert.match(sheet, /if \(held\) afterTwoFrames\(releasePageBelow\)/);
+  // No pausa la página de debajo: marcar `data-sv-sheet-open` recalculaba el
+  // estilo de los ~10.000 elementos y le quitaba el cristal a mitad de la
+  // animación (retardo y parpadeo en Android). Sin ella no hay más cambios de
+  // capas por toque dentro de la hoja, sino menos.
+  assert.doesNotMatch(sheet, /holdPageBelow|releasePageBelow|pausePageBelow|SHEET_OPEN_ATTR/);
   assert.match(sheet, /export function useOptionsSheetController\(\)/);
 });
 
@@ -153,9 +153,25 @@ test("el modal de episodios vistos abre sus opciones móviles en la hoja, encima
   const modal = read("components/trakt/TraktEpisodesWatchedModal.jsx");
   assert.match(modal, /<MobileOptionsSheet\s+open={mobileFiltersOpen}\s+onClose={\(\) => setMobileFiltersOpen\(false\)}/);
   assert.doesNotMatch(modal, /<MobileFiltersPanel\b/);
-  // El modal vive en z-[99999] dentro de la página: la hoja sube por encima
-  // y no apaga su cristal con `data-sv-sheet-open`.
+  // El modal vive en z-[99999] dentro de la página: la hoja sube por encima.
   assert.match(modal, /layerClassName="z-\[100001\]"/);
-  assert.match(modal, /pausePageBelow={false}/);
-  assert.match(sheet, /if \(!open \|\| !pausePageBelow\) return undefined;/);
+});
+
+// Una regla `:root[data-…] … *` (universal a la derecha) obliga a Chrome a
+// recalcular el estilo del documento ENTERO al poner o quitar el atributo:
+// ~300 ms con la CPU de un móvil en Favoritos. `data-sv-modal-open` cambia al
+// abrir cualquier modal u hoja, así que sus reglas apuntan a clases.
+test("abrir un modal no recalcula el estilo de toda la página", () => {
+  const selectors = css
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split(/[{}]/)
+    .flatMap((chunk) => chunk.split(","))
+    .map((selector) => selector.trim())
+    .filter((selector) => selector.includes("[data-sv-modal-open]"));
+  assert.ok(selectors.length > 0);
+  for (const selector of selectors) {
+    assert.doesNotMatch(selector, /(^|\s)\*$/, selector);
+  }
+  // El fondo animado de las páginas de usuario se pausa por sus clases.
+  assert.match(css, /:root:is\(\[data-sv-modal-open\], \[data-sv-sheet-open\]\) :is\(\.sv-upage-blob, \.sv-upage-aurora, \.sv-upage-icon, \.sv-upage-ember\)/);
 });

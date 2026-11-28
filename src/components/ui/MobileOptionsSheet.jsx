@@ -33,45 +33,11 @@ export const MOBILE_OPTIONS_SHEET_EXIT_MS = 220;
 const EXIT_FALLBACK_EXTRA_MS = 400;
 const EXIT_ANIMATIONS = new Set(["sv-options-sheet-out", "sv-options-side-out"]);
 
-// `data-sv-sheet-open` (pausa el cristal de la página tapada) cambia el estilo
-// de TODA la página: ~11.000 elementos, 35 ms en un portátil y 140 ms con la
-// CPU de un móvil. Ponerlo o quitarlo en el mismo fotograma en que empieza la
-// animación de la hoja retrasaba ese fotograma y la hoja aparecía ya a mitad
-// de camino. Se hace dos fotogramas después, con la animación ya corriendo en
-// el compositor. Varias hojas a la vez (la de filtros cerrándose mientras sube
-// la de filtros avanzados) lo comparten: se quita al soltarlo la última, así
-// el relevo no lo quita y lo vuelve a poner.
-const SHEET_OPEN_ATTR = "data-sv-sheet-open";
-let pageBelowHolders = 0;
-let ownsPageBelowAttr = false;
-
-function holdPageBelow() {
-  pageBelowHolders += 1;
-  if (pageBelowHolders !== 1) return;
-  const root = document.documentElement;
-  // Si ya lo puso la vista lateral de debajo, es suyo: no se toca.
-  if (root.hasAttribute(SHEET_OPEN_ATTR)) return;
-  root.setAttribute(SHEET_OPEN_ATTR, "");
-  ownsPageBelowAttr = true;
-}
-
-function releasePageBelow() {
-  pageBelowHolders = Math.max(0, pageBelowHolders - 1);
-  if (pageBelowHolders || !ownsPageBelowAttr) return;
-  document.documentElement.removeAttribute(SHEET_OPEN_ATTR);
-  ownsPageBelowAttr = false;
-}
-
-function afterTwoFrames(callback) {
-  let second = 0;
-  const first = requestAnimationFrame(() => {
-    second = requestAnimationFrame(callback);
-  });
-  return () => {
-    cancelAnimationFrame(first);
-    cancelAnimationFrame(second);
-  };
-}
+// La hoja NO pausa la página de debajo (`data-sv-sheet-open`): ese atributo en
+// <html> recalculaba el estilo de los ~10.000 elementos de Favoritos (~350 ms
+// con CPU de móvil) a mitad de la animación y le quitaba el cristal a cientos
+// de elementos, lo que en Android se veía como retardo y parpadeo. Sin él, los
+// toques dentro de la hoja no cambian más capas, sino menos.
 // Arrastre que cierra la hoja (px hacia abajo), o un gesto rápido.
 const DRAG_CLOSE_DISTANCE = 96;
 const DRAG_CLOSE_VELOCITY = 0.6;
@@ -192,10 +158,6 @@ export default function MobileOptionsSheet({
   // Capa de la hoja: por encima de un modal con z mayor (p. ej. el de
   // episodios vistos) hay que subirla.
   layerClassName = "z-[10000]",
-  // `data-sv-sheet-open` apaga el cristal de los hijos de <body> que no son
-  // capas de modal: debajo de un modal pintado dentro de la página (no en un
-  // portal) le quitaría el suyo, así que ahí se desactiva.
-  pausePageBelow = true,
   // Pie fijo bajo el contenido desplazable (p. ej. «Restablecer» / «Ver
   // resultados»).
   footer = null,
@@ -243,23 +205,6 @@ export default function MobileOptionsSheet({
   }, [open, present]);
 
   useModalGuard({ open, onClose });
-
-  // Pausa del cristal de la página tapada (ver holdPageBelow): se coge dos
-  // fotogramas después de abrir y se suelta dos después de empezar a cerrar.
-  // Con otra hoja ya sosteniéndola (relevo), se coge al momento: no cuesta nada.
-  useEffect(() => {
-    if (!open || !pausePageBelow) return undefined;
-    let held = false;
-    const hold = () => {
-      held = true;
-      holdPageBelow();
-    };
-    const cancel = pageBelowHolders > 0 ? (hold(), () => {}) : afterTwoFrames(hold);
-    return () => {
-      cancel();
-      if (held) afterTwoFrames(releasePageBelow);
-    };
-  }, [open, pausePageBelow]);
 
   // Foco al panel al abrir (lectores de pantalla y Escape).
   useEffect(() => {

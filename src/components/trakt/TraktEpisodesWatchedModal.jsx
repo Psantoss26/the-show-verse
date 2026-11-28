@@ -1600,7 +1600,6 @@ export default function TraktEpisodesWatchedModal({
             subtitle={title || null}
             accent="emerald"
             layerClassName="z-[100001]"
-            pausePageBelow={false}
           >
             <SheetOptionGroup label="Vista" icon={isRewatchView ? History : Tv}>
               {viewMenuItems.map((item) => (
