@@ -26,6 +26,7 @@ import { createPortal } from "react-dom";
 import { CheckCircle2, SlidersHorizontal, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import CountBadge from "@/components/ui/CountBadge";
 
 export const MOBILE_OPTIONS_SHEET_EXIT_MS = 220;
 // Si `animationend` no llega (pestaña oculta, animación anulada), se desmonta
@@ -513,18 +514,7 @@ export function SheetOption({ active, onClick, children, icon: Icon, media = nul
       ) : null}
       {media ? <span className="flex shrink-0" aria-hidden="true">{media}</span> : null}
       <span className="min-w-0 truncate">{children}</span>
-      {count != null ? (
-        // `pt-px`: las cifras de PT Sans quedan 1 px por encima del centro de
-        // su línea (medido: 5,5 px de hueco arriba y 6,5 abajo); así quedan
-        // centradas en la insignia.
-        <span
-          className={`inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 pt-px text-[11px] font-bold tabular-nums leading-none ${
-            shownActive ? "bg-zinc-950/10 text-zinc-700" : "bg-white/[0.08] text-zinc-400"
-          }`}
-        >
-          {count}
-        </span>
-      ) : null}
+      {count != null ? <CountBadge tone={shownActive ? "onLight" : "glass"}>{count}</CountBadge> : null}
       {trailing}
       {shownActive && !Icon && !trailing ? <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
     </button>

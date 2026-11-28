@@ -45,6 +45,7 @@ import PageStatCard from "@/components/ui/PageStatCard";
 import { useSlidingSectionIndicator } from "@/components/ui/useSlidingSectionIndicator";
 import { getOwnCardPoster } from "@/lib/artworkApi";
 import { useOwnCardPostersVersion } from "@/lib/hooks/useOwnCardPoster";
+import CountBadge from "@/components/ui/CountBadge";
 import {
   Activity,
   Award,
@@ -1626,9 +1627,9 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
           >
             {it.label}
             {typeof it.count === "number" && (
-              <span className={`ml-1.5 hidden text-[10px] font-semibold tracking-normal @[640px]/detail-page:inline ${active ? "text-emerald-400" : "text-zinc-600"}`}>
+              <CountBadge tone={active ? "active" : "glass"} className="ml-1.5 hidden @[640px]/detail-page:inline-flex">
                 {it.count}
-              </span>
+              </CountBadge>
             )}
             {/* Hasta medir (HTML del servidor, primer render) la pestaña
                 activa pinta su propio subrayado. */}
