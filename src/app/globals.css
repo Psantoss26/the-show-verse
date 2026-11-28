@@ -5602,12 +5602,23 @@ html[data-details-sequence-transition] .sv-topbar {
     linear-gradient(to bottom, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04));
 }
 
-/* Botones de la cabecera (junto al título): llevan el cristal con `!` de
-   LiquidButton (`!from-white/20 !via-white/5`), así que aquí también. */
-:where(.sv-upage-bg ~ *) .sv-upage-heading :where(button, a)[class*="!from-white/20"] {
-  background-image:
-    radial-gradient(130% 110% at 0% 0%, rgb(var(--upage-tint) / 0.24), rgb(var(--upage-tint) / 0.06) 60%, transparent 85%),
-    linear-gradient(to bottom, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.03)) !important;
+/* Botones de la cabecera (junto al título; en el Perfil, `.sv-upage-actions`
+   de ProfileTitleRow): son LiquidButton y llevan el
+   cristal con `!` (`!bg-gradient-to-br !from-white/20`). Esos `!important`
+   viven en `@layer utilities`, y con `!important` gana la capa ANTERIOR (y
+   cualquier capa a lo que no tiene capa): por eso esta regla va en
+   `@layer base`. Activo (`data-active`) y sólido (`data-solid`) no se tocan. */
+@layer base {
+  :where(.sv-upage-bg ~ *) :is(.sv-upage-heading, .sv-upage-actions) [data-liquid-button]:not([data-active], [data-solid]) {
+    background-image:
+      radial-gradient(130% 110% at 0% 0%, rgb(var(--upage-tint) / 0.24), rgb(var(--upage-tint) / 0.06) 60%, transparent 85%),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.03)) !important;
+  }
+  :where(.sv-upage-bg ~ *) :is(.sv-upage-heading, .sv-upage-actions) [data-liquid-button]:not([data-active], [data-solid], :disabled):hover {
+    background-image:
+      radial-gradient(130% 110% at 0% 0%, rgb(var(--upage-tint) / 0.34), rgb(var(--upage-tint) / 0.09) 60%, transparent 85%),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.13), rgb(255 255 255 / 0.04)) !important;
+  }
 }
 
 /* Desplegables de las páginas de usuario (`.sv-upage-menu`): van en un
