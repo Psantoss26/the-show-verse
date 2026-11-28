@@ -278,6 +278,7 @@ function ProfilePosterGrid({
             showStars={showStars}
             viewerState={viewerTitleStates[titleStateKey(item)]}
             indicatorSize="profile"
+            sheen
             fixedIndicator={fixedIndicator}
             showFixedIndicator={showFixedIndicator}
           />
@@ -395,7 +396,7 @@ function PendingPreview({ username, items, onOpen }) {
                 key={`${item.mediaType}:${item.tmdbId}`}
                 href={href}
                 onClick={previewClick(item)}
-                className="group/poster absolute top-3 bottom-3 aspect-[2/3] overflow-hidden rounded-lg bg-zinc-900 shadow-xl transition-all duration-300 ease-out hover:!z-50 hover:-translate-y-3 hover:scale-105 hover:shadow-[0_20px_40px_rgba(0,0,0,0.95)] focus-visible:outline-none"
+                className="group/poster absolute top-3 bottom-3 aspect-[2/3] overflow-hidden rounded-lg shadow-xl transition-all duration-300 ease-out hover:!z-50 hover:-translate-y-3 hover:scale-105 hover:shadow-[0_20px_40px_rgba(0,0,0,0.95)] focus-visible:outline-none"
                 style={{ left: `${leftPercent}%`, zIndex: index + 1 }}
               >
                 {source ? (
@@ -406,7 +407,7 @@ function PendingPreview({ username, items, onOpen }) {
                     loading="lazy"
                   />
                 ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-zinc-600">
+                  <div className="flex h-full w-full flex-col items-center justify-center bg-zinc-900 p-2 text-center text-zinc-600">
                     <Film className="h-6 w-6 opacity-60" aria-hidden="true" />
                     <span className="mt-1 line-clamp-2 text-[10px] font-semibold text-zinc-400">
                       {titleText}

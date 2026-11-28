@@ -882,7 +882,7 @@ function ActivityPoster({ item, className = "", backdrop = false, size = "w185" 
   ) : src ? (
     <OptimizedImage src={src} alt={item?.title || ""} className="h-full w-full object-cover" loading="lazy" />
   ) : (
-    <span className="flex h-full w-full items-center justify-center text-zinc-700">
+    <span className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-700">
       <ImageOff className="h-4 w-4" aria-hidden="true" />
     </span>
   );
@@ -890,11 +890,10 @@ function ActivityPoster({ item, className = "", backdrop = false, size = "w185" 
   const likeHref = likeTargetHref(item);
   if (likeHref) {
     // Me gusta a una persona con backdrop: solo su foto centrada, sin fondo.
-    const surface = backdrop && isPortraitActivity(item) ? "" : "bg-zinc-900";
-    return (
+        return (
       <Link
         href={likeHref}
-        className={`${className} shrink-0 overflow-hidden ${surface} transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
+        className={`${className} shrink-0 overflow-hidden transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
         aria-label={`Ver ${likeTargetName(item)}`}
       >
         {poster}
@@ -910,7 +909,7 @@ function ActivityPoster({ item, className = "", backdrop = false, size = "w185" 
     <Link
       href={href || `/details/${type}/${item.tmdbId}`}
       onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })}
-      className={`${className} shrink-0 overflow-hidden bg-zinc-900 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
+      className={`${className} shrink-0 overflow-hidden transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
       aria-label={`Ver ${item.title || "ficha"}`}
     >
       {poster}
@@ -940,7 +939,7 @@ function ActivityReview({ item, actor, compact = false, posterList = false, back
               {src ? (
                 <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
               ) : (
-                <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-5 w-5" /></span>
+                <span className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-700"><ImageOff className="h-5 w-5" /></span>
               )}
             </Link>
           </>
@@ -1097,12 +1096,12 @@ function ReviewCard({ item }) {
       <Link
         href={`/details/${type}/${item.tmdbId}`}
         onClick={previewClick(item)}
-        className={`${PROFILE_REVIEW_POSTER_CLASS} flex-shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-sm`}
+        className={`${PROFILE_REVIEW_POSTER_CLASS} flex-shrink-0 overflow-hidden rounded-lg shadow-sm`}
       >
         {src ? (
           <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-zinc-700">
+          <div className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-700">
             <ImageOff className="h-5 w-5" />
           </div>
         )}
@@ -1270,8 +1269,8 @@ function ProfileMediaListItem({ item, showStars, viewerState, compact = false, s
       onClick={previewClick(item, { mediaType: type })}
       className={`group flex min-w-0 items-center ${PROFILE_LIST_ROW_CLASS} ${LIST_ROW_SURFACE} ${LIST_ROW_SURFACE_HOVER}`}
     >
-      <span className={`${sizeClass} shrink-0 overflow-hidden rounded-xl bg-zinc-900`}>
-        {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
+      <span className={`${sizeClass} shrink-0 overflow-hidden rounded-lg`}>
+        {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
       </span>
       <span className="min-w-0 flex-1">
         <span className={`block truncate ${PROFILE_LIST_TITLE_CLASS} font-bold text-white transition-colors group-hover:text-emerald-300`}>{title}</span>
@@ -1313,8 +1312,8 @@ function DiaryListItem({ item, viewerState, onOpenGroup }) {
   const cardClassName = `flex w-full min-w-0 items-center ${PROFILE_LIST_ROW_CLASS} text-left transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70`;
   const cardContent = (
     <>
-      <span className={`${PROFILE_LIST_POSTER_CLASS} shrink-0 overflow-hidden rounded-xl bg-zinc-900`}>
-        {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
+      <span className={`${PROFILE_LIST_POSTER_CLASS} shrink-0 overflow-hidden rounded-lg`}>
+        {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
       </span>
       <span className="min-w-0 flex-1">
         <span className={`block truncate ${PROFILE_LIST_TITLE_CLASS} font-bold text-white transition-colors group-hover:text-emerald-300`}>{title}</span>
@@ -1379,11 +1378,11 @@ function DiaryGroupedEpisodeRow({ item, stillPath }) {
         onClick={previewClick(item, { mediaType: "tv", episode: getEpisodePreview(item) })}
         className="flex items-center gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70"
       >
-        <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-md sm:w-28">
+        <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-lg shadow-md sm:w-28">
           {imagePath ? (
             <OptimizedImage src={`https://image.tmdb.org/t/p/w780${imagePath}`} alt="" className="h-full w-full object-cover" loading="lazy" />
           ) : (
-            <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-5 w-5" /></span>
+            <span className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-700"><ImageOff className="h-5 w-5" /></span>
           )}
         </div>
         <div className="min-w-0 flex-1 pr-12 sm:pr-14">
@@ -1446,8 +1445,8 @@ function DiaryGroupedEpisodesModal({ entry, onClose }) {
         <div className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit] bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.12),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.05),transparent_42%)]" aria-hidden="true" />
         <header className="flex w-full shrink-0 items-center justify-between gap-4 bg-white/[0.025] px-5 py-4 sm:px-8 sm:pb-6 sm:pt-8">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <div className="aspect-[2/3] w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900 shadow-inner sm:w-12">
-              {posterPath ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${posterPath}`} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
+            <div className="aspect-[2/3] w-10 shrink-0 overflow-hidden rounded-lg shadow-inner sm:w-12">
+              {posterPath ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${posterPath}`} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
             </div>
             <div className="min-w-0">
               <p className="mb-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">Serie</p>
@@ -1538,6 +1537,7 @@ function DiaryPosterItems({ items, view, viewerTitleStates, animateWithin }) {
               starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
               compactIndicator={view === "compact"}
               hoverExpand={view === "compact"}
+              sheen
               cornerOverlay={grouped ? (
                 <>
                   <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
@@ -1618,6 +1618,7 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates, animate
             starIconClassName={view === "compact" ? "h-2.5 w-2.5" : undefined}
             compactIndicator={view === "compact"}
             hoverExpand={view === "compact"}
+            sheen
             fixedIndicator={fixedIndicator}
             // Sin píldora fija bajo la tarjeta en móvil/táctil: los estados
             // solo se ven en el overlay de hover del ordenador.

@@ -52,7 +52,7 @@ function clampScore(score) {
   return Number.isNaN(num) ? null : Math.max(0, Math.min(10, num));
 }
 
-export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", hoverExpand = false, cornerOverlay = null, fixedIndicator = false, showFixedIndicator = true, onClick }) {
+export default function PosterTile({ item, showStars = false, viewerState, starIconClassName, compactIndicator = false, indicatorSize = "default", hoverExpand = false, cornerOverlay = null, fixedIndicator = false, showFixedIndicator = true, sheen = false, onClick }) {
   const [failed, setFailed] = useState(false);
   const previewClick = usePreviewOpen();
   const mediaType = mediaTypeOf(item);
@@ -119,7 +119,10 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
     >
       <HoverExpandCard
         cellClassName="aspect-[2/3]"
-        className={`overflow-hidden bg-zinc-900 shadow-md ${hoverExpand ? "rounded-lg" : "rounded-xl"}`}
+        // Sin fondo en la caja que recorta: un gris aquí asoma como filo claro en
+        // el canto (antialias del recorte). Las cuadrículas grandes llevan el
+        // mismo brillo diagonal en hover que Favoritos (`sheen`).
+        className={`overflow-hidden shadow-md ${hoverExpand ? "rounded-lg" : "rounded-xl"}${sheen && !hoverExpand ? " sv-card-sheen" : ""}`}
         enabled={hoverExpand}
       >
 
@@ -135,7 +138,7 @@ export default function PosterTile({ item, showStars = false, viewerState, starI
               onError={() => setFailed(true)}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-zinc-700">
+            <div className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-700">
               <ImageOff className="h-7 w-7 opacity-50" />
             </div>
           )}
