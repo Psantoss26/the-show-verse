@@ -1989,7 +1989,7 @@ export default function WatchlistClient() {
   const advancedSheet = useOptionsSheetController();
   // true desde la primera vez que se abre la hoja de avanzados (ya subida):
   // entonces se piden sus datos.
-  const advancedRequested = useAdvancedFiltersRequested(advancedSheet);
+  const advancedRequested = useAdvancedFiltersRequested(advancedSheet, filtersSheet);
   const setAdvancedFilters = useCallback((next) => {
     setAdvancedFiltersState(next);
     writeAdvancedFilters(WATCHLIST_ADVANCED_FILTERS_KEY, next);
@@ -2409,7 +2409,7 @@ export default function WatchlistClient() {
     () => items.map((item) => getScoreItemKey(item)),
     [items],
   );
-  const { metaByKey: titleMetaByKey, pending: titleMetaPending } =
+  const { metaByKey: titleMetaByKey, pending: titleMetaPending, complete: titleMetaComplete } =
     useTitleMetaMap(advancedTitleKeys, {
       enabled:
         advancedRequested ||
@@ -2444,6 +2444,9 @@ export default function WatchlistClient() {
     showRelease: true,
     loadingProviders: advancedNeeds.providers && loadingProviders,
     loadingTitleMeta: titleMetaPending,
+    // Todas las secciones a la vez: hasta tener las fichas (idiomas,
+    // géneros…), el panel enseña su esqueleto entero.
+    optionsReady: titleMetaComplete,
   };
 
   const filtered = useMemo(() => {

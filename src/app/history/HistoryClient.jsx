@@ -3331,7 +3331,7 @@ export default function HistoryClient() {
   const advancedSheet = useOptionsSheetController();
   // true desde la primera vez que se abre la hoja de avanzados (ya subida):
   // entonces se piden sus datos.
-  const advancedRequested = useAdvancedFiltersRequested(advancedSheet);
+  const advancedRequested = useAdvancedFiltersRequested(advancedSheet, filtersSheet);
   const setAdvancedFilters = useCallback((next) => {
     setAdvancedFiltersState(next);
     writeAdvancedFilters(HISTORY_ADVANCED_FILTERS_KEY, next);
@@ -3871,7 +3871,7 @@ export default function HistoryClient() {
       }),
     [historyTitleKeys],
   );
-  const { metaByKey: titleMetaByKey, pending: titleMetaPending } = useTitleMetaMap(
+  const { metaByKey: titleMetaByKey, pending: titleMetaPending, complete: titleMetaComplete } = useTitleMetaMap(
     historyTitleKeys,
     {
       enabled:
@@ -3946,6 +3946,9 @@ export default function HistoryClient() {
     showWatchTime: true,
     loadingProviders: advancedNeeds.providers && loadingProviders,
     loadingTitleMeta: titleMetaPending,
+    // Todas las secciones a la vez: hasta tener las fichas (idiomas,
+    // géneros…), el panel enseña su esqueleto entero.
+    optionsReady: titleMetaComplete,
   };
 
   const searchFiltered = useMemo(() => {

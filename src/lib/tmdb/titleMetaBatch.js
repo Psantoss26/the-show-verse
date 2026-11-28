@@ -12,6 +12,9 @@ const BATCH_WINDOW_MS = 16;
 const MAX_PER_REQUEST = 16;
 
 const resolved = new Map(); // "movie:603" -> { genres, runtime }
+// Pedidos que ya contestaron sin ficha (o fallaron) en esta visita: no se
+// recuerdan como resueltos, pero cuentan para saber que la lista está completa.
+const answered = new Set();
 const waiting = new Map(); // "movie:603" -> [resolve, …]
 const inFlight = new Set();
 let timer = 0;
@@ -28,11 +31,13 @@ async function send(keys) {
     for (const key of keys) {
       const value = meta[key] || undefined;
       if (value) resolved.set(key, value);
+      answered.add(key);
       for (const done of waiting.get(key) || []) done(value);
       waiting.delete(key);
     }
   } catch {
     for (const key of keys) {
+      answered.add(key);
       for (const done of waiting.get(key) || []) done(undefined);
       waiting.delete(key);
     }
@@ -88,7 +93,9 @@ export function useTitleMeta(mediaType, id, { enabled = true } = {}) {
  * Metadatos de MUCHOS títulos (filtros avanzados de Historial): Map
  * "movie:603" -> meta, que crece según llegan los lotes. Con `enabled: false`
  * no pide nada (lo ya resuelto en esta visita sí se devuelve). `pending`:
- * quedan títulos por llegar.
+ * quedan títulos por llegar. `complete`: todos los títulos tienen respuesta
+ * (con o sin ficha); los filtros avanzados esperan a él para pintar todas sus
+ * secciones a la vez.
  */
 export function useTitleMetaMap(keys, { enabled = true } = {}) {
   const signature = useMemo(
@@ -125,17 +132,19 @@ export function useTitleMetaMap(keys, { enabled = true } = {}) {
     };
   }, [enabled, signature]);
 
-  const map = useMemo(() => {
+  const { map, complete } = useMemo(() => {
     const out = new Map();
-    if (!signature) return out;
+    let all = true;
+    if (!signature) return { map: out, complete: true };
     for (const key of signature.split(",")) {
       const meta = resolved.get(key);
       if (meta) out.set(key, meta);
+      else if (!answered.has(key)) all = false;
     }
-    return out;
+    return { map: out, complete: all };
     // version: se recalcula al llegar cada lote.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, version]);
 
-  return { metaByKey: map, pending };
+  return { metaByKey: map, pending, complete };
 }

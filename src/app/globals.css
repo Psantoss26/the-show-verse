@@ -803,33 +803,118 @@ html:not([data-avatar-boot]) .alerts-boot {
   }
 }
 
-/* Tiradores de las barras de rango de los filtros avanzados (RangeBar): dos
-   <input type="range"> superpuestos; solo el tirador recibe el puntero. */
-.sv-range-thumb::-webkit-slider-thumb {
+/* Barras de deslizar de los filtros avanzados (RangeBar, StepBar en
+   AdvancedFilters.jsx), diseño «cápsula» con el color de la página
+   (--sv-range-accent). Los <input type="range"> (.sv-range-input) no reciben
+   el puntero; su tirador sí: así dos inputs superpuestos se arrastran cada
+   uno por su tirador. --sv-range-thumb: ancho del tirador; pista y relleno se
+   recortan medio tirador a cada lado. */
+.sv-range {
+  --sv-range-thumb: 26px;
+}
+
+.sv-range-fill {
+  background: rgb(255 255 255 / 0.22);
+  transition: background-color 200ms ease, box-shadow 200ms ease;
+}
+
+.sv-range-fill-on {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--sv-range-accent, #ef4444) 55%, transparent),
+    var(--sv-range-accent, #ef4444)
+  );
+  box-shadow: 0 0 14px color-mix(in srgb, var(--sv-range-accent, #ef4444) 45%, transparent);
+}
+
+.sv-range-value {
+  background: rgb(255 255 255 / 0.06);
+  color: rgb(161 161 170);
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+.sv-range-value-on {
+  background: color-mix(in srgb, var(--sv-range-accent, #ef4444) 18%, transparent);
+  color: var(--sv-range-accent, #ef4444);
+}
+
+.sv-range-bubble {
+  background: var(--sv-range-accent, #ef4444);
+  color: #09090b;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.5);
+}
+
+.sv-range-input {
+  touch-action: none;
+}
+
+.sv-range-input::-webkit-slider-thumb {
   pointer-events: auto;
-  width: 18px;
-  height: 18px;
+  box-sizing: border-box;
+  width: var(--sv-range-thumb);
+  height: var(--sv-range-thumb);
+  border: 3px solid #fff;
   border-radius: 9999px;
   background: var(--sv-range-accent, #ef4444);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45);
-  cursor: pointer;
+  box-shadow:
+    0 0 0 0 color-mix(in srgb, var(--sv-range-accent, #ef4444) 30%, transparent),
+    0 3px 10px rgb(0 0 0 / 0.55);
+  cursor: grab;
+  transition: box-shadow 160ms ease, transform 160ms ease;
   -webkit-appearance: none;
 }
 
-.sv-range-thumb::-moz-range-thumb {
+.sv-range-input::-moz-range-thumb {
   pointer-events: auto;
-  width: 18px;
-  height: 18px;
-  border: none;
+  box-sizing: border-box;
+  width: var(--sv-range-thumb);
+  height: var(--sv-range-thumb);
+  border: 3px solid #fff;
   border-radius: 9999px;
   background: var(--sv-range-accent, #ef4444);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45);
-  cursor: pointer;
+  box-shadow:
+    0 0 0 0 color-mix(in srgb, var(--sv-range-accent, #ef4444) 30%, transparent),
+    0 3px 10px rgb(0 0 0 / 0.55);
+  cursor: grab;
+  transition: box-shadow 160ms ease, transform 160ms ease;
 }
 
-.sv-range-thumb:focus-visible::-webkit-slider-thumb {
+.sv-range-input:hover::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--sv-range-accent, #ef4444) 25%, transparent),
+    0 3px 10px rgb(0 0 0 / 0.55);
+}
+
+.sv-range-input:hover::-moz-range-thumb {
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--sv-range-accent, #ef4444) 25%, transparent),
+    0 3px 10px rgb(0 0 0 / 0.55);
+}
+
+.sv-range-input:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.12);
+  box-shadow:
+    0 0 0 9px color-mix(in srgb, var(--sv-range-accent, #ef4444) 30%, transparent),
+    0 3px 10px rgb(0 0 0 / 0.55);
+}
+
+.sv-range-input:active::-moz-range-thumb {
+  cursor: grabbing;
+  transform: scale(1.12);
+  box-shadow:
+    0 0 0 9px color-mix(in srgb, var(--sv-range-accent, #ef4444) 30%, transparent),
+    0 3px 10px rgb(0 0 0 / 0.55);
+}
+
+.sv-range-input:focus-visible::-webkit-slider-thumb {
   outline: 2px solid rgb(255 255 255 / 0.8);
-  outline-offset: 2px;
+  outline-offset: 3px;
+}
+
+.sv-range-input:focus-visible::-moz-range-thumb {
+  outline: 2px solid rgb(255 255 255 / 0.8);
+  outline-offset: 3px;
 }
 
 @media (min-width: 640px) {

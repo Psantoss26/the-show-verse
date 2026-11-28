@@ -11,7 +11,7 @@
 //   - `AdvancedFiltersSheetButton`: el de móvil, en la cabecera de la hoja de
 //     filtros de la página.
 
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useState, useSyncExternalStore } from "react";
 import {
   CalendarClock,
   CalendarDays,
@@ -82,37 +82,123 @@ const PROVIDER_LOGOS = {
 
 const formatRating = (value) => (Number.isInteger(value) ? String(value) : value.toFixed(1));
 
+// Pista común de RangeBar y StepBar (diseño «cápsula»): surco ancho hundido,
+// relleno en degradado del color de la página entre `from` y `to` (en %) y la
+// escala debajo. Sin filtro el relleno es neutro. Mientras se arrastra o se
+// enfoca un tirador, una burbuja del color de la página sigue su valor.
+// Pista y relleno se recortan medio tirador a cada lado (--sv-range-thumb,
+// globals.css) para que el centro del tirador caiga justo en su valor.
+// Los <input> llevan `.sv-range-input`: solo su tirador recibe el puntero
+// (pointer-events), así dos inputs superpuestos se arrastran cada uno el suyo.
+const THUMB_HALF = "calc(var(--sv-range-thumb) / 2)";
+const atPercent = (percent) =>
+  `calc(${THUMB_HALF} + (100% - var(--sv-range-thumb)) * ${percent / 100})`;
+
+function RangeTrack({ from, to, active, minLabel, maxLabel, bubble = null, children }) {
+  return (
+    <div className="sv-range">
+      <div className="relative h-11 w-full">
+        <div
+          className="absolute top-1/2 h-2.5 -translate-y-1/2 rounded-full bg-white/[0.06] shadow-[inset_0_1px_3px_rgb(0_0_0/0.65),0_1px_0_rgb(255_255_255/0.05)]"
+          style={{ left: THUMB_HALF, right: THUMB_HALF }}
+        />
+        <div
+          className={`sv-range-fill absolute top-1/2 h-2.5 -translate-y-1/2 rounded-full ${active ? "sv-range-fill-on" : ""}`}
+          style={{ left: atPercent(from), width: `calc((100% - var(--sv-range-thumb)) * ${(to - from) / 100})` }}
+        />
+        {children}
+        {bubble ? (
+          <div
+            className="sv-range-bubble pointer-events-none absolute -top-5 z-10 -translate-x-1/2 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black tabular-nums leading-none"
+            style={{ left: atPercent(bubble.percent) }}
+            aria-hidden="true"
+          >
+            {bubble.label}
+          </div>
+        ) : null}
+      </div>
+      <div className="-mt-1 flex justify-between px-0.5 text-[11px] font-bold tabular-nums text-zinc-500">
+        <span>{minLabel}</span>
+        <span>{maxLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+// Cabecera de una barra: qué ajusta y, a la derecha, el valor elegido en una
+// píldora (con el color de la página si el filtro está puesto).
+function RangeHeader({ label, valueLabel, active }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-[13px] font-bold text-zinc-200">{label}</span>
+      <span className={`sv-range-value inline-flex min-h-6 items-center rounded-full px-2.5 pt-px text-xs font-bold tabular-nums ${active ? "sv-range-value-on" : ""}`}>
+        {valueLabel}
+      </span>
+    </div>
+  );
+}
+
+const RANGE_INPUT_CLASS =
+  "sv-range-input pointer-events-none absolute inset-0 h-full w-full appearance-none bg-transparent";
+
+// Qué tirador se está moviendo (para la burbuja): al pulsarlo o enfocarlo
+// con el teclado; se suelta al levantar el dedo o perder el foco.
+function useActiveThumb() {
+  const [activeThumb, setActiveThumb] = useState(null);
+  const bind = (index, commit) => ({
+    onPointerDown: () => setActiveThumb(index),
+    onFocus: () => setActiveThumb(index),
+    onPointerUp: () => {
+      setActiveThumb(null);
+      commit();
+    },
+    onPointerCancel: () => {
+      setActiveThumb(null);
+      commit();
+    },
+    onKeyUp: commit,
+    onBlur: () => {
+      setActiveThumb(null);
+      commit();
+    },
+  });
+  return [activeThumb, bind];
+}
+
 // Barra de dos tiradores. Mientras se arrastra solo cambia el estado local; el
 // filtro se aplica al soltar, para no recalcular la lista en cada paso.
 function RangeBar({ label, min, max, step = 1, value, onChange, format = (v) => v }) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
+  const [activeThumb, bind] = useActiveThumb();
 
   const [lo, hi] = [Math.min(...draft), Math.max(...draft)];
   const span = max - min || 1;
-  const from = ((lo - min) / span) * 100;
-  const to = ((hi - min) / span) * 100;
+  const toPercent = (v) => ((v - min) / span) * 100;
+  const full = lo === min && hi === max;
   const commit = () => {
     if (lo !== value[0] || hi !== value[1]) onChange([lo, hi]);
   };
 
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-xs font-bold text-zinc-400">
-        <span>{label}</span>
-        <span className="tabular-nums text-[color:var(--sv-range-accent)]">
-          {lo === min && hi === max ? "Cualquiera" : `${format(lo)} – ${format(hi)}`}
-        </span>
-      </div>
-      <div className="relative h-8 w-full">
-        <div className="absolute inset-x-2 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
-        <div
-          className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-[color:var(--sv-range-accent)]"
-          style={{
-            left: `calc(8px + (100% - 16px) * ${from / 100})`,
-            width: `calc((100% - 16px) * ${(to - from) / 100})`,
-          }}
-        />
+      <RangeHeader
+        label={label}
+        valueLabel={full ? "Cualquiera" : lo === hi ? format(lo) : `${format(lo)} – ${format(hi)}`}
+        active={!full}
+      />
+      <RangeTrack
+        from={toPercent(lo)}
+        to={toPercent(hi)}
+        active={!full}
+        minLabel={format(min)}
+        maxLabel={format(max)}
+        bubble={
+          activeThumb == null
+            ? null
+            : { percent: toPercent(draft[activeThumb]), label: format(draft[activeThumb]) }
+        }
+      >
         {[0, 1].map((index) => (
           <input
             key={index}
@@ -122,18 +208,17 @@ function RangeBar({ label, min, max, step = 1, value, onChange, format = (v) => 
             step={step}
             value={draft[index]}
             aria-label={`${label} ${index === 0 ? "mínimo" : "máximo"}`}
+            aria-valuetext={String(format(draft[index]))}
             onChange={(event) => {
               const next = [...draft];
               next[index] = Number(event.target.value);
               setDraft(next);
             }}
-            onPointerUp={commit}
-            onKeyUp={commit}
-            onBlur={commit}
-            className="sv-range-thumb pointer-events-none absolute inset-0 h-full w-full appearance-none bg-transparent"
+            {...bind(index, commit)}
+            className={RANGE_INPUT_CLASS}
           />
         ))}
-      </div>
+      </RangeTrack>
     </div>
   );
 }
@@ -144,28 +229,24 @@ function StepBar({ label, steps, value, onChange, format = (v) => v, anyLabel = 
   const index = Math.max(0, steps.findIndex((step) => step >= value));
   const [draft, setDraft] = useState(index);
   useEffect(() => setDraft(index), [index]);
+  const [activeThumb, bind] = useActiveThumb();
   const commit = () => {
     if (steps[draft] !== value) onChange(steps[draft]);
   };
   const percent = (draft / (steps.length - 1 || 1)) * 100;
+  const valueLabel = draft === 0 ? anyLabel : format(steps[draft]);
 
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-xs font-bold text-zinc-400">
-        <span>{label}</span>
-        <span className="tabular-nums text-[color:var(--sv-range-accent)]">
-          {draft === 0 ? anyLabel : format(steps[draft])}
-        </span>
-      </div>
-      <div className="relative h-8 w-full">
-        <div className="absolute inset-x-2 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
-        <div
-          className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-[color:var(--sv-range-accent)]"
-          style={{
-            left: `calc(8px + (100% - 16px) * ${percent / 100})`,
-            right: "8px",
-          }}
-        />
+      <RangeHeader label={label} valueLabel={valueLabel} active={draft !== 0} />
+      <RangeTrack
+        from={percent}
+        to={100}
+        active={draft !== 0}
+        minLabel={anyLabel}
+        maxLabel={format(steps[steps.length - 1])}
+        bubble={activeThumb == null ? null : { percent, label: valueLabel }}
+      >
         <input
           type="range"
           min={0}
@@ -173,14 +254,53 @@ function StepBar({ label, steps, value, onChange, format = (v) => v, anyLabel = 
           step={1}
           value={draft}
           aria-label={label}
-          aria-valuetext={draft === 0 ? anyLabel : format(steps[draft])}
+          aria-valuetext={valueLabel}
           onChange={(event) => setDraft(Number(event.target.value))}
-          onPointerUp={commit}
-          onKeyUp={commit}
-          onBlur={commit}
-          className="sv-range-thumb pointer-events-none absolute inset-0 h-full w-full appearance-none bg-transparent"
+          {...bind(0, commit)}
+          className={RANGE_INPUT_CLASS}
         />
-      </div>
+      </RangeTrack>
+    </div>
+  );
+}
+
+// Esqueleto del panel ENTERO mientras llegan las fichas de los títulos
+// (idiomas, géneros…): al tenerlas se pintan todas las secciones a la vez, en
+// vez de ir apareciendo grupos y botones con el panel ya abierto. Un solo
+// `animate-pulse` para todo el bloque.
+const SKELETON_GROUPS = [
+  [96, 88, 92, 112],
+  [72, 84, 70, 120, 150, 88, 76, 110, 80, 96],
+  null,
+  [76, 82, 90],
+  [116, 96, 92, 84],
+  null,
+  [92, 104, 92, 110, 100],
+];
+
+function AdvancedFiltersSkeleton() {
+  return (
+    <div className="space-y-5 animate-pulse" aria-busy="true" aria-label="Cargando filtros">
+      {SKELETON_GROUPS.map((pills, groupIndex) => (
+        <div key={groupIndex}>
+          <div className="mb-2 h-3 w-28 rounded-full bg-white/10" />
+          {pills ? (
+            <div className="flex flex-wrap gap-2">
+              {pills.map((width, index) => (
+                <div key={index} className="h-9 rounded-full bg-white/[0.07]" style={{ width }} />
+              ))}
+            </div>
+          ) : (
+            <div className="pt-1">
+              <div className="mb-3 flex justify-between">
+                <div className="h-3.5 w-20 rounded-full bg-white/10" />
+                <div className="h-6 w-20 rounded-full bg-white/[0.07]" />
+              </div>
+              <div className="h-1.5 rounded-full bg-white/[0.07]" />
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -211,8 +331,11 @@ export function AdvancedFilterGroups({
   loadingProviders = false,
   // Duración y estado esperan a la ficha de cada título.
   loadingTitleMeta = false,
+  // Fichas de los títulos ya recibidas: hasta entonces, esqueleto del panel.
+  optionsReady = true,
   showReset = false,
 }) {
+  if (!optionsReady) return <AdvancedFiltersSkeleton />;
   const update = (patch) => onChange({ ...filters, ...patch });
   const toggle = (field, value) => {
     const list = filters[field] || [];
@@ -337,7 +460,8 @@ export function AdvancedFilterGroups({
               <img
                 src={PROVIDER_LOGOS[provider.key]}
                 alt=""
-                loading="lazy"
+                loading="eager"
+                decoding="sync"
                 className="block h-5 w-5 rounded-md object-cover"
               />
             }
@@ -535,22 +659,61 @@ export function AdvancedFiltersBadge({ count, accent = "red" }) {
   );
 }
 
-// La página pide los datos de los filtros avanzados (fichas, notas…) la
-// primera vez que se abre su hoja, pero sin repintarse en el fotograma en que
-// empieza a subir: se entera al terminar la animación, y solo una vez.
+// La página pide los datos de los filtros avanzados (fichas, notas…) antes de
+// enseñarlos: al pasar el puntero o enfocar el botón de escritorio, o un poco
+// después de abrir la hoja de filtros de la página (móvil, donde está el botón
+// «Avanzados») o la propia hoja de avanzados. Nunca en el fotograma en que una
+// hoja empieza a subir: se entera al terminar la animación, y solo una vez.
 const ADVANCED_DATA_DELAY_MS = 380;
+const intentStores = new WeakMap();
 
-export function useAdvancedFiltersRequested(controller) {
+function getIntentStore(controller) {
+  let store = intentStores.get(controller);
+  if (!store) {
+    let requested = false;
+    const listeners = new Set();
+    store = {
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      getSnapshot: () => requested,
+      request() {
+        if (requested) return;
+        requested = true;
+        listeners.forEach((listener) => listener());
+      },
+    };
+    intentStores.set(controller, store);
+  }
+  return store;
+}
+
+const getFalse = () => false;
+
+function prefetchAdvancedFilters(controller) {
+  if (controller) startTransition(() => getIntentStore(controller).request());
+}
+
+export function useAdvancedFiltersRequested(controller, pageSheetController = null) {
   const open = useOptionsSheetOpen(controller);
+  const pageSheetOpen = useOptionsSheetOpen(pageSheetController);
+  const store = getIntentStore(controller);
+  const intent = useSyncExternalStore(store.subscribe, store.getSnapshot, getFalse);
   const [requested, setRequested] = useState(false);
   useEffect(() => {
-    if (!open || requested) return undefined;
+    if (requested) return undefined;
+    if (intent) {
+      startTransition(() => setRequested(true));
+      return undefined;
+    }
+    if (!open && !pageSheetOpen) return undefined;
     const timer = window.setTimeout(
       () => startTransition(() => setRequested(true)),
       ADVANCED_DATA_DELAY_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [open, requested]);
+  }, [open, pageSheetOpen, intent, requested]);
   return requested;
 }
 
@@ -560,6 +723,8 @@ export function AdvancedFiltersButton({ controller, count = 0, accent = "red" })
     <button
       type="button"
       onClick={controller.open}
+      onPointerEnter={() => prefetchAdvancedFilters(controller)}
+      onFocus={() => prefetchAdvancedFilters(controller)}
       aria-haspopup="dialog"
       aria-expanded={open ? "true" : "false"}
       className="sv-page-toolbar-trigger inline-flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10"

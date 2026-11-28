@@ -1355,7 +1355,7 @@ export default function InProgressClient({
   const advancedSheet = useOptionsSheetController();
   // true desde la primera vez que se abre la hoja de avanzados (ya subida):
   // entonces se piden sus datos.
-  const advancedRequested = useAdvancedFiltersRequested(advancedSheet);
+  const advancedRequested = useAdvancedFiltersRequested(advancedSheet, filtersSheet);
   const setAdvancedFilters = useCallback((next) => {
     setAdvancedFiltersState(next);
     writeAdvancedFilters(IN_PROGRESS_ADVANCED_FILTERS_KEY, next);
@@ -1796,7 +1796,7 @@ export default function InProgressClient({
   );
   // Idioma, duración y votos salen de la ficha (title-meta por lotes): al
   // abrir los filtros (para ofrecer los idiomas) o con alguno activo.
-  const { metaByKey: titleMetaByKey, pending: titleMetaPending } = useTitleMetaMap(
+  const { metaByKey: titleMetaByKey, pending: titleMetaPending, complete: titleMetaComplete } = useTitleMetaMap(
     advancedTitleKeys,
     {
       enabled:
@@ -1846,6 +1846,9 @@ export default function InProgressClient({
     showRemaining: activeTab !== "completed",
     loadingProviders: advancedNeeds.providers && loadingProviders,
     loadingTitleMeta: titleMetaPending,
+    // Todas las secciones a la vez: hasta tener las fichas (idiomas,
+    // géneros…), el panel enseña su esqueleto entero.
+    optionsReady: titleMetaComplete,
   };
 
   // Filter + Sort. La búsqueda mira también el nombre en inglés y en español.
