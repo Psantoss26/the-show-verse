@@ -970,6 +970,7 @@ export default function FilterableListItems({
                         imdbRating={entry.meta.imdbRating}
                         action={action}
                         showTitleMeta
+                        surface="card"
                       />
                     </ListCardEntrance>
                   );
