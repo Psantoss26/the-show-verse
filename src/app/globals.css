@@ -4798,6 +4798,27 @@ html[data-details-sequence-transition] .sv-topbar {
 .sv-nav-lens[data-nav-tone="red"] { --nav-rgb: 239 68 68; --nav-rgb2: 248 113 113; }
 .sv-nav-lens[data-nav-tone="pink"] { --nav-rgb: 236 72 153; --nav-rgb2: 244 114 182; }
 
+/* CUERPO DE LA BARRA LATERAL (ESCRITORIO): la pieza entera lleva el acabado de
+   los desplegables de filtros, orden y agrupación de las páginas de usuario
+   (`sv-page-toolbar-trigger`: `rounded-2xl`, `bg-gradient-to-br from-white/10
+   to-white/5`, `backdrop-blur-lg`, `shadow-lg`) en lugar del cristal líquido
+   de la barra inferior, que en vertical se leía plano. En una página de
+   usuario toma su `--upage-tint` igual que esos botones (ver «CRISTAL TINTADO
+   EN REPOSO»). Encima van el tinte de la sección y la cápsula activa. Solo
+   `backdrop-filter` estándar: ver la nota de `-webkit-backdrop-filter`. */
+.sv-side-nav-shell {
+  background-image: linear-gradient(to bottom right, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.05));
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+:root[data-sv-upage-bg] .sv-side-nav-shell {
+  background-image:
+    radial-gradient(130% 110% at 0% 0%, rgb(var(--upage-tint) / 0.2), rgb(var(--upage-tint) / 0.05) 55%, transparent 80%),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.025));
+}
+
 /* TINTE DE LA BARRA LATERAL (ESCRITORIO): el cristal deja de ser neutro y toma
    el color de la sección seleccionada, con la receta del cristal tintado de
    las páginas de usuario: un velo suave en toda la barra y un brillo que se

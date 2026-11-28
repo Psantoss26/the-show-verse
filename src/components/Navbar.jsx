@@ -3762,28 +3762,11 @@ function NavbarContent() {
             ? "none"
             : "translate3d(calc(-100% - 1.5rem), 0, 0)",
         }}
-        className={`sv-desktop-side-nav hidden desktop:flex fixed left-4 top-1/2 z-30 w-14 -translate-y-1/2 flex-col items-center gap-1 rounded-full px-1.5 py-2 ${LIQUID_GLASS_BAR}`}
+        className={`sv-desktop-side-nav sv-side-nav-shell hidden desktop:flex fixed left-4 top-1/2 z-30 w-14 -translate-y-1/2 flex-col items-center gap-1 rounded-3xl px-1.5 py-2`}
       >
-        {/* Las mismas capas ópticas que la barra inferior, con la máscara y
-            la luz giradas para una pieza vertical. */}
-        <span
-          aria-hidden="true"
-          className="sv-glass-rim pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[2px] backdrop-brightness-[1.16] backdrop-saturate-[240%]"
-          style={{
-            WebkitMaskImage:
-              "radial-gradient(135% 115% at 50% 50%, transparent 40%, #000 95%)",
-            maskImage:
-              "radial-gradient(135% 115% at 50% 50%, transparent 40%, #000 95%)",
-          }}
-        />
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[linear-gradient(160deg,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.03)_16%,transparent_40%,transparent_60%,rgba(255,255,255,0.03)_86%,rgba(255,255,255,0.07)_100%)]"
-        />
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(100%_60%_at_50%_0%,rgba(255,255,255,0.08)_0%,transparent_75%)]"
-        />
+        {/* Cuerpo de la barra: el de los desplegables de filtros, orden y
+            agrupación de las páginas de usuario (`.sv-side-nav-shell` en
+            globals.css), no el cristal líquido de la barra inferior. */}
         {/* Tinte del color de la sección: un velo suave en toda la barra y un
             brillo alrededor del botón activo, sin canto ni bordes (ver
             `.sv-side-nav-tint` en globals.css). Sin sección activa no pinta. */}
