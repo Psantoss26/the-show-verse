@@ -1394,7 +1394,7 @@ function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
-                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl backdrop-blur-2xl"
+                className="sv-upage-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl backdrop-blur-2xl"
                 style={menuStyle}
               >
                 <div

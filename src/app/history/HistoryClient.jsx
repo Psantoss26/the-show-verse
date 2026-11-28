@@ -1200,7 +1200,7 @@ function InlineDropdownMenu({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
-                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+                className="sv-upage-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
                 style={{
                   ...menuStyle,
                 }}
@@ -2301,8 +2301,6 @@ const HistoryItemCard = memo(function HistoryItemCard({
         data-history-card=""
         data-flip-key={flipKey}
       >
-        {/* Overlay de borde para que los indicadores queden por debajo */}
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
         <div className="block">{Content}</div>
       </div>
     );
@@ -2319,8 +2317,6 @@ const HistoryItemCard = memo(function HistoryItemCard({
         onClick={onPreviewClick}
         className="block relative overflow-hidden bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group"
       >
-        {/* Overlay de borde para que los indicadores queden por debajo */}
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
         {Content}
       </Link>
     </div>
@@ -2603,12 +2599,10 @@ const HistoryGridCard = memo(function HistoryGridCard({
       className={[
         // IMPORTANTE: hover SOLO en desktop para evitar "hover pegajoso" en móvil
         `relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group overflow-hidden rounded-xl shadow-md`,
-        "lg:hover:shadow-emerald-900/20 transition-all",
+        "lg:hover:shadow-emerald-900/20 transition-all sv-card-sheen",
         disabledCls,
       ].join(" ")}
     >
-      {/* Overlay de borde para que los indicadores queden por debajo */}
-      <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 lg:group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         {imageMode === "backdrop" ? (
           <Backdrop entry={entry} className="w-full h-full" />

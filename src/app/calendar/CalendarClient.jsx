@@ -466,8 +466,6 @@ const CalendarListCard = memo(function CalendarListCard({
         href={item.href}
         className="block relative overflow-hidden bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group"
       >
-        {/* Borde en overlay para que los indicadores queden por debajo */}
-        <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]" />
         <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 pr-4 transition-all">
           <div className="w-[140px] sm:w-[210px] aspect-video rounded-lg relative shadow-md bg-zinc-900 shrink-0">
             <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
@@ -573,8 +571,7 @@ const CalendarGridCard = memo(function CalendarGridCard({
     >
       <Link href={item.href} className="block">
         {/* Hover SOLO en escritorio: en táctil se queda "pegado". */}
-        <div className="relative aspect-[2/3] group overflow-hidden rounded-xl bg-zinc-900 shadow-md lg:hover:shadow-yellow-900/20 transition-all">
-          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 lg:group-hover:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]" />
+        <div className="relative aspect-[2/3] group overflow-hidden rounded-xl bg-zinc-900 shadow-md lg:hover:shadow-yellow-900/20 transition-all sv-card-sheen">
           <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
             <TmdbPoster
               path={item.posterPath}
@@ -771,7 +768,7 @@ function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
-                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+                className="sv-upage-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
                 style={{
                   ...menuStyle,
                 }}

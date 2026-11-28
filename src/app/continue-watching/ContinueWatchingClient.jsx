@@ -490,7 +490,7 @@ function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
-                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+                className="sv-upage-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
                 style={{
                   ...menuStyle,
                 }}
@@ -779,7 +779,7 @@ const ProgressCard = memo(function ProgressCard({
   if (viewMode === "compact") {
     return (
       <motion.div initial={isBackNav ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: isBackNav ? 0 : animDelay, ease: "easeOut" }}>
-        <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className="relative block overflow-hidden rounded-xl [-webkit-tap-highlight-color:transparent] bg-zinc-900/30 transition-colors group hover:bg-zinc-900/60 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
+        <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className="relative block overflow-hidden rounded-xl [-webkit-tap-highlight-color:transparent] bg-zinc-900/30 transition-colors group hover:bg-zinc-900/60">
           <div className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 ${canDelete ? "pr-12 sm:pr-14" : ""}`}>
             <div data-meta-thumb="" className="w-[var(--meta-thumb,180px)] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               <SmartImage item={item} kind="backdrop" alt={title} />
@@ -867,7 +867,7 @@ const ProgressCard = memo(function ProgressCard({
     return (
       <motion.div initial={isBackNav ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: isBackNav ? 0 : animDelay, ease: "easeOut" }}>
         <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className="block [-webkit-tap-highlight-color:transparent]">
-          <div className={`relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]`}>
+          <div className={`relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all sv-card-sheen`}>
             <SmartImage item={item} kind={imageMode} alt={title} />
 
             <ContinueWatchingPosterHoverIndicator

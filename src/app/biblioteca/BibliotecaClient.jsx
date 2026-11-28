@@ -469,7 +469,7 @@ function InlineDropdownMenu({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
-                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl p-2"
+                className="sv-upage-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl p-2"
                 style={{
                   ...menuStyle,
                 }}
@@ -803,7 +803,7 @@ function LibraryMediaCard({
         data-library-card=""
       >
         <article
-          className={`relative flex items-center gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 bg-black/15 rounded-2xl transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)] ${canOpen ? "cursor-pointer hover:bg-white/[0.07]" : ""}`}
+          className={`relative flex items-center gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 bg-black/15 rounded-2xl transition-colors group overflow-hidden ${canOpen ? "cursor-pointer hover:bg-white/[0.07]" : ""}`}
           onClick={openItem}
         >
           {/* Como la fila de lista de Favoritos (TitleRow): backdrop 16:9 sin
@@ -877,10 +877,9 @@ function LibraryMediaCard({
     >
       <div className="block">
         <article
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-amber-900/20 transition-shadow duration-300 ${canOpen ? "cursor-pointer" : ""}`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-amber-900/20 transition-shadow duration-300 sv-card-sheen ${canOpen ? "cursor-pointer" : ""}`}
           onClick={openItem}
         >
-          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)]" />
           {renderMedia()}
           <LibraryHoverIndicator isMovie={isMovie} resolution={primaryRes} />
         </article>

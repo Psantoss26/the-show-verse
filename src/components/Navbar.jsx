@@ -3784,6 +3784,19 @@ function NavbarContent() {
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(100%_60%_at_50%_0%,rgba(255,255,255,0.08)_0%,transparent_75%)]"
         />
+        {/* Tinte del color de la sección: un velo suave en toda la barra y un
+            brillo alrededor del botón activo, sin canto ni bordes (ver
+            `.sv-side-nav-tint` en globals.css). Sin sección activa no pinta. */}
+        <span
+          aria-hidden="true"
+          className="sv-side-nav-tint pointer-events-none absolute inset-0 rounded-[inherit]"
+          data-nav-tone={mobileBottomActive?.tone || undefined}
+          style={{
+            "--side-nav-glow-y": `${
+              8 + Math.max(0, mobileBottomItems.indexOf(mobileBottomActive)) * 48 + 22
+            }px`,
+          }}
+        />
 
         <BottomNavActiveLens
           activeKey={mobileBottomActive?.href || null}

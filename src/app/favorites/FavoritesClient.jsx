@@ -1503,7 +1503,7 @@ function InlineDropdownMenu({
           open && menuStyle ? (
             <div
               ref={menuRef}
-              className="sv-inline-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+              className="sv-inline-menu sv-upage-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
               style={menuStyle}
             >
               <div
@@ -1994,7 +1994,7 @@ const FavoriteCard = memo(function FavoriteCard({
           }
           // El tamaño de backdrop de siempre de estas páginas.
           mediaClassName="aspect-video w-[180px] sm:w-[280px] rounded-lg shadow-md"
-          className="relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]"
+          className="relative overflow-hidden"
         />
       </div>
     );
@@ -2049,10 +2049,8 @@ const FavoriteCard = memo(function FavoriteCard({
         className="block"
       >
         <div
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300 sv-card-sheen`}
         >
-          {/* Overlay de borde para que los indicadores queden por debajo */}
-          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />
           <SmartPoster item={item} title={title} mode={effectiveImageMode} />
           <FavoriteHoverIndicator
             type={type}

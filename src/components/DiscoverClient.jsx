@@ -570,7 +570,7 @@ function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
-                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+                className="sv-upage-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
                 style={menuStyle}
               >
                 <div
@@ -948,7 +948,7 @@ function DiscoverCard({
           showTitleMeta
           media={image}
           mediaClassName="aspect-video w-[180px] sm:w-[280px] rounded-lg shadow-md"
-          className="relative overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(249,115,22,0.95)]"
+          className="relative overflow-hidden"
         />
       </div>
     );
@@ -979,9 +979,8 @@ function DiscoverCard({
     <div ref={shellRef} className={shellClassName} data-flip-key={flipKey} data-discover-card="">
       <Link href={href} prefetch={false} onClick={onPreviewClick} {...intentProps} className="block">
         <div
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-orange-900/20 transition-shadow duration-300`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-orange-900/20 transition-shadow duration-300 sv-card-sheen`}
         >
-          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(249,115,22,0.95)]" />
           {image}
           <DiscoverHoverIndicator
             type={type}

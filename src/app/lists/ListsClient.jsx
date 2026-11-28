@@ -623,7 +623,7 @@ function Dropdown({ valueLabel, icon: Icon, children, className = "" }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
-            className="absolute right-0 top-full z-[99999] mt-2 w-full rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+            className="sv-upage-menu absolute right-0 top-full z-[99999] mt-2 w-full rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
           >
             <div className="space-y-1">
               {children({ close: () => setOpen(false) })}
@@ -821,7 +821,7 @@ function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
-                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+                className="sv-upage-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
                 style={{
                   ...menuStyle,
                 }}
@@ -1151,7 +1151,7 @@ const ListItemCard = memo(function ListItemCard({
       onFocus={prefetchEnabled ? prefetchImdb : undefined}
     >
       <motion.div
-        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-800/80 shadow-lg transform-gpu will-change-transform after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_var(--card-ring-hover)]"
+        className="group relative z-0 aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-800/80 shadow-lg transform-gpu will-change-transform sv-card-sheen"
         whileHover={{
           y: -6,
           zIndex: 50,
@@ -1159,7 +1159,6 @@ const ListItemCard = memo(function ListItemCard({
         }}
         whileTap={{ y: -2 }}
         transition={{ type: "spring", stiffness: 360, damping: 26 }}
-        style={{ "--card-ring-hover": accentStyle.borderColor }}
       >
         {posterUrl && !imgFailed ? (
           <OptimizedImage

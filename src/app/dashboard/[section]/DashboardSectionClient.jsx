@@ -743,7 +743,7 @@ function SectionCard({
           href={href}
           prefetch={false}
           onClick={onPreviewClick}
-          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)]"
+          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
             <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
@@ -819,11 +819,9 @@ function SectionCard({
         className="block"
       >
         <div
-          className={`relative ${aspect} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-amber-900/20 transition-shadow duration-300`}
+          className={`relative ${aspect} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-amber-900/20 transition-shadow duration-300 sv-card-sheen`}
           onMouseEnter={loadImdbScore}
         >
-          {/* Aro del hover por encima de la imagen y de la píldora. */}
-          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)]" />
           <PosterImage
             item={item}
             mode={effectiveImageMode}

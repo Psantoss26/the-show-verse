@@ -522,6 +522,55 @@ body {
   }
 }
 
+/* Brillo diagonal al pasar el ratón por las tarjetas de las cuadrículas
+   grandes (las que no se amplían). Cruza la tarjeta una vez al entrar y se
+   queda fuera mientras dure el hover; sustituye al anillo de color. Solo
+   transform/opacity en un pseudo, recortado por el overflow de la tarjeta. */
+.sv-card-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.06) 42%,
+    rgba(255, 255, 255, 0.26) 50%,
+    rgba(255, 255, 255, 0.06) 58%,
+    transparent 68%
+  );
+  opacity: 0;
+  transform: translateX(-100%);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sv-card-sheen:hover::after {
+    animation: sv-card-sheen 0.85s cubic-bezier(0.45, 0, 0.25, 1) both;
+  }
+}
+
+@keyframes sv-card-sheen {
+  from {
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-card-sheen:hover::after {
+    animation: none;
+    background: rgba(255, 255, 255, 0.06);
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .animate-shimmer {
   animation: shimmer 2s infinite;
   background: linear-gradient(90deg,
@@ -4749,6 +4798,55 @@ html[data-details-sequence-transition] .sv-topbar {
 .sv-nav-lens[data-nav-tone="red"] { --nav-rgb: 239 68 68; --nav-rgb2: 248 113 113; }
 .sv-nav-lens[data-nav-tone="pink"] { --nav-rgb: 236 72 153; --nav-rgb2: 244 114 182; }
 
+/* TINTE DE LA BARRA LATERAL (ESCRITORIO): el cristal deja de ser neutro y toma
+   el color de la sección seleccionada, con la receta del cristal tintado de
+   las páginas de usuario: un velo suave en toda la barra y un brillo que se
+   concentra alrededor del botón activo (`--side-nav-glow-y`, que pone Navbar).
+   Sin canto ni reflejo de 1 px: Pablo no quiere bordes marcados. En una página
+   de usuario manda su `--upage-tint` (el color del fondo animado, que en
+   Descubrir es naranja aunque su botón sea índigo), así toda la pantalla va en
+   un solo tono. Color y posición son propiedades registradas para que al
+   cambiar de sección el brillo se deslice y cambie de color, no salte. */
+@property --side-nav-tint {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+@property --side-nav-glow-y {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 30px;
+}
+.sv-side-nav-tint {
+  background:
+    radial-gradient(150% 64px at 50% var(--side-nav-glow-y), color-mix(in srgb, var(--side-nav-tint) 30%, transparent) 0%, color-mix(in srgb, var(--side-nav-tint) 8%, transparent) 60%, transparent 100%),
+    linear-gradient(to bottom, color-mix(in srgb, var(--side-nav-tint) 14%, transparent), color-mix(in srgb, var(--side-nav-tint) 6%, transparent));
+  transition:
+    --side-nav-tint 450ms ease-out,
+    --side-nav-glow-y 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sv-side-nav-tint[data-nav-tone="gold"] { --side-nav-tint: rgb(245 158 11); }
+.sv-side-nav-tint[data-nav-tone="blue"] { --side-nav-tint: rgb(14 165 233); }
+.sv-side-nav-tint[data-nav-tone="purple"] { --side-nav-tint: rgb(217 70 239); }
+.sv-side-nav-tint[data-nav-tone="green"] { --side-nav-tint: rgb(16 185 129); }
+.sv-side-nav-tint[data-nav-tone="indigo"] { --side-nav-tint: rgb(99 102 241); }
+.sv-side-nav-tint[data-nav-tone="lime"] { --side-nav-tint: rgb(132 204 22); }
+.sv-side-nav-tint[data-nav-tone="red"] { --side-nav-tint: rgb(239 68 68); }
+.sv-side-nav-tint[data-nav-tone="pink"] { --side-nav-tint: rgb(236 72 153); }
+:root[data-sv-upage-bg] .sv-side-nav-tint {
+  --side-nav-tint: rgb(var(--upage-tint));
+}
+/* Página de usuario cuyo botón no está en la barra (Descubrir, Calendario…):
+   solo el velo del color de la página, sin brillo, que no señalaría nada. */
+.sv-side-nav-tint:not([data-nav-tone]) {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--side-nav-tint) 14%, transparent), color-mix(in srgb, var(--side-nav-tint) 6%, transparent));
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-side-nav-tint {
+    transition: none;
+  }
+}
+
 /* HOVER DE LOS BOTONES DE LA BARRA LATERAL: el icono crece y toma el color de
    su sección, y detrás aparece una lente de cristal líquido (desenfoque,
    brillo especular arriba, sombra interior abajo y halo del tono) que crece
@@ -5510,6 +5608,23 @@ html[data-details-sequence-transition] .sv-topbar {
   background-image:
     radial-gradient(130% 110% at 0% 0%, rgb(var(--upage-tint) / 0.24), rgb(var(--upage-tint) / 0.06) 60%, transparent 85%),
     linear-gradient(to bottom, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.03)) !important;
+}
+
+/* Desplegables de las páginas de usuario (`.sv-upage-menu`): van en un
+   portal, fuera del alcance de la regla anterior, así que llevan su marca. El
+   panel conserva su negro de fondo (legibilidad sobre los pósters) y añade el
+   brillo del tono; la opción elegida (`bg-white/10`) y la que está bajo el
+   cursor (`bg-white/5`) pasan al color de la página. Sin bordes. */
+:root[data-sv-upage-bg] .sv-upage-menu {
+  background-image:
+    radial-gradient(140% 100% at 0% 0%, rgb(var(--upage-tint) / 0.2), rgb(var(--upage-tint) / 0.06) 55%, transparent 85%),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.02));
+}
+:root[data-sv-upage-bg] .sv-upage-menu .bg-white\/10 {
+  background-color: rgb(var(--upage-tint) / 0.2);
+}
+:root[data-sv-upage-bg] .sv-upage-menu .hover\:bg-white\/5:hover {
+  background-color: rgb(var(--upage-tint) / 0.1);
 }
 
 .sv-upage-bg[data-variant="favorites"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.5-4.6-9.6-9.3C.9 8.2 3 4.5 6.6 4.5c2.1 0 3.6 1.2 4.4 2.5.8-1.3 2.3-2.5 4.4-2.5 3.6 0 5.7 3.7 4.2 7.2C19.5 16.4 12 21 12 21z'/%3E%3C/svg%3E"); }

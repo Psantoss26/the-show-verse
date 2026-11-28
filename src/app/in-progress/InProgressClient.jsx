@@ -809,7 +809,7 @@ function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
-                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+                className="sv-upage-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
                 style={{
                   ...menuStyle,
                 }}
@@ -962,7 +962,7 @@ const InProgressCard = memo(function InProgressCard({
           href={href}
           prefetch={false}
           onClick={onPreviewClick}
-          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]"
+          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
             {/* Backdrop image - same size as History list view */}
@@ -1041,7 +1041,7 @@ const InProgressCard = memo(function InProgressCard({
     return (
       <div className={enterClass("sv-progress-rise").trim() || undefined} style={enterStyle(animDelay)}>
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
-          <div className={`relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]`}>
+          <div className={`relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-emerald-900/20 transition-all sv-card-sheen`}>
             {imageMode === "backdrop" ? (
               <SmartBackdrop item={item} title={title} />
             ) : (

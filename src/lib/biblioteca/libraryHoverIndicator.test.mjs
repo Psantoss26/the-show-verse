@@ -29,9 +29,10 @@ test("Biblioteca muestra tipo y resolución en un indicador hover liquid glass",
   assert.match(source, /\? "h-7 px-2 text-base"/);
   assert.match(source, /: "h-9 px-2\.5 text-xl"/);
   assert.match(source, /hasLongResolutionLabel \? "gap-0\.5" : ""/);
-  assert.match(source, /hover:after:shadow-\[inset_0_0_0_2\.5px_rgba\(239,68,68,0\.95\)\]/);
-  assert.match(source, /lg:hover:shadow-red-900\/20/);
-  assert.match(source, /group-hover:shadow-\[inset_0_0_0_2\.5px_rgba\(239,68,68,0\.95\)\]/);
+  // Cuadrícula: brillo diagonal en hover (sv-card-sheen), sin anillo de color.
+  assert.match(source, /sv-card-sheen/);
+  assert.match(source, /lg:hover:shadow-amber-900\/20/);
+  assert.doesNotMatch(source, /group-hover:shadow-\[inset_0_0_0_2\.5px/);
   assert.match(source, /zIndex: 100/);
   assert.doesNotMatch(source, /bg-gradient-to-t from-black\/90/);
 });
