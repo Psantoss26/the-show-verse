@@ -215,12 +215,12 @@ function hrefDeEvento(evento) {
 
 // Título enlazado a su ficha, con el mismo peso que en el perfil y el hover en
 // el rosa de la sección.
-function TituloEvento({ evento }) {
+function TituloEvento({ evento, className = "" }) {
   const titulo = hasTargetActivity(evento) ? likeTargetName(evento) || "Sin título" : evento.title || evento.name || "Sin título";
   const href = hrefDeEvento(evento);
-  if (!href) return <span className="font-bold text-white">{titulo}</span>;
+  if (!href) return <span className={`font-bold text-white ${className}`}>{titulo}</span>;
   return (
-    <Link href={href} prefetch={false} className="font-bold text-white transition-colors hover:text-pink-300">
+    <Link href={href} prefetch={false} className={`font-bold text-white transition-colors hover:text-pink-300 ${className}`}>
       {titulo}
     </Link>
   );
@@ -374,7 +374,9 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
       <p className="min-w-0 flex-1 text-sm leading-5 text-zinc-400">
         <SujetoEvento evento={evento} mostrarAutor={mostrarAutor} />
         {verboDe(evento, mostrarAutor)} {objetivo}
-        <TituloEvento evento={evento} />
+        {/* El espacio de PT Sans (~4 px) se perdía junto a la negrita del
+            título: un margen lo separa de la frase. */}
+        <TituloEvento evento={evento} className="ml-1" />
         {evento.type === "list_item" && evento.listName ? (
           <span className="text-zinc-500"> · {evento.listName}</span>
         ) : null}

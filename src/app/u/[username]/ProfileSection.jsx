@@ -82,6 +82,7 @@ import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } 
 import { normalizeSearchText, titleMatchesQuery } from "@/lib/search/titleMatching";
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import { LIST_ROW_SURFACE, LIST_ROW_SURFACE_HOVER } from "@/lib/ui/listRowSurface";
 
 // Sección de Perfil ↔ lista del store de altas optimistas.
 const PROFILE_PENDING_LIST_BY_SECTION = {
@@ -926,7 +927,7 @@ function ActivityReview({ item, actor, compact = false, posterList = false, back
   const src = posterPath ? `https://image.tmdb.org/t/p/w185${posterPath}` : null;
 
   return (
-    <article className={`rounded-xl bg-white/[0.04] px-3 @[640px]/detail-page:px-4 ${compact ? "py-3" : "py-4"}`}>
+    <article className={`${LIST_ROW_SURFACE} px-3 @[640px]/detail-page:px-4 ${compact ? "py-3" : "py-4"}`}>
       <div className="flex items-start gap-3">
         {backdropList ? (
           <ActivityPoster item={item} backdrop className={`${ACTIVITY_BACKDROP_CLASS} self-start`} />
@@ -1002,7 +1003,7 @@ function ActivityRow({ item, actor, compact = false, posterList = false, backdro
     item.type === "rating" ? `${formatActivityRatingTarget(item)} ` : "";
 
   return (
-    <article className={`flex min-w-0 items-center gap-3 border-b border-white/[0.07] px-3 last:border-b-0 @[640px]/detail-page:px-4 ${compact ? "py-2" : "py-3"}`}>
+    <article className={`flex min-w-0 items-center gap-3 ${LIST_ROW_SURFACE} px-3 @[640px]/detail-page:px-4 ${compact ? "py-2" : "py-3"}`}>
       {backdropList ? (
         <ActivityPoster item={item} backdrop className={ACTIVITY_BACKDROP_CLASS} />
       ) : posterList ? (
@@ -1024,11 +1025,12 @@ function ActivityRow({ item, actor, compact = false, posterList = false, backdro
         {actionText}{" "}
         {ratingTargetLabel || episodeLabel}
         {item.type === "list" ? (
-          <Link href={`/lists/${item.id.replace("list:", "")}`} className="font-bold text-white hover:text-emerald-300">{item.name}</Link>
+          <Link href={`/lists/${item.id.replace("list:", "")}`} className="ml-1 font-bold text-white hover:text-emerald-300">{item.name}</Link>
         ) : likeHref ? (
-          <Link href={likeHref} className="font-bold text-white hover:text-emerald-300">{likeTargetName(item)}</Link>
+          <Link href={likeHref} className="ml-1 font-bold text-white hover:text-emerald-300">{likeTargetName(item)}</Link>
         ) : (
-          <ActivityTitle item={item} />
+          // Margen: el espacio de PT Sans se perdía junto a la negrita.
+          <ActivityTitle item={item} className="ml-1" />
         )}
         {item.type === "list_item" && item.listName ? <span className="text-zinc-500"> · {item.listName}</span> : null}
         {author ? (
@@ -1061,7 +1063,7 @@ function ActivityRow({ item, actor, compact = false, posterList = false, backdro
 
 function ActivityFeed({ items, actor, compact = false, posterList = false, backdropList = false, animateWithin }) {
   return (
-    <ol className={compact ? "space-y-1" : "space-y-3"} role="list">
+    <ol className={compact ? "space-y-2" : "space-y-3"} role="list">
       {items.map((item, index) => (
         <li key={item.id}>
           <ProfileEntrance index={index} total={items.length} animateWithin={animateWithin}>
@@ -1266,7 +1268,7 @@ function ProfileMediaListItem({ item, showStars, viewerState, compact = false, s
     <Link
       href={`/details/${type}/${item?.tmdbId || item?.id}`}
       onClick={previewClick(item, { mediaType: type })}
-      className={`group flex min-w-0 items-center ${PROFILE_LIST_ROW_CLASS} rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] shadow-lg transition hover:from-white/[0.13] hover:to-white/[0.06]`}
+      className={`group flex min-w-0 items-center ${PROFILE_LIST_ROW_CLASS} ${LIST_ROW_SURFACE} ${LIST_ROW_SURFACE_HOVER}`}
     >
       <span className={`${sizeClass} shrink-0 overflow-hidden rounded-xl bg-zinc-900`}>
         {src ? <OptimizedImage src={`https://image.tmdb.org/t/p/w185${src}`} alt="" className="h-full w-full object-cover" loading="lazy" /> : <span className="flex h-full w-full items-center justify-center text-zinc-700"><ImageOff className="h-4 w-4" /></span>}
@@ -1333,7 +1335,7 @@ function DiaryListItem({ item, viewerState, onOpenGroup }) {
   );
 
   return (
-    <article className="group overflow-hidden rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] shadow-lg">
+    <article className={`group overflow-hidden ${LIST_ROW_SURFACE}`}>
       {grouped ? (
         <button
           type="button"
