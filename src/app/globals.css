@@ -810,7 +810,7 @@ html:not([data-avatar-boot]) .alerts-boot {
    uno por su tirador. --sv-range-thumb: ancho del tirador; pista y relleno se
    recortan medio tirador a cada lado. */
 .sv-range {
-  --sv-range-thumb: 26px;
+  --sv-range-thumb: 20px;
 }
 
 .sv-range-fill {
@@ -853,7 +853,7 @@ html:not([data-avatar-boot]) .alerts-boot {
   box-sizing: border-box;
   width: var(--sv-range-thumb);
   height: var(--sv-range-thumb);
-  border: 3px solid #fff;
+  border: none;
   border-radius: 9999px;
   background: var(--sv-range-accent, #ef4444);
   box-shadow:
@@ -869,7 +869,7 @@ html:not([data-avatar-boot]) .alerts-boot {
   box-sizing: border-box;
   width: var(--sv-range-thumb);
   height: var(--sv-range-thumb);
-  border: 3px solid #fff;
+  border: none;
   border-radius: 9999px;
   background: var(--sv-range-accent, #ef4444);
   box-shadow:
