@@ -1553,6 +1553,42 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
     { id: "lists", label: "Listas", count: sections?.lists },
     { id: "social", label: "Social" },
   ];
+  // Móvil: cada pestaña mide un cuarto del menú (siempre se ven cuatro
+  // enteras). Si título e insignia no caben en ese cuarto (p. ej.
+  // «PUNTUACIONES 325»), el título se reduce lo justo para que quepan, medido;
+  // en el resto (y en escritorio, donde la pestaña toma su ancho) no cambia.
+  const countsKey = items.map((it) => it.count ?? "").join("|");
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return undefined;
+    const fit = () => {
+      nav.querySelectorAll("[data-profile-tab-label]").forEach((label) => {
+        label.style.fontSize = "";
+        label.style.transform = "";
+        const tab = label.parentElement;
+        const badge = label.nextElementSibling?.matches("span.rounded-full") ? label.nextElementSibling : null;
+        if (!badge) return;
+        const style = getComputedStyle(tab);
+        const room =
+          tab.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - (parseFloat(style.columnGap) || 0) - parseFloat(getComputedStyle(badge).marginLeft) - badge.getBoundingClientRect().width;
+        const width = label.getBoundingClientRect().width;
+        if (width <= room + 1) return;
+        const size = parseFloat(getComputedStyle(label).fontSize);
+        const next = Math.floor(size * (room / width) * 10) / 10;
+        label.style.fontSize = `${next}px`;
+        // La línea base no se mueve al reducir la letra (medido), así que las
+        // mayúsculas, más bajas, quedarían por debajo del centro de la
+        // insignia; se suben la mitad de lo que encoge su altura (~0,7 em).
+        label.style.transform = `translateY(${(-(size - next) * 0.35).toFixed(2)}px)`;
+      });
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(nav);
+    document.fonts?.ready.then(fit);
+    return () => observer.disconnect();
+  }, [countsKey]);
+
   // El subrayado de la pestaña activa se desliza de una a otra, como el del
   // menú Detalles · Producción · Sinopsis de la ficha. Vive dentro del nav con
   // scroll horizontal (se mide por offsetLeft), así que acompaña al scroll.
@@ -1622,11 +1658,11 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
             data-offline-local-nav="true"
             data-profile-tab-active={active || undefined}
             data-section-key={it.id}
-            className={`relative z-10 flex w-auto min-w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center gap-1.5 whitespace-nowrap @[640px]/detail-page:min-w-0 @[640px]/detail-page:gap-0 px-2 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 @[640px]/detail-page:w-auto @[640px]/detail-page:justify-start @[640px]/detail-page:px-3.5 @[640px]/detail-page:text-xs @[640px]/detail-page:tracking-widest ${
+            className={`relative z-10 flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center gap-[5px] overflow-hidden whitespace-nowrap @[640px]/detail-page:overflow-visible @[640px]/detail-page:gap-0 px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 @[640px]/detail-page:w-auto @[640px]/detail-page:justify-start @[640px]/detail-page:px-3.5 @[640px]/detail-page:text-xs @[640px]/detail-page:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
-            {it.label}
+            <span data-profile-tab-label>{it.label}</span>
             {typeof it.count === "number" && (
               <CountBadge tone={active ? "active" : "glass"} size="tab" className="@[640px]/detail-page:ml-1.5">
                 {it.count}
