@@ -58,6 +58,8 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { ControlledOptionsSheet, OptionsSheetTrigger, SheetOption, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 import {
   AdvancedFiltersBadge,
   AdvancedFiltersButton,
@@ -2136,29 +2138,18 @@ export default function InProgressClient({
   if (showLoginPrompt) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20">
-        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          {/* Manchas abstractas esmeralda y negras */}
-          <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-emerald-800/25 blur-[120px] sm:blur-[150px]" />
-        </div>
+        <UserPageBackdrop variant="progress" />
 
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
           <header className="mb-8 sv-section-header-in">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-emerald-500" />
-              <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">
-                SEGUIMIENTO
-              </span>
-            </div>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              {activeTab === "completed" ? "Completadas" : "En Progreso"}<span className="text-emerald-500">.</span>
-            </h1>
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-              {activeTab === "completed"
+            <UserPageHeading
+              eyebrow="SEGUIMIENTO"
+              title={activeTab === "completed" ? "Completadas" : "En Progreso"}
+              accent="emerald"
+              description={activeTab === "completed"
                 ? "Series que ya has terminado de ver."
                 : "Series que estás viendo actualmente con su progreso."}
-            </p>
+            />
           </header>
 
           {/* Sin sesión NO se ofrece el conmutador En progreso / Completadas:
@@ -2204,12 +2195,7 @@ export default function InProgressClient({
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Manchas abstractas esmeralda y negras */}
-        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-emerald-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
+      <UserPageBackdrop variant="progress" />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
         {/* ========== HEADER (same pattern as History, Favorites, Watchlist, Calendar) ========== */}
@@ -2217,20 +2203,15 @@ export default function InProgressClient({
             ver `.sv-progress-*` en globals.css. */}
         <header className={`mb-6 lg:mb-10${staticHeader ? "" : " sv-section-header-in"}`}>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-px w-12 bg-emerald-500" />
-                <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">
-                  SEGUIMIENTO
-                </span>
-              </div>
-              <div className="flex items-center gap-6">
-                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                  {activeTab === "completed" ? "Completadas" : "En Progreso"}
-                  <span className="text-emerald-500">.</span>
-                </h1>
-
-                {/* Action buttons next to title */}
+            <UserPageHeading
+              eyebrow="SEGUIMIENTO"
+              title={activeTab === "completed" ? "Completadas" : "En Progreso"}
+              accent="emerald"
+              animate={!staticHeader}
+              description={activeTab === "completed"
+                  ? "Series que ya has terminado de ver."
+                  : "Series que estás viendo actualmente con su progreso."}
+              actions={
                 <div className="flex items-center gap-2">
                   <div
                     className={staticHeader ? undefined : "sv-progress-pop"}
@@ -2271,13 +2252,8 @@ export default function InProgressClient({
                     </LiquidButton>
                   </div>
                 </div>
-              </div>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                {activeTab === "completed"
-                  ? "Series que ya has terminado de ver."
-                  : "Series que estás viendo actualmente con su progreso."}
-              </p>
-            </div>
+              }
+            />
 
             {/* Stats cards on the right (same as History) */}
             <div

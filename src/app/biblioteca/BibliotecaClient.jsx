@@ -52,6 +52,8 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import HoverExpandCard, { HoverExpandZoom } from "@/components/ui/HoverExpandCard";
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 import FlipReorder from "@/components/ui/FlipReorder";
 import useCardEntrance from "@/hooks/useCardEntrance";
 import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
@@ -1940,11 +1942,7 @@ export default function BibliotecaClient() {
   if (error) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center text-zinc-100 font-sans selection:bg-amber-500/30">
-        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-amber-600/15 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-amber-700/20 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-orange-800/25 blur-[120px] sm:blur-[150px]" />
-        </div>
+        <UserPageBackdrop variant="library" />
         <div className="relative z-10 text-center">
           <Clapperboard className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">
@@ -1972,11 +1970,7 @@ export default function BibliotecaClient() {
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-amber-500/30">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-amber-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-amber-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-orange-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
+      <UserPageBackdrop variant="library" />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
         {/* ====== HEADER ====== */}
@@ -1989,17 +1983,13 @@ export default function BibliotecaClient() {
           }
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-px w-12 bg-amber-500" />
-                <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">
-                  PLEX SERVER
-                </span>
-              </div>
-              <div className="flex items-center gap-4">
-                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                  Biblioteca<span className="text-amber-500">.</span>
-                </h1>
+            <UserPageHeading
+              eyebrow="PLEX SERVER"
+              title="Biblioteca"
+              accent="amber"
+              animate={!isBackNav && !reduceMotion}
+              description="Contenido del servidor Plex."
+              actions={
                 <motion.div
                   initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -2027,11 +2017,8 @@ export default function BibliotecaClient() {
                   />
                 </LiquidButton>
                 </motion.div>
-              </div>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                Contenido del servidor Plex.
-              </p>
-            </div>
+              }
+            />
 
             {/* Siempre montadas (con su estado de carga), como en Favoritos:
                 antes aparecían al terminar de cargar y empujaban la cabecera. */}

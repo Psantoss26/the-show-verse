@@ -83,6 +83,8 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import { ControlledOptionsSheet, OptionsSheetTrigger, SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 import {
   AdvancedFiltersBadge,
   AdvancedFiltersButton,
@@ -4234,11 +4236,7 @@ export default function HistoryClient() {
   ) {
     return (
       <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20">
-        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
-          <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-emerald-800/25 blur-[120px] sm:blur-[150px]" />
-        </div>
+        <UserPageBackdrop variant="history" />
 
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
           <motion.header
@@ -4247,18 +4245,12 @@ export default function HistoryClient() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-emerald-500" />
-              <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">
-                REGISTRO
-              </span>
-            </div>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              Historial<span className="text-emerald-500">.</span>
-            </h1>
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-              Registro cronológico de todo lo que has visto.
-            </p>
+            <UserPageHeading
+              eyebrow="REGISTRO"
+              title="Historial"
+              accent="emerald"
+              description="Registro cronológico de todo lo que has visto."
+            />
           </motion.header>
 
           <div className="flex items-center justify-center py-12 lg:py-24">
@@ -4297,12 +4289,7 @@ export default function HistoryClient() {
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Manchas abstractas esmeralda y negras */}
-        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-emerald-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
+      <UserPageBackdrop variant="history" />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
         {/* Header */}
@@ -4313,21 +4300,14 @@ export default function HistoryClient() {
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-px w-12 bg-emerald-500" />
-                <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">
-                  REGISTRO
-                </span>
-              </div>
-              <div className="flex items-center gap-6">
-                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                  Historial
-                  <span className="text-emerald-500">.</span>
-                </h1>
-
-                {/* Botones redondos junto al título */}
-                {auth.connected && (historyLoaded || fromSibling) && (
+            <UserPageHeading
+              eyebrow="REGISTRO"
+              title="Historial"
+              accent="emerald"
+              animate={!staticChrome}
+              description="Registro cronológico de todo lo que has visto."
+              actions={
+                auth.connected && (historyLoaded || fromSibling) && (
                   <div className="flex items-center gap-2">
                     <motion.div
                       initial={staticChrome ? false : { opacity: 0, transform: "scale(0.8)" }}
@@ -4368,12 +4348,9 @@ export default function HistoryClient() {
                       </LiquidButton>
                     </motion.div>
                   </div>
-                )}
-              </div>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                Registro cronológico de todo lo que has visto.
-              </p>
-            </div>
+                )
+              }
+            />
 
             {/* Solo estadísticas a la derecha */}
             {auth.connected && (historyLoaded || fromSibling) && (

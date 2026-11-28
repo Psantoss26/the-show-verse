@@ -8,10 +8,12 @@
 // (MobileOptionsSheet placement="side"): lateral desde 640px, inferior en
 // móvil.
 
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 import OptimizedImage from "@/components/OptimizedImage";
+import { TitleRow } from "@/components/details/sectionSheet/SectionSheetRows";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { TitleRow } from "@/components/details/sectionSheet/SectionSheetRows";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
@@ -1997,12 +1999,7 @@ export default function DiscoverClient() {
   // --- Render ---
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-orange-500/30">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Manchas abstractas naranjas y negras (como las rojas de Favoritos) */}
-        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-orange-500/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-orange-600/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-orange-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
+      <UserPageBackdrop variant="discover" />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
         {/* Header */}
@@ -2013,20 +2010,12 @@ export default function DiscoverClient() {
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-px w-12 bg-orange-500" />
-                <span className="text-orange-400 font-bold uppercase tracking-widest text-xs">
-                  EXPLORAR
-                </span>
-              </div>
-              <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                Descubrir<span className="text-orange-500">.</span>
-              </h1>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                Filtra y busca películas o series con criterios avanzados.
-              </p>
-            </div>
+            <UserPageHeading
+              eyebrow="EXPLORAR"
+              title="Descubrir"
+              accent="orange"
+              description="Filtra y busca películas o series con criterios avanzados."
+            />
 
             <motion.div
               className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"

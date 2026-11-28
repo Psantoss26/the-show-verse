@@ -100,6 +100,8 @@ import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import GroupingProgress from "@/components/ui/GroupingProgress";
 import { ControlledOptionsSheet, OptionsSheetTrigger, SheetOption, SheetOptionCollapse, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 import {
   AdvancedFiltersBadge,
   AdvancedFiltersButton,
@@ -2941,12 +2943,7 @@ export default function WatchlistClient() {
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Manchas abstractas azules y negras */}
-        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-blue-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-blue-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-blue-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
+      <UserPageBackdrop variant="watchlist" />
 
       <div
         ref={detailsSequenceRef}
@@ -2963,19 +2960,13 @@ export default function WatchlistClient() {
           }
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-px w-12 bg-blue-500" />
-                <span className="text-blue-400 font-bold uppercase tracking-widest text-xs">
-                  POR VER
-                </span>
-              </div>
-              <div className="flex items-center gap-6">
-                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                  Pendientes<span className="text-blue-500">.</span>
-                </h1>
-
-                {/* Action buttons next to title */}
+            <UserPageHeading
+              eyebrow="POR VER"
+              title="Pendientes"
+              accent="blue"
+              animate={!isBackNav && !reduceMotion}
+              description="Títulos guardados para ver más tarde."
+              actions={
                 <div className="flex items-center gap-2">
                   <motion.div
                     initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
@@ -3029,11 +3020,8 @@ export default function WatchlistClient() {
                     />
                   </motion.div>
                 </div>
-              </div>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                Títulos guardados para ver más tarde.
-              </p>
-            </div>
+              }
+            />
 
               <motion.div
                 className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"

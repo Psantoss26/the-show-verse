@@ -75,6 +75,8 @@ import {
   Globe,
 } from "lucide-react";
 import PageStatCard from "@/components/ui/PageStatCard";
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 import { useSlidingSectionIndicator } from "@/components/ui/useSlidingSectionIndicator";
 import { listsHeaderStats } from "@/lib/lists/headerStats";
 import { FEATURED_COLLECTION_IDS } from "@/lib/tmdb/featuredCollections";
@@ -2722,11 +2724,7 @@ export default function ListsClient({ initialSource = DEFAULT_LISTS_SOURCE }) {
     // barra superior va sobre el <body>, y con otro tono la página empezaba
     // bajo ella y la barra se veía como una franja negra con su borde.
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-purple-500/30">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-purple-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-purple-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-blue-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
+      <UserPageBackdrop variant="lists" />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
         {/* Header */}
@@ -2739,28 +2737,27 @@ export default function ListsClient({ initialSource = DEFAULT_LISTS_SOURCE }) {
           }
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-px w-12 bg-purple-500" />
-                <span className="text-purple-400 font-bold uppercase tracking-widest text-xs">
-                  {source === "collections"
+            <UserPageHeading
+              eyebrow={source === "collections"
                     ? "SAGAS"
                     : source === "trakt"
                       ? "COMUNIDAD"
                       : "TUS LISTAS"}
-                </span>
-              </div>
-              <div className="flex items-center gap-4 sm:gap-6">
-                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                  {source === "collections"
+              title={source === "collections"
                     ? "Colecciones"
                     : source === "trakt"
                       ? "Listas de la comunidad"
                       : "Mis Listas"}
-                  <span className="text-purple-500">.</span>
-                </h1>
+              accent="purple"
+              animate={!isBackNav}
+              description={source === "collections"
+                  ? "Explora colecciones temáticas de películas."
+                  : source === "trakt"
+                    ? "Descubre y explora listas populares de la comunidad."
+                    : "Gestiona y organiza tus listas personales."}
+              actions={
 
-                {personalLocked ? null : (
+                personalLocked ? null : (
                 <motion.div
                   initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -2779,16 +2776,9 @@ export default function ListsClient({ initialSource = DEFAULT_LISTS_SOURCE }) {
                     <RefreshCcw className="h-5 w-5" />
                   </LiquidButton>
                 </motion.div>
-                )}
-              </div>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                {source === "collections"
-                  ? "Explora colecciones temáticas de películas."
-                  : source === "trakt"
-                    ? "Descubre y explora listas populares de la comunidad."
-                    : "Gestiona y organiza tus listas personales."}
-              </p>
-            </div>
+                )
+              }
+            />
 
             {/* Tarjetas de información a la altura del título, como en
                 Historial o En progreso: tres por pestaña, con lo que se está

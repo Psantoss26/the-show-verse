@@ -107,6 +107,8 @@ import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import GroupingProgress from "@/components/ui/GroupingProgress";
 import { ControlledOptionsSheet, OptionsSheetTrigger, SheetOption, SheetOptionCollapse, SheetOptionGroup, useInOptionsSheet, useOptionsSheetController } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 import useGroupScoresOnDemand from "@/hooks/useGroupScoresOnDemand";
 import GroupScoreStats, {
   MY_RATING_GROUP_SCORE_PRIORITY,
@@ -3418,12 +3420,7 @@ export default function FavoritesClient() {
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-500/30">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Manchas abstractas rojas y negras */}
-        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-red-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-red-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-red-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
+      <UserPageBackdrop variant="favorites" />
 
       <div
         ref={detailsSequenceRef}
@@ -3440,19 +3437,13 @@ export default function FavoritesClient() {
           }
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-px w-12 bg-red-500" />
-                <span className="text-red-400 font-bold uppercase tracking-widest text-xs">
-                  COLECCIÓN
-                </span>
-              </div>
-              <div className="flex items-center gap-6">
-                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                  Favoritos<span className="text-red-500">.</span>
-                </h1>
-
-                {/* Action buttons next to title */}
+            <UserPageHeading
+              eyebrow="COLECCIÓN"
+              title="Favoritos"
+              accent="red"
+              animate={!isBackNav && !reduceMotion}
+              description="Tu colección personal de películas y series favoritas."
+              actions={
                 <div className="flex items-center gap-2">
                   <motion.div
                     initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
@@ -3506,11 +3497,8 @@ export default function FavoritesClient() {
                     />
                   </motion.div>
                 </div>
-              </div>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                Tu colección personal de películas y series favoritas.
-              </p>
-            </div>
+              }
+            />
 
               <motion.div
                 className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"

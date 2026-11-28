@@ -413,9 +413,11 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
       <h1
         data-header-morph="name"
         ref={nameRef}
-        className="col-start-1 row-start-1 min-w-0 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white @[640px]/detail-page:text-[clamp(2.25rem,4.1vw,3.5rem)]"
+        className="col-start-1 row-start-1 min-w-0 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] pb-1 -mb-1 @[640px]/detail-page:text-[clamp(2.25rem,4.1vw,3.5rem)] bg-gradient-to-r from-white from-5% via-emerald-300 via-30% to-emerald-500 to-75% bg-clip-text text-transparent drop-shadow-[0_0_28px_rgba(16,185,129,0.35)]"
       >
-        {user.displayName}<span className="text-emerald-400">.</span>
+        {/* Mismo degradado y halo que el título de las demás páginas de
+            usuario (UserPageHeading). */}
+        {user.displayName}<span className="text-emerald-500">.</span>
       </h1>
 
       {subtitle ? (

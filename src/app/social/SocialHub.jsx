@@ -7,6 +7,8 @@
 // otra página (/today) con su propia cabecera y entradas de menú; ahora es una
 // opción más de esa barra y lleva sus filtros en el mismo menú.
 
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 import { useCallback, useEffect, useState } from "react";
 import LoginRequiredScreen from "@/components/auth/LoginRequiredScreen";
 import { Activity, CalendarDays, Clapperboard, Flame, Users } from "lucide-react";
@@ -207,12 +209,7 @@ export default function SocialHub({ initialView, initialToday, initialFeedPrefs 
 
   return (
     <div className="min-h-screen bg-black font-sans text-zinc-100 selection:bg-pink-500/30">
-      {/* Manchas de color de la sección, igual que en las demás páginas */}
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute -left-[5%] -top-[10%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-pink-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -right-[5%] top-[15%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-fuchsia-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-pink-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
+      <UserPageBackdrop variant="social" />
 
       <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
         <motion.header
@@ -222,18 +219,13 @@ export default function SocialHub({ initialView, initialToday, initialFeedPrefs 
           transition={statsEntry ? { duration: 0.5, ease: "easeOut" } : { duration: 0 }}
         >
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="mb-2 flex items-center gap-3">
-                <div className="h-px w-12 bg-pink-500" />
-                <span className="text-xs font-bold uppercase tracking-widest text-pink-400">COMUNIDAD</span>
-              </div>
-              <h1 className="text-4xl font-bold tracking-tighter text-white md:text-6xl">
-                Social<span className="text-pink-500">.</span>
-              </h1>
-              <p className="mt-2 hidden whitespace-nowrap text-lg text-zinc-400 md:block">
-                Lo destacado de hoy y la actividad de la gente a la que sigues, y la tuya.
-              </p>
-            </div>
+            <UserPageHeading
+              eyebrow="COMUNIDAD"
+              title="Social"
+              accent="pink"
+              animate={statsEntry}
+              description="Lo destacado de hoy y la actividad de la gente a la que sigues, y la tuya."
+            />
 
             <motion.div
               className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:w-auto"

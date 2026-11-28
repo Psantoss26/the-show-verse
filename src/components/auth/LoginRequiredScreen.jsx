@@ -3,43 +3,22 @@
 // src/components/auth/LoginRequiredScreen.jsx
 //
 // Pantalla «Inicia sesión» de las páginas de usuario (Favoritos, Pendientes,
-// Mis listas, Social): fondo con las manchas de color de la sección, su
-// cabecera y la tarjeta de cristal con el logo y el botón. Una sola pieza para
+// Mis listas, Social): el fondo animado común (UserPageBackdrop), la cabecera
+// común (UserPageHeading) y la tarjeta de cristal con el logo y el botón. Una sola pieza para
 // que las cuatro sean idénticas y solo cambien el color y los textos.
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 
-// Clases completas por color (Tailwind solo genera las que aparecen enteras).
+// Por color: la variante del fondo común y el acento del título (los mismos
+// que usa la página con sesión), y el color de la selección de texto.
 const THEMES = {
-  red: {
-    selection: "selection:bg-red-500/30",
-    blobs: ["bg-red-600/15", "bg-red-700/20", "bg-red-800/25"],
-    line: "bg-red-500",
-    eyebrow: "text-red-400",
-    dot: "text-red-500",
-  },
-  blue: {
-    selection: "selection:bg-blue-500/30",
-    blobs: ["bg-blue-600/15", "bg-blue-700/20", "bg-blue-800/25"],
-    line: "bg-blue-500",
-    eyebrow: "text-blue-400",
-    dot: "text-blue-500",
-  },
-  purple: {
-    selection: "selection:bg-purple-500/30",
-    blobs: ["bg-purple-600/15", "bg-purple-700/20", "bg-blue-800/25"],
-    line: "bg-purple-500",
-    eyebrow: "text-purple-400",
-    dot: "text-purple-500",
-  },
-  pink: {
-    selection: "selection:bg-pink-500/30",
-    blobs: ["bg-pink-600/15", "bg-fuchsia-700/20", "bg-pink-800/25"],
-    line: "bg-pink-500",
-    eyebrow: "text-pink-400",
-    dot: "text-pink-500",
-  },
+  red: { variant: "favorites", accent: "red", selection: "selection:bg-red-500/30" },
+  blue: { variant: "watchlist", accent: "blue", selection: "selection:bg-blue-500/30" },
+  purple: { variant: "lists", accent: "purple", selection: "selection:bg-purple-500/30" },
+  pink: { variant: "social", accent: "pink", selection: "selection:bg-pink-500/30" },
 };
 
 // Solo la tarjeta, para las páginas que siguen enseñando su cabecera y sus
@@ -88,35 +67,17 @@ export default function LoginRequiredScreen({
 
   return (
     <div className={`min-h-screen bg-black text-zinc-100 font-sans ${t.selection} pb-20`}>
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className={`absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full ${t.blobs[0]} blur-[120px] sm:blur-[150px]`} />
-        <div className={`absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full ${t.blobs[1]} blur-[120px] sm:blur-[150px]`} />
-        <div className={`absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full ${t.blobs[2]} blur-[120px] sm:blur-[150px]`} />
-      </div>
+      <UserPageBackdrop variant={t.variant} />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
-        <motion.header
-          className="mb-8"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div className={`h-px w-12 ${t.line}`} />
-            <span className={`${t.eyebrow} font-bold uppercase tracking-widest text-xs`}>
-              {eyebrow}
-            </span>
-          </div>
-          <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-            {title}
-            <span className={t.dot}>.</span>
-          </h1>
-          {description ? (
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-              {description}
-            </p>
-          ) : null}
-        </motion.header>
+        <header className="mb-8">
+          <UserPageHeading
+            eyebrow={eyebrow}
+            title={title}
+            accent={t.accent}
+            description={description}
+          />
+        </header>
 
         <LoginRequiredCard message={message} next={next} />
       </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 import OptimizedImage from "@/components/OptimizedImage";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { createPortal } from "react-dom";
@@ -2326,15 +2328,9 @@ function AddProgressConfig({
   );
 }
 
-// Fondo con manchas ámbar (mismo lenguaje que Historial/En progreso).
+// Fondo común de las páginas de usuario (variante con el icono de la barra).
 function Blobs() {
-  return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-      <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
-      <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
-      <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-emerald-800/25 blur-[120px] sm:blur-[150px]" />
-    </div>
-  );
+  return <UserPageBackdrop variant="continue" />;
 }
 
 // `staticEntry`: llegando desde Historial la cabecera no repite su entrada
@@ -2344,25 +2340,20 @@ function Header({ cards, staticEntry = false, onRefresh, refreshing }) {
     <motion.header className="mb-6 lg:mb-10" initial={staticEntry ? false : { opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
       <div className="flex flex-col lg:flex-row lg:flex-wrap lg:items-center lg:justify-between gap-6">
         <div className="shrink-0 min-w-0">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-px w-12 bg-emerald-500" />
-            <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">SEGUIMIENTO</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              Continuar viendo<span className="text-emerald-500">.</span>
-            </h1>
-            {onRefresh && (
-              <motion.div initial={staticEntry ? false : { opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, delay: 0.3 }}>
+          <UserPageHeading
+            eyebrow="SEGUIMIENTO"
+            title="Continuar viendo"
+            accent="emerald"
+            animate={!staticEntry}
+            description="Películas y episodios que estás viendo."
+            actions={onRefresh ? (
+              <motion.div className="shrink-0" initial={staticEntry ? false : { opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, delay: 0.3 }}>
                 <LiquidButton onClick={onRefresh} disabled={refreshing} loading={refreshing} activeColor="green" groupId="cw-header-actions" title="Actualizar" className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15">
                   <RotateCcw className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`} />
                 </LiquidButton>
               </motion.div>
-            )}
-          </div>
-          <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-            Películas y episodios que estás viendo.
-          </p>
+            ) : null}
+          />
         </div>
         <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end shrink-0" initial={staticEntry ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
           {cards.map((card, index) => (

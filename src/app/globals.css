@@ -2967,6 +2967,22 @@ html[data-android-app] .sv-modal-flat-glass * {
   );
 }
 
+/* Páginas de usuario con fondo animado (UserPageBackdrop marca <html>): la
+   saturación del cristal (190% el completo, 130% el leve que sobresale)
+   avivaba el rojo/azul del fondo y dejaba una franja de más color con un
+   corte horizontal donde acababa. Aquí las dos capas solo desenfocan, sin
+   saturar, y el tinte negro baja al 8%: medido por filas de píxeles, la zona
+   de la barra sigue el tono del fondo sin escalón (2 puntos más oscura arriba
+   y se iguala en el degradado). Lo que pasa por debajo sigue desenfocado. */
+[data-sv-upage-bg] .sv-topbar-glass {
+  background-color: rgb(0 0 0 / 8%);
+  backdrop-filter: blur(7px);
+}
+
+[data-sv-upage-bg] .sv-topbar-glass-soft {
+  backdrop-filter: blur(2.5px);
+}
+
 /* Móvil y tablet: las barras de menú fijas (páginas de usuario, menú de
    secciones de la ficha) se quedan a 8px bajo la barra (top 3.5rem). Con los
    20/34px de arriba el difuminado desenfocaba el borde superior de esas
@@ -5391,4 +5407,262 @@ html[data-details-sequence-transition] .sv-topbar {
     --sv-zoom: 1.05;
     scale: calc(1 / var(--sv-zoom));
   }
+}
+
+/* ===================================================================
+   FONDO ANIMADO DE LAS PÁGINAS DE USUARIO (UserPageBackdrop.jsx)
+   La misma base en todas: manchas que derivan y laten, aurora, iconos de la
+   página desenfocados que suben y brasas. Cada variante solo cambia los
+   colores y el icono (`--icon`, una máscara SVG del icono de la barra).
+   Solo transform/opacity: el compositor mueve capas ya pintadas.
+   =================================================================== */
+.sv-upage-bg {
+  /* Manchas */
+  --c1: 220 38 38;
+  --c2: 185 28 28;
+  --c3: 153 27 27;
+  /* Aurora (de más a menos intenso), segundo tono y brillo de iconos/brasas */
+  --a1: 239 68 68;
+  --a2: 244 63 94;
+  --a3: 251 113 133;
+  --light: 254 202 202;
+  --ember: 252 165 165;
+  contain: strict;
+}
+.sv-upage-bg[data-variant="watchlist"] {
+  --c1: 37 99 235; --c2: 29 78 216; --c3: 30 64 175;
+  --a1: 59 130 246; --a2: 14 165 233; --a3: 56 189 248; --light: 191 219 254; --ember: 147 197 253;
+}
+.sv-upage-bg[data-variant="history"],
+.sv-upage-bg[data-variant="progress"],
+.sv-upage-bg[data-variant="continue"],
+.sv-upage-bg[data-variant="profile"] {
+  --c1: 5 150 105; --c2: 4 120 87; --c3: 6 95 70;
+  --a1: 16 185 129; --a2: 20 184 166; --a3: 52 211 153; --light: 167 243 208; --ember: 110 231 183;
+}
+.sv-upage-bg[data-variant="lists"] {
+  --c1: 147 51 234; --c2: 126 34 206; --c3: 30 64 175;
+  --a1: 168 85 247; --a2: 217 70 239; --a3: 192 132 252; --light: 233 213 255; --ember: 216 180 254;
+}
+.sv-upage-bg[data-variant="library"] {
+  --c1: 217 119 6; --c2: 180 83 9; --c3: 154 52 18;
+  --a1: 245 158 11; --a2: 249 115 22; --a3: 251 191 36; --light: 253 230 138; --ember: 252 211 77;
+}
+.sv-upage-bg[data-variant="social"] {
+  --c1: 219 39 119; --c2: 162 28 175; --c3: 157 23 77;
+  --a1: 236 72 153; --a2: 217 70 239; --a3: 244 114 182; --light: 251 207 232; --ember: 249 168 212;
+}
+.sv-upage-bg[data-variant="calendar"] {
+  --c1: 202 138 4; --c2: 161 98 7; --c3: 146 64 14;
+  --a1: 234 179 8; --a2: 245 158 11; --a3: 250 204 21; --light: 254 240 138; --ember: 253 224 71;
+}
+.sv-upage-bg[data-variant="discover"] {
+  --c1: 234 88 12; --c2: 194 65 12; --c3: 154 52 18;
+  --a1: 249 115 22; --a2: 251 146 60; --a3: 253 186 116; --light: 254 215 170; --ember: 253 186 116;
+}
+/* ============================================================================
+   CRISTAL TINTADO EN REPOSO — controles de las páginas de usuario
+   ============================================================================
+   Tarjetas de información, botones, desplegables y cabeceras de agrupación
+   llevaban en reposo el mismo cristal blanco neutro
+   (`bg-gradient-to-br from-white/10 to-white/5`, un centenar de copias). Aquí
+   ese cristal toma el color de la página: un brillo del tono desde la esquina
+   superior izquierda y un velo blanco que se apaga hacia abajo. SIN canto ni
+   reflejo de 1 px: Pablo no quiere bordes marcados en ninguna pieza. El tono lo pone
+   UserPageBackdrop en `<html data-sv-upage-bg="variante">`.
+
+   ALCANCE: solo lo que va DESPUÉS del fondo (`.sv-upage-bg ~ *`), es decir,
+   el contenido de la página; los portales (modales, vistas laterales) quedan
+   fuera. Los botones activos de color (`from-red-500`…) no llevan
+   `from-white/10`, así que no se tocan.
+
+   ESPECIFICIDAD: 0,1,0 a propósito (todo lo demás dentro de `:where`). Al ir
+   sin @layer ya gana a las utilidades de Tailwind, y así la regla de los
+   menús FIJADOS (`[data-menu-pinned="true"] .backdrop-blur-lg`, 0,2,0) sigue
+   pasándolos al cristal del navbar. No toca `backdrop-filter` (Social lo
+   apaga en reposo) ni la opacidad. */
+:root[data-sv-upage-bg] { --upage-tint: 239 68 68; }
+:root[data-sv-upage-bg="watchlist"] { --upage-tint: 59 130 246; }
+:root:is([data-sv-upage-bg="history"], [data-sv-upage-bg="progress"], [data-sv-upage-bg="continue"], [data-sv-upage-bg="profile"]) { --upage-tint: 16 185 129; }
+:root[data-sv-upage-bg="lists"] { --upage-tint: 168 85 247; }
+:root[data-sv-upage-bg="library"] { --upage-tint: 245 158 11; }
+:root[data-sv-upage-bg="social"] { --upage-tint: 236 72 153; }
+:root[data-sv-upage-bg="calendar"] { --upage-tint: 234 179 8; }
+:root[data-sv-upage-bg="discover"] { --upage-tint: 249 115 22; }
+
+:where(.sv-upage-bg ~ *) :where(.from-white\/10).to-white\/5 {
+  background-image:
+    radial-gradient(130% 110% at 0% 0%, rgb(var(--upage-tint) / 0.2), rgb(var(--upage-tint) / 0.05) 55%, transparent 80%),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.025));
+}
+
+/* Al pasar el cursor por un control, el tono se aviva (sustituye al
+   `hover:from-white/15` de cada pieza, que ya no pinta). */
+:where(.sv-upage-bg ~ *) :where(button, a, [role="button"], summary):where(.from-white\/10).to-white\/5:where(:hover:not(:disabled)) {
+  background-image:
+    radial-gradient(130% 110% at 0% 0%, rgb(var(--upage-tint) / 0.3), rgb(var(--upage-tint) / 0.08) 60%, transparent 85%),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04));
+}
+
+/* Botones de la cabecera (junto al título): llevan el cristal con `!` de
+   LiquidButton (`!from-white/20 !via-white/5`), así que aquí también. */
+:where(.sv-upage-bg ~ *) .sv-upage-heading :where(button, a)[class*="!from-white/20"] {
+  background-image:
+    radial-gradient(130% 110% at 0% 0%, rgb(var(--upage-tint) / 0.24), rgb(var(--upage-tint) / 0.06) 60%, transparent 85%),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.03)) !important;
+}
+
+.sv-upage-bg[data-variant="favorites"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.5-4.6-9.6-9.3C.9 8.2 3 4.5 6.6 4.5c2.1 0 3.6 1.2 4.4 2.5.8-1.3 2.3-2.5 4.4-2.5 3.6 0 5.7 3.7 4.2 7.2C19.5 16.4 12 21 12 21z'/%3E%3C/svg%3E"); }
+.sv-upage-bg[data-variant="watchlist"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z'/%3E%3C/svg%3E"); }
+.sv-upage-bg[data-variant="history"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0ZM15 12a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z'/%3E%3C/svg%3E"); }
+.sv-upage-bg[data-variant="progress"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 3l14 9-14 9z' stroke='black' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.sv-upage-bg[data-variant="lists"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg stroke='black' stroke-width='2.4' stroke-linecap='round' fill='none'%3E%3Cpath d='M16 6H3M12 12H3M12 18H3'/%3E%3C/g%3E%3Cpath d='M16 12l5 3-5 3z' stroke='black' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.sv-upage-bg[data-variant="library"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2ZM7 10h2v4H7zM11 10h2v2h-2zM15 10h2v6h-2z'/%3E%3C/svg%3E"); }
+.sv-upage-bg[data-variant="continue"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm6 4v6l5-3z'/%3E%3Cpath d='M7 20h10v2H7zM11 17h2v3h-2z'/%3E%3C/svg%3E"); }
+.sv-upage-bg[data-variant="social"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M1 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1z'/%3E%3Ccircle cx='17' cy='6' r='3'/%3E%3Cpath d='M18 13a5 5 0 0 1 5 5v2h-4.4a7.4 7.4 0 0 0-2.6-6.6z'/%3E%3C/svg%3E"); }
+.sv-upage-bg[data-variant="calendar"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2zM6 10h3v3H6zM10.5 10h3v3h-3zM15 10h3v3h-3zM6 15h3v3H6zM10.5 15h3v3h-3z'/%3E%3C/svg%3E"); }
+.sv-upage-bg[data-variant="discover"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 1a11 11 0 1 1 0 22 11 11 0 0 1 0-22Zm4.5 6.5-6.4 2.6-2.6 6.4 6.4-2.6z'/%3E%3C/svg%3E"); }
+.sv-upage-bg[data-variant="profile"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='5'/%3E%3Cpath d='M3 22a9 9 0 0 1 18 0z'/%3E%3C/svg%3E"); }
+
+/* Las manchas derivan (transform) y laten a doble golpe (opacity, para no
+   pisar la deriva). */
+.sv-upage-blob {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  filter: blur(120px);
+  will-change: transform;
+  animation-timing-function: ease-in-out, ease-out;
+  animation-direction: alternate, normal;
+  animation-iteration-count: infinite;
+}
+@media (min-width: 640px) {
+  .sv-upage-blob { filter: blur(150px); }
+}
+.sv-upage-blob--a {
+  top: -10%; left: -5%; width: 60vw; max-width: 800px;
+  background: rgb(var(--c1) / 20%);
+  animation-name: sv-upage-drift-a, sv-upage-beat;
+  animation-duration: 38s, 4.8s;
+}
+.sv-upage-blob--b {
+  top: 15%; right: -5%; width: 55vw; max-width: 700px;
+  background: rgb(var(--a2) / 18%);
+  animation-name: sv-upage-drift-b, sv-upage-beat;
+  animation-duration: 44s, 4.8s;
+  animation-delay: 0s, -0.3s;
+}
+.sv-upage-blob--c {
+  bottom: -10%; left: 15%; width: 65vw; max-width: 800px;
+  background: rgb(var(--c3) / 25%);
+  animation-name: sv-upage-drift-c, sv-upage-beat;
+  animation-duration: 52s, 4.8s;
+  animation-delay: 0s, -0.6s;
+}
+@keyframes sv-upage-drift-a { to { transform: translate3d(8vw, 6vh, 0) scale(1.08); } }
+@keyframes sv-upage-drift-b { to { transform: translate3d(-10vw, 8vh, 0) scale(0.92); } }
+@keyframes sv-upage-drift-c { to { transform: translate3d(6vw, -8vh, 0) scale(1.1); } }
+@keyframes sv-upage-beat {
+  0%, 30%, 100% { opacity: 0.75; }
+  8% { opacity: 1; }
+  15% { opacity: 0.8; }
+  22% { opacity: 1; }
+}
+
+.sv-upage-fx { position: absolute; inset: 0; }
+
+.sv-upage-aurora {
+  position: absolute;
+  top: -18vh;
+  left: -10vw;
+  width: 120vw;
+  height: 55vh;
+  background:
+    radial-gradient(40% 60% at 25% 50%, rgb(var(--a1) / 22%), transparent 70%),
+    radial-gradient(35% 55% at 60% 40%, rgb(var(--a2) / 16%), transparent 70%),
+    radial-gradient(30% 50% at 85% 60%, rgb(var(--a3) / 10%), transparent 70%);
+  filter: blur(40px);
+  transform-origin: 50% 0;
+  animation: sv-upage-aurora 24s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes sv-upage-aurora {
+  0% { transform: translate3d(-4vw, 0, 0) scaleY(0.9) skewX(-6deg); }
+  100% { transform: translate3d(5vw, 3vh, 0) scaleY(1.12) skewX(6deg); }
+}
+
+/* Iconos de la página desenfocados (bokeh) que suben muy despacio */
+.sv-upage-icon {
+  position: absolute;
+  left: var(--x);
+  bottom: calc(var(--s) * -1.2);
+  width: var(--s);
+  height: var(--s);
+  opacity: 0;
+  background: radial-gradient(circle at 35% 30%, rgb(var(--light)), rgb(var(--a1)) 60%);
+  mask: var(--icon) center / contain no-repeat;
+  filter: blur(var(--b));
+  animation: sv-upage-icon var(--d) linear var(--delay) infinite;
+  will-change: transform, opacity;
+}
+@keyframes sv-upage-icon {
+  0% { transform: translate3d(0, 0, 0) rotate(var(--r)); opacity: 0; }
+  15% { opacity: var(--o); }
+  75% { opacity: calc(var(--o) * 0.7); }
+  100% { transform: translate3d(0, -115vh, 0) rotate(calc(var(--r) * -1)); opacity: 0; }
+}
+@media (max-width: 767px) {
+  .sv-upage-icon:nth-of-type(odd) { display: none; }
+}
+
+/* Brasas que suben */
+.sv-upage-ember {
+  position: absolute;
+  left: var(--x);
+  bottom: -12px;
+  width: var(--s);
+  height: var(--s);
+  border-radius: 9999px;
+  background: rgb(var(--ember));
+  box-shadow: 0 0 10px 3px rgb(var(--c1) / 80%);
+  opacity: 0;
+  animation: sv-upage-ember var(--d) linear var(--delay) infinite;
+}
+@keyframes sv-upage-ember {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  10% { opacity: 0.95; }
+  60% { opacity: 0.5; }
+  100% { transform: translate3d(var(--drift), -105vh, 0); opacity: 0; }
+}
+
+/* Grano fijo (sin animar) que quita el aspecto de degradado digital. */
+.sv-upage-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.06;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+:root[data-sv-modal-open] .sv-upage-bg *,
+:root[data-sv-sheet-open] .sv-upage-bg * {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-upage-bg * { animation: none !important; }
+  .sv-upage-ember, .sv-upage-icon { display: none; }
+}
+
+/* Cabecera de las páginas de usuario (UserPageHeading.jsx) */
+.sv-upage-eyebrow-line { transform-origin: left center; }
+.sv-upage-heading[data-animate] .sv-upage-eyebrow-line {
+  animation: sv-upage-line-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+@keyframes sv-upage-line-in { from { transform: scaleX(0); } }
+.sv-upage-heading[data-animate] .sv-upage-eyebrow-text {
+  animation: sv-upage-eyebrow-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+}
+@keyframes sv-upage-eyebrow-in { from { opacity: 0; transform: translate3d(-8px, 0, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .sv-upage-heading[data-animate] * { animation: none !important; }
 }

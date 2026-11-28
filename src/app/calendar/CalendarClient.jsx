@@ -1,6 +1,8 @@
 "use client";
 
 
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
+import UserPageHeading from "@/components/ui/UserPageHeading";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   createContext,
@@ -1515,11 +1517,7 @@ export default function CalendarClient({
   return (
     <CardEntryContext.Provider value={entryState}>
     <div className="min-h-screen bg-black text-gray-100 font-sans selection:bg-yellow-500/30 pb-20">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-yellow-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-yellow-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-amber-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
+      <UserPageBackdrop variant="calendar" />
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-2 sm:px-6 lg:px-8 py-6 lg:py-12">
         {/* Header Section */}
@@ -1532,21 +1530,13 @@ export default function CalendarClient({
         >
           {/* Título. Los controles ya no viven aquí: están en la barra fija de
               abajo, que los mantiene a mano al bajar por el listado. */}
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-yellow-500" />
-              <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">
-                ESTRENOS
-              </span>
-            </div>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-              Calendario
-              <span className="text-yellow-500">.</span>
-            </h1>
-            <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-              Consulta las fechas de emisión y próximos estrenos.
-            </p>
-          </div>
+          <UserPageHeading
+            eyebrow="ESTRENOS"
+            title="Calendario"
+            accent="yellow"
+            animate={!isBackNav}
+            description="Consulta las fechas de emisión y próximos estrenos."
+          />
 
         </div>
 

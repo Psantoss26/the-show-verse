@@ -1,5 +1,6 @@
 "use client";
 
+import UserPageBackdrop from "@/components/ui/UserPageBackdrop";
 import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -157,14 +158,9 @@ function cacheProfile(key, profile) {
   }
 }
 
+// Fondo común de las páginas de usuario, variante del Perfil.
 function ProfileBackdrop() {
-  return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
-      <div className="absolute -top-[10%] -left-[5%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-emerald-600/15 blur-[120px] @[640px]/detail-page:blur-[150px]" />
-      <div className="absolute top-[15%] -right-[5%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-emerald-700/20 blur-[120px] @[640px]/detail-page:blur-[150px]" />
-      <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-teal-800/25 blur-[120px] @[640px]/detail-page:blur-[150px]" />
-    </div>
-  );
+  return <UserPageBackdrop variant="profile" />;
 }
 
 function ProfilePendingSurface() {
