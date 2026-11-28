@@ -949,6 +949,7 @@ function DiscoverCard({
           media={image}
           mediaClassName="aspect-video w-[180px] sm:w-[280px] rounded-lg shadow-md"
           className="relative overflow-hidden"
+          surface="card"
         />
       </div>
     );

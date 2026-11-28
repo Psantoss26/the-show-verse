@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Descubrir (vista de lista): las filas toman el mismo fondo que Favoritos y las demás páginas de usuario: degradado suave y sombra, sin borde, algo más claro al pasar el ratón. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Favoritos, Pendientes, Historial, En progreso, Completadas, Continuar viendo y Biblioteca (vista de lista): las filas tienen ahora el mismo fondo que Social, Listas y las listas del perfil: degradado suave y sombra, sin borde, algo más claro al pasar el ratón. Antes eran casi transparentes (gris o negro muy tenue). → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Dashboards (Inicio, Películas y Series): el título de cada sección y la etiqueta con línea de encima ya no vibran al aparecer. Entraban creciendo un poco, y al reescalar la línea fina y las letras pequeñas temblaban; ahora solo se funden mientras la fila sube. → [componentes](docs/frontend/components.md)
 - Listas (vista de lista): las filas dejan el fondo oscuro con borde marcado y pasan al mismo fondo que las filas de lista del perfil y de Social: degradado suave y sombra, sin borde, algo más claro al pasar el ratón. → [páginas](docs/frontend/app-router-pages.md)
