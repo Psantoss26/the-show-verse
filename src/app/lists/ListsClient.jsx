@@ -93,6 +93,7 @@ import { getOwnCardPoster } from "@/lib/artworkApi";
 import useOwnCardPoster, { useOwnCardPostersVersion } from "@/lib/hooks/useOwnCardPoster";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
+import { LIST_ROW_SURFACE, LIST_ROW_SURFACE_HOVER } from "@/lib/ui/listRowSurface";
 
 // ================== UTILS & CACHE ==================
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -1699,7 +1700,7 @@ const ListModeRow = memo(function ListModeRow({
       <ListNavWrapper list={list} className="group block">
         {/* Fondo de las filas de lista del perfil y de Social: degradado
             suave y sombra, sin borde. */}
-        <div className="flex items-center gap-4 rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] p-3 shadow-lg transition hover:from-white/[0.13] hover:to-white/[0.06] sm:gap-5">
+        <div className={`flex items-center gap-4 p-3 sm:gap-5 ${LIST_ROW_SURFACE} ${LIST_ROW_SURFACE_HOVER}`}>
           {/* Ancho = huecos 2:3 del alto interior (3 en el móvil, 5 desde sm).
               Sin fondo ni borde: con menos de cinco títulos no queda caja negra. */}
           <div className="h-[5.5rem] w-[10.75rem] shrink-0 overflow-hidden rounded-lg sm:h-24 sm:w-[19.5rem] lg:h-28 lg:w-[22.75rem]">

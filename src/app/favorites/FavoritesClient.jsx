@@ -1995,6 +1995,7 @@ const FavoriteCard = memo(function FavoriteCard({
           // El tamaño de backdrop de siempre de estas páginas.
           mediaClassName="aspect-video w-[180px] sm:w-[280px] rounded-lg shadow-md"
           className="relative overflow-hidden"
+          surface="card"
         />
       </div>
     );

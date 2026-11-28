@@ -13,6 +13,7 @@ import { videoThumbUrl, videoTypeLabel } from "@/lib/details/videos";
 import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 import { formatRuntime } from "@/lib/tmdb/titleMeta";
 import { useTitleMeta } from "@/lib/tmdb/titleMetaBatch";
+import { LIST_ROW_SURFACE, LIST_ROW_SURFACE_HOVER } from "@/lib/ui/listRowSurface";
 
 const ROW_BASE = "flex items-center rounded-2xl bg-black/15 transition-colors";
 const ROW = `${ROW_BASE} gap-3.5 p-2.5`;
@@ -20,6 +21,7 @@ const LINK_STATES = "hover:bg-white/[0.07] focus-visible:outline focus-visible:o
 const ROW_LINK = `${ROW} ${LINK_STATES}`;
 // Personas y títulos: compacto hasta Full HD; más amplio en monitores grandes.
 const ROW_LINK_LARGE = `${ROW_BASE} gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 ${LINK_STATES}`;
+const ROW_LINK_LARGE_CARD = `flex items-center ${LIST_ROW_SURFACE} ${LIST_ROW_SURFACE_HOVER} gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400`;
 const LARGE_POSTER = "aspect-[2/3] w-16 min-[1920px]:w-20 rounded-xl";
 // Backdrop en lugar del póster: más ancho, con el alto de la fila de póster.
 const BACKDROP_MEDIA = "aspect-video w-[132px] sm:w-[180px] min-[1920px]:w-[220px] rounded-xl";
@@ -110,6 +112,9 @@ export function TitleRow({
   mediaClassName = BACKDROP_MEDIA,
   prefetch,
   className = "",
+  // "card": fondo de las filas de lista de las páginas de usuario
+  // (degradado y sombra) en lugar del negro translúcido de las vistas laterales.
+  surface = "sheet",
 }) {
   const type = item?.media_type === "tv" || mediaType === "tv" ? "tv" : "movie";
   const title = customTitle || item?.title || item?.name || "Sin título";
@@ -178,7 +183,7 @@ export function TitleRow({
           onNavigate?.();
         }
       }}
-      className={`${ROW_LINK_LARGE} ${action ? "pr-14" : ""} ${className}`}
+      className={`${surface === "card" ? ROW_LINK_LARGE_CARD : ROW_LINK_LARGE} ${action ? "pr-14" : ""} ${className}`}
     >
       {media ? (
         <span className={`relative shrink-0 overflow-hidden ${mediaClassName}`}>{media}</span>

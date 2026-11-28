@@ -78,6 +78,7 @@ import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOp
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
 import { useOwnCardImage } from "@/lib/hooks/useOwnCardPoster";
+import { LIST_ROW_SURFACE, LIST_ROW_SURFACE_HOVER } from "@/lib/ui/listRowSurface";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -779,7 +780,7 @@ const ProgressCard = memo(function ProgressCard({
   if (viewMode === "compact") {
     return (
       <motion.div initial={isBackNav ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: isBackNav ? 0 : animDelay, ease: "easeOut" }}>
-        <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className="relative block overflow-hidden rounded-xl [-webkit-tap-highlight-color:transparent] bg-zinc-900/30 transition-colors group hover:bg-zinc-900/60">
+        <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className={`relative block overflow-hidden [-webkit-tap-highlight-color:transparent] group ${LIST_ROW_SURFACE} ${LIST_ROW_SURFACE_HOVER}`}>
           <div className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 ${canDelete ? "pr-12 sm:pr-14" : ""}`}>
             <div data-meta-thumb="" className="w-[var(--meta-thumb,180px)] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               <SmartImage item={item} kind="backdrop" alt={title} />

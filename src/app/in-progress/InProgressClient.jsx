@@ -84,6 +84,7 @@ import { useTitleMetaMap } from "@/lib/tmdb/titleMetaBatch";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
 import { readScoreCache } from "@/lib/userLists/listScoreCache";
 import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
+import { LIST_ROW_SURFACE, LIST_ROW_SURFACE_HOVER } from "@/lib/ui/listRowSurface";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -962,7 +963,7 @@ const InProgressCard = memo(function InProgressCard({
           href={href}
           prefetch={false}
           onClick={onPreviewClick}
-          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden"
+          className={`relative block group overflow-hidden ${LIST_ROW_SURFACE} ${LIST_ROW_SURFACE_HOVER}`}
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
             {/* Backdrop image - same size as History list view */}

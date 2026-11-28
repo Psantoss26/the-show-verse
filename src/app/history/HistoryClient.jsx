@@ -111,6 +111,7 @@ import { useTitleMetaMap } from "@/lib/tmdb/titleMetaBatch";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
 import { readScoreCache } from "@/lib/userLists/listScoreCache";
 import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
+import { LIST_ROW_SURFACE, LIST_ROW_SURFACE_HOVER } from "@/lib/ui/listRowSurface";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -2297,7 +2298,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
     return (
       <div
         ref={ref}
-        className="relative overflow-hidden bg-zinc-900/30 rounded-xl cursor-pointer hover:bg-zinc-900/60 transition-colors group"
+        className={`relative overflow-hidden cursor-pointer group ${LIST_ROW_SURFACE} ${LIST_ROW_SURFACE_HOVER}`}
         data-history-card=""
         data-flip-key={flipKey}
       >
@@ -2315,7 +2316,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
         href={href}
         prefetch
         onClick={onPreviewClick}
-        className="block relative overflow-hidden bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group"
+        className={`block relative overflow-hidden group ${LIST_ROW_SURFACE} ${LIST_ROW_SURFACE_HOVER}`}
       >
         {Content}
       </Link>

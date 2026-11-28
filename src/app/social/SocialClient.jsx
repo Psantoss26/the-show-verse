@@ -92,6 +92,7 @@ import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } 
 import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
 import { activityBackdropTarget, hasActivityBackdropArtwork, isPortraitActivity, isUserActivity } from "@/lib/profile/activityBackdrops";
 import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
+import { LIST_ROW_SURFACE } from "@/lib/ui/listRowSurface";
 
 const PAGE_SIZE = 30;
 const FEED_VACIO = { items: [], hasMore: false, offset: 0, loaded: false, error: "" };
@@ -466,7 +467,7 @@ function EventoResena({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
 
 // Zona de cada registro (eventos y reseñas): el fondo de las filas de las
 // vistas de lista del perfil (ProfileSection), no transparente sobre el fondo.
-const FONDO_FILA = "rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] shadow-lg";
+const FONDO_FILA = LIST_ROW_SURFACE;
 
 // Vistas «Lista con backdrop» y «Lista con póster»: el mismo criterio y tamaño
 // que la Actividad y las listas de las secciones del perfil. Crecen con la

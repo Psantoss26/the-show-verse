@@ -59,6 +59,7 @@ import useCardEntrance from "@/hooks/useCardEntrance";
 import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { estimateUserPageEntranceCount } from "@/lib/ui/entranceFill";
+import { LIST_ROW_SURFACE, LIST_ROW_SURFACE_HOVER } from "@/lib/ui/listRowSurface";
 
 
 // ================== CONSTANTS ==================
@@ -803,7 +804,7 @@ function LibraryMediaCard({
         data-library-card=""
       >
         <article
-          className={`relative flex items-center gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 bg-black/15 rounded-2xl transition-colors group overflow-hidden ${canOpen ? "cursor-pointer hover:bg-white/[0.07]" : ""}`}
+          className={`relative flex items-center gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 ${LIST_ROW_SURFACE} group overflow-hidden ${canOpen ? `cursor-pointer ${LIST_ROW_SURFACE_HOVER}` : ""}`}
           onClick={openItem}
         >
           {/* Como la fila de lista de Favoritos (TitleRow): backdrop 16:9 sin
