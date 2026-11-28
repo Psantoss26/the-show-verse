@@ -3939,16 +3939,16 @@ export default function HistoryClient() {
   );
   // Lo que comparten el panel lateral y la hoja móvil.
   const advancedGroupProps = {
-    yearBounds: advancedYearBounds,
-    genreOptions: advancedGenreOptions,
-    languageOptions: advancedLanguageOptions,
+    // Lo que sale de las fichas de los títulos llega entero: hasta tenerlas
+    // todas, la sección no se pinta (luego entra desplegándose) en vez de
+    // ir creciendo y reordenándose por lotes.
+    yearBounds: titleMetaComplete ? advancedYearBounds : null,
+    genreOptions: titleMetaComplete ? advancedGenreOptions : [],
+    languageOptions: titleMetaComplete ? advancedLanguageOptions : [],
     showWatched: false,
     showWatchTime: true,
     loadingProviders: advancedNeeds.providers && loadingProviders,
     loadingTitleMeta: titleMetaPending,
-    // Todas las secciones a la vez: hasta tener las fichas (idiomas,
-    // géneros…), el panel enseña su esqueleto entero.
-    optionsReady: titleMetaComplete,
   };
 
   const searchFiltered = useMemo(() => {

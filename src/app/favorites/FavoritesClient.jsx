@@ -2874,14 +2874,14 @@ export default function FavoritesClient() {
   const advancedGroupProps = {
     yearBounds: advancedYearBounds,
     genreOptions: advancedGenreOptions,
-    languageOptions: advancedLanguageOptions,
+    // Lo que sale de las fichas de los títulos llega entero: hasta tenerlas
+    // todas, la sección no se pinta (luego entra desplegándose) en vez de
+    // ir creciendo y reordenándose por lotes.
+    languageOptions: titleMetaComplete ? advancedLanguageOptions : [],
     showTrakt: true,
     showLastWatched: true,
     loadingProviders: advancedNeeds.providers && loadingProviders,
     loadingTitleMeta: titleMetaPending,
-    // Todas las secciones a la vez: hasta tener las fichas (idiomas,
-    // géneros…), el panel enseña su esqueleto entero.
-    optionsReady: titleMetaComplete,
   };
 
   const filtered = useMemo(

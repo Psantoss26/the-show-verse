@@ -2750,6 +2750,47 @@ body {
   }
 }
 
+/* Sección de los filtros avanzados que llega después de abrir el panel
+   (LateEnter en AdvancedFilters.jsx): se despliega de alto 0 a su tamaño,
+   también el hueco con la sección siguiente (margin de `space-y-5`), y su
+   contenido entra con un fundido y un leve desplazamiento. La opacidad va en
+   el hijo, no en la caja que cambia de alto. */
+.sv-filter-enter {
+  display: grid;
+  animation: sv-filter-enter-rows 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sv-filter-enter > * {
+  min-height: 0;
+  overflow: clip;
+  overflow-clip-margin: 1rem;
+  animation: sv-filter-enter-fade 260ms 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes sv-filter-enter-rows {
+  from {
+    grid-template-rows: 0fr;
+    margin-block: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+  }
+}
+
+@keyframes sv-filter-enter-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-filter-enter,
+  .sv-filter-enter > * {
+    animation: none;
+  }
+}
+
 /* EL BUSCADOR TAMBIÉN CEDE, PERO SIN DEJAR HUECO. Ocupa el hueco sobrante de
    la fila, así que es lo primero que aprieta a los demás cuando el sitio falta.
 

@@ -11,7 +11,14 @@
 //   - `AdvancedFiltersSheetButton`: el de móvil, en la cabecera de la hoja de
 //     filtros de la página.
 
-import { startTransition, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  startTransition,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   CalendarClock,
   CalendarDays,
@@ -264,43 +271,31 @@ function StepBar({ label, steps, value, onChange, format = (v) => v, anyLabel = 
   );
 }
 
-// Esqueleto del panel ENTERO mientras llegan las fichas de los títulos
-// (idiomas, géneros…): al tenerlas se pintan todas las secciones a la vez, en
-// vez de ir apareciendo grupos y botones con el panel ya abierto. Un solo
-// `animate-pulse` para todo el bloque.
-const SKELETON_GROUPS = [
-  [96, 88, 92, 112],
-  [72, 84, 70, 120, 150, 88, 76, 110, 80, 96],
-  null,
-  [76, 82, 90],
-  [116, 96, 92, 84],
-  null,
-  [92, 104, 92, 110, 100],
-];
-
-function AdvancedFiltersSkeleton() {
+// Secciones que dependen de datos que llegan después (géneros, año, idiomas):
+// el panel se abre con lo que ya hay, sin esqueleto, y la sección que aparece
+// más tarde entra desplegándose (alto y hueco de 0 a su tamaño, contenido con
+// fundido; `.sv-filter-enter` en globals.css). `panelMounted` es un ref que
+// el panel pone a true tras su primer pintado: lo que ya estaba al abrir no
+// se anima.
+function LateEnter({ panelMounted, children }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node || !panelMounted.current) return undefined;
+    node.classList.add("sv-filter-enter");
+    const done = (event) => {
+      if (event.target === node) node.classList.remove("sv-filter-enter");
+    };
+    node.addEventListener("animationend", done);
+    node.addEventListener("animationcancel", done);
+    return () => {
+      node.removeEventListener("animationend", done);
+      node.removeEventListener("animationcancel", done);
+    };
+  }, [panelMounted]);
   return (
-    <div className="space-y-5 animate-pulse" aria-busy="true" aria-label="Cargando filtros">
-      {SKELETON_GROUPS.map((pills, groupIndex) => (
-        <div key={groupIndex}>
-          <div className="mb-2 h-3 w-28 rounded-full bg-white/10" />
-          {pills ? (
-            <div className="flex flex-wrap gap-2">
-              {pills.map((width, index) => (
-                <div key={index} className="h-9 rounded-full bg-white/[0.07]" style={{ width }} />
-              ))}
-            </div>
-          ) : (
-            <div className="pt-1">
-              <div className="mb-3 flex justify-between">
-                <div className="h-3.5 w-20 rounded-full bg-white/10" />
-                <div className="h-6 w-20 rounded-full bg-white/[0.07]" />
-              </div>
-              <div className="h-1.5 rounded-full bg-white/[0.07]" />
-            </div>
-          )}
-        </div>
-      ))}
+    <div ref={ref}>
+      <div>{children}</div>
     </div>
   );
 }
@@ -331,11 +326,12 @@ export function AdvancedFilterGroups({
   loadingProviders = false,
   // Duración y estado esperan a la ficha de cada título.
   loadingTitleMeta = false,
-  // Fichas de los títulos ya recibidas: hasta entonces, esqueleto del panel.
-  optionsReady = true,
   showReset = false,
 }) {
-  if (!optionsReady) return <AdvancedFiltersSkeleton />;
+  const panelMounted = useRef(false);
+  useEffect(() => {
+    panelMounted.current = true;
+  }, []);
   const update = (patch) => onChange({ ...filters, ...patch });
   const toggle = (field, value) => {
     const list = filters[field] || [];
@@ -370,50 +366,56 @@ export function AdvancedFilterGroups({
       ) : null}
 
       {genreOptions.length ? (
-        <SheetOptionGroup label="Géneros" icon={Tag}>
-          {genreOptions.map((genre) => (
-            <SheetOption
-              key={genre.id}
-              active={filters.genres.includes(genre.id)}
-              count={genre.count}
-              onClick={() => toggle("genres", genre.id)}
-            >
-              {genre.label}
-            </SheetOption>
-          ))}
-        </SheetOptionGroup>
+        <LateEnter panelMounted={panelMounted}>
+          <SheetOptionGroup label="Géneros" icon={Tag}>
+            {genreOptions.map((genre) => (
+              <SheetOption
+                key={genre.id}
+                active={filters.genres.includes(genre.id)}
+                count={genre.count}
+                onClick={() => toggle("genres", genre.id)}
+              >
+                {genre.label}
+              </SheetOption>
+            ))}
+          </SheetOptionGroup>
+        </LateEnter>
       ) : null}
 
       {yearBounds && yearBounds[0] < yearBounds[1] ? (
-        <SheetOptionGroup label="Año" icon={CalendarRange} layout="stack">
-          <RangeBar
-            label="Estreno"
-            min={yearBounds[0]}
-            max={yearBounds[1]}
-            value={yearValue}
-            onChange={(yearRange) =>
-              update({
-                yearRange:
-                  yearRange[0] <= yearBounds[0] && yearRange[1] >= yearBounds[1] ? null : yearRange,
-              })
-            }
-          />
-        </SheetOptionGroup>
+        <LateEnter panelMounted={panelMounted}>
+          <SheetOptionGroup label="Año" icon={CalendarRange} layout="stack">
+            <RangeBar
+              label="Estreno"
+              min={yearBounds[0]}
+              max={yearBounds[1]}
+              value={yearValue}
+              onChange={(yearRange) =>
+                update({
+                  yearRange:
+                    yearRange[0] <= yearBounds[0] && yearRange[1] >= yearBounds[1] ? null : yearRange,
+                })
+              }
+            />
+          </SheetOptionGroup>
+        </LateEnter>
       ) : null}
 
       {languageOptions.length > 1 ? (
-        <SheetOptionGroup label="Idioma original" icon={Languages}>
-          {languageOptions.map((language) => (
-            <SheetOption
-              key={language.id}
-              active={filters.originalLanguages.includes(language.id)}
-              count={language.count}
-              onClick={() => toggle("originalLanguages", language.id)}
-            >
-              {language.label}
-            </SheetOption>
-          ))}
-        </SheetOptionGroup>
+        <LateEnter panelMounted={panelMounted}>
+          <SheetOptionGroup label="Idioma original" icon={Languages}>
+            {languageOptions.map((language) => (
+              <SheetOption
+                key={language.id}
+                active={filters.originalLanguages.includes(language.id)}
+                count={language.count}
+                onClick={() => toggle("originalLanguages", language.id)}
+              >
+                {language.label}
+              </SheetOption>
+            ))}
+          </SheetOptionGroup>
+        </LateEnter>
       ) : null}
 
       {showRuntime ? (
