@@ -81,7 +81,7 @@ import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 import PosterImage from "@/components/dashboard/DashboardPosterImage";
 import { getMobileCardsPerRow } from "@/lib/ui/mobileCardsPerRow";
 import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
-import { fadeInUp, scaleIn } from "@/lib/motion/revealVariants";
+import { fadeInUp, titleReveal } from "@/lib/motion/revealVariants";
 import {
   rowSwiperKeySuffix,
   rowSwiperScrollProps,
@@ -2017,7 +2017,7 @@ function ContinueWatchingSection({
     // es `pointer-events-none`: así NO intercepta tarjetas ni hovers (no se
     // "superpone" en interacción); SOLO el enlace del título reactiva el clic.
     <motion.div
-      variants={scaleIn}
+      variants={titleReveal}
       className="relative z-20 mb-5 px-1 sm:px-0 pointer-events-none"
     >
       <SectionEyebrow accent="amber">{isCalendar ? "PRÓXIMOS EPISODIOS" : "CONTINUAR"}</SectionEyebrow>

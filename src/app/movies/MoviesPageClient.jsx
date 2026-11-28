@@ -31,7 +31,7 @@ import {
   DASHBOARD_PREVIEW_REDUCED_TRANSITION,
 } from "@/lib/dashboard/previewTiming";
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
-import { fadeInUp, staggerContainer, scaleIn } from "@/lib/motion/revealVariants";
+import { fadeInUp, staggerContainer, titleReveal } from "@/lib/motion/revealVariants";
 
 // El hero de este dashboard no repite los títulos del hero de Inicio.
 const FEATURED_AVOID_HOME = { avoid: ["home"] };
@@ -1384,7 +1384,7 @@ function Row({
     >
       <motion.div
         {...revealProps}
-        variants={scaleIn}
+        variants={titleReveal}
         className="mb-4 px-1 sm:px-0"
       >
         {labelText && (

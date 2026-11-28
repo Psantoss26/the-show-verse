@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Dashboards (Inicio, Películas y Series): el título de cada sección y la etiqueta con línea de encima ya no vibran al aparecer. Entraban creciendo un poco, y al reescalar la línea fina y las letras pequeñas temblaban; ahora solo se funden mientras la fila sube. → [componentes](docs/frontend/components.md)
 - Listas (vista de lista): las filas dejan el fondo oscuro con borde marcado y pasan al mismo fondo que las filas de lista del perfil y de Social: degradado suave y sombra, sin borde, algo más claro al pasar el ratón. → [páginas](docs/frontend/app-router-pages.md)
 - Social (Siguiendo y Yo): cada registro de la actividad va ahora en su propia zona, con el mismo fondo que las filas de la vista de lista del perfil (degradado suave y sombra), en lugar de quedar transparente sobre el fondo de la página. Las reseñas usan el mismo fondo. → [social y perfiles](docs/features/social-y-perfiles.md)
 - Dashboards (Inicio, Películas y Series): la etiqueta que va encima del título de cada sección (TENDENCIAS, POPULARES, TRAKT…) tiene ahora el mismo estilo que el antetítulo de las páginas de usuario: línea de color más larga que se apaga en degradado hacia el texto, y letra algo mayor y más espaciada. También en Continuar viendo, Calendario y la página de cada sección. → [componentes](docs/frontend/components.md)

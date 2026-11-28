@@ -105,7 +105,7 @@ import {
   preloadImage,
 } from "@/lib/dashboard/media";
 import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
-import { fadeInUp, scaleIn } from "@/lib/motion/revealVariants";
+import { fadeInUp, titleReveal } from "@/lib/motion/revealVariants";
 import {
   rowSwiperKeySuffix,
   rowSwiperScrollProps,
@@ -1564,7 +1564,7 @@ export default function DashboardBackdropRow({
 
   const Header = (
     <motion.div
-      variants={scaleIn}
+      variants={titleReveal}
       className="relative z-20 mb-5 px-1 pointer-events-none sm:px-0"
     >
       {sectionLabel && (

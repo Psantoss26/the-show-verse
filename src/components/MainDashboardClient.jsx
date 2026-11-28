@@ -124,7 +124,7 @@ import {
   fetchBestBackdrop,
   preparePreviewBackdrop,
 } from "@/lib/dashboard/media";
-import { fadeInUp, staggerContainer, scaleIn } from "@/lib/motion/revealVariants";
+import { fadeInUp, staggerContainer, titleReveal } from "@/lib/motion/revealVariants";
 import { CRISP_ZOOM_FILL_STYLE } from "@/lib/ui/crispZoom";
 import {
   rowSwiperKeySuffix,
@@ -2017,14 +2017,14 @@ export function Row({
         variants={fadeInUp}
         className="relative"
       >
-        {/* El título es el MISMO motion.div (variante scaleIn) que en la fila
+        {/* El título es el MISMO motion.div (variante titleReveal) que en la fila
             montada, para que React lo conserve al montar el Swiper. Si aquí
             fuera un div normal, al montar la fila nacería un motion.div hijo
             nuevo; con scroll rápido el padre ya ha disparado `whileInView` y
             framer no propaga la variante a un hijo que llega tarde: el título
             se quedaba oculto (opacidad 0) para siempre. */}
         {!hideTitle && (
-          <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
+          <motion.div variants={titleReveal} className="mb-5 px-1 sm:px-0">
             {labelText && (
               <SectionEyebrow accent={accent}>{labelText}</SectionEyebrow>
             )}
@@ -2113,7 +2113,7 @@ export function Row({
       }`}
     >
       {!hideTitle && (
-        <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
+        <motion.div variants={titleReveal} className="mb-5 px-1 sm:px-0">
           {labelText && (
             <SectionEyebrow accent={accent}>{labelText}</SectionEyebrow>
           )}
@@ -2409,7 +2409,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
       variants={fadeInUp}
       className="relative group"
     >
-      <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
+      <motion.div variants={titleReveal} className="mb-5 px-1 sm:px-0">
         {labelText && (
           <SectionEyebrow accent="emerald">{labelText}</SectionEyebrow>
         )}
@@ -2883,7 +2883,7 @@ function TopRatedHero({
       className="relative group mb-10 sm:mb-14"
     >
       {/* Título de la clasificación mixta */}
-      <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
+      <motion.div variants={titleReveal} className="mb-5 px-1 sm:px-0">
         <SectionEyebrow accent="amber">DESTACADAS</SectionEyebrow>
         <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
           Mejor valoradas<span className="text-amber-500">.</span>
