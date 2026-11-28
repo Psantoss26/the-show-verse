@@ -2984,7 +2984,7 @@ export default function WatchlistClient() {
                       activeColor="blue"
                       groupId="watchlist-header-actions"
                       title="Sincronizar lista"
-                      className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
+                      liquidGlass
                     >
                       <RotateCcw
                         className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
@@ -3009,7 +3009,8 @@ export default function WatchlistClient() {
                       groupId="watchlist-header-actions"
                       title="Cerrar sesión"
                       aria-label="Cerrar sesión"
-                      className="!text-red-400 hover:!text-red-300 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
+                      liquidGlass
+                      className="!text-red-400 hover:!text-red-300"
                     >
                       <LogOut className="w-5 h-5" />
                     </LiquidButton>

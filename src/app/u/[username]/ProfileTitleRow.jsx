@@ -34,7 +34,7 @@ import { buildProfileShareCard } from "@/lib/profile/shareProfile";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 const HEADER_BUTTON_CLASS =
-  "!h-11 !w-11 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15";
+  "!h-11 !w-11 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12";
 const HEADER_ICON_CLASS = "h-[1.375rem] w-[1.375rem] @[640px]/detail-page:h-5 @[640px]/detail-page:w-5";
 const MENU_GAP = 8;
 
@@ -311,6 +311,7 @@ function ActionsMenu({ children, open, onOpenChange, buttonProps }) {
           aria-haspopup="menu"
           aria-expanded={open}
           active={open}
+          liquidGlass
           className={HEADER_BUTTON_CLASS}
           {...buttonProps}
         >
@@ -392,6 +393,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
       activeColor="teal"
       groupId="profile-header-actions"
       title="Configuración"
+      liquidGlass
       className={HEADER_BUTTON_CLASS}
     >
       <Settings className={HEADER_ICON_CLASS} />
@@ -460,6 +462,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
               title="Compartir perfil"
               aria-label="Compartir perfil"
               aria-haspopup="dialog"
+              liquidGlass
               className={HEADER_BUTTON_CLASS}
             >
               <Share2 className={HEADER_ICON_CLASS} />
@@ -471,6 +474,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
               activeColor="green"
               groupId="profile-header-actions"
               title="Sincronizar"
+              liquidGlass
               className={HEADER_BUTTON_CLASS}
             >
               <RotateCcw className={`${HEADER_ICON_CLASS} ${syncing ? "animate-spin" : ""}`} />
@@ -482,6 +486,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
               groupId="profile-header-actions"
               title="Cerrar sesión"
               aria-label="Cerrar sesión"
+              liquidGlass
               className={`${HEADER_BUTTON_CLASS} !text-red-400 hover:!text-red-300`}
             >
               <LogOut className={HEADER_ICON_CLASS} />
@@ -497,6 +502,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
               title="Compartir perfil"
               aria-label="Compartir perfil"
               aria-haspopup="dialog"
+              liquidGlass
               className={HEADER_BUTTON_CLASS}
             >
               <Share2 className={HEADER_ICON_CLASS} />
@@ -512,6 +518,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync, stat
               title={following ? "Siguiendo" : "Seguir"}
               aria-label={following ? "Dejar de seguir" : "Seguir"}
               aria-pressed={following}
+              liquidGlass
               className={`${HEADER_BUTTON_CLASS} ${following ? "!text-emerald-300" : ""}`}
             >
               {following ? <UserCheck className={HEADER_ICON_CLASS} /> : <UserPlus className={HEADER_ICON_CLASS} />}

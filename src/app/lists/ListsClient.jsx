@@ -2770,7 +2770,8 @@ export default function ListsClient({ initialSource = DEFAULT_LISTS_SOURCE }) {
                     activeColor="purple"
                     groupId="lists-header-actions"
                     title="Sincronizar listas"
-                    className="!h-11 !w-11 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15 sm:!h-12 sm:!w-12"
+                    liquidGlass
+                    className="!h-11 !w-11 sm:!h-12 sm:!w-12"
                   >
                     <RefreshCcw className="h-5 w-5" />
                   </LiquidButton>
