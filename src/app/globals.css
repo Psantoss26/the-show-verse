@@ -5864,6 +5864,54 @@ html[data-details-sequence-transition] .sv-topbar {
   100% { transform: translate3d(5vw, 3vh, 0) scaleY(1.12) skewX(6deg); }
 }
 
+/* APP DE ANDROID: el mismo fondo, en movimiento, sin `filter`.
+   Medido 2026-11-28 (carga de Favoritos, perfil de la app, CPU ×4): un
+   elemento con `filter: blur()` que se mueve obliga a repetir el desenfoque
+   EN CADA FOTOGRAMA, y el fondo, al moverse, ensucia la pantalla entera, de
+   modo que también se recalculan los `backdrop-filter` del navbar y de los
+   botones de cristal que tiene encima. Así la entrada del título, los botones y
+   el contenido iba a ~34-40 fps con ~100 fotogramas tarde en 6 s; sin fondo,
+   ~57 fps y 3. Con esto: ~57 fps y ~5, y la diferencia de imagen con el
+   desenfoque real es ≤ 8/255 por píxel (media 0,6).
+   Cómo: el desenfoque de cada mancha (un círculo de radio R con blur σ) se pinta
+   ya hecho como degradado radial en un `::before` más grande (`--blob-spread`)
+   cuyas paradas (`--bp0…7`) son el perfil del círculo convolucionado con la
+   gaussiana: R ≈ σ en el móvil (60vw y 120px) y R ≈ 1,6σ en la tableta (60vw
+   de ~800px y 150px). Siguen moviéndose `transform` y `opacity` del
+   elemento, que el compositor mueve sin repintar. La aurora ya son degradados
+   radiales suaves: basta con quitarle el `filter`. Los iconos (bokeh) conservan
+   su desenfoque: son tres pequeños en el móvil y no cambiaban la medida. */
+html[data-android-app] .sv-upage-bg {
+  --bp0: 0.409; --bp1: 0.38; --bp2: 0.304; --bp3: 0.209; --bp4: 0.123; --bp5: 0.062; --bp6: 0.026; --bp7: 0.009;
+  --blob-spread: -122%;
+}
+@media (min-width: 640px) {
+  html[data-android-app] .sv-upage-bg {
+    --bp0: 0.722; --bp1: 0.676; --bp2: 0.553; --bp3: 0.387; --bp4: 0.229; --bp5: 0.111; --bp6: 0.044; --bp7: 0.014;
+    --blob-spread: -78%;
+  }
+}
+html[data-android-app] .sv-upage-blob { filter: none; background: none; }
+html[data-android-app] .sv-upage-blob--a { --blob: var(--c1); --blob-a: 0.2; }
+html[data-android-app] .sv-upage-blob--b { --blob: var(--a2); --blob-a: 0.18; }
+html[data-android-app] .sv-upage-blob--c { --blob: var(--c3); --blob-a: 0.25; }
+html[data-android-app] .sv-upage-blob::before {
+  content: "";
+  position: absolute;
+  inset: var(--blob-spread);
+  background: radial-gradient(closest-side,
+    rgb(var(--blob) / calc(var(--blob-a) * var(--bp0))) 0%,
+    rgb(var(--blob) / calc(var(--blob-a) * var(--bp1))) 12.5%,
+    rgb(var(--blob) / calc(var(--blob-a) * var(--bp2))) 25%,
+    rgb(var(--blob) / calc(var(--blob-a) * var(--bp3))) 37.5%,
+    rgb(var(--blob) / calc(var(--blob-a) * var(--bp4))) 50%,
+    rgb(var(--blob) / calc(var(--blob-a) * var(--bp5))) 62.5%,
+    rgb(var(--blob) / calc(var(--blob-a) * var(--bp6))) 75%,
+    rgb(var(--blob) / calc(var(--blob-a) * var(--bp7))) 87.5%,
+    transparent 100%);
+}
+html[data-android-app] .sv-upage-aurora { filter: none; }
+
 /* Iconos de la página desenfocados (bokeh) que suben muy despacio */
 .sv-upage-icon {
   position: absolute;
