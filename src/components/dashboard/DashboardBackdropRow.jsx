@@ -12,6 +12,7 @@
 // caché que el resto del dashboard) y los extras/logo/trailer solo se piden al
 // hacer hover, ya que la tarjeta de vista previa se monta en ese momento.
 
+import SectionEyebrow from "@/components/ui/SectionEyebrow";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
 import usePreviewMorph from "@/lib/dashboard/usePreviewMorph";
@@ -118,22 +119,16 @@ const EMPTY_ARRAY = [];
 const BACKDROP_SIZE = PREVIEW_BACKDROP_SIZE;
 const SECTION_ACCENTS = {
   amber: {
-    line: "bg-amber-500",
-    text: "text-amber-400",
     dot: "text-amber-500",
     chevron: "text-amber-400",
     hover: "hover:from-amber-100 hover:via-white hover:to-amber-200",
   },
   sky: {
-    line: "bg-sky-500",
-    text: "text-sky-400",
     dot: "text-sky-400",
     chevron: "text-sky-400",
     hover: "hover:from-sky-100 hover:via-white hover:to-sky-200",
   },
   fuchsia: {
-    line: "bg-fuchsia-500",
-    text: "text-fuchsia-400",
     dot: "text-fuchsia-400",
     chevron: "text-fuchsia-400",
     hover: "hover:from-fuchsia-100 hover:via-white hover:to-fuchsia-200",
@@ -1573,14 +1568,7 @@ export default function DashboardBackdropRow({
       className="relative z-20 mb-5 px-1 pointer-events-none sm:px-0"
     >
       {sectionLabel && (
-        <div className="mb-1.5 flex items-center gap-2">
-          <div className={`h-px w-8 ${sectionAccent.line}`} />
-          <span
-            className={`text-[10px] font-bold uppercase tracking-widest ${sectionAccent.text}`}
-          >
-            {sectionLabel}
-          </span>
-        </div>
+        <SectionEyebrow accent={accent}>{sectionLabel}</SectionEyebrow>
       )}
       {href ? (
         <Link

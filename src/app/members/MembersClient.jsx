@@ -1,5 +1,6 @@
 "use client";
 
+import SectionEyebrow from "@/components/ui/SectionEyebrow";
 import { useEffect, useRef, useState } from "react";
 import { Search, Loader2, Users } from "lucide-react";
 import MemberRow from "@/components/social/MemberRow";
@@ -44,12 +45,7 @@ export default function MembersClient() {
     <div className="min-h-screen bg-black text-zinc-100 pb-24">
       <div className="mx-auto max-w-[720px] px-4 py-8 sm:px-6 lg:py-12">
         <header className="mb-6">
-          <div className="mb-2 flex items-center gap-3">
-            <div className="h-px w-12 bg-emerald-500" />
-            <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">
-              Red social
-            </span>
-          </div>
+          <SectionEyebrow accent="emerald" className="mb-2">Red social</SectionEyebrow>
           <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
             Miembros<span className="text-emerald-500">.</span>
           </h1>

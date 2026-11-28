@@ -1,6 +1,7 @@
 // /src/components/MainDashboardClient.jsx
 "use client";
 
+import SectionEyebrow from "@/components/ui/SectionEyebrow";
 import AdSlot from "@/components/billing/AdSlot";
 import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
@@ -348,36 +349,26 @@ const EXPANDABLE_SECTION_HREFS = {
 
 const SECTION_ACCENTS = {
   amber: {
-    line: "bg-amber-500",
-    text: "text-amber-400",
     dot: "text-amber-500",
     chevron: "text-amber-400",
     hover: "hover:from-amber-100 hover:via-white hover:to-amber-200",
   },
   sky: {
-    line: "bg-sky-500",
-    text: "text-sky-400",
     dot: "text-sky-400",
     chevron: "text-sky-400",
     hover: "hover:from-sky-100 hover:via-white hover:to-sky-200",
   },
   fuchsia: {
-    line: "bg-fuchsia-500",
-    text: "text-fuchsia-400",
     dot: "text-fuchsia-400",
     chevron: "text-fuchsia-400",
     hover: "hover:from-fuchsia-100 hover:via-white hover:to-fuchsia-200",
   },
   purple: {
-    line: "bg-purple-500",
-    text: "text-purple-400",
     dot: "text-purple-400",
     chevron: "text-purple-400",
     hover: "hover:from-purple-100 hover:via-white hover:to-purple-200",
   },
   rose: {
-    line: "bg-rose-500",
-    text: "text-rose-400",
     dot: "text-rose-400",
     chevron: "text-rose-400",
     hover: "hover:from-rose-100 hover:via-white hover:to-rose-200",
@@ -1623,12 +1614,7 @@ const RowWithTimeFilter = memo(function RowWithTimeFilter({
     <div className="relative">
       {/* Título con selector de período */}
       <div className="mb-5 px-1 sm:px-0">
-        <div className="flex items-center gap-2 mb-1.5">
-          <div className="h-px w-8 bg-amber-500" />
-          <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
-            TRAKT
-          </span>
-        </div>
+        <SectionEyebrow accent="amber">TRAKT</SectionEyebrow>
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
             {title}
@@ -1715,12 +1701,9 @@ const RowWithSourceFilter = memo(function RowWithSourceFilter({
     <div className="relative">
       {/* Título con selector de fuente */}
       <div className="mb-5 px-1 sm:px-0">
-        <div className="flex items-center gap-2 mb-1.5">
-          <div className="h-px w-8 bg-amber-500" />
-          <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
-            {effectiveSource === "trakt" ? "TRAKT" : "TMDB"}
-          </span>
-        </div>
+        <SectionEyebrow accent="amber">
+          {effectiveSource === "trakt" ? "TRAKT" : "TMDB"}
+        </SectionEyebrow>
         <div className="flex items-center justify-between gap-4">
           <ExpandableSectionTitle
             title={title}
@@ -2043,14 +2026,7 @@ export function Row({
         {!hideTitle && (
           <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
             {labelText && (
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className={`h-px w-8 ${sectionAccent.line}`} />
-                <span
-                  className={`${sectionAccent.text} font-bold uppercase tracking-widest text-[10px]`}
-                >
-                  {labelText}
-                </span>
-              </div>
+              <SectionEyebrow accent={accent}>{labelText}</SectionEyebrow>
             )}
             <ExpandableSectionTitle
               title={title}
@@ -2139,14 +2115,7 @@ export function Row({
       {!hideTitle && (
         <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
           {labelText && (
-            <div className="flex items-center gap-2 mb-1.5">
-              <div className={`h-px w-8 ${sectionAccent.line}`} />
-              <span
-                className={`${sectionAccent.text} font-bold uppercase tracking-widest text-[10px]`}
-              >
-                {labelText}
-              </span>
-            </div>
+            <SectionEyebrow accent={accent}>{labelText}</SectionEyebrow>
           )}
           <ExpandableSectionTitle
             title={title}
@@ -2442,12 +2411,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
     >
       <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
         {labelText && (
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-px w-8 bg-emerald-500" />
-            <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
-              {labelText}
-            </span>
-          </div>
+          <SectionEyebrow accent="emerald">{labelText}</SectionEyebrow>
         )}
         <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
           {title}
@@ -2578,12 +2542,7 @@ const AnticipatedSection = memo(function AnticipatedSection({
       {/* Título con selector */}
       <div className="flex items-center justify-between mb-5 px-1 sm:px-0">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-px w-8 bg-amber-500" />
-            <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
-              PRÓXIMAMENTE
-            </span>
-          </div>
+          <SectionEyebrow accent="amber">PRÓXIMAMENTE</SectionEyebrow>
           <ExpandableSectionTitle
             title="Más esperadas"
             href={EXPANDABLE_SECTION_HREFS["Más esperadas"]}
@@ -2697,12 +2656,7 @@ const RecommendedSection = memo(function RecommendedSection({
     >
       <div className="flex items-center justify-between mb-5 px-1 sm:px-0">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-px w-8 bg-amber-500" />
-            <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
-              TRAKT
-            </span>
-          </div>
+          <SectionEyebrow accent="amber">TRAKT</SectionEyebrow>
           <ExpandableSectionTitle
             title="Recomendados"
             href={EXPANDABLE_SECTION_HREFS["Recomendados"]}
@@ -2930,12 +2884,7 @@ function TopRatedHero({
     >
       {/* Título de la clasificación mixta */}
       <motion.div variants={scaleIn} className="mb-5 px-1 sm:px-0">
-        <div className="flex items-center gap-2 mb-1.5">
-          <div className="h-px w-8 bg-amber-500" />
-          <span className="text-amber-400 font-bold uppercase tracking-widest text-[10px]">
-            DESTACADAS
-          </span>
-        </div>
+        <SectionEyebrow accent="amber">DESTACADAS</SectionEyebrow>
         <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
           Mejor valoradas<span className="text-amber-500">.</span>
         </h3>

@@ -1,6 +1,7 @@
 // /src/app/series/SeriesPageClient.jsx
 "use client";
 
+import SectionEyebrow from "@/components/ui/SectionEyebrow";
 import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
 import RowNavGlass from "@/components/dashboard/RowNavGlass";
@@ -1258,12 +1259,7 @@ function Row({
       >
         {/* Título para Top 10 móvil con diseño igual a escritorio */}
         <div className="mb-4 px-1 sm:px-0">
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-px w-8 bg-fuchsia-500" />
-            <span className="text-fuchsia-400 font-bold uppercase tracking-widest text-[10px]">
-              TOP 10
-            </span>
-          </div>
+          <SectionEyebrow accent="fuchsia">TOP 10</SectionEyebrow>
           <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
             {title}<span className="text-fuchsia-400">.</span>
           </h3>
@@ -1371,12 +1367,7 @@ function Row({
         className="mb-4 px-1 sm:px-0"
       >
         {labelText && (
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="h-px w-8 bg-fuchsia-500" />
-            <span className="text-fuchsia-400 font-bold uppercase tracking-widest text-[10px]">
-              {labelText}
-            </span>
-          </div>
+          <SectionEyebrow accent="fuchsia">{labelText}</SectionEyebrow>
         )}
         <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent">
           {title}

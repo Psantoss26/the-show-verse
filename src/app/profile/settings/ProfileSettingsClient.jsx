@@ -1,5 +1,6 @@
 "use client";
 
+import SectionEyebrow from "@/components/ui/SectionEyebrow";
 import OnlineOnlyForm from "@/components/OnlineOnlyForm";
 import Link from "next/link";
 import { useServerOnline } from "@/context/ServerStatusContext";
@@ -2407,12 +2408,9 @@ function ProfileSettingsClient() {
             páginas de usuario: mismo relleno superior y fila de «Tu cuenta» de
             16 px de alto. */}
         <header className="mb-6 sm:mb-8">
-          <div className="flex h-4 items-center gap-3 mb-2">
-            <div className="h-px w-10 bg-emerald-500" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 truncate">
-              {t("settings_account", "Tu cuenta")}
-            </span>
-          </div>
+          <SectionEyebrow accent="emerald" className="mb-2 h-4">
+            {t("settings_account", "Tu cuenta")}
+          </SectionEyebrow>
 
           <div className="flex items-center justify-between gap-4">
             <h1 className="text-3xl font-black tracking-tight text-white sm:text-5xl truncate">

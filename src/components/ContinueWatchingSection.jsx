@@ -1,6 +1,7 @@
 // /src/components/ContinueWatchingSection.jsx
 "use client";
 
+import SectionEyebrow from "@/components/ui/SectionEyebrow";
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
 import RowNavGlass, { ROW_NAV_FADE } from "@/components/dashboard/RowNavGlass";
 import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
@@ -2019,12 +2020,7 @@ function ContinueWatchingSection({
       variants={scaleIn}
       className="relative z-20 mb-5 px-1 sm:px-0 pointer-events-none"
     >
-      <div className="mb-1.5 flex items-center gap-2">
-        <div className="h-px w-8 bg-amber-500" />
-        <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
-          {isCalendar ? "PRÓXIMOS EPISODIOS" : "CONTINUAR"}
-        </span>
-      </div>
+      <SectionEyebrow accent="amber">{isCalendar ? "PRÓXIMOS EPISODIOS" : "CONTINUAR"}</SectionEyebrow>
       {/* Mismo indicador de título que el resto de secciones del dashboard
           (ExpandableSectionTitle): flecha tenue, siempre visible, que se aviva
           y avanza al pasar el cursor. El `pointer-events-auto` lo hace

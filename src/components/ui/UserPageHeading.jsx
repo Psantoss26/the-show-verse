@@ -14,20 +14,21 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
+import SectionEyebrow from "./SectionEyebrow";
 
 const MOBILE_QUERY = "(max-width: 767px)";
 
 // `grad`: blanco a la izquierda que pasa al tono claro y acaba en el color de
 // la página; `glow`: halo del mismo color detrás de las letras.
 const ACCENTS = {
-  red: { line: "from-red-500", text: "text-red-400", dot: "text-red-500", grad: "via-red-300 via-30% to-red-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(239,68,68,0.35)]" },
-  blue: { line: "from-blue-500", text: "text-blue-400", dot: "text-blue-500", grad: "via-blue-300 via-30% to-blue-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(59,130,246,0.35)]" },
-  emerald: { line: "from-emerald-500", text: "text-emerald-400", dot: "text-emerald-500", grad: "via-emerald-300 via-30% to-emerald-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(16,185,129,0.35)]" },
-  purple: { line: "from-purple-500", text: "text-purple-400", dot: "text-purple-500", grad: "via-purple-300 via-30% to-purple-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(168,85,247,0.35)]" },
-  pink: { line: "from-pink-500", text: "text-pink-400", dot: "text-pink-500", grad: "via-pink-300 via-30% to-pink-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(236,72,153,0.35)]" },
-  yellow: { line: "from-yellow-500", text: "text-yellow-400", dot: "text-yellow-500", grad: "via-yellow-200 via-30% to-yellow-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(234,179,8,0.35)]" },
-  orange: { line: "from-orange-500", text: "text-orange-400", dot: "text-orange-500", grad: "via-orange-300 via-30% to-orange-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(249,115,22,0.35)]" },
-  amber: { line: "from-amber-500", text: "text-amber-400", dot: "text-amber-500", grad: "via-amber-300 via-30% to-amber-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(245,158,11,0.35)]" },
+  red: { dot: "text-red-500", grad: "via-red-300 via-30% to-red-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(239,68,68,0.35)]" },
+  blue: { dot: "text-blue-500", grad: "via-blue-300 via-30% to-blue-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(59,130,246,0.35)]" },
+  emerald: { dot: "text-emerald-500", grad: "via-emerald-300 via-30% to-emerald-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(16,185,129,0.35)]" },
+  purple: { dot: "text-purple-500", grad: "via-purple-300 via-30% to-purple-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(168,85,247,0.35)]" },
+  pink: { dot: "text-pink-500", grad: "via-pink-300 via-30% to-pink-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(236,72,153,0.35)]" },
+  yellow: { dot: "text-yellow-500", grad: "via-yellow-200 via-30% to-yellow-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(234,179,8,0.35)]" },
+  orange: { dot: "text-orange-500", grad: "via-orange-300 via-30% to-orange-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(249,115,22,0.35)]" },
+  amber: { dot: "text-amber-500", grad: "via-amber-300 via-30% to-amber-500 to-75%", glow: "drop-shadow-[0_0_28px_rgba(245,158,11,0.35)]" },
 };
 
 export default function UserPageHeading({
@@ -95,16 +96,7 @@ export default function UserPageHeading({
       {/* En el móvil el antetítulo se estrecha (línea más corta, menos
           espaciado) y el título crece: con 36 px y 0,28em medían casi lo
           mismo y competían. */}
-      <div className="flex items-center gap-2.5 md:gap-3 mb-1.5 md:mb-2">
-        <span
-          className={`sv-upage-eyebrow-line h-px w-7 md:w-12 bg-gradient-to-r ${a.line} via-current to-transparent ${a.text}`}
-        />
-        <span
-          className={`sv-upage-eyebrow-text ${a.text} font-bold uppercase tracking-[0.16em] md:tracking-[0.28em] text-[11px] md:text-xs`}
-        >
-          {eyebrow}
-        </span>
-      </div>
+      <SectionEyebrow accent={accent}>{eyebrow}</SectionEyebrow>
       <div ref={rowRef} className="flex items-center gap-4 md:gap-6">
         <h1
           ref={titleRef}

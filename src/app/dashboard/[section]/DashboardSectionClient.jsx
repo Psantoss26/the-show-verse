@@ -1,6 +1,7 @@
 "use client";
 
 
+import SectionEyebrow from "@/components/ui/SectionEyebrow";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   useCallback,
@@ -1222,12 +1223,7 @@ export default function DashboardSectionClient({
             <div>
               {/* La misma etiqueta que lleva la sección en el dashboard
                   (TENDENCIAS, POPULARES, PARA TI, ANTICIPADAS…). */}
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-px w-12 bg-amber-500" />
-                <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">
-                  {sectionLabel || "Dashboard"}
-                </span>
-              </div>
+              <SectionEyebrow accent="amber">{sectionLabel || "Dashboard"}</SectionEyebrow>
               <div className="flex items-center gap-6">
                 <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
                   {data?.title || initialTitle || "Sección"}

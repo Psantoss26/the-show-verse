@@ -1,5 +1,6 @@
 "use client";
 
+import SectionEyebrow from "@/components/ui/SectionEyebrow";
 import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 
@@ -1019,12 +1020,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
 
       {/* User text details & Inline actions */}
       <div className="min-w-0 flex-1">
-        <div className="mb-1.5 flex items-center gap-3">
-          <div className="h-px w-10 bg-indigo-500" />
-          <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-indigo-400">
-            Tu cuenta
-          </span>
-        </div>
+        <SectionEyebrow accent="indigo" className="mb-1.5">Tu cuenta</SectionEyebrow>
         <div className="flex flex-wrap items-center gap-3 sm:gap-4 min-w-0">
           <h1 className="min-w-0 truncate text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-none text-white">
             {displayName}
@@ -1739,12 +1735,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8 lg:mb-10"
           >
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-px w-12 bg-emerald-500" />
-              <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">
-                Tu Perfil
-              </span>
-            </div>
+            <SectionEyebrow accent="emerald" className="mb-2">Tu Perfil</SectionEyebrow>
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
               Perfil
               <span className="text-emerald-500">.</span>
