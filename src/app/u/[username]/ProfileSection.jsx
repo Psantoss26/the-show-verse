@@ -1617,6 +1617,9 @@ function ProfilePosterItems({ items, view, showStars, viewerTitleStates, animate
             compactIndicator={view === "compact"}
             hoverExpand={view === "compact"}
             fixedIndicator={fixedIndicator}
+            // Sin píldora fija bajo la tarjeta en móvil/táctil: los estados
+            // solo se ven en el overlay de hover del ordenador.
+            showFixedIndicator={false}
           />
         </ProfileEntrance>
       ))}
