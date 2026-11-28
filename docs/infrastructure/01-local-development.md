@@ -58,6 +58,22 @@ Ajuste: el servidor de Next (`src/instrumentation.js` →
 primero y dan 2,5 s a cada intento. Se aplica al arrancar: tras cambiarlo hay
 que reiniciar `npm run dev`.
 
+## `ReferenceError: require is not defined` en una ruta
+
+Síntoma: tras editar código, una ruta (pasó en `/profile`) devuelve 500 con
+`ReferenceError: require is not defined` en `doRender`, dentro de un chunk
+`node_modules_*.js` de `.next/dev/server/chunks/ssr/`. Las demás rutas van bien.
+
+Causa: el Fast Refresh de servidor de Next 16.2 aplica las actualizaciones con
+un `eval` global del runtime de Turbopack, sin `require`. Si se reevalúa la
+plantilla de la ruta (`next/dist/esm/build/templates/app-page.js`, que hace
+`require('path')`), la ruta queda rota hasta reiniciar.
+
+Ajuste: `next.config.ts` lleva `experimental.turbopackServerFastRefresh: false`,
+así que un cambio de servidor recompila la ruta en vez de inyectarse. Se lee al
+arrancar: tras cambiarlo hay que reiniciar `npm run dev`. Con un servidor ya
+roto, `touch` del `page.jsx` de la ruta también la recompila.
+
 ## Grafo de código con graphify
 
 [graphify](https://github.com/Graphify-Labs/graphify) mapea el repositorio en un

@@ -100,6 +100,16 @@ const nextConfig: NextConfig = {
     // de lo que ocupa se queda intentando liberar en bucle (medido: 1.300 % de
     // CPU constante sin ediciones ni peticiones; sin el tope, 0 % y 2,7 GB).
     turbopackFileSystemCacheForDev: false,
+    // SIN FAST REFRESH DE SERVIDOR EN `next dev`.
+    //
+    // Next 16.2 aplica los cambios del código de servidor con un `(0, eval)` del
+    // runtime de Turbopack, en ámbito global, donde `require` no existe. Si entre
+    // los módulos actualizados cae la plantilla de la ruta (`app-page.js`, que
+    // hace `require('path')`), esa ruta da 500 con «ReferenceError: require is
+    // not defined» hasta reiniciar el servidor (pasó en /profile tras editar
+    // estilos). Sin esto, un cambio de servidor recompila la ruta entera: algo
+    // más lento, pero sin dejarla rota. El navegador sigue con su Fast Refresh.
+    turbopackServerFastRefresh: false,
   },
   images: {
     // Optimización de imágenes de Vercel DESACTIVADA a propósito.
