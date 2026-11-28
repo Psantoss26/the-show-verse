@@ -569,7 +569,7 @@ function CircularProgress({ pct, colors, size = 52, customText }) {
           strokeWidth={strokeWidth}
         />
         {/* Progress arc */}
-        <motion.circle
+        <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
@@ -578,10 +578,12 @@ function CircularProgress({ pct, colors, size = 52, customText }) {
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
-          style={{ filter: `drop-shadow(0 0 4px ${colors.stroke}60)` }}
+          className="sv-progress-ring-fill"
+          style={{
+            strokeDashoffset: offset,
+            "--sv-ring-from": `${circumference}px`,
+            filter: `drop-shadow(0 0 4px ${colors.stroke}60)`,
+          }}
         />
       </svg>
       {/* Center text */}
@@ -609,6 +611,9 @@ function StatCard(props) {
 // Si la nueva llega desde la hermana (aún montada o desmontada hace un
 // instante), su cabecera sale quieta con esas cifras y en el siguiente
 // fotograma las releva, animadas, por las suyas (`animateChanges`).
+// Tarjetas con entrada animada por lista (las demás quedan fuera de pantalla).
+const ENTRY_ANIMATED_CARDS = 24;
+
 const STATS_HANDOFF_MAX_AGE_MS = 1500;
 let lastStatsCards = null; // { tab, cards: [{ value, loading }], leftAt }
 
@@ -630,17 +635,15 @@ function GroupDivider({
   isFirstGroup = false,
 }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  // Se decide al montar (como las tarjetas): al volver atrás, quieto.
+  const isBackNav = useIsHistoryNavigation();
+  const [entryStatic] = useState(() => isBackNav);
 
   return (
-    <motion.div
-      className={
-        isFirstGroup
-          ? "mt-2 mb-4 sm:my-8"
-          : "my-4 sm:my-8"
-      }
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+    <div
+      className={`${isFirstGroup ? "mt-2 mb-4 sm:my-8" : "my-4 sm:my-8"}${
+        entryStatic ? "" : " sv-progress-divider-in"
+      }`}
     >
       <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-xl">
         <div className="relative px-3 sm:px-6 py-2.5 sm:py-5 flex items-center justify-between gap-3 sm:gap-6">
@@ -680,7 +683,7 @@ function GroupDivider({
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -939,16 +942,20 @@ const InProgressCard = memo(function InProgressCard({
 
   const animDelay = Math.min(index * 0.06, 0.5);
   // Al VOLVER (atrás/adelante) la tarjeta se pinta estática, sin animación de entrada.
+  // Entrada en CSS (`.sv-progress-*` en globals.css), no en framer: framer la
+  // movía en JS y en la primera visita de la sesión iba a cámara lenta. Se
+  // decide UNA vez, al montar: si la clase cambiara (refresco en segundo plano,
+  // reordenar), la animación volvería a arrancar. Solo las primeras tarjetas
+  // de cada lista; las de más abajo (fuera de pantalla) salen ya quietas.
   const isBackNav = useIsHistoryNavigation();
+  const [entryAnimated] = useState(() => !isBackNav && index < ENTRY_ANIMATED_CARDS);
+  const enterClass = (name) => (entryAnimated ? ` ${name}` : "");
+  const enterStyle = (delaySec) =>
+    entryAnimated ? { "--sv-enter-delay": `${Math.round(delaySec * 1000)}ms` } : undefined;
 
   if (viewMode === "compact") {
     return (
-      <motion.div
-        initial={isBackNav ? false : { opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
-      >
+      <div className={enterClass("sv-progress-rise").trim() || undefined} style={enterStyle(animDelay)}>
         <Link
           href={href}
           prefetch={false}
@@ -997,21 +1004,15 @@ const InProgressCard = memo(function InProgressCard({
                   16 px), para que quede centrada. */}
               {activeTab !== "completed" && (
               <div className="h-1.5 sm:mr-2 rounded-full bg-zinc-800 overflow-hidden relative">
-                <motion.div
-                  className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden`}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressPct}%` }}
-                  transition={{
-                    duration: 0.8,
-                    delay: animDelay + 0.2,
-                    ease: "easeOut",
-                  }}
+                <div
+                  className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden${enterClass("sv-progress-bar-fill")}`}
+                  style={{ width: `${progressPct}%`, ...enterStyle(animDelay + 0.2) }}
                 >
                   <div
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2s_infinite]"
                     style={{ animationDelay: `${animDelay}s` }}
                   />
-                </motion.div>
+                </div>
               </div>
               )}
 
@@ -1029,19 +1030,14 @@ const InProgressCard = memo(function InProgressCard({
             </div>
           </div>
         </Link>
-      </motion.div>
+      </div>
     );
   }
 
   // ==== POSTER VIEW ====
   if (viewMode === "poster") {
     return (
-      <motion.div
-        initial={isBackNav ? false : { opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
-      >
+      <div className={enterClass("sv-progress-rise").trim() || undefined} style={enterStyle(animDelay)}>
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
           <div className={`relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group rounded-xl overflow-hidden shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]`}>
             {imageMode === "backdrop" ? (
@@ -1083,22 +1079,13 @@ const InProgressCard = memo(function InProgressCard({
             />
           </div>
         ) : null}
-      </motion.div>
+      </div>
     );
   }
 
   // ==== CARDS VIEW (default) ====
   return (
-    <motion.div
-      initial={isBackNav ? false : { opacity: 0, y: 30, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{
-        duration: 0.4,
-        delay: animDelay,
-        ease: [0.25, 0.46, 0.45, 0.94],
-      }}
-    >
+    <div className={enterClass("sv-progress-card-in").trim() || undefined} style={enterStyle(animDelay)}>
       <Link href={href} prefetch={false} onClick={onPreviewClick} className="block group">
         <div
           className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg transition-all duration-300 hover:shadow-xl"
@@ -1180,22 +1167,20 @@ const InProgressCard = memo(function InProgressCard({
                 </span>
               </div>
               <div className="h-2.5 w-full rounded-full bg-zinc-800/80 overflow-hidden relative">
-                <motion.div
-                  className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden`}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressPct}%` }}
-                  transition={{
-                    duration: 1,
-                    delay: animDelay + 0.3,
-                    ease: "easeOut",
+                <div
+                  className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden${enterClass("sv-progress-bar-fill")}`}
+                  style={{
+                    width: `${progressPct}%`,
+                    boxShadow: `0 0 8px ${colors.stroke}40`,
+                    ...enterStyle(animDelay + 0.3),
+                    ...(entryAnimated ? { "--sv-fill-duration": "1000ms" } : null),
                   }}
-                  style={{ boxShadow: `0 0 8px ${colors.stroke}40` }}
                 >
                   <div
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-[shimmer_2s_infinite]"
                     style={{ animationDelay: `${animDelay}s` }}
                   />
-                </motion.div>
+                </div>
               </div>
             </div>
 
@@ -1234,7 +1219,7 @@ const InProgressCard = memo(function InProgressCard({
           </div>
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
 });
 
@@ -2159,12 +2144,7 @@ export default function InProgressClient({
         </div>
 
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
-          <motion.header
-            className="mb-8"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-          >
+          <header className="mb-8 sv-section-header-in">
             <div className="flex items-center gap-3 mb-2">
               <div className="h-px w-12 bg-emerald-500" />
               <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">
@@ -2179,7 +2159,7 @@ export default function InProgressClient({
                 ? "Series que ya has terminado de ver."
                 : "Series que estás viendo actualmente con su progreso."}
             </p>
-          </motion.header>
+          </header>
 
           {/* Sin sesión NO se ofrece el conmutador En progreso / Completadas:
               ambas secciones piden lo mismo —iniciar sesión—, así que cambiar
@@ -2188,10 +2168,8 @@ export default function InProgressClient({
               mientras no hay cuenta. */}
 
           <div className="flex items-center justify-center py-12 lg:py-24">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
+            <div
+              className="sv-progress-rise max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
             >
               <div className="relative mb-4 flex h-24 w-48 items-center justify-center mx-auto">
                 <img
@@ -2217,7 +2195,7 @@ export default function InProgressClient({
               >
                 Iniciar sesión
               </button>
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>
@@ -2235,12 +2213,9 @@ export default function InProgressClient({
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-8 lg:py-12">
         {/* ========== HEADER (same pattern as History, Favorites, Watchlist, Calendar) ========== */}
-        <motion.header
-          className="mb-6 lg:mb-10"
-          initial={staticHeader ? false : { opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={staticHeader ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }}
-        >
+        {/* Entrada en CSS (`.sv-section-*`, `.sv-progress-pop`), no en framer:
+            ver `.sv-progress-*` en globals.css. */}
+        <header className={`mb-6 lg:mb-10${staticHeader ? "" : " sv-section-header-in"}`}>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -2257,10 +2232,9 @@ export default function InProgressClient({
 
                 {/* Action buttons next to title */}
                 <div className="flex items-center gap-2">
-                  <motion.div
-                    initial={staticHeader ? false : { opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={staticHeader ? { duration: 0 } : { duration: 0.4, delay: 0.3 }}
+                  <div
+                    className={staticHeader ? undefined : "sv-progress-pop"}
+                    style={staticHeader ? undefined : { "--sv-enter-delay": "300ms" }}
                   >
                     <LiquidButton
                       onClick={() =>
@@ -2277,12 +2251,11 @@ export default function InProgressClient({
                         className={`w-5 h-5 ${currentLoading || auth.loading ? "animate-spin" : ""}`}
                       />
                     </LiquidButton>
-                  </motion.div>
+                  </div>
 
-                  <motion.div
-                    initial={staticHeader ? false : { opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={staticHeader ? { duration: 0 } : { duration: 0.4, delay: 0.4 }}
+                  <div
+                    className={staticHeader ? undefined : "sv-progress-pop"}
+                    style={staticHeader ? undefined : { "--sv-enter-delay": "400ms" }}
                   >
                     <LiquidButton
                       onClick={() => setShowDisconnectModal(true)}
@@ -2296,7 +2269,7 @@ export default function InProgressClient({
                     >
                       <LogOut className="w-5 h-5" />
                     </LiquidButton>
-                  </motion.div>
+                  </div>
                 </div>
               </div>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
@@ -2307,26 +2280,21 @@ export default function InProgressClient({
             </div>
 
             {/* Stats cards on the right (same as History) */}
-            <motion.div
-              className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
-              initial={staticHeader ? false : { opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={staticHeader ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
+            <div
+              className={`grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end${staticHeader ? "" : " sv-section-stats-in"}`}
             >
               {statCards.map((card, index) => (
-                <motion.div
+                <div
                   key={card.label}
-                  className="w-full min-w-0"
-                  initial={staticHeader ? false : { opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={staticHeader ? { duration: 0 } : { duration: 0.4, delay: 0.5 + index * 0.1 }}
+                  className={`w-full min-w-0${staticHeader ? "" : " sv-section-stat-in"}`}
+                  style={staticHeader ? undefined : { "--sv-enter-delay": `${500 + index * 100}ms` }}
                 >
                   <StatCard {...card} swapIndex={index} />
-                </motion.div>
+                </div>
               ))}
-            </motion.div>
+            </div>
           </div>
-        </motion.header>
+        </header>
 
         {/* ========== FILTERS (same pattern as History) ========== */}
         <motion.div

@@ -1670,6 +1670,87 @@ body {
   animation: sv-section-aside-in 500ms ease-out 400ms backwards;
 }
 
+/* ENTRADA DE EN PROGRESO Y COMPLETADAS (InProgressClient): antes con framer,
+   que anima `y`, `scale` y `width` en JS fotograma a fotograma y limita el
+   avance a 40 ms por fotograma; en la primera visita de la sesión (portadas
+   descargándose y decodificándose, JS compilando) los fotogramas pasaban de
+   ahí y toda la entrada iba a cámara lenta y a saltos, sobre todo en la app
+   de Android. En CSS va en el compositor y dura lo que dice. Mismos tiempos
+   que tenía; el retardo de cada pieza va en `--sv-enter-delay` (inline). */
+@keyframes sv-progress-rise {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+@keyframes sv-progress-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+}
+
+@keyframes sv-progress-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+/* La barra ya tiene su ancho final y entra deslizándose dentro de su pista
+   (`overflow-hidden`): mismo efecto que crecer desde 0 sin relayout. */
+@keyframes sv-progress-bar-fill {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes sv-progress-ring-fill {
+  from {
+    stroke-dashoffset: var(--sv-ring-from);
+  }
+}
+
+.sv-progress-rise {
+  animation: sv-progress-rise 350ms ease-out var(--sv-enter-delay, 0ms)
+    backwards;
+}
+
+.sv-progress-divider-in {
+  animation: sv-progress-rise 400ms ease-out backwards;
+}
+
+.sv-progress-card-in {
+  animation: sv-progress-card-in 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94)
+    var(--sv-enter-delay, 0ms) backwards;
+}
+
+.sv-progress-pop {
+  animation: sv-progress-pop 400ms ease-out var(--sv-enter-delay, 0ms)
+    backwards;
+}
+
+.sv-progress-bar-fill {
+  animation: sv-progress-bar-fill var(--sv-fill-duration, 800ms) ease-out
+    var(--sv-enter-delay, 0ms) backwards;
+}
+
+.sv-progress-ring-fill {
+  animation: sv-progress-ring-fill 1200ms ease-out 300ms backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-progress-rise,
+  .sv-progress-divider-in,
+  .sv-progress-card-in,
+  .sv-progress-pop,
+  .sv-progress-bar-fill,
+  .sv-progress-ring-fill {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sv-section-header-in,
   .sv-section-stats-in,
